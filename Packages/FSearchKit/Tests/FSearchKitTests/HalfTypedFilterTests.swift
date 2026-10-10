@@ -60,3 +60,79 @@ import Testing
         #expect(m.phase == .results, "no error shown while the filter is being typed")
     }
 }
+
+/// Item 29: a value on its way to a valid one is still being typed.
+@Suite struct PartlyTypedValueTests {
+    @Test(arguments: [
+        "foo type:c", "type:co", "type:a", "type:code,", "type:code,im",
+        "kind:fi", "kind:fo", "kind:li", "kind:sym",
+        "size:1mb..", "size:>", "size:<", "size:>=", "size:<=", "mtime:<", "modified:>", "size:1mb.",
+    ])
+    func halfTyped(_ q: String) {
+        #expect(QuerySplit.endsInHalfTypedFilter(q))
+    }
+
+    @Test(arguments: [
+        "type:code", "type:app", "type:code,image", "type:zzz", "type:Code",
+        "kind:d", "kind:f", "kind:file", "kind:xyz",
+        "size:1mb..5mb", "size:>1k", "mtime:<7d", "ext:r", "in:~/D", "path:a.", "type:c ",
+    ])
+    func notHalfTyped(_ q: String) {
+        #expect(!QuerySplit.endsInHalfTypedFilter(q))
+    }
+}
+
+/// Item 28: the wait keeps older rows only while they're for the query being extended.
+@MainActor @Suite struct HalfTypedWaitScopeTests {
+    @Test func replacedQueryClearsInsteadOfWaiting() async {
+        let names = RecordingBackend()
+        let m = SearchModel(names: names, content: RecordingBackend())
+        m.query = "foo"
+        await m.refresh()
+        m.query = "bar size:"  // select-all + paste
+        await m.refresh()
+        #expect(names.calls == ["search foo"], "still nothing sent for a half-typed filter")
+        #expect(m.items.isEmpty && m.phase == .idle)
+        #expect(m.resultsAreCurrent, "the empty list answers it")
+    }
+
+    @Test func modeChangeClearsInsteadOfWaiting() async {
+        let names = RecordingBackend(), content = RecordingBackend()
+        let m = SearchModel(names: names, content: content)
+        m.query = "foo"
+        await m.refresh()
+        m.mode = .content
+        m.query = "foo size:"
+        await m.refresh()
+        #expect(content.calls.isEmpty && m.items.isEmpty && m.phase == .idle, "name rows aren't shown in content mode")
+    }
+
+    @Test func extendingWaitsAndIsNotCurrent() async {
+        let names = RecordingBackend()
+        let m = SearchModel(names: names, content: RecordingBackend())
+        m.query = "foo s"
+        await m.refresh()
+        for q in ["foo si", "foo siz", "foo size:", "foo size:>"] {
+            m.query = q
+            await m.refresh()
+        }
+        #expect(names.calls == ["search foo s", "search foo si", "search foo siz"])
+        #expect(m.items.map(\.path) == ["/r/foo siz"], "the last finished query's rows stay up")
+        #expect(!m.resultsAreCurrent, "they don't answer the half-typed query")
+        m.query = "foo size:>1k"
+        await m.refresh()
+        #expect(names.calls.last == "search foo size:>1k" && m.resultsAreCurrent)
+    }
+
+    @Test func afterAClearFurtherTypingKeepsWaiting() async {
+        let names = RecordingBackend()
+        let m = SearchModel(names: names, content: RecordingBackend())
+        m.query = "foo"
+        await m.refresh()
+        m.query = "bar size:"
+        await m.refresh()
+        m.query = "bar size:>"
+        await m.refresh()
+        #expect(names.calls == ["search foo"] && m.items.isEmpty)
+    }
+}

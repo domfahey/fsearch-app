@@ -39,10 +39,18 @@ import Testing
         #expect(c?.q == "main" && c?.pattern == "needle" && c?.mode == mode)
     }
 
-    @Test func emptyValueIsStillAFilter() {
-        // The daemon's split_once(':') gives ("ext", ""), and filter() takes it.
-        #expect(QuerySplit.split("todo ext:") == ("todo", "ext:"))
-        #expect(QuerySplit.split("in:") == ("", "in:"))
+    @Test func emptyValueIsText() {
+        // A content pattern like `kind: Deployment` or `limit: 10` is text:
+        // sent as a filter it would be a daemon error (or a match-all `path:`).
+        #expect(QuerySplit.split("todo ext:") == ("todo ext:", ""))
+        #expect(QuerySplit.split("in:") == ("in:", ""))
+        #expect(QuerySplit.split(#"in:"""#) == (#"in:"""#, ""), "quotes around nothing are still nothing")
+    }
+
+    @Test(arguments: ["kind: Deployment", "size: 3", "type: module", "limit: 10", "path: str"])
+    func yamlLikeTextIsThePattern(_ text: String) {
+        #expect(QuerySplit.split(text) == (text, ""))
+        #expect(QuerySplit.split("\(text) ext:yaml") == (text, "ext:yaml"))
     }
 
     @Test func keysAreCaseSensitive() {
@@ -84,9 +92,10 @@ import Testing
     @Test func quotedPatternKeepsQuotesAndSpacing() {
         #expect(QuerySplit.split(#""a  b" ext:md  c"#) == (#""a  b"  c"#, "ext:md"))
     }
-    @Test func quotedKeyStillCountsAsAFilter() {
-        // The daemon drops the quotes before looking for `key:`.
-        #expect(QuerySplit.split(#""ext:rs" main"#) == ("main", #""ext:rs""#))
+    @Test func aWordStartingWithAQuoteIsText() {
+        // Quoting is how to search for filter-looking text.
+        #expect(QuerySplit.split(#""ext:rs" main"#) == (#""ext:rs" main"#, ""))
+        #expect(QuerySplit.split(#""kind: Deployment""#) == (#""kind: Deployment""#, ""))
     }
     @Test func unclosedQuoteRunsToTheEnd() {
         #expect(QuerySplit.split(#"in:"~/My Stuff todo"#) == ("", #"in:"~/My Stuff todo"#))
@@ -133,7 +142,7 @@ import Testing
 @Suite struct QuerySyntaxTests {
     @Test func cheatSheetListsTheFilters() {
         let text = QuerySyntax.cheatSheet.map(\.syntax).joined(separator: " ")
-        for key in ["ext:", "in:", "type:", "kind:", "size:", "mtime:", "path:", "re:", "\""] {
+        for key in ["ext:", "in:", "type:", "kind:", "size:", "mtime:", "path:", "re:", "limit:", "\""] {
             #expect(text.contains(key), "cheat sheet mentions \(key)")
         }
         #expect(QuerySyntax.cheatSheet.allSatisfy { !$0.meaning.isEmpty })
@@ -142,5 +151,28 @@ import Testing
         #expect(QuerySyntax.isCheatSheet("?"))
         #expect(!QuerySyntax.isCheatSheet("a?"))
         #expect(!QuerySyntax.isCheatSheet(""))
+    }
+}
+
+/// What reaches the daemon for filter-looking text in content and symbol searches.
+@MainActor @Suite struct ContentModeFilterWordTests {
+    @Test(arguments: [SearchMode.content, .symbols])
+    func bareKeyIsSentAsPattern(mode: SearchMode) async {
+        let content = RecordingBackend()
+        let m = SearchModel(names: RecordingBackend(), content: content)
+        m.mode = mode
+        m.query = "kind: Deployment ext:yaml"
+        await m.refresh()
+        let grepMode = mode == .symbols ? "symbol" : "literal"
+        #expect(content.calls == ["grep ext:yaml|kind: Deployment|\(grepMode)"])
+    }
+
+    @Test func emptyPathIsNotAMatchAllFilter() async {
+        let content = RecordingBackend()
+        let m = SearchModel(names: RecordingBackend(), content: content)
+        m.mode = .content
+        m.query = "path: str"
+        await m.refresh()
+        #expect(content.calls == ["grep |path: str|literal"])
     }
 }

@@ -12,7 +12,8 @@ public enum GrepMode: String, Sendable {
 
 /// One request to the daemon. Name search is the default op.
 public enum Request: Sendable {
-    /// Search file names.
+    /// Search file names. `limit` is left out of the JSON when `q` has its
+    /// own `limit:` word, which the daemon would otherwise override.
     case search(q: String, limit: Int)
     /// Search inside files; `budgetMs` caps the daemon's time.
     case grep(q: String, pattern: String, mode: GrepMode, budgetMs: Int)
@@ -31,7 +32,10 @@ public enum Request: Sendable {
     public func json(id: Int) -> Data {
         var o: [String: Any] = ["id": id]
         switch self {
-        case let .search(q, limit): o["q"] = q; o["limit"] = limit
+        case let .search(q, limit):
+            o["q"] = q
+            // The daemon applies JSON fields after `q`: a JSON limit would override a typed `limit:`.
+            if !QuerySplit.hasLimitWord(q) { o["limit"] = limit }
         case let .grep(q, pattern, mode, budget):
             o["op"] = "grep"; o["q"] = q; o["pattern"] = pattern; o["mode"] = mode.rawValue; o["budget_ms"] = budget
         case .status: o["op"] = "status"

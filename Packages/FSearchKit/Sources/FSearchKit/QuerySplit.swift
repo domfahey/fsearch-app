@@ -1,7 +1,9 @@
 /// Content queries: the typed text is the pattern, except fsearch filters
-/// (`ext:rs`, `in:~/x`, `mtime:<7d`), which narrow the files searched. As in
-/// the daemon, a known key with an empty value (`ext:`) is still a filter, and
-/// keys match case-sensitively.
+/// (`ext:rs`, `in:~/x`, `mtime:<7d`), which narrow the files searched. Keys
+/// match case-sensitively, as in the daemon. Unlike the daemon, a word is a
+/// filter only when it has a value: a bare key (`kind: Deployment`,
+/// `limit: 10`) and a word that starts with a quote (`"ext:rs"`) are text,
+/// since sent as filters they'd be daemon errors or a match-all `path:`.
 /// Sending the text as `grep:...` instead would turn a second word into a
 /// name filter.
 ///
@@ -67,14 +69,38 @@ public enum QuerySplit {
         return found.map { (rest.joined(separator: " "), $0.0, $0.1) }
     }
 
+    /// True if the daemon will read a `limit:` word in the query (quotes
+    /// dropped, as it does), whatever its value.
+    ///
+    /// - Parameter query: The typed text.
+    public static func hasLimitWord(_ query: String) -> Bool {
+        words(query).contains { unquoted($0).hasPrefix("limit:") }
+    }
+
+    /// The typed `limit:` value (the last one wins, as in the daemon), or nil
+    /// when there is none or it isn't a number.
+    ///
+    /// - Parameter query: The typed text.
+    public static func limit(_ query: String) -> Int? {
+        guard let last = words(query).map(unquoted).last(where: { $0.hasPrefix("limit:") }) else { return nil }
+        return Int(last.dropFirst("limit:".count))
+    }
+
     /// True if the query has a content key, so a name search would get lines back.
     ///
     /// - Parameter query: The typed text.
     public static func hasContentKey(_ query: String) -> Bool { contentSearch(query) != nil }
 
-    /// True while the last word is a filter key with nothing after the colon
-    /// and no space typed since (`foo size:`): the user is still typing the
-    /// value, and the daemon would answer with an error (or match nothing).
+    /// The daemon's `type:` values (query.rs `TYPES`, plus `app`).
+    static let typeValues: Set<String> = ["code", "doc", "image", "video", "audio", "archive", "font", "app"]
+    /// The daemon's `kind:` values.
+    static let kindValues: Set<String> = ["file", "f", "dir", "folder", "d", "link", "symlink", "l"]
+
+    /// True while the last word, with no space typed since, is a filter whose
+    /// value is still being typed: nothing after the colon (`foo size:`), a
+    /// strict prefix of a `type:`/`kind:` value (`type:c`, `kind:fi`, or after
+    /// a comma: `type:code,`), or a range cut short (`size:1mb..`, `size:>`,
+    /// `mtime:<`). The daemon would answer with an error, or match nothing.
     ///
     /// The half-typed rule keeps the previous results on screen instead of flashing an error.
     ///
@@ -82,8 +108,21 @@ public enum QuerySplit {
     public static func endsInHalfTypedFilter(_ query: String) -> Bool {
         guard let last = words(query).last, query.last != " " else { return false }
         let plain = unquoted(last)
-        guard let colon = plain.firstIndex(of: ":"), plain.index(after: colon) == plain.endIndex else { return false }
-        return keys.contains(String(plain[..<colon]))
+        guard let colon = plain.firstIndex(of: ":") else { return false }
+        let key = String(plain[..<colon]), value = String(plain[plain.index(after: colon)...])
+        guard keys.contains(key) else { return false }
+        if value.isEmpty { return true }
+        switch key {
+        case "type": return isStrictPrefix(String(value.split(separator: ",", omittingEmptySubsequences: false).last ?? ""), of: typeValues)
+        case "kind": return isStrictPrefix(value, of: kindValues)
+        case "size", "mtime", "modified": return [".", "<", ">", "="].contains { value.hasSuffix($0) }
+        default: return false
+        }
+    }
+
+    /// `s` starts some value but isn't one yet.
+    private static func isStrictPrefix(_ s: String, of values: Set<String>) -> Bool {
+        !values.contains(s) && values.contains { $0.hasPrefix(s) }
     }
 
     /// Each word with the spaces typed before it.
@@ -101,10 +140,10 @@ public enum QuerySplit {
         return out
     }
 
-    /// Whether a word is `key:value` with a known filter key (an empty value still counts).
+    /// `key:value` with a known key, no quote before the colon, and a value
+    /// that isn't empty once its quotes are dropped.
     private static func isFilter(_ word: String) -> Bool {
-        let plain = unquoted(word)
-        guard let colon = plain.firstIndex(of: ":") else { return false }
-        return keys.contains(String(plain[..<colon]))
+        guard let colon = word.firstIndex(of: ":"), keys.contains(String(word[..<colon])) else { return false }
+        return !unquoted(String(word[word.index(after: colon)...])).isEmpty
     }
 }

@@ -8,7 +8,7 @@ public protocol SearchBackend: Sendable {
     ///
     /// - Parameters:
     ///   - q: The query, filters included.
-    ///   - limit: The most hits to return.
+    ///   - limit: The most hits to return; a `limit:` word in `q` overrides it.
     /// - Returns: The ranked hits.
     func search(_ q: String, limit: Int) async throws -> SearchReply
     /// Searches inside files.
