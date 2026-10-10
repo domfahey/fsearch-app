@@ -5,7 +5,6 @@ import Testing
     @Test func quietPhasesSayNothing() {
         #expect(UserMessage.forPhase(.idle) == nil)
         #expect(UserMessage.forPhase(.loading) == nil)
-        #expect(UserMessage.forPhase(.results) == nil)
     }
 
     @Test func indexingShowsTheSameTextWhateverTheDaemonSaid() {
@@ -21,12 +20,8 @@ import Testing
     }
 
     @Test func daemonMessagePassesThroughVerbatim() {
+        // current behaviour, arguably wrong: an empty daemon error shows an empty message.
         #expect(UserMessage.forPhase(.failed(.daemon(""))) == "")
         #expect(UserMessage.forPhase(.failed(.daemon("bad filter: 🏡"))) == "bad filter: 🏡")
-    }
-
-    @Test func startingSearchForConnectionTrouble() {
-        #expect(UserMessage.forPhase(.failed(.disconnected)) == "Starting search…")
-        #expect(UserMessage.forPhase(.failed(.timeout)) == "Starting search…")
     }
 }

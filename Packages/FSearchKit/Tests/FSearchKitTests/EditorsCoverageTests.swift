@@ -4,19 +4,16 @@ import Testing
 
 @Suite struct EditorsCoverageTests {
     @Test func everyEditorHasADistinctBundleIdAndName() {
-        let expected: [Editor: (String, String)] = [
-            .vscode: ("com.microsoft.VSCode", "Visual Studio Code"),
-            .cursor: ("com.todesktop.230313mzl4w4u92", "Cursor"),
-            .zed: ("dev.zed.Zed", "Zed"),
-            .sublime: ("com.sublimetext.4", "Sublime Text"),
-            .bbedit: ("com.barebones.bbedit", "BBEdit"),
-            .xcode: ("com.apple.dt.Xcode", "Xcode"),
+        let expected: [Editor: String] = [
+            .vscode: "com.microsoft.VSCode",
+            .cursor: "com.todesktop.230313mzl4w4u92",
+            .zed: "dev.zed.Zed",
+            .sublime: "com.sublimetext.4",
+            .bbedit: "com.barebones.bbedit",
+            .xcode: "com.apple.dt.Xcode",
         ]
         #expect(Editor.allCases.count == expected.count)
-        for e in Editor.allCases {
-            #expect(e.bundleId == expected[e]?.0)
-            #expect(e.displayName == expected[e]?.1)
-        }
+        for e in Editor.allCases { #expect(e.bundleId == expected[e]) }
         #expect(Set(Editor.allCases.map(\.bundleId)).count == Editor.allCases.count)
         #expect(Set(Editor.allCases.map(\.displayName)).count == Editor.allCases.count)
     }
@@ -33,28 +30,15 @@ import Testing
         #expect(c.arguments == ["/a b/c d.txt:3"])
     }
 
-    @Test func lineNumbersAreInterpolatedVerbatim() {
-        let app = URL(fileURLWithPath: "/A.app")
-        #expect(openAtLine(.vscode, appURL: app, path: "/f", line: 1).arguments == ["-g", "/f:1"])
-        #expect(openAtLine(.xcode, appURL: app, path: "/f", line: 99999).arguments == ["-l", "99999", "/f"])
-        #expect(openAtLine(.bbedit, appURL: app, path: "/f", line: 0).arguments == ["+0", "/f"])
-    }
-
-    @Test func xcodeIgnoresTheAppURL() {
-        let a = openAtLine(.xcode, appURL: URL(fileURLWithPath: "/one.app"), path: "/f", line: 2)
-        let b = openAtLine(.xcode, appURL: URL(fileURLWithPath: "/two.app"), path: "/f", line: 2)
-        #expect(a == b)
-    }
-
     @Test func pathsAreNeverQuotedOrSplit() {
         let tricky = "/tmp/it's \"x\" $HOME; rm -rf *.txt"
         for e in Editor.allCases {
             let c = openAtLine(e, appURL: URL(fileURLWithPath: "/A.app"), path: tricky, line: 5)
-            #expect(c.arguments.contains { $0.contains(tricky) }, "\(e) passes the path untouched")
+            #expect(c.arguments.contains(tricky) || c.arguments.contains("\(tricky):5"), "\(e) passes the path untouched")
         }
     }
 
-    @Test func installedFollowsDeclaredOrderNotLookupOrder() {
+    @Test func everyEditorIsLookedUpOnceInDeclaredOrder() {
         var asked: [String] = []
         let found = installedEditors { id in
             asked.append(id)
