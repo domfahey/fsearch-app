@@ -13,6 +13,8 @@ targets:
     sources: [App]
     settings:
       base:
+        SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
+        GCC_TREAT_WARNINGS_AS_ERRORS: YES
         PRODUCT_BUNDLE_IDENTIFIER: com.domfahey.fsearch
         INFOPLIST_FILE: App/Resources/Info.plist
         CODE_SIGN_ENTITLEMENTS: App/Resources/FSearch.entitlements
@@ -57,6 +59,8 @@ targets:
     sources: [AppUITests]
     settings:
       base:
+        SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
+        GCC_TREAT_WARNINGS_AS_ERRORS: YES
         GENERATE_INFOPLIST_FILE: YES
         SWIFT_VERSION: "6.0"
         CODE_SIGN_IDENTITY: "-"
@@ -68,6 +72,8 @@ targets:
     sources: [AppTests]
     settings:
       base:
+        SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
+        GCC_TREAT_WARNINGS_AS_ERRORS: YES
         GENERATE_INFOPLIST_FILE: YES
         SWIFT_VERSION: "6.0"
         CODE_SIGN_IDENTITY: "-"

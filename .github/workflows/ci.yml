@@ -36,6 +36,8 @@ jobs:
           toolchain: stable
           targets: aarch64-apple-darwin,x86_64-apple-darwin
       - run: scripts/build-daemon.sh
+      - run: swift build --build-tests -Xswiftc -warnings-as-errors
+        working-directory: Packages/FSearchKit
       - run: swift test
         working-directory: Packages/FSearchKit
 

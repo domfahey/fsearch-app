@@ -12,7 +12,7 @@ Follow-ups not done yet, grouped by priority. "You" items need the maintainer: a
 - [x] **"Report an Issue…" menu item:** opens a new GitHub issue pre-filled with the app version, macOS version, chip and daemon status, for the user to review. Nothing is sent automatically.
 - [x] **Use the faster PanelRows in the panel:** FSearchKit now builds `PanelRows(files:query:mode:)` once per query (about 103 µs down to 1.8 µs for 50 rows); SearchView still calls the old static functions per row. Build it once per refresh.
 - [ ] **Coverage gate in CI:** fail below 90% (FSearchKit and app), and post a report on each pull request. Uses the app-coverage script.
-- [ ] **Warnings as errors for our targets only:** set `SWIFT_TREAT_WARNINGS_AS_ERRORS` in project.yml for FSearch and the test targets (a command-line flag breaks KeyboardShortcuts). The two UI-test concurrency warnings must be gone first.
+- [x] **Warnings as errors for our targets only:** set `SWIFT_TREAT_WARNINGS_AS_ERRORS` in project.yml for FSearch and the test targets (a command-line flag breaks KeyboardShortcuts). The two UI-test concurrency warnings must be gone first.
 - [x] **Apply formatting:** run `make format` repo-wide in one commit with no other changes (259 style-only issues), then remove `continue-on-error` from the CI swift-format step.
 - [x] **docs/architecture.md:** describes AppTests, the seams, the UI tests and coverage.
 - [x] **Help menu:** README, docs index, keyboard shortcuts, query syntax, changelog.
