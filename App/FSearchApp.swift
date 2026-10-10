@@ -7,6 +7,7 @@ struct FSearchApp: App {
     init() {
         let state = AppState()
         _app = StateObject(wrappedValue: state)
+        Updater.start()
         DispatchQueue.main.async {
             PanelController.shared.install(app: state)
             OnboardingLauncher.launch(app: state)
@@ -42,6 +43,7 @@ struct MenuContent: View {
         }
         FinishSetupMenuItem(app: app)
         SettingsLink { Text("Settings…") }
+        CheckForUpdatesItem()
         Button("Quit FSearch") { NSApp.terminate(nil) }
     }
 }

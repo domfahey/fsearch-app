@@ -1,0 +1,95 @@
+name: CI
+on:
+  push:
+    branches: [main, v1]
+    tags: ['v*']
+  pull_request:
+
+permissions:
+  contents: read
+
+# Actions are pinned to full commit SHAs; the comment names the version.
+# UI tests (AppUITests) are not run here: they need a logged-in GUI session and
+# accessibility permission that hosted runners don't grant reliably. Run locally.
+jobs:
+  kit:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master, 2026-09-12 (merge of #185)
+        with:
+          toolchain: stable
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - run: scripts/build-daemon.sh
+      - run: swift test
+        working-directory: Packages/FSearchKit
+
+  app:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master, 2026-09-12 (merge of #185)
+        with:
+          toolchain: stable
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - run: brew install xcodegen
+      - run: scripts/build-daemon.sh
+      - run: xcodegen generate
+      - run: >
+          xcodebuild -project FSearch.xcodeproj -scheme FSearch -configuration Debug
+          -derivedDataPath build CODE_SIGN_IDENTITY=- build
+
+  release:
+    # Only on version tags. Secrets are referenced by name; none live in the repo.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [kit, app]
+    runs-on: macos-15
+    env:
+      DEVELOPER_ID: ${{ secrets.DEVELOPER_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master, 2026-09-12 (merge of #185)
+        with:
+          toolchain: stable
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - run: brew install xcodegen
+      - name: Import signing certificate
+        env:
+          CERT_P12_BASE64: ${{ secrets.DEVELOPER_ID_CERT_P12_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERT_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/build.keychain-db"
+          echo "KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
+          umask 077
+          echo "$CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/cert.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          # Add to the user search list (keeping the existing ones) and make it default.
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          security default-keychain -d user -s "$KEYCHAIN"
+      - name: Store notary credentials (App Store Connect API key)
+        env:
+          NOTARY_KEY_P8_BASE64: ${{ secrets.NOTARY_API_KEY_P8_BASE64 }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_API_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_API_ISSUER_ID }}
+        run: |
+          umask 077
+          KEYFILE="$RUNNER_TEMP/notary-key.p8"
+          trap 'rm -f "$KEYFILE"' EXIT
+          echo "$NOTARY_KEY_P8_BASE64" | base64 --decode > "$KEYFILE"
+          xcrun notarytool store-credentials fsearch-notary \
+            --key "$KEYFILE" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" \
+            --keychain "$KEYCHAIN"
+      - run: scripts/release.sh
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: FSearch-dmg
+          path: build/release/*.dmg
+      - name: Delete signing keychain
+        if: always()
+        run: security delete-keychain "$KEYCHAIN" || true
