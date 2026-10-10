@@ -42,24 +42,33 @@ final class LineSocket {
     /// and fails with `.disconnected` (the daemon restarted or dropped it) is
     /// re-dialled once and the line resent. Timeouts are not retried, and a fresh
     /// dial is never retried.
-    func roundTrip(_ line: Data) throws -> Data {
+    ///
+    /// `accepts` judges each line read: a rejected one (a stale reply) is dropped and
+    /// the next line is read, all within one `timeout` deadline. A call that only ever
+    /// sees rejected lines fails with `.timeout` and closes the connection.
+    func roundTrip(_ line: Data, accepts: (Data) -> Bool = { _ in true }) throws -> Data {
         let reused = fd >= 0
         do {
-            return try exchange(line)
+            return try exchange(line, accepts)
         } catch DaemonError.disconnected where reused {
-            return try exchange(line)
+            return try exchange(line, accepts)
         }
     }
 
     /// One attempt. Any failure closes the connection, so the next attempt dials again.
-    private func exchange(_ line: Data) throws -> Data {
+    private func exchange(_ line: Data, _ accepts: (Data) -> Bool) throws -> Data {
         do {
             try connectIfNeeded()
             var out = line
             out.append(UInt8(ascii: "\n"))
             let sent = out.withUnsafeBytes { write(fd, $0.baseAddress, out.count) }
             guard sent == out.count else { throw DaemonError.disconnected }
-            return try readLine()
+            let deadline = Date().addingTimeInterval(timeout)
+            while true {
+                let reply = try readLine()
+                if accepts(reply) { return reply }
+                if Date() >= deadline { throw DaemonError.timeout }
+            }
         } catch {
             close()
             throw error

@@ -85,20 +85,6 @@ private func waitUntilStarted(_ b: some StartSignal) async throws {
         #expect(m.phase == .results && m.lastTookUs == 9)
     }
 
-    @Test func latestWins() async {
-        let b = ScriptedBackend()
-        b.delays = ["m": 0.3, "ma": 0.2, "mai": 0.1, "main": 0]
-        let m = SearchModel(names: b, content: ScriptedBackend())
-        await withTaskGroup(of: Void.self) { g in
-            for q in ["m", "ma", "mai", "main"] {
-                m.query = q
-                g.addTask { await m.refresh() }
-                try? await Task.sleep(for: .milliseconds(5))
-            }
-        }
-        #expect(m.items.map(\.path) == ["/r/main"], "slower answers to older queries are dropped")
-    }
-
     @Test func contentModeSplitsFilters() async {
         let m = SearchModel(names: ScriptedBackend(), content: ScriptedBackend())
         m.mode = .content
@@ -110,12 +96,17 @@ private func waitUntilStarted(_ b: some StartSignal) async throws {
     }
 
     @Test func symbolsModeUsesSymbolGrep() async {
-        let m = SearchModel(names: ScriptedBackend(), content: ScriptedBackend())
+        let names = RecordingBackend(), content = RecordingBackend()
+        let m = SearchModel(names: names, content: content)
+        var log: [SearchModel.LogEntry] = []
+        m.onSearched = { log.append($0) }
         m.mode = .symbols
-        m.query = "apply_dir"
+        m.query = "applyDir ext:rs"
         await m.refresh()
-        guard case let .line(_, match) = m.items.first else { Issue.record("no line result"); return }
-        #expect(match.text.hasSuffix("|symbol"))
+        #expect(names.calls.isEmpty)
+        #expect(content.calls == ["grep ext:rs|applyDir|symbol"])
+        #expect(log.first?.mode == .symbols && log.first?.resultCount == 1)
+        #expect(m.items == [.line(path: "/r/g.txt", match: Match(line: 1, text: "x"))])
     }
 
     @Test func emptyQueryIsIdle() async {
@@ -127,18 +118,22 @@ private func waitUntilStarted(_ b: some StartSignal) async throws {
 
     @Test func indexingIsItsOwnPhase() async {
         let b = ScriptedBackend()
-        b.fail = .indexing("indexing (first run scans the whole disk, ~20s)")
         let m = SearchModel(names: b, content: ScriptedBackend())
         m.query = "x"
         await m.refresh()
-        #expect(m.phase == .indexing)
+        #expect(!m.items.isEmpty, "results to clear")
+        b.fail = .indexing("indexing (first run scans the whole disk, ~20s)")
+        await m.refresh()
+        #expect(m.phase == .indexing && m.items.isEmpty)
     }
 
     @Test func errorsAreKeptAndResultsCleared() async {
         let b = ScriptedBackend()
-        b.fail = .daemon("unknown type dir")
         let m = SearchModel(names: b, content: ScriptedBackend())
         m.query = "type:dir x"
+        await m.refresh()
+        #expect(!m.items.isEmpty, "results to clear")
+        b.fail = .daemon("unknown type dir")
         await m.refresh()
         #expect(m.phase == .failed(.daemon("unknown type dir")) && m.items.isEmpty)
     }
@@ -166,7 +161,7 @@ private func waitUntilStarted(_ b: some StartSignal) async throws {
         await m.refresh()
         await first.value
         #expect(b.cancelled, "the superseded call was cancelled")
-        #expect(Date().timeIntervalSince(t0) < 2, "a hung daemon costs no timeout")
+        #expect(Date().timeIntervalSince(t0) < 2, "a hung daemon costs one timeout, not one per keystroke")
         #expect(m.items.map(\.path) == ["/r/fast"] && m.phase == .results)
         #expect(log.map(\.query) == ["fast"], "only the newest search is reported")
     }
@@ -174,14 +169,18 @@ private func waitUntilStarted(_ b: some StartSignal) async throws {
     @Test func emptyQueryCancelsInFlight() async throws {
         let b = HangingBackend(hangingQuery: "slow")
         let m = SearchModel(names: b, content: ScriptedBackend())
+        var log: [SearchModel.LogEntry] = []
+        m.onSearched = { log.append($0) }
         m.query = "slow"
         let first = Task { await m.refresh() }
         try await waitUntilStarted(b)
+        #expect(b.started)
         m.query = ""
         await m.refresh()
         await first.value
         #expect(b.cancelled, "clearing the query cancels the search in flight")
         #expect(m.phase == .idle && m.items.isEmpty)
+        #expect(log.isEmpty, "the cancelled search is neither shown nor logged")
     }
 
     @Test func staleReplyIsDropped() async throws {
@@ -209,7 +208,7 @@ final class RecordingBackend: SearchBackend, @unchecked Sendable {
     func search(_ q: String, limit: Int) async throws -> SearchReply {
         lock.withLock { _calls.append("search \(q)") }
         if throwOther { throw CocoaError(.fileReadUnknown) }
-        return SearchReply(tookUs: 1, hits: [])
+        return SearchReply(tookUs: 1, hits: [Hit(path: "/r/\(q)", kind: "file", size: 0, mtime: 0, score: 0)])
     }
     func grep(q: String, pattern: String, mode: GrepMode) async throws -> GrepReply {
         lock.withLock { _calls.append("grep \(q)|\(pattern)|\(mode.rawValue)") }
@@ -277,13 +276,16 @@ final class RecordingBackend: SearchBackend, @unchecked Sendable {
 
     @Test func otherErrorsAreReportedToo() async {
         let names = RecordingBackend()
-        names.throwOther = true
         let m = SearchModel(names: names, content: RecordingBackend())
         var log: [SearchModel.LogEntry] = []
         m.onSearched = { log.append($0) }
         m.query = "x"
         await m.refresh()
+        #expect(!m.items.isEmpty, "results to clear")
+        names.throwOther = true
+        await m.refresh()
         guard case .failed(.badReply) = m.phase else { Issue.record("phase \(m.phase)"); return }
-        #expect(log.count == 1 && log[0].error != nil && log[0].resultCount == 0)
+        #expect(m.items.isEmpty && m.lastTookUs == nil)
+        #expect(log.count == 2 && log[1].error != nil && log[1].resultCount == 0)
     }
 }

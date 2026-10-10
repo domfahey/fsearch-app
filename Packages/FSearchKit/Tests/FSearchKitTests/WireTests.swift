@@ -59,7 +59,7 @@ import Testing
         #expect(throws: DaemonError.daemon("unknown type dir")) {
             try decodeReply(Data(#"{"ok":false,"error":"unknown type dir"}"#.utf8), as: SearchReply.self)
         }
-        #expect(throws: DaemonError.self) { try decodeReply(Data("not json".utf8), as: SearchReply.self) }
+        #expect(throws: DaemonError.badReply("not json")) { try decodeReply(Data("not json".utf8), as: SearchReply.self) }
     }
 }
 

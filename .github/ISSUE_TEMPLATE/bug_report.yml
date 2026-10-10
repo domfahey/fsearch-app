@@ -1,0 +1,71 @@
+name: Bug report
+description: Something in FSearch for Mac does not work as expected.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. For security problems, do not use this form. See the security policy.
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "14.6.1"
+    validations:
+      required: true
+  - type: dropdown
+    id: chip
+    attributes:
+      label: Chip
+      options:
+        - Apple silicon
+        - Intel
+    validations:
+      required: true
+  - type: input
+    id: app-version
+    attributes:
+      label: FSearch app version
+      description: Or the commit, if you built it from source.
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: daemon
+    attributes:
+      label: How is the fsearch daemon installed?
+      options:
+        - Bundled with the app
+        - CLI (fsearch install --login)
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Press the hotkey
+        2. Type ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: index-details
+    attributes:
+      label: Index Details output
+      description: |
+        Turn on debug mode (⌥⌘D or Settings), open Index Details and click "Copy All". Paste it here.
+        Remove private file paths and names first.
+      render: text

@@ -30,17 +30,18 @@ import Testing
         #expect(reduce(&s, .cmdDigit(4)) == .none)
     }
 
-    @Test func nothingToActOnWithNoResults() {
-        var s = state(count: 0)
-        #expect(reduce(&s, .enter) == .none)
-        #expect(reduce(&s, .cmdK) == .none)
-    }
-
-    @Test func escapeClearsThenBacksOutThenHides() {
-        var s = state("abc", .content)
-        #expect(reduce(&s, .escape) == .none); #expect(s.query == "" && s.mode == .content)
-        #expect(reduce(&s, .escape) == .none); #expect(s.mode == .names)
-        #expect(reduce(&s, .escape) == .hide)
+    /// Each escape, in order: clear the query (and the selection), then drop
+    /// the content/symbols chip, then hide.
+    @Test(arguments: [
+        (SearchMode.content, [(PanelEffect.none, "", SearchMode.content), (.none, "", .names), (.hide, "", .names)]),
+        (.names, [(.none, "", .names), (.hide, "", .names)]),
+    ])
+    func escapeClearsThenBacksOutThenHides(_ mode: SearchMode, _ steps: [(PanelEffect, String, SearchMode)]) {
+        var s = state("abc", mode, sel: 2)
+        for (i, (effect, query, mode)) in steps.enumerated() {
+            #expect(reduce(&s, .escape) == effect, "escape \(i + 1)")
+            #expect(s.query == query && s.mode == mode && s.selection == 0, "escape \(i + 1)")
+        }
     }
 
     @Test func backspaceOnEmptyDropsTheChip() {
@@ -49,12 +50,21 @@ import Testing
         #expect(reduce(&s, .backspaceOnEmpty) == .none); #expect(s.mode == .names)
     }
 
-    @Test func resumesWithinSixtySeconds() {
+    @Test func resumeWindowIsSixtySecondsInclusive() {
         var session = PanelSession()
         let t = Date(timeIntervalSince1970: 1000)
         session.hidden(state("report", .content, sel: 3), at: t)
-        #expect(session.opened(at: t.addingTimeInterval(59)) == state("report", .content, sel: 3))
-        #expect(session.opened(at: t.addingTimeInterval(61)) == PanelState(query: "", mode: .names, selection: 0, count: 0))
+        #expect(session.opened(at: t.addingTimeInterval(60)) == state("report", .content, sel: 3))
+        #expect(session.opened(at: t.addingTimeInterval(60.001)) == PanelState())
+    }
+
+    @Test func hidingAgainReplacesTheEarlierState() {
+        var session = PanelSession()
+        let t = Date(timeIntervalSince1970: 1000)
+        session.hidden(state("first", .content, sel: 1), at: t)
+        session.hidden(state("second", .symbols, sel: 2), at: t.addingTimeInterval(30))
+        // 70 s after the first hide but 40 s after the second: the second resumes.
+        #expect(session.opened(at: t.addingTimeInterval(70)) == state("second", .symbols, sel: 2))
     }
 
     // Fix round 1: clamp selection to existing rows.
@@ -84,23 +94,7 @@ import Testing
         #expect(s.query == "abc")
     }
 
-    // Fix round 1: the resume window is inclusive at 60 s, exclusive after.
-
-    @Test func resumeWindowIsInclusiveAtSixtySeconds() {
-        var session = PanelSession()
-        let t = Date(timeIntervalSince1970: 1000)
-        session.hidden(state("report", .content, sel: 3), at: t)
-        #expect(session.opened(at: t.addingTimeInterval(60)) == state("report", .content, sel: 3))
-    }
-
-    @Test func resumeWindowClosesJustAfterSixtySeconds() {
-        var session = PanelSession()
-        let t = Date(timeIntervalSince1970: 1000)
-        session.hidden(state("report", .content, sel: 3), at: t)
-        #expect(session.opened(at: t.addingTimeInterval(60.001)) == PanelState())
-    }
-
-    // Fix round 1: edge cases for digits, empty results, and escape.
+    // Fix round 1: edge cases for digits and empty results.
 
     @Test func cmdDigitOutsideOneToNineIsIgnored() {
         var s = state(count: 20)
@@ -116,6 +110,8 @@ import Testing
 
     @Test func emptyResultsIgnoreEveryActionAndPinSelectionAtZero() {
         var s = state(count: 0)
+        #expect(reduce(&s, .enter) == .none)
+        #expect(reduce(&s, .cmdK) == .none)
         #expect(reduce(&s, .cmdEnter) == .none)
         #expect(reduce(&s, .cmdY) == .none)
         #expect(reduce(&s, .cmdShiftC) == .none)
@@ -124,20 +120,6 @@ import Testing
         #expect(s.selection == 0)
         #expect(reduce(&s, .down) == .none)
         #expect(s.selection == 0)
-    }
-
-    @Test func escapeResetsSelectionToZero() {
-        var s = state("abc", .names, sel: 2)
-        #expect(reduce(&s, .escape) == .none)
-        #expect(s.selection == 0)
-    }
-
-    @Test func escapeInNamesClearsQueryWithoutHiding() {
-        var s = state("abc", .names, sel: 2)
-        #expect(reduce(&s, .escape) == .none)
-        #expect(s.query == "")
-        #expect(s.mode == .names)
-        #expect(reduce(&s, .escape) == .hide)
     }
 }
 

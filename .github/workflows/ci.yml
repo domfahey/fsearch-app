@@ -15,10 +15,22 @@ permissions:
 # accessibility permission that hosted runners don't grant reliably. Run locally.
 jobs:
   kit:
-    runs-on: macos-26
+    # macos-14 is the deployment target (macOS 14): its newest Xcode with Swift 6 is
+    # 16.2 (Swift 6.0.3, satisfies swift-tools-version 6.0), per macos-14-arm64 Readme,
+    # image 20260831. That image is deprecated (unsupported 2026-11-02); then drop the leg.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-26
+            xcode: '26.6'
+          - os: macos-14
+            xcode: '16.2'
+    runs-on: ${{ matrix.os }}
+    continue-on-error: false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: sudo xcode-select -s /Applications/Xcode_26.6.app
+      - run: sudo xcode-select -s /Applications/Xcode_${{ matrix.xcode }}.app
       - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master, 2026-09-12 (merge of #185)
         with:
           toolchain: stable
@@ -43,6 +55,22 @@ jobs:
           xcodebuild -project FSearch.xcodeproj -scheme FSearch -configuration Debug
           -derivedDataPath build -destination 'generic/platform=macOS'
           CODE_SIGN_IDENTITY=- build
+
+  lint:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: sudo xcode-select -s /Applications/Xcode_26.6.app
+      - run: scripts/gen-credits.sh --check
+      - name: Syntax-check shell scripts
+        run: for f in scripts/*.sh; do bash -n "$f"; done
+      - run: brew install actionlint shellcheck
+      - run: actionlint
+      - run: shellcheck -S warning scripts/*.sh
+      - name: swift format lint
+        # Remove continue-on-error once the codebase has been formatted.
+        continue-on-error: true
+        run: xcrun swift format lint --strict --configuration .swift-format -r App AppUITests Packages/FSearchKit/Sources Packages/FSearchKit/Tests
 
   release:
     # Only on version tags. Secrets are referenced by name; none live in the repo.
@@ -99,3 +127,27 @@ jobs:
       - name: Delete signing keychain
         if: always()
         run: security delete-keychain "$KEYCHAIN" || true
+
+  bench:
+    # Non-blocking performance report (bench/README.md). Compares against a
+    # "ci-macos-26" baseline entry if one exists, never fails the workflow, and
+    # uploads the results JSON. Hosted-runner timings are noisy; read trends, not single runs.
+    runs-on: macos-26
+    continue-on-error: true
+    env:
+      BENCH_MACHINE: ci-macos-26
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: sudo xcode-select -s /Applications/Xcode_26.6.app
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master, 2026-09-12 (merge of #185)
+        with:
+          toolchain: stable
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - run: scripts/build-daemon.sh
+      - run: scripts/bench.sh --report-only
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: bench-results
+          path: bench/results/*.json
+          if-no-files-found: warn

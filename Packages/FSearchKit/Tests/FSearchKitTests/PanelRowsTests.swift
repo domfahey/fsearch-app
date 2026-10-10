@@ -39,3 +39,17 @@ import Testing
         #expect(PanelRows.count(files: 2, query: "grep:needle", mode: .names) == 2)
     }
 }
+
+@Suite struct PanelRowsValueTests {
+    @Test(arguments: ["abc", "", "   ", "?", "grep:x", "foo ext:rs"])
+    func valueMatchesStaticForwarders(query: String) {
+      for mode in [SearchMode.names, .content, .symbols] { for files in [0, 3] {
+        let rows = PanelRows(files: files, query: query, mode: mode)
+        #expect(rows.hasFallbacks == PanelRows.hasFallbacks(query: query, mode: mode))
+        #expect(rows.count == PanelRows.count(files: files, query: query, mode: mode))
+        for i in -1...(rows.count + 1) {
+            #expect(rows.row(at: i) == PanelRows.row(at: i, files: files, query: query, mode: mode))
+        }
+      } }
+    }
+}

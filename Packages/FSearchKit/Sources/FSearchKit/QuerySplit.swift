@@ -1,5 +1,7 @@
 /// Content queries: the typed text is the pattern, except fsearch filters
-/// (`ext:rs`, `in:~/x`, `mtime:<7d`), which narrow the files searched.
+/// (`ext:rs`, `in:~/x`, `mtime:<7d`), which narrow the files searched. As in
+/// the daemon, a known key with an empty value (`ext:`) is still a filter, and
+/// keys match case-sensitively.
 /// Sending the text as `grep:...` instead would turn a second word into a
 /// name filter.
 ///
@@ -52,6 +54,16 @@ public enum QuerySplit {
     /// True if the query has a content key, so a name search would get lines back.
     public static func hasContentKey(_ query: String) -> Bool { contentSearch(query) != nil }
 
+    /// True while the last word is a filter key with nothing after the colon
+    /// and no space typed since (`foo size:`): the user is still typing the
+    /// value, and the daemon would answer with an error (or match nothing).
+    public static func endsInHalfTypedFilter(_ query: String) -> Bool {
+        guard let last = words(query).last, query.last != " " else { return false }
+        let plain = unquoted(last)
+        guard let colon = plain.firstIndex(of: ":"), plain.index(after: colon) == plain.endIndex else { return false }
+        return keys.contains(String(plain[..<colon]))
+    }
+
     /// Each word with the spaces typed before it.
     private static func spacedWords(_ s: String) -> [(space: String, word: String)] {
         var out: [(String, String)] = [], space = "", cur = "", quoted = false
@@ -69,7 +81,7 @@ public enum QuerySplit {
 
     private static func isFilter(_ word: String) -> Bool {
         let plain = unquoted(word)
-        guard let colon = plain.firstIndex(of: ":"), plain.index(after: colon) < plain.endIndex else { return false }
+        guard let colon = plain.firstIndex(of: ":") else { return false }
         return keys.contains(String(plain[..<colon]))
     }
 }

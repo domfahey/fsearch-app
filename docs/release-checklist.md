@@ -16,6 +16,7 @@ Run on a real Mac, on the DMG produced by `scripts/release.sh`.
 - [ ] Before building: bump `CFBundleShortVersionString` and `CFBundleVersion` in `App/Resources/Info.plist`.
 
 - [ ] First real release run only: verify the signing of Sparkle's nested code. `codesign -dvv` on `Sparkle.framework/Versions/B/{Autoupdate,Updater.app,XPCServices/Installer.xpc,XPCServices/Downloader.xpc}` shows the Developer ID authority, a timestamp and `flags=0x10000(runtime)`; `codesign -d --entitlements - .../Downloader.xpc` matches what the Sparkle package shipped (an empty dict as of 2.x via SPM); the `--deep --strict` verify passed.
+- [ ] The release script finished without error: it ran `stapler validate` on the app and DMG and `codesign --verify --deep --strict` on the app.
 - [ ] `spctl` accepts the DMG and the app (the release script prints "accepted" for both).
 - [ ] The DMG opens with FSearch.app beside an Applications shortcut.
 - [ ] Fresh install (new user account): opens with no Gatekeeper warning.
@@ -32,6 +33,6 @@ Run on a real Mac, on the DMG produced by `scripts/release.sh`.
 - [ ] Upgrade over the previous version via Sparkle: Full Disk Access is still on, and the index wasn't rebuilt.
 - [ ] With the CLI's daemon running (`fsearch install --login`), the app uses it and doesn't start a second one.
 - [ ] Debug mode on: the search log fills; Clear Log empties it; debug off removes the file.
-- [ ] After verifying: run Sparkle's `generate_appcast` on `build/release` (it reads the EdDSA private key from your Keychain) and publish `appcast.xml` plus the DMG to the `SUFeedURL` GitHub Pages site; check that an older build sees the update.
+- [ ] After verifying: run Sparkle's `generate_appcast` on `build/release` (it reads the EdDSA private key from your Keychain) and publish `appcast.xml`, the DMG and its `FSearch-<version>.dmg.sha256` (written by the release script; also attach both to the GitHub release) to the `SUFeedURL` GitHub Pages site; check that an older build sees the update.
 
 CI does not run the UI tests (no GUI session on hosted runners); run them locally.

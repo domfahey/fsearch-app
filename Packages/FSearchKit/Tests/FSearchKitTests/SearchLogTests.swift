@@ -48,9 +48,11 @@ import Testing
     @Test func compactsAtTwiceTheCap() throws {
         let s = sandbox(); defer { try? FileManager.default.removeItem(at: s.dir) }
         let log = SearchLog(file: s.file, cap: 3)
-        for i in 0..<7 { log.append(SearchModel.LogEntry(query: "q\(i)", mode: .names, resultCount: 0, tookUs: nil, roundTripMs: 0, error: nil), at: Date()) }
-        let lines = try String(contentsOf: s.file, encoding: .utf8).split(separator: "\n")
-        #expect(lines.count <= 6)
+        let lines = { try String(contentsOf: s.file, encoding: .utf8).split(separator: "\n").count }
+        for i in 0..<6 { log.append(SearchModel.LogEntry(query: "q\(i)", mode: .names, resultCount: 0, tookUs: nil, roundTripMs: 0, error: nil), at: Date()) }
+        #expect(try lines() == 6, "2x cap lines is not yet over the limit")
+        log.append(SearchModel.LogEntry(query: "q6", mode: .names, resultCount: 0, tookUs: nil, roundTripMs: 0, error: nil), at: Date())
+        #expect(try lines() == 3, "the 7th line triggers one rewrite down to cap")
         #expect(log.entries().map(\.query) == ["q4", "q5", "q6"])
     }
 

@@ -80,7 +80,7 @@ public struct DaemonStatus: Decodable, Equatable, Sendable {
     public let fullDiskAccess, owner: Bool
 }
 
-public enum DaemonError: Error, Equatable, Sendable {
+public enum DaemonError: Error, Equatable, Sendable, LocalizedError, CustomStringConvertible {
     /// The first index isn't built yet (the daemon says "indexing ...").
     case indexing(String)
     /// Any other error the daemon reports, e.g. a bad regex or filter.
@@ -88,6 +88,18 @@ public enum DaemonError: Error, Equatable, Sendable {
     case disconnected
     case timeout
     case badReply(String)
+
+    /// Short text for the user (and the search log), not the Swift case name.
+    public var description: String {
+        switch self {
+        case .indexing: "The search index is still being built"
+        case let .daemon(msg): msg.isEmpty ? "The search daemon reported an error" : msg
+        case .disconnected: "Can't reach the search daemon"
+        case .timeout: "The search daemon didn't answer in time"
+        case let .badReply(detail): "Unexpected reply from the search daemon: \(detail)"
+        }
+    }
+    public var errorDescription: String? { description }
 }
 
 private struct Envelope: Decodable { let ok: Bool; let error: String? }
@@ -112,13 +124,22 @@ public func decodeReply<T: Decodable>(_ line: Data, as: T.Type) throws -> T {
 /// One short line for a reply that didn't have the expected shape.
 private func describe(_ e: DecodingError) -> String {
     func at(_ c: DecodingError.Context) -> String {
-        let path = c.codingPath.map { $0.intValue.map(String.init) ?? $0.stringValue }.joined(separator: ".")
+        let path = c.codingPath.map { $0.intValue.map(String.init) ?? wireName($0.stringValue) }.joined(separator: ".")
         return path.isEmpty ? "" : " at \(path)"
     }
     switch e {
-    case let .keyNotFound(key, c): return "reply has no \"\(key.stringValue)\"" + at(c)
+    case let .keyNotFound(key, c): return "reply has no \"\(wireName(key.stringValue))\"" + at(c)
     case let .typeMismatch(_, c), let .valueNotFound(_, c): return "unexpected value in reply" + at(c)
     case let .dataCorrupted(c): return "unreadable reply" + at(c)
     @unknown default: return "unreadable reply"
     }
+}
+
+/// The daemon's JSON key for a Swift property name (`tookUs` -> `took_us`).
+private func wireName(_ swift: String) -> String {
+    var out = ""
+    for ch in swift {
+        if ch.isUppercase { out += "_" + ch.lowercased() } else { out.append(ch) }
+    }
+    return out
 }

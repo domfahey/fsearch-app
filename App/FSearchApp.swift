@@ -42,6 +42,7 @@ struct MenuContent: View {
         }
         DebugMenuItem(app: app)
         FinishSetupMenuItem(app: app)
+        Button("About FSearch") { NSApp.activate(ignoringOtherApps: true); NSApp.orderFrontStandardAboutPanel(nil) }
         SettingsLink { Text("Settings…") }
         CheckForUpdatesItem()
         Button("Quit FSearch") { NSApp.terminate(nil) }

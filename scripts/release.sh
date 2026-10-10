@@ -65,6 +65,19 @@ hdiutil create -volname FSearch -srcfolder "$STAGE" -ov -format UDZO "$DMG"
 codesign --force --timestamp --sign "$DEVELOPER_ID" "$DMG"
 xcrun notarytool submit "$DMG" --keychain-profile "$PROFILE" ${NOTARY_KC[@]+"${NOTARY_KC[@]}"} --wait
 xcrun stapler staple "$DMG"
-spctl -a -t open --context context:primary-signature -v "$DMG"
-spctl -a -t exec -vv "$APP"
-echo "Now run Sparkle's generate_appcast on $OUT and publish appcast.xml + the DMG."
+# Notarization covered the app inside the DMG; staple the archive's identical app
+# too so `stapler validate` can check it below.
+xcrun stapler staple "$APP" || fail "stapling $APP failed"
+
+# Verify the finished artifacts; any failure stops the release.
+xcrun stapler validate "$APP" || fail "stapler validate failed for $APP"
+xcrun stapler validate "$DMG" || fail "stapler validate failed for $DMG"
+codesign --verify --deep --strict --verbose=2 "$APP" || fail "codesign verification failed for $APP"
+spctl -a -t open --context context:primary-signature -v "$DMG" || fail "Gatekeeper rejected $DMG"
+spctl -a -t exec -vv "$APP" || fail "Gatekeeper rejected $APP"
+
+# Checksums to publish next to the DMG (verify with: shasum -a 256 -c FILE.dmg.sha256).
+(cd "$OUT" && shasum -a 256 "$(basename "$DMG")" > "$(basename "$DMG").sha256") \
+  || fail "could not write checksum for $DMG"
+echo "SHA-256:"; cat "$DMG.sha256"
+echo "Now publish $DMG and $DMG.sha256 with appcast.xml (run Sparkle's generate_appcast on $OUT)."

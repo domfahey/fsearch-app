@@ -50,6 +50,9 @@ public final class SearchModel {
     }
 
     public func refresh() async {
+        // A filter still being typed (`foo size:`) is not a query yet: keep
+        // what is showing, and let any search already under way finish.
+        if QuerySplit.endsInHalfTypedFilter(query) { return }
         generation += 1
         inflight?.cancel()
         inflight = nil
@@ -75,12 +78,12 @@ public final class SearchModel {
             return
         } catch let e as DaemonError {
             guard gen == generation else { return }
-            items = []
+            (items, lastTookUs) = ([], nil)
             if case .indexing = e { phase = .indexing } else { phase = .failed(e) }
             report(q, mode, 0, nil, started, String(describing: e))
         } catch {
             guard gen == generation else { return }
-            (items, phase) = ([], .failed(.badReply(String(describing: error))))
+            (items, phase, lastTookUs) = ([], .failed(.badReply(String(describing: error))), nil)
             report(q, mode, 0, nil, started, String(describing: error))
         }
     }

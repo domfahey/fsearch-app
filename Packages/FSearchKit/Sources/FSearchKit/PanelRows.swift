@@ -18,18 +18,33 @@ public enum PanelRow: Equatable, Sendable {
 /// reaches them: they exist only for a non-blank query in names mode (the
 /// same blank check as SearchModel), not for the "?" cheat sheet, and not
 /// when the query already searches inside files (`grep:` and friends).
-public enum PanelRows {
+public struct PanelRows: Sendable {
+    public let files: Int
+    /// Whether the two fallback rows follow the files; decided once per query.
+    public let hasFallbacks: Bool
+    public let count: Int
+
+    public init(files: Int, query: String, mode: SearchMode) {
+        self.files = files
+        hasFallbacks = Self.hasFallbacks(query: query, mode: mode)
+        count = files + (hasFallbacks ? 2 : 0)
+    }
+
+    public func row(at i: Int) -> PanelRow? {
+        guard i >= 0, i < count else { return nil }
+        if i < files { return .result(i) }
+        return i == files ? .searchInside : .findDefinitions
+    }
+
     public static func hasFallbacks(query: String, mode: SearchMode) -> Bool {
         mode == .names && !SearchModel.isBlank(query) && !QuerySyntax.isCheatSheet(query) && !QuerySplit.hasContentKey(query)
     }
 
     public static func count(files: Int, query: String, mode: SearchMode) -> Int {
-        files + (hasFallbacks(query: query, mode: mode) ? 2 : 0)
+        PanelRows(files: files, query: query, mode: mode).count
     }
 
     public static func row(at i: Int, files: Int, query: String, mode: SearchMode) -> PanelRow? {
-        guard i >= 0, i < count(files: files, query: query, mode: mode) else { return nil }
-        if i < files { return .result(i) }
-        return i == files ? .searchInside : .findDefinitions
+        PanelRows(files: files, query: query, mode: mode).row(at: i)
     }
 }
