@@ -4,52 +4,64 @@ import Quartz
 
 @MainActor
 enum FileActions {
+    /// Where actions go: the real workspace, or a fake under test.
+    static var workspace: Workspace = SystemWorkspace()
+    /// ⌘⇧C and "Copy File" write here: the general pasteboard, or a private one under test.
+    static var pasteboard: NSPasteboard = .general
+
     static func url(_ path: String) -> URL { URL(fileURLWithPath: path) }
+
+    /// The editor command for a content hit, if an editor is chosen and installed.
+    static func editorCommand(for item: ResultItem, editor: Editor?) -> EditorCommand? {
+        guard case let .line(path, match) = item, let e = editor,
+              let appURL = workspace.urlForApplication(withBundleIdentifier: e.bundleId) else { return nil }
+        return openAtLine(e, appURL: appURL, path: path, line: match.line)
+    }
 
     /// Default app; content hits open at their line in the chosen editor if it is installed.
     static func open(_ item: ResultItem, editor: Editor?) {
-        if case let .line(path, match) = item, let e = editor,
-           let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: e.bundleId) {
-            let c = openAtLine(e, appURL: appURL, path: path, line: match.line)
-            let p = Process()
-            p.executableURL = URL(fileURLWithPath: c.executable)
-            p.arguments = c.arguments
+        let file = url(item.path)
+        if let c = editorCommand(for: item, editor: editor) {
             // The editor's CLI can start and still fail (bad flag, editor gone): fall back to the default app.
-            let file = url(item.path)
-            p.terminationHandler = { proc in
-                guard proc.terminationStatus != 0 else { return }
-                Task { @MainActor in NSWorkspace.shared.open(file) }
+            let started = workspace.run(c.executable, c.arguments) { status in
+                guard status != 0 else { return }
+                Task { @MainActor in FileActions.workspace.open(file) }
             }
-            if (try? p.run()) != nil { return }
+            if started { return }
         }
-        NSWorkspace.shared.open(url(item.path))
+        workspace.open(file)
     }
 
-    static func reveal(_ path: String) { NSWorkspace.shared.activateFileViewerSelecting([url(path)]) }
+    static func reveal(_ path: String) { workspace.activateFileViewerSelecting([url(path)]) }
 
     static func copyPath(_ path: String) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(path, forType: .string)
+        pasteboard.clearContents()
+        pasteboard.setString(path, forType: .string)
     }
 
     static func copyFile(_ path: String) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.writeObjects([url(path) as NSURL])
+        pasteboard.clearContents()
+        pasteboard.writeObjects([url(path) as NSURL])
     }
 
     static func openWith(_ path: String, app: URL) {
-        NSWorkspace.shared.open([url(path)], withApplicationAt: app, configuration: NSWorkspace.OpenConfiguration())
+        workspace.open([url(path)], withApplicationAt: app, completion: nil)
+    }
+
+    /// The folder Terminal opens for a result: itself if a folder, else its parent.
+    static func terminalFolder(for path: String) -> String {
+        var isDir: ObjCBool = false
+        FileManager.default.fileExists(atPath: path, isDirectory: &isDir)
+        return isDir.boolValue ? path : (path as NSString).deletingLastPathComponent
     }
 
     static func openTerminal(at path: String, onError: @escaping @MainActor (String) -> Void) {
-        var isDir: ObjCBool = false
-        FileManager.default.fileExists(atPath: path, isDirectory: &isDir)
-        let folder = isDir.boolValue ? path : (path as NSString).deletingLastPathComponent
-        guard let terminal = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal") else {
+        let folder = terminalFolder(for: path)
+        guard let terminal = workspace.urlForApplication(withBundleIdentifier: "com.apple.Terminal") else {
             onError("Couldn't find Terminal")
             return
         }
-        NSWorkspace.shared.open([url(folder)], withApplicationAt: terminal, configuration: NSWorkspace.OpenConfiguration()) { _, error in
+        workspace.open([url(folder)], withApplicationAt: terminal) { error in
             guard let error else { return }
             let message = "Couldn't open Terminal: \(error.localizedDescription)"
             Task { @MainActor in onError(message) }
@@ -57,7 +69,7 @@ enum FileActions {
     }
 
     static func trash(_ path: String) throws {
-        try FileManager.default.trashItem(at: url(path), resultingItemURL: nil)
+        try workspace.trash(url(path))
     }
 
     /// ⌘Y: show the preview, or close it if it is already up.

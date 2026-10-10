@@ -5,8 +5,10 @@ struct FSearchApp: App {
     @StateObject private var app: AppState
 
     init() {
-        let state = AppState()
+        let state = AppState.live()
         _app = StateObject(wrappedValue: state)
+        // Hosting unit tests: start nothing (no helper, hotkey, onboarding or Sparkle).
+        guard !state.options.unitTestHost else { return }
         Updater.start()
         DispatchQueue.main.async {
             PanelController.shared.install(app: state)

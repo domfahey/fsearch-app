@@ -7,12 +7,12 @@ import SwiftUI
 /// The floating launcher: a borderless panel over every Space, centred on
 /// the active screen, hidden when it loses focus.
 @MainActor
-final class PanelController {
+final class PanelController: PanelHost {
     static let shared = PanelController()
-    private var panel: NSPanel?
+    private(set) var panel: NSPanel?
     private var session = PanelSession()
     private weak var app: AppState?
-    private var selection = 0
+    private(set) var selection = 0
     /// The app that was in front when the panel opened, to hand focus back to.
     private var previousApp: NSRunningApplication?
 
@@ -21,7 +21,7 @@ final class PanelController {
         override func resignKey() {
             super.resignKey()
             // UI tests keep the panel up even though the test runner holds focus.
-            if CommandLine.arguments.contains("-UITestShowPanel") { return }
+            if LaunchOptions.current.showPanel { return }
             // Quick Look takes key while it previews; the launcher stays up behind it.
             if QuickLookSource.shared.isPreviewing { return }
             // The user moved to another app, so don't pull focus back.
@@ -46,7 +46,7 @@ final class PanelController {
     func install(app: AppState) {
         self.app = app
         KeyboardShortcuts.onKeyUp(for: .togglePanel) { [weak self] in self?.toggle(app: app) }
-        if CommandLine.arguments.contains("-UITestShowPanel") { show(app: app) }
+        if LaunchOptions.current.showPanel { show(app: app) }
     }
 
     var isVisible: Bool { panel?.isVisible == true }
@@ -111,7 +111,7 @@ final class PanelController {
         }
     }
 
-    private func perform(_ effect: PanelEffect, _ items: [ResultItem]) {
+    func perform(_ effect: PanelEffect, _ items: [ResultItem]) {
         guard let app else { return }
         switch effect {
         case let .open(i), let .reveal(i), let .quickLook(i), let .copyPath(i), let .showActions(i):
