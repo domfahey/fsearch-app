@@ -33,6 +33,8 @@ public final class SearchLog: @unchecked Sendable {
     private let lock = NSLock()
     /// Physical lines in the file, seeded by one read on first use.
     private var lineCount: Int?
+    /// Whether this instance has secured the file it is appending to (see `secure()`).
+    private var secured = false
 
     /// Creates a log.
     ///
@@ -72,13 +74,17 @@ public final class SearchLog: @unchecked Sendable {
         line.append(UInt8(ascii: "\n"))
 
         if lineCount == nil { lineCount = rawLines().count }
-        let dir = file.deletingLastPathComponent()
-        try? FileManager.default.createDirectory(
-            at: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-        if !FileManager.default.fileExists(atPath: file.path) {
-            FileManager.default.createFile(atPath: file.path, contents: nil, attributes: [.posixPermissions: 0o600])
+        // The folder and attributes are set up once, and again whenever the file has to be created.
+        if !secured || !FileManager.default.fileExists(atPath: file.path) {
+            let dir = file.deletingLastPathComponent()
+            try? FileManager.default.createDirectory(
+                at: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+            if !FileManager.default.fileExists(atPath: file.path) {
+                FileManager.default.createFile(atPath: file.path, contents: nil, attributes: [.posixPermissions: 0o600])
+            }
+            secure()
+            secured = true
         }
-        secure()
         guard let fh = try? FileHandle(forUpdating: file) else { return }
         defer { try? fh.close() }
         let end = (try? fh.seekToEnd()) ?? 0
@@ -126,7 +132,8 @@ public final class SearchLog: @unchecked Sendable {
     }
 
     /// The log holds search text: folder 0700, file 0600, both left out of backups.
-    /// Run after every create and after `compact` (an atomic rewrite makes a new file).
+    /// Run on this instance's first append, after every create and after `compact`
+    /// (an atomic rewrite makes a new file); not on every append.
     /// Caller holds the lock.
     private func secure() {
         let fm = FileManager.default

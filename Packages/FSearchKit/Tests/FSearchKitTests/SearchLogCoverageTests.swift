@@ -207,6 +207,25 @@ import Testing
         #expect(excluded(file))
     }
 
+    /// Securing touches the folder and file attributes several times: only on the first append, after a create or
+    /// a compact, never on every append.
+    @Test func securesOnCreateNotOnEveryAppend() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("fsk-logperm-\(UUID())", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = dir.appendingPathComponent("searches.jsonl")
+        let log = SearchLog(file: file)
+        log.append(entry("a"), at: Date())
+        try FileManager.default.setAttributes([.posixPermissions: 0o640], ofItemAtPath: file.path)
+        log.append(entry("b"), at: Date())
+        #expect(mode(file) == 0o640, "a plain append leaves the attributes alone")
+        try FileManager.default.removeItem(at: file)
+        log.append(entry("c"), at: Date())
+        #expect(mode(file) == 0o600 && excluded(file), "a recreated file is secured again")
+        log.clear()
+        log.append(entry("d"), at: Date())
+        #expect(mode(file) == 0o600 && log.entries().map(\.query) == ["d"])
+    }
+
     @Test func anExistingLooseFolderAndFileAreTightened() throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("fsk-logperm-\(UUID())", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: dir) }
