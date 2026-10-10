@@ -50,25 +50,42 @@ enum PanelInput {
     }
 
     enum Route: Equatable {
-        /// Pass the effect to the controller.
+        /// Pass the effect to the controller; its indexes are file indexes.
         case perform(PanelEffect)
         /// Return on a "use with..." row: search again in that mode.
         case switchMode(SearchMode)
+        /// Return on an app-command row.
+        case runCommand(AppCommand)
         case ignore
     }
 
-    /// Rows past the files are the "use with..." rows: Return switches mode,
-    /// file actions don't apply to them.
-    static func route(_ effect: PanelEffect, files: Int, query: String, mode: SearchMode) -> Route {
+    /// Effects arrive with row indexes. Command rows run on Return and take no
+    /// file action; "use with..." rows switch mode on Return and take none either;
+    /// file rows pass through with their file index.
+    static func route(_ effect: PanelEffect, rows: PanelRows) -> Route {
         switch effect {
-        case let .open(i) where i >= files:
-            if let m = PanelRows.row(at: i, files: files, query: query, mode: mode)?.mode { return .switchMode(m) }
-            return .ignore
-        case let .reveal(i), let .quickLook(i), let .copyPath(i), let .showActions(i):
-            return i < files ? .perform(effect) : .ignore
-        default:
-            return .perform(effect)
+        case let .open(i):
+            switch rows.row(at: i) {
+            case let .result(f): return .perform(.open(f))
+            case let .command(c): return .runCommand(c)
+            case let .some(r): return r.mode.map(Route.switchMode) ?? .ignore
+            case nil: return .ignore
+            }
+        case let .reveal(i): return fileEffect(rows, i) { .reveal($0) }
+        case let .quickLook(i): return fileEffect(rows, i) { .quickLook($0) }
+        case let .copyPath(i): return fileEffect(rows, i) { .copyPath($0) }
+        case let .showActions(i): return fileEffect(rows, i) { .showActions($0) }
+        case .none, .hide: return .perform(effect)
         }
+    }
+
+    private static func fileEffect(_ rows: PanelRows, _ i: Int, _ make: (Int) -> PanelEffect) -> Route {
+        if case let .result(f)? = rows.row(at: i) { return .perform(make(f)) }
+        return .ignore
+    }
+
+    static func route(_ effect: PanelEffect, files: Int, query: String, mode: SearchMode) -> Route {
+        route(effect, rows: PanelRows(files: files, query: query, mode: mode))
     }
 
     /// The ⌘K menu action an effect is, so a key and its menu item agree on hiding the panel.

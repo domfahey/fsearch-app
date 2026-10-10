@@ -61,7 +61,8 @@ final class PanelController: PanelHost {
         selection = resumed.selection
         let view = SearchView(model: app.search, state: resumed, onEffect: { [weak self] effect, items in
             self?.perform(effect, items)
-        }, onSelect: { [weak self] in self?.selection = $0 }).environmentObject(app)
+        }, onSelect: { [weak self] in self?.selection = $0 },
+        onCommand: { [weak self] in self?.run($0) }).environmentObject(app)
         let p = panel ?? Panel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         p.isFloatingPanel = true
         p.level = .floating
@@ -109,6 +110,20 @@ final class PanelController: PanelHost {
         NSApp.windows.contains { w in
             w !== panel && w.isVisible && !(w is NSPanel) && w.styleMask.contains(.titled)
         }
+    }
+
+    /// Opens Settings, the same window the menu's SettingsLink opens.
+    static var openSettings: () -> Void = {
+        AppActivation.activate()
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+    }
+
+    /// Runs an app command from its panel row and puts the launcher away.
+    func run(_ command: AppCommand) {
+        switch command {
+        case .settings: Self.openSettings()
+        }
+        hide(returnFocus: false)
     }
 
     func perform(_ effect: PanelEffect, _ items: [ResultItem]) {

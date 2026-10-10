@@ -74,6 +74,48 @@ extension AppTests {
             }
         }
 
+        // "set" with 2 files: row 0 is the command, rows 1-2 the files, 3-4 the fallbacks.
+        private func commandRows() -> PanelRows { PanelRows(files: 2, query: "set", mode: .names) }
+
+        @Test func returnOnTheCommandRowRunsIt() {
+            #expect(PanelInput.route(.open(0), rows: commandRows()) == .runCommand(.settings))
+            #expect(PanelInput.route(.open(1), rows: commandRows()) == .perform(.open(0)))
+            #expect(PanelInput.route(.open(2), rows: commandRows()) == .perform(.open(1)))
+            #expect(PanelInput.route(.open(3), rows: commandRows()) == .switchMode(.content))
+            #expect(PanelInput.route(.open(4), rows: commandRows()) == .switchMode(.symbols))
+            #expect(PanelInput.route(.open(5), rows: commandRows()) == .ignore)
+        }
+
+        @Test func fileActionsIgnoreTheCommandRowAndShiftToFileIndexes() {
+            for e in [PanelEffect.reveal(0), .quickLook(0), .copyPath(0), .showActions(0), .reveal(3)] {
+                #expect(PanelInput.route(e, rows: commandRows()) == .ignore)
+            }
+            #expect(PanelInput.route(.reveal(2), rows: commandRows()) == .perform(.reveal(1)))
+            #expect(PanelInput.route(.showActions(1), rows: commandRows()) == .perform(.showActions(0)))
+        }
+
+        @Test func commandNKeysStillOpenFilesOnly() {
+            var s = PanelState(query: "set", selection: 0, count: 5, files: 2, commands: 1)
+            let effect = reduce(&s, .cmdDigit(1))
+            #expect(PanelInput.route(effect, rows: commandRows()) == .perform(.open(0)))
+            let past = reduce(&s, .cmdDigit(3))
+            #expect(PanelInput.route(past, rows: commandRows()) == .perform(.none))
+        }
+
+        @Test func noCommandInContentMode() {
+            let rows = PanelRows(files: 2, query: "settings", mode: .content)
+            #expect(PanelInput.route(.open(0), rows: rows) == .perform(.open(0)))
+        }
+
+        @Test func runningTheSettingsCommandOpensSettings() {
+            var opened = 0
+            let saved = PanelController.openSettings
+            PanelController.openSettings = { opened += 1 }
+            defer { PanelController.openSettings = saved }
+            PanelController.shared.run(.settings)
+            #expect(opened == 1)
+        }
+
         /// A key and its ⌘K menu item agree on whether the launcher goes away.
         @Test func effectsHideLikeTheirMenuItems() {
             #expect(PanelInput.menuAction(for: .open(0)) == .open)
