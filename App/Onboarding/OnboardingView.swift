@@ -1,6 +1,7 @@
 import AppKit
 import FSearchKit
 import KeyboardShortcuts
+import os
 import SwiftUI
 
 /// Wording for the Full Disk Access step. Task 0 (docs/notes/fda-attribution.md)
@@ -53,9 +54,11 @@ final class OnboardingFlow: ObservableObject {
 
     func next() {
         if let n = OnboardingStep(rawValue: step.rawValue + 1) {
+            Log.onboarding.info("step \(String(describing: self.step), privacy: .public) -> \(String(describing: n), privacy: .public)")
             step = n
             if n == .helper { startDaemon() }
         } else {
+            Log.onboarding.info("finished")
             defaults.set(true, forKey: "onboarded")
             onFinish()
         }
@@ -75,6 +78,7 @@ final class OnboardingFlow: ObservableObject {
     }
 
     func turnOnFullDiskAccess() {
+        Log.onboarding.info("opening System Settings for Full Disk Access")
         pressedTurnOn = true
         FileActions.workspace.open(FDACopy.settingsURL)
     }
@@ -82,6 +86,7 @@ final class OnboardingFlow: ObservableObject {
     func openPrivacySettings() { FileActions.workspace.open(FDACopy.settingsURL) }
 
     func skipFullDiskAccess() {
+        Log.onboarding.info("skipped Full Disk Access")
         pressedTurnOn = false
         defaults.set(true, forKey: "skippedFullDiskAccess")
         facts.skippedFullDiskAccess = true
@@ -130,9 +135,11 @@ final class OnboardingFlow: ObservableObject {
     /// went to turn on. A daemon the app doesn't own is only polled.
     func returnedFromSettings() async {
         guard step != .welcome, !busy else { return }
+        Log.onboarding.info("returned from System Settings at step \(String(describing: self.step), privacy: .public)")
         if app.daemon.state == .needsApproval { await startDaemon().value; return }
         if step == .fullDiskAccess,
            restartAfterSettings(pressedTurnOn: pressedTurnOn, owns: app.daemon.ownsDaemon, fullDiskAccess: facts.fullDiskAccess) {
+            Log.onboarding.info("restarting the helper to pick up Full Disk Access")
             pressedTurnOn = false
             busy = true
             await cancelPollRefresh()

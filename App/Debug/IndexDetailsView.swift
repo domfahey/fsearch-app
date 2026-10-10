@@ -1,5 +1,6 @@
 import AppKit
 import FSearchKit
+import os
 import SwiftUI
 
 struct IndexDetailsView: View {
@@ -28,8 +29,8 @@ struct IndexDetailsView: View {
             }
             HStack {
                 Button("Reveal Data Folder") { FileActions.workspace.activateFileViewerSelecting([dataDir]) }
-                Button("Save Now") { Task { await app.daemon.saveNow() } }
-                Button("Restart Daemon") { Task { await app.daemon.restart() } }
+                Button("Save Now") { Log.debug.info("Save Now pressed"); Task { await app.daemon.saveNow() } }
+                Button("Restart Daemon") { Log.debug.info("Restart Daemon pressed"); Task { await app.daemon.restart() } }
                 Button("Copy All") {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(report(), forType: .string)

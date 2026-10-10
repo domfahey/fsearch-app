@@ -1,4 +1,5 @@
 import AppKit
+import os
 import SwiftUI
 
 /// First-launch entry point. A SwiftUI `Window` scene can't open itself at
@@ -23,7 +24,9 @@ enum OnboardingLauncher {
 
     /// Opens onboarding the first time; afterwards just starts the helper.
     static func launch(app: AppState) {
-        switch decision(onboarded: onboarded, testMode: app.options.testMode) {
+        let d = decision(onboarded: onboarded, testMode: app.options.testMode)
+        Log.onboarding.info("launch: \(String(describing: d), privacy: .public)")
+        switch d {
         case .startDaemon: startDaemon(app: app)
         case .showOnboarding: show(app: app)
         }

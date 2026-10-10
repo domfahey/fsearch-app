@@ -27,6 +27,8 @@ FSearch for Mac is a menu-bar launcher (`LSUIElement`, no Dock icon) in front of
           name index + content index on disk
 ```
 
+The app logs through `os.Logger` (subsystem `com.domfahey.fsearch`, see `App/Support/Log.swift`); see [Collecting logs](reference/troubleshooting.md#collecting-logs).
+
 ## FSearchKit and the App target
 
 [`Packages/FSearchKit`](../Packages/FSearchKit) holds everything that can be tested without a UI: the wire types and `decodeReply`, `LineSocket`, `DaemonClient`, `SearchModel`, `QuerySplit`/`QuerySyntax`, `DaemonPlan`, `RestartBudget`, `MenuBarWarning`, onboarding rules, `Recents`, `SearchLog`, key handling (`PanelKeys`) and row layout (`PanelRows`). It has no dependencies. The `FSearch` target in [`project.yml`](../project.yml) is the glue: windows, `SMAppService`, Sparkle, the global shortcut, and file actions. Put new logic in the package and keep the App code thin.
