@@ -68,7 +68,7 @@ All fixed; see the CHANGELOG.
 - [ ] Set up the GitHub Pages site behind `SUFeedURL`, and add the CI secrets listed in docs/release-checklist.md.
 - [ ] Test an update: install a build with a lowered `CFBundleVersion`, run `defaults delete com.domfahey.fsearch SULastCheckTime`, and confirm the update is offered.
 - [ ] Tag v0.1.0 and run `scripts/release.sh 0.1.0`; GitHub release with DMG + SHA-256; artifact attestations and SBOM; Homebrew cask (with `zap`).
-- [ ] Confirm the privacy manifest's file-timestamp reason (C617.1).
+- [x] Confirm the privacy manifest's file-timestamp reason (C617.1). It is the only reason now: the app reads timestamps only of its own helper and log files.
 
 **On an idle Mac** (these tests synthesize keystrokes)
 - [ ] Run the 16 end-to-end UI tests (`make ui`).

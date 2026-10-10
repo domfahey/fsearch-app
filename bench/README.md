@@ -132,7 +132,10 @@ daemon metrics move with it.
 The `bench` job in `.github/workflows/ci.yml` runs `scripts/bench.sh
 --report-only` with `BENCH_MACHINE=ci-macos-26` and uploads `bench/results/*.json`
 as the `bench-results` artifact. It is `continue-on-error` and never fails the
-workflow. There is no `ci-macos-26` entry yet, so it only reports; to add one,
+workflow. It also sets `FSEARCH_BENCH_TIMEOUT=90`: the seconds one daemon request
+may take before the run gives up. It replaces the local defaults (15 s for the
+canned server, 30 s for the real daemon) and works the same way locally.
+There is no `ci-macos-26` entry yet, so it only reports; to add one,
 take the JSON from a CI artifact and run
 `swift run -c release --package-path Packages/FSearchKit FSearchBench record --baseline bench/baseline.json --current <file> --machine ci-macos-26`.
 Hosted runners vary between runs, so treat CI numbers as a trend.

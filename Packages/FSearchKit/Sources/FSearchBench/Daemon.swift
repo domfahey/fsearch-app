@@ -203,7 +203,7 @@ final class Cleanup: @unchecked Sendable {
             let launched = now()
             try d.start()
             defer { d.stop(); try? FileManager.default.removeItem(at: dataDir) }
-            buildNs.append(try await namesReady(d, DaemonClient(socketPath: d.socketPath, timeout: 30), launched: launched).1)
+            buildNs.append(try await namesReady(d, DaemonClient(socketPath: d.socketPath, timeout: benchTimeout(30)), launched: launched).1)
         }
     }
 
@@ -211,7 +211,7 @@ final class Cleanup: @unchecked Sendable {
     defer { d.stop() }
     let launched = now()
     try d.start()
-    let client = DaemonClient(socketPath: d.socketPath, timeout: 30)
+    let client = DaemonClient(socketPath: d.socketPath, timeout: benchTimeout(30))
     let deadline = launched + 180 * 1_000_000_000
     let (namesStatus, namesNs) = try await namesReady(d, client, launched: launched)
     buildNs.append(namesNs)
