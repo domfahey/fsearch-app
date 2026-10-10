@@ -1,5 +1,7 @@
 # FAQ
 
+This page answers common questions about FSearch for Mac.
+
 ## What is FSearch for Mac?
 
 A menu-bar launcher for the [fsearch](https://github.com/noahdunnagan/fsearch) file-search daemon by Noah Dunnagan. fsearch builds and serves the index. This app is the panel, the setup and the actions.
@@ -56,6 +58,19 @@ Builds with updates configured show **Check for Updates…** in the menu. Other 
 
 See [Uninstall](../uninstall.md).
 
+## Why does the panel say "Starting search…" or "Indexing your disk…"?
+
+"Starting search…" means the app cannot reach the fsearch daemon yet or it did not answer in time. "Indexing your disk… results will appear shortly" means the first index is still being built. Both clear by themselves. See [Troubleshooting](troubleshooting.md).
+
+## Why is there a red line under the search field?
+
+The daemon rejected your query, and the red text is its own message, for example about an unfinished regular expression. Fix the query. A filter you are still typing, like `size:` with no value, does not trigger it. See [Query syntax](query-syntax.md).
+
 ## Where do I report a bug or ask for a feature?
 
 See [Support](../../SUPPORT.md). For security problems, see [Security](../../SECURITY.md).
+
+## See also
+
+- [Troubleshooting](troubleshooting.md)
+- [Documentation hub](../README.md)

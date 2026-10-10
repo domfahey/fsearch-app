@@ -1,5 +1,7 @@
 # Keyboard shortcuts
 
+This page lists every keyboard shortcut in FSearch for Mac.
+
 ## Global
 
 | Key | Action |
@@ -69,3 +71,8 @@ If an action fails, the panel stays up (or comes back) and shows the error in it
 | Quit FSearch | | |
 
 When something needs attention, the menu starts with a warning line and, for some problems, a **Fix…** button. See [Troubleshooting](troubleshooting.md).
+
+## See also
+
+- [Query syntax](query-syntax.md)
+- [Change the hotkey](../how-to/change-the-hotkey.md)

@@ -1,5 +1,7 @@
 # Support
 
+This page tells you where to get help with FSearch for Mac and how to report a problem.
+
 ## Questions
 
 Ask questions in [GitHub Discussions](https://github.com/domfahey/fsearch-app/discussions) once Discussions is turned on for the repository.

@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Find your symptom below. If it is not here, see [Support](../../SUPPORT.md).
+Use this page to match what FSearch for Mac shows you to a cause and a fix. If your symptom is not here, see [Support](../../SUPPORT.md).
 
 For most problems, turn on [debug mode](../how-to/turn-on-debug-mode.md) first. Index Details shows what the daemon is doing.
 
@@ -14,9 +14,9 @@ The app cannot reach the search daemon. It restarts the daemon it registered its
 4. In Index Details, press **Restart Daemon**, and read the end of `daemon.log`.
 5. If you use the CLI daemon, restart it from the CLI.
 
-## "Indexing your disk…"
+## "Indexing your disk… results will appear shortly"
 
-The daemon is building its first index. Results appear when it finishes, usually within a minute or so. The panel keeps checking by itself. Searching works as soon as the index is ready.
+The fsearch daemon is building its first index. Results appear when it finishes, usually within a minute or so. The panel keeps checking by itself. Searching works as soon as the index is ready.
 
 If it never finishes, open Index Details and check that the entry count grows.
 
@@ -54,7 +54,22 @@ See [Open results in your editor](../how-to/open-results-in-your-editor.md). The
 
 ## A query shows a red error line
 
-The daemon rejected the query, for example an unfinished regular expression or an unknown `type:`. Fix the query and results resume. See [Query syntax](query-syntax.md).
+The daemon rejected the query, for example an unfinished regular expression or an unknown `type:`. The panel shows the daemon's own message in red under the search field. Fix the query and results resume. See [Query syntax](query-syntax.md).
+
+A filter you are still typing, such as `foo size:` with nothing after the colon, does not search or show an error. The panel keeps the results it has until you finish the value or type a space.
+
+## Other messages in the panel
+
+These are the exact texts the panel shows when a search cannot return results.
+
+| You see | Meaning | What to do |
+|---|---|---|
+| Starting search… | The app cannot reach the daemon yet, or it did not answer in time. | See [Starting search…](#starting-search-does-not-go-away). |
+| Indexing your disk… results will appear shortly | The first index is still being built. | Wait. See [Indexing](#indexing-your-disk-results-will-appear-shortly). |
+| Unexpected reply from the search daemon: *detail* | The daemon answered with something the app does not understand, for example `reply has no "hits"`. This usually means the app and the daemon are different versions. | Quit and reopen FSearch. If it persists, [report it](../../SUPPORT.md) with the detail text. |
+| *The daemon's own message* (in red) | The daemon rejected the query. | Fix the query. |
+
+In the debug-mode Search Log, a failed search is recorded as "Can't reach the search daemon", "The search daemon didn't answer in time", "The search index is still being built", or "The search daemon reported an error" (when the daemon gave no text).
 
 ## Nothing shows for a search inside files
 
@@ -64,3 +79,9 @@ The daemon rejected the query, for example an unfinished regular expression or a
 ## Still stuck
 
 Quit FSearch from the menu and open it again. Then see [Support](../../SUPPORT.md).
+
+## See also
+
+- [Turn on debug mode](../how-to/turn-on-debug-mode.md)
+- [Files and locations](files-and-locations.md)
+- [FAQ](faq.md)

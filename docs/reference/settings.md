@@ -1,5 +1,7 @@
 # Settings
 
+This page lists the options in FSearch for Mac's Settings window.
+
 Open **Settings…** from the menu-bar icon.
 
 ## Options
@@ -34,3 +36,9 @@ These are not settings:
 - Reopening the panel within 60 seconds resumes your last query.
 - Name searches ask for 50 results.
 - The search log keeps 10,000 searches.
+
+## See also
+
+- [Change the hotkey](../how-to/change-the-hotkey.md)
+- [Open results in your editor](../how-to/open-results-in-your-editor.md)
+- [Turn on debug mode](../how-to/turn-on-debug-mode.md)

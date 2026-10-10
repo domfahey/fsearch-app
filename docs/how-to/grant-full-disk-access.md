@@ -1,5 +1,7 @@
 # Grant Full Disk Access
 
+This guide shows you how to let FSearch for Mac index folders that macOS protects.
+
 ## Why
 
 Without Full Disk Access, macOS hides some folders from every app: Desktop, Documents, Downloads, Mail, Messages and iCloud Drive. The search daemon reads your disk to build the index, so it cannot find files in those folders until you allow it. The index stays on your Mac.
@@ -35,3 +37,8 @@ If you close the welcome window without granting or skipping, the menu bar shows
 macOS ties the grant to the program's code signature. A build you compile yourself with an ad-hoc signature (`CODE_SIGN_IDENTITY=-`) has a new identity each time, so you may need to turn the entry off and on again, or remove and re-add it, after each rebuild. The release app is signed with a Developer ID, and its grant is meant to carry across updates.
 
 Which binary macOS lists for the bundled helper (the app or the helper) is still being confirmed. It is tracked in the [release checklist](../release-checklist.md).
+
+## See also
+
+- [Troubleshooting](../reference/troubleshooting.md)
+- [Privacy](../../PRIVACY.md)

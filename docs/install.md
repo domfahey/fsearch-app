@@ -35,3 +35,9 @@ FSearch can share a daemon with the fsearch command-line tool.
 - In that case, Full Disk Access belongs to that daemon. Grant it to the fsearch binary in Privacy & Security, then restart that daemon.
 
 To remove FSearch, see [Uninstall](uninstall.md).
+
+## See also
+
+- [Tutorial: your first search](tutorial-first-search.md)
+- [Grant Full Disk Access](how-to/grant-full-disk-access.md)
+- [Troubleshooting](reference/troubleshooting.md)
