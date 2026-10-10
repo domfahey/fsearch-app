@@ -4,8 +4,8 @@ options:
   deploymentTarget: { macOS: "14.0" }
 packages:
   FSearchKit: { path: Packages/FSearchKit }
-  KeyboardShortcuts: { url: https://github.com/sindresorhus/KeyboardShortcuts, from: "2.0.0" }
-  Sparkle: { url: https://github.com/sparkle-project/Sparkle, from: "2.6.0" }
+  KeyboardShortcuts: { url: https://github.com/sindresorhus/KeyboardShortcuts, exactVersion: "2.4.0" }
+  Sparkle: { url: https://github.com/sparkle-project/Sparkle, exactVersion: "2.10.0" }
 targets:
   FSearch:
     type: application
