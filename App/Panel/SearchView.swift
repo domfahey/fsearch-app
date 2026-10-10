@@ -34,7 +34,8 @@ struct SearchView: View {
 
     var body: some View {
         let rows = rows
-        let commands = rows.commands.count
+        let commandsStart = shown.count
+        let fallbacksStart = shown.count + rows.commands.count
         return VStack(spacing: 0) {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
@@ -65,20 +66,21 @@ struct SearchView: View {
                     if QuerySyntax.isCheatSheet(model.query) {
                         cheatSheet
                     }
-                    if !rows.commands.isEmpty {
-                        section("FSearch")
-                        ForEach(Array(rows.commands.enumerated()), id: \.offset) { i, c in
-                            fallback(c.title, c.symbol, selected: state.selection == i) { onCommand(c) }
-                                .accessibilityIdentifier("command-\(c.title)")
-                        }
-                    }
                     if !shown.isEmpty {
                         section(model.query.isEmpty ? "Recent" : (showsLines ? "Inside files" : "Files"))
                         ForEach(Array(shown.enumerated()), id: \.element.id) { i, item in
-                            ResultRow(item: item, query: highlightQuery, selected: commands + i == state.selection)
+                            ResultRow(item: item, query: highlightQuery, selected: i == state.selection)
                                 .onTapGesture(count: 2) { onEffect(.open(i), shown) }
-                                .onTapGesture { state.selection = commands + i }
+                                .onTapGesture { state.selection = i }
                                 .draggable(URL(fileURLWithPath: item.path))
+                        }
+                    }
+                    // Below the files, so ↵ after "set" still opens the top file.
+                    if !rows.commands.isEmpty {
+                        section("FSearch")
+                        ForEach(Array(rows.commands.enumerated()), id: \.offset) { i, c in
+                            fallback(c.title, c.symbol, selected: state.selection == commandsStart + i) { onCommand(c) }
+                                .accessibilityIdentifier("command-\(c.title)")
                         }
                     }
                     if rows.hasFallbacks {
@@ -86,11 +88,11 @@ struct SearchView: View {
                         section("Use “\(model.query)” with…")
                             .accessibilityIdentifier("fallbacks")
                             .accessibilityValue(model.phase == .loading ? "searching" : "done")
-                        fallback("Search inside files", "doc.text.magnifyingglass", selected: state.selection == commands + shown.count) {
+                        fallback("Search inside files", "doc.text.magnifyingglass", selected: state.selection == fallbacksStart) {
                             switchMode(.content)
                         }
                         .accessibilityIdentifier("fallback-content")
-                        fallback("Find definitions", "function", selected: state.selection == commands + shown.count + 1) {
+                        fallback("Find definitions", "function", selected: state.selection == fallbacksStart + 1) {
                             switchMode(.symbols)
                         }
                         .accessibilityIdentifier("fallback-symbols")
@@ -167,7 +169,6 @@ struct SearchView: View {
     private func handle(_ press: KeyPress) -> KeyPress.Result {
         let rows = rows
         state.query = model.query; state.mode = model.mode; state.count = rows.count; state.files = shown.count
-        state.commands = rows.commands.count
         guard let key = PanelInput.key(for: PanelInput.Press(press), queryIsEmpty: model.query.isEmpty) else { return .ignored }
         let effect = reduce(&state, key)
         // A query change refreshes through .onChange; only a mode change alone needs it here.

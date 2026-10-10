@@ -51,10 +51,16 @@ class PanelUITestCase: XCTestCase {
         try await super.tearDown()
     }
 
-    /// Puts back what the user had, only if the last change was the test's own copy.
+    /// Puts back what the user had, only if the last change was the test's own
+    /// copy: one the test read (`clipboard`), or a fixture path the app copied
+    /// that the test never read. A newer change that isn't a fixture path is
+    /// the user's, and is left alone.
     private func restoreClipboardIfStillOurs() {
         let pb = NSPasteboard.general
-        guard let ours = changeCountAfterOwnCopy, pb.changeCount == ours, ours != changeCountAtStart else { return }
+        let now = pb.changeCount
+        guard now != changeCountAtStart else { return }
+        let readByTest = changeCountAfterOwnCopy == now
+        guard readByTest || holdsFixturePath(pb) else { return }
         pb.clearContents()
         let items = savedClipboard.map { saved in
             let item = NSPasteboardItem()
@@ -62,6 +68,15 @@ class PanelUITestCase: XCTestCase {
             return item
         }
         if !items.isEmpty { pb.writeObjects(items) }
+    }
+
+    /// The pasteboard holds a path (⌘⇧C) or file (Copy File) under the fixtures.
+    private func holdsFixturePath(_ pb: NSPasteboard) -> Bool {
+        guard !socket.isEmpty else { return false }
+        let prefix = fixtureRoot + "/"
+        if pb.string(forType: .string)?.hasPrefix(prefix) == true { return true }
+        if let s = pb.string(forType: .fileURL), let u = URL(string: s), u.isFileURL { return u.path.hasPrefix(prefix) }
+        return false
     }
 
     /// The fixtures' root (`$H/root`), from the socket at `$H/Library/Application Support/FSearch/`.
@@ -88,7 +103,10 @@ class PanelUITestCase: XCTestCase {
         socket = s
         try refuseIfTheUsersFSearchIsRunning(file: file, line: line)
         app = XCUIApplication()
-        app.launchArguments = ["-UITestShowPanel", "-FSEARCH_SOCKET", s, "-debugMode", debugMode ? "YES" : "NO"]
+        // -ApplePersistenceIgnoreState: never reopen windows saved by the user's FSearch or an earlier test.
+        app.launchArguments = [
+            "-UITestShowPanel", "-FSEARCH_SOCKET", s, "-debugMode", debugMode ? "YES" : "NO", "-ApplePersistenceIgnoreState", "YES",
+        ]
         app.launch()
         app.activate()
         let found = field.waitForExistence(timeout: 15)
@@ -226,7 +244,7 @@ class PanelUITestCase: XCTestCase {
             .joined(separator: "\n")
     }
 
-    /// Presses ↵ on a fallback row (`fallback-content` or `fallback-symbols`)
+    /// Presses ↵ on a fallback row (`fallback-content`, `fallback-symbols` or a `command-…` row)
     /// only once the name search has finished (no late file row can take the
     /// selection) and that row is the selected one. Even if a file row were
     /// selected, the test-mode workspace would only record the open.

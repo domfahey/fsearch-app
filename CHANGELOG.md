@@ -21,8 +21,8 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
 - Four-step onboarding: choose the hotkey (with a warning when another launcher holds it), turn on the background helper login item, grant Full Disk Access (you can skip it), and watch the first index progress.
 - A universal (arm64 and x86_64) fsearch daemon bundled in the app and registered with SMAppService.
 - Coexistence with the fsearch CLI: the app reuses a daemon that is already running and never takes over, stops or replaces a daemon it didn't start.
-- App commands in the search panel: typing "settings", "preferences" or "prefs" shows an FSearch Settings row above the results; ↵ opens Settings.
-- Settings: "Open FSearch at login", with the real login-item status, and "Remove Background Helper and Data…" to uninstall from inside the app. It removes the helper only if FSearch owns it, and moves the data and logs to the Trash.
+- App commands in the search panel: typing "settings", "preferences" or "prefs" shows an FSearch Settings row below the files, just above the "Use … with" rows, so ↵ still opens the top file; select the row and press ↵ to open Settings. With no matching files the row is first.
+- Settings: "Open FSearch at login", with the real login-item status, and "Remove Background Helper and Data…" to uninstall from inside the app. It removes FSearch's own helper (also one still awaiting approval) and moves the logs and settings to the Trash. The index goes too only if FSearch's helper ran the daemon and the fsearch CLI's login agent isn't installed, since the two share one data folder.
 - After you skip Full Disk Access during setup, a quiet menu-bar reminder offers "Turn On Full Disk Access…" and "Don't Remind Me". It clears itself once access is granted.
 - Help menu (FSearch Help, Keyboard Shortcuts, Query Syntax, Changelog, Privacy) and "Report an Issue…", which opens a pre-filled GitHub bug form with versions, chip and daemon state. It never includes paths or queries.
 - Unified logging (`os.Logger`, subsystem `com.domfahey.fsearch`). Paths and queries are never logged in the clear. See Troubleshooting → Collecting logs.
@@ -38,7 +38,7 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
 - FSearchKit Swift package with unit and daemon integration tests. A separate UI smoke test (`scripts/ui-smoke.sh`) runs locally, not in CI.
 - Benchmarks: `scripts/bench.sh` measures keystroke, client and real-daemon performance and fails when a result regresses against `bench/baseline.json`. See [bench/README.md](bench/README.md).
 - A Makefile for common tasks (`make test`, `lint`, `type`, `bench`, `check`) and a `.swift-format` style config.
-- CI runs the FSearchKit tests on macOS 14 (Xcode 16.2) and macOS 26 (Xcode 26.6), builds the universal app, lints the scripts and workflows, and reports benchmarks.
+- CI runs the FSearchKit tests on macOS 14 (Xcode 16.2) and macOS 26 (Xcode 26.6), builds the universal app, runs the app's unit tests (AppTests), gates coverage (FSearchKit at 90%, the app's unit tests at 80%), treats compiler warnings as errors, blocks on swift-format lint, checks Markdown links, lints the scripts and workflows, and reports benchmarks.
 - Open-source project files: contributing guide, security policy, code of conduct, architecture overview, issue and pull request templates, CODEOWNERS, and Dependabot for GitHub Actions.
 - Documentation ([docs/README.md](docs/README.md)): a first-search tutorial, how-to guides, reference pages (keyboard shortcuts, query syntax, settings, files and locations, troubleshooting, FAQ), architecture decision records, install and uninstall guides, a privacy policy ([Privacy](docs/privacy.md)), support ([Support](.github/SUPPORT.md)) and a roadmap ([Roadmap](docs/roadmap.md)).
 
@@ -53,9 +53,12 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
 - The client checks the id on every reply from the daemon, so a stray or late line can never be shown as the answer to a different search.
 - In content search, a filter key with no value yet (for example `ext:`) is treated as a filter, as the daemon does, instead of as search text.
 - After a failed search, the debug footer no longer shows the previous search's timing.
+- The menu-bar status no longer crashes when the app's defaults change off the main thread (a3ad0df).
+- ⌃N and ⌃P move the selection even when SwiftUI reports them as control characters (4c49488).
 
 ### Security
 
 - CI actions are pinned to full commit SHAs, and workflows run with read-only permissions.
+- An OpenSSF Scorecard workflow checks the repository's supply-chain security practices.
 
 [Unreleased]: https://github.com/domfahey/fsearch-app/commits/main

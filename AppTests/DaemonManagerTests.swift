@@ -1,6 +1,7 @@
 import FSearchKit
 import Foundation
 import Testing
+
 @testable import FSearch
 
 /// Every app test shares globals (FileActions.workspace, MenuBarStatus.shared,
@@ -11,7 +12,9 @@ struct AppTests {}
 extension AppTests {
     @Suite @MainActor
     struct DaemonManagerTests {
-        private func manager(_ helper: FakeHelper?, _ daemon: StubDaemon = StubDaemon(), cli: Bool = false, clock: FakeClock = FakeClock()) -> DaemonManager {
+        private func manager(_ helper: FakeHelper?, _ daemon: StubDaemon = StubDaemon(), cli: Bool = false, clock: FakeClock = FakeClock())
+            -> DaemonManager
+        {
             DaemonManager(client: daemon, service: helper, cliAgentInstalled: { cli }, clock: clock.clock)
         }
 
@@ -162,7 +165,9 @@ extension AppTests {
 
         @Test func refreshRetriesUntilAnswered() async {
             let d = StubDaemon()
-            d.onStatus = { n in if n < 4 { throw DaemonError.timeout }; return Wire.status(entries: 9) }
+            d.onStatus = { n in
+                if n < 4 { throw DaemonError.timeout }; return Wire.status(entries: 9)
+            }
             let m = manager(nil, d)
             await m.refresh()
             #expect(m.state == .running(Wire.status(entries: 9)))
@@ -199,7 +204,9 @@ extension AppTests {
             let m = manager(nil, d, clock: FakeClock())
             let t = Task { @MainActor in await m.refresh() }
             // The first answer fails and cancels the caller: the retry sleep sees it.
-            d.onStatus = { _ in t.cancel(); throw DaemonError.timeout }
+            d.onStatus = { _ in
+                t.cancel(); throw DaemonError.timeout
+            }
             await t.value
             #expect(m.state == .checking)
         }

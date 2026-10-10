@@ -2,6 +2,7 @@ import FSearchKit
 import Foundation
 import Sparkle
 import Testing
+
 @testable import FSearch
 
 extension AppTests {

@@ -19,8 +19,9 @@ public enum PanelRow: Equatable, Sendable {
 /// same blank check as SearchModel), not for the "?" cheat sheet, and not
 /// when the query already searches inside files (`grep:` and friends).
 ///
-/// App commands (typing "settings") come first, in their own section above the files.
-/// A `.result(i)` is the i-th file; every other index here is a row index.
+/// App commands (typing "settings") come after the files, just above the
+/// fallbacks, so ↵ still opens the top file; with no files the command is first.
+/// A `.result(i)` is the i-th file and has row index i; every other index here is a row index.
 public struct PanelRows: Sendable {
     public let commands: [AppCommand]
     public let files: Int
@@ -37,10 +38,10 @@ public struct PanelRows: Sendable {
 
     public func row(at i: Int) -> PanelRow? {
         guard i >= 0, i < count else { return nil }
-        if i < commands.count { return .command(commands[i]) }
-        let f = i - commands.count
-        if f < files { return .result(f) }
-        return f == files ? .searchInside : .findDefinitions
+        if i < files { return .result(i) }
+        let c = i - files
+        if c < commands.count { return .command(commands[c]) }
+        return c == commands.count ? .searchInside : .findDefinitions
     }
 
     public static func hasFallbacks(query: String, mode: SearchMode) -> Bool {

@@ -2,6 +2,7 @@ import AppKit
 import FSearchKit
 import Foundation
 import SwiftUI
+
 @testable import FSearch
 
 struct TestError: Error, LocalizedError {
@@ -14,10 +15,10 @@ struct TestError: Error, LocalizedError {
 enum Wire {
     static func status(entries: Int = 42, fullDiskAccess: Bool = true, owner: Bool = true) -> DaemonStatus {
         let json = """
-        {"ok":true,"entries":\(entries),"dirs":3,"overlay":1,"removed":0,"event_id":7,"index_bytes":2048,\
-        "content_docs":5,"content_segments":1,"content_bytes":4096,"content_pending":0,\
-        "full_disk_access":\(fullDiskAccess),"owner":\(owner)}
-        """
+            {"ok":true,"entries":\(entries),"dirs":3,"overlay":1,"removed":0,"event_id":7,"index_bytes":2048,\
+            "content_docs":5,"content_segments":1,"content_bytes":4096,"content_pending":0,\
+            "full_disk_access":\(fullDiskAccess),"owner":\(owner)}
+            """
         return try! decodeReply(Data(json.utf8), as: DaemonStatus.self)
     }
 
@@ -25,8 +26,10 @@ enum Wire {
         let fs = files.map { path, ms in
             ["path": path, "matches": ms.map { ["line": $0.0, "text": $0.1] }] as [String: Any]
         }
-        let o: [String: Any] = ["ok": true, "took_us": tookUs, "source": "index", "candidates": files.count,
-                                "read": files.count, "complete": true, "files": fs]
+        let o: [String: Any] = [
+            "ok": true, "took_us": tookUs, "source": "index", "candidates": files.count,
+            "read": files.count, "complete": true, "files": fs,
+        ]
         return try! decodeReply(try! JSONSerialization.data(withJSONObject: o), as: GrepReply.self)
     }
 
@@ -46,10 +49,22 @@ final class StubDaemon: DaemonControl, @unchecked Sendable {
 
     private func locked<T>(_ f: () throws -> T) rethrows -> T { lock.lock(); defer { lock.unlock() }; return try f() }
 
-    var onPing: @Sendable (Int) -> Bool { get { locked { _onPing } } set { locked { _onPing = newValue } } }
-    var onStatus: @Sendable (Int) throws -> DaemonStatus { get { locked { _onStatus } } set { locked { _onStatus = newValue } } }
-    var onSearch: @Sendable (String) throws -> SearchReply { get { locked { _onSearch } } set { locked { _onSearch = newValue } } }
-    var onGrep: @Sendable (String, String, GrepMode) throws -> GrepReply { get { locked { _onGrep } } set { locked { _onGrep = newValue } } }
+    var onPing: @Sendable (Int) -> Bool {
+        get { locked { _onPing } }
+        set { locked { _onPing = newValue } }
+    }
+    var onStatus: @Sendable (Int) throws -> DaemonStatus {
+        get { locked { _onStatus } }
+        set { locked { _onStatus = newValue } }
+    }
+    var onSearch: @Sendable (String) throws -> SearchReply {
+        get { locked { _onSearch } }
+        set { locked { _onSearch = newValue } }
+    }
+    var onGrep: @Sendable (String, String, GrepMode) throws -> GrepReply {
+        get { locked { _onGrep } }
+        set { locked { _onGrep = newValue } }
+    }
     var pings: Int { locked { _pings } }
     var statuses: Int { locked { _statuses } }
     var saves: Int { locked { _saves } }
@@ -57,24 +72,32 @@ final class StubDaemon: DaemonControl, @unchecked Sendable {
     var greps: [(q: String, pattern: String, mode: GrepMode)] { locked { _greps } }
 
     func ping() async throws {
-        let (n, f) = locked { _pings += 1; return (_pings, _onPing) }
+        let (n, f) = locked {
+            _pings += 1; return (_pings, _onPing)
+        }
         if !f(n) { throw DaemonError.disconnected }
     }
 
     func status() async throws -> DaemonStatus {
-        let (n, f) = locked { _statuses += 1; return (_statuses, _onStatus) }
+        let (n, f) = locked {
+            _statuses += 1; return (_statuses, _onStatus)
+        }
         return try f(n)
     }
 
     func save() async throws { locked { _saves += 1 } }
 
     func search(_ q: String, limit: Int) async throws -> SearchReply {
-        let f = locked { _searches.append(q); return _onSearch }
+        let f = locked {
+            _searches.append(q); return _onSearch
+        }
         return try f(q)
     }
 
     func grep(q: String, pattern: String, mode: GrepMode) async throws -> GrepReply {
-        let f = locked { _greps.append((q, pattern, mode)); return _onGrep }
+        let f = locked {
+            _greps.append((q, pattern, mode)); return _onGrep
+        }
         return try f(q, pattern, mode)
     }
 }
@@ -95,7 +118,9 @@ final class FakeClock: @unchecked Sendable {
 
     var clock: DaemonClock {
         DaemonClock(
-            now: { [self] in lock.lock(); defer { lock.unlock() }; return _now },
+            now: { [self] in
+                lock.lock(); defer { lock.unlock() }; return _now
+            },
             sleep: { [self] d in
                 try Task.checkCancellation()
                 advance(d)
@@ -210,9 +235,12 @@ final class FakePanel: PanelHost {
 }
 
 /// One app with fakes everywhere, a throwaway defaults suite and a temp folder.
+/// AppTests run serialized, so every TestEnv shares one fixed suite, emptied
+/// when each starts and ends: at most one plist exists, removed at exit.
 @MainActor
 final class TestEnv {
-    let suite = "com.domfahey.fsearch.apptests.\(UUID().uuidString)"
+    nonisolated static let unitSuite = "com.domfahey.fsearch.apptests.unit"
+    let suite = TestEnv.unitSuite
     let defaults: UserDefaults
     let dir: URL
     let daemon: StubDaemon
@@ -225,16 +253,21 @@ final class TestEnv {
 
     init(helper: FakeHelper? = nil, daemon: StubDaemon = StubDaemon()) {
         _ = TestEnv.sweptStaleSuites
-        defaults = UserDefaults(suiteName: suite)!
+        defaults = TestEnv.emptySuite(suite)
         dir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("fsa-unit-\(UUID().uuidString.prefix(8))")
         try! FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         self.daemon = daemon
         self.helper = helper
-        let options = LaunchOptions(socketPath: dir.path + "/Library/Application Support/FSearch/fsearch.sock",
-                                    testMode: helper == nil, unitTestHost: false, showPanel: false)
-        app = AppState(options: options, defaults: defaults, helper: helper,
-                       names: daemon, content: daemon, control: daemon, clock: clock.clock,
-                       cliAgentInstalled: { false })  // never the real ~/Library/LaunchAgents
+        let options = LaunchOptions(
+            socketPath: dir.path + "/Library/Application Support/FSearch/fsearch.sock",
+            testMode: helper == nil, unitTestHost: false, showPanel: false,
+            // With a helper this isn't test mode; keep the log out of ~/Library/Logs.
+            searchLogOverride: dir.appendingPathComponent("searches.jsonl"))
+        app = AppState(
+            options: options, defaults: defaults, helper: helper,
+            names: daemon, content: daemon, control: daemon, clock: clock.clock,
+            cliAgentInstalled: { false })  // never the real ~/Library/LaunchAgents
+        precondition(app.log.file.path.hasPrefix(dir.path), "TestEnv's search log escaped its temp folder")
         app.panel = panel
         app.actionErrorDuration = .milliseconds(20)
         FileActions.workspace = workspace
@@ -256,7 +289,7 @@ final class TestEnv {
         FileActions.workspace = FakeWorkspace()
         FileActions.pasteboard = NSPasteboard(name: NSPasteboard.Name("com.domfahey.fsearch.apptests.idle"))
         pasteboard.releaseGlobally()
-        TestEnv.removeSuite(suite)
+        _ = TestEnv.emptySuite(suite)
         try? FileManager.default.removeItem(at: dir)
     }
 
@@ -265,15 +298,27 @@ final class TestEnv {
     static let sweptStaleSuites: Void = {
         let prefs = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Preferences")
         let names = (try? FileManager.default.contentsOfDirectory(atPath: prefs.path)) ?? []
-        for n in names where n.hasPrefix("com.domfahey.fsearch.apptests.") && n.hasSuffix(".plist")
-            && n != AppDefaults.testSuiteName + ".plist" {
+        for n in names
+        where n.hasPrefix("com.domfahey.fsearch.apptests.") && n.hasSuffix(".plist")
+            && n != AppDefaults.testSuiteName + ".plist"
+        {
             try? FileManager.default.removeItem(at: prefs.appendingPathComponent(n))
         }
+        // At the end of the run, best effort, the shared suite's (now empty)
+        // plist goes too; cfprefsd may still write it back, and the sweep above
+        // (and scripts/coverage.sh, ui-smoke.sh) removes it next time.
+        atexit { TestEnv.deletePlist(TestEnv.unitSuite) }
     }()
 
-    /// Clears a throwaway suite and deletes the plist cfprefsd leaves behind.
-    static func removeSuite(_ name: String) {
-        UserDefaults(suiteName: name)?.removePersistentDomain(forName: name)
+    /// The suite, emptied and flushed, so cfprefsd holds no stale keys for it.
+    nonisolated static func emptySuite(_ name: String) -> UserDefaults {
+        let d = UserDefaults(suiteName: name)!
+        d.removePersistentDomain(forName: name)
+        d.synchronize()
+        return d
+    }
+
+    nonisolated static func deletePlist(_ name: String) {
         let plist = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Preferences/\(name).plist")
         try? FileManager.default.removeItem(at: plist)
@@ -302,7 +347,8 @@ let offscreenOrigin = NSPoint(x: -20_000, y: -20_000)
 /// Close the returned window when done.
 @MainActor
 func render<V: View>(_ view: V, size: NSSize = NSSize(width: 680, height: 460), settle: Duration = .milliseconds(150)) async -> NSWindow {
-    let w = HostSafeWindow(contentRect: NSRect(origin: offscreenOrigin, size: size), styleMask: [.borderless], backing: .buffered, defer: false)
+    let w = HostSafeWindow(
+        contentRect: NSRect(origin: offscreenOrigin, size: size), styleMask: [.borderless], backing: .buffered, defer: false)
     w.isReleasedWhenClosed = false
     w.contentView = NSHostingView(rootView: view)
     w.setFrameOrigin(offscreenOrigin)
@@ -311,4 +357,3 @@ func render<V: View>(_ view: V, size: NSSize = NSSize(width: 680, height: 460), 
     w.contentView?.layoutSubtreeIfNeeded()
     return w
 }
-

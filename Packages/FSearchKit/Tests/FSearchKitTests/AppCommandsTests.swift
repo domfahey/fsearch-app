@@ -20,13 +20,14 @@ import Testing
 }
 
 @Suite struct PanelRowsCommandTests {
-    @Test func commandRowsComeFirstThenFilesThenFallbacks() {
+    /// ↵ after typing "set" opens the top file, not Settings: the command sits below the files.
+    @Test func filesComeFirstThenCommandRowsThenFallbacks() {
         let rows = PanelRows(files: 2, query: "set", mode: .names)
         #expect(rows.commands == [.settings])
         #expect(rows.count == 5)
-        #expect(rows.row(at: 0) == .command(.settings))
-        #expect(rows.row(at: 1) == .result(0))
-        #expect(rows.row(at: 2) == .result(1))
+        #expect(rows.row(at: 0) == .result(0))
+        #expect(rows.row(at: 1) == .result(1))
+        #expect(rows.row(at: 2) == .command(.settings))
         #expect(rows.row(at: 3) == .searchInside)
         #expect(rows.row(at: 4) == .findDefinitions)
         #expect(rows.row(at: 5) == nil)
@@ -54,9 +55,9 @@ import Testing
     }
 
     @Test func commandNeverAnswersAFileAction() {
-        var s = PanelState(query: "set", selection: 0, count: 5, files: 2, commands: 1)
-        #expect(reduce(&s, .cmdDigit(1)) == .open(1))
-        #expect(reduce(&s, .cmdDigit(2)) == .open(2))
+        var s = PanelState(query: "set", selection: 0, count: 5, files: 2)
+        #expect(reduce(&s, .cmdDigit(1)) == .open(0))
+        #expect(reduce(&s, .cmdDigit(2)) == .open(1))
         #expect(reduce(&s, .cmdDigit(3)) == .none)
         #expect(reduce(&s, .enter) == .open(0))
     }

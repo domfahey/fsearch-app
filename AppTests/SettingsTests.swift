@@ -1,6 +1,7 @@
 import FSearchKit
 import Foundation
 import Testing
+
 @testable import FSearch
 
 extension AppTests {
@@ -53,10 +54,14 @@ extension AppTests {
         let data = URL(fileURLWithPath: "/fake/Application Support/FSearch")
         let logs = URL(fileURLWithPath: "/fake/Logs/FSearch")
 
-        func make(_ env: TestEnv, helper: FakeHelper?, login: FakeLoginItem?, exists: @escaping (URL) -> Bool = { _ in true },
-                  shortcutResets: Box = Box()) -> Uninstaller {
-            Uninstaller(helper: helper, loginItem: login, workspace: env.workspace, defaults: env.defaults,
-                        dataFolder: data, logFolder: logs, exists: exists, resetShortcut: { shortcutResets.n += 1 })
+        func make(
+            _ env: TestEnv, helper: FakeHelper?, login: FakeLoginItem?, exists: @escaping (URL) -> Bool = { _ in true },
+            cliAgent: Bool = false, shortcutResets: Box = Box()
+        ) -> Uninstaller {
+            Uninstaller(
+                helper: helper, loginItem: login, workspace: env.workspace, defaults: env.defaults,
+                dataFolder: data, logFolder: logs, exists: exists, cliAgentInstalled: { cliAgent },
+                resetShortcut: { shortcutResets.n += 1 })
         }
 
         final class Box { var n = 0 }
@@ -92,15 +97,52 @@ extension AppTests {
             #expect(helper.unregistered == 0 && login.unregistered == 0)
             #expect(env.workspace.trashed == [logs])
             guard case let .done(r) = u.phase else { Issue.record("not done"); return }
-            #expect(r.kept.count == 1 && r.kept[0].contains("command-line"))
+            #expect(r.kept.count == 1 && r.kept[0].contains("wasn't enabled"))
+            #expect(!r.kept[0].contains("command-line"))
+        }
+
+        @Test func helperAwaitingApprovalIsUnregisteredButDataKept() async {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let helper = FakeHelper(.requiresApproval)
+            let u = make(env, helper: helper, login: nil)
+            await u.run(ownsDaemon: false)
+            #expect(helper.unregistered == 1)
+            #expect(!env.workspace.trashed.contains(data))
+            guard case let .done(r) = u.phase else { Issue.record("not done"); return }
+            #expect(r.removed.contains { $0.contains("background helper") })
+            #expect(r.kept.count == 1 && r.kept[0].contains("wasn't enabled"))
+        }
+
+        @Test func cliLoginAgentKeepsTheSharedDataFolder() async {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let helper = FakeHelper(.enabled)
+            let u = make(env, helper: helper, login: nil, cliAgent: true)
+            await u.run(ownsDaemon: true)
+            #expect(helper.unregistered == 1)
+            #expect(env.workspace.trashed == [logs])
+            guard case let .done(r) = u.phase else { Issue.record("not done"); return }
+            #expect(r.kept.count == 1 && r.kept[0].contains("mt.nd.fsearch"))
+        }
+
+        @Test func sparkleDefaultsAreRemovedToo() async {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let sparkle = ["SUEnableAutomaticChecks", "SUHasLaunchedBefore", "SULastCheckTime", "SUSendProfileInfo"]
+            for k in sparkle { env.defaults.set(true, forKey: k) }
+            await make(env, helper: nil, login: nil).run(ownsDaemon: false)
+            for k in sparkle { #expect(env.defaults.object(forKey: k) == nil, "\(k)") }
         }
 
         @Test func helperFailureKeepsTheDataFolder() async {
             let env = TestEnv()
             defer { env.tearDown() }
             let helper = FailingHelper()
-            let u = Uninstaller(helper: helper, loginItem: nil, workspace: env.workspace, defaults: env.defaults,
-                                dataFolder: data, logFolder: logs, exists: { _ in true }, resetShortcut: {})
+            let u = Uninstaller(
+                helper: helper, loginItem: nil, workspace: env.workspace, defaults: env.defaults,
+                dataFolder: data, logFolder: logs, exists: { _ in true }, cliAgentInstalled: { false },
+                resetShortcut: {})
             await u.run(ownsDaemon: true)
             #expect(!env.workspace.trashed.contains(data))
             guard case let .done(r) = u.phase else { Issue.record("not done"); return }

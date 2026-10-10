@@ -1,6 +1,7 @@
 import FSearchKit
 import Foundation
 import Testing
+
 @testable import FSearch
 
 extension AppTests {
@@ -13,7 +14,9 @@ extension AppTests {
         }
 
         @Test func socketArgumentIsTestMode() {
-            let o = LaunchOptions.parse(arguments: ["FSearch", "-UITestShowPanel", "-FSEARCH_SOCKET", "/t/h/x.sock"], environment: ["XCTestConfigurationFilePath": "/x"])
+            let o = LaunchOptions.parse(
+                arguments: ["FSearch", "-UITestShowPanel", "-FSEARCH_SOCKET", "/t/h/x.sock"],
+                environment: ["XCTestConfigurationFilePath": "/x"])
             #expect(o.socketPath == "/t/h/x.sock")
             #expect(o.testMode)
             #expect(!o.unitTestHost)  // a UI-test launch is the app proper
@@ -49,7 +52,8 @@ extension AppTests {
     struct AppStateTests {
         @Test func liveTestModeHasNoHelper() {
             let dir = NSTemporaryDirectory() + "fsa-live-\(UUID().uuidString.prefix(6))"
-            let app = AppState.live(options: LaunchOptions(socketPath: dir + "/s.sock", testMode: true, unitTestHost: false, showPanel: false))
+            let app = AppState.live(
+                options: LaunchOptions(socketPath: dir + "/s.sock", testMode: true, unitTestHost: false, showPanel: false))
             #expect(app.daemon.service == nil)  // SMAppService is never touched
             #expect(!app.daemon.ownsDaemon)
             #expect(app.log.file.path == dir + "/searches.jsonl")
@@ -61,8 +65,8 @@ extension AppTests {
             #expect(AppDefaults.make(testMode: false) === UserDefaults.standard)
             #expect(AppDefaults.store !== UserDefaults.standard)  // this host is test mode
             #expect(OnboardingLauncher.defaults !== UserDefaults.standard)
-            let name = "com.domfahey.fsearch.apptests.\(UUID().uuidString)"
-            defer { TestEnv.removeSuite(name) }
+            let name = TestEnv.unitSuite
+            defer { _ = TestEnv.emptySuite(name) }
             UserDefaults(suiteName: name)!.set(["/stale"], forKey: "recentPaths")
             let d = AppDefaults.make(testMode: true, suiteName: name)
             #expect(d !== UserDefaults.standard)
@@ -130,10 +134,11 @@ extension AppTests {
         }
 
         @Test func defaultPanelHostIsTheLauncher() {
-            defer { TestEnv.removeSuite("com.domfahey.fsearch.apptests.panel") }
-            let app = AppState(options: LaunchOptions(socketPath: "/nowhere.sock", testMode: true, unitTestHost: false, showPanel: false),
-                               defaults: UserDefaults(suiteName: "com.domfahey.fsearch.apptests.panel")!, helper: nil,
-                               names: StubDaemon(), content: StubDaemon(), control: StubDaemon())
+            defer { _ = TestEnv.emptySuite(TestEnv.unitSuite) }
+            let app = AppState(
+                options: LaunchOptions(socketPath: "/nowhere.sock", testMode: true, unitTestHost: false, showPanel: false),
+                defaults: TestEnv.emptySuite(TestEnv.unitSuite), helper: nil,
+                names: StubDaemon(), content: StubDaemon(), control: StubDaemon())
             #expect(app.panel === PanelController.shared)
         }
     }

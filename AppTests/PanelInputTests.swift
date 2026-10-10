@@ -1,6 +1,8 @@
+import AppKit
 import FSearchKit
 import SwiftUI
 import Testing
+
 @testable import FSearch
 
 extension AppTests {
@@ -78,24 +80,24 @@ extension AppTests {
         private func commandRows() -> PanelRows { PanelRows(files: 2, query: "set", mode: .names) }
 
         @Test func returnOnTheCommandRowRunsIt() {
-            #expect(PanelInput.route(.open(0), rows: commandRows()) == .runCommand(.settings))
-            #expect(PanelInput.route(.open(1), rows: commandRows()) == .perform(.open(0)))
-            #expect(PanelInput.route(.open(2), rows: commandRows()) == .perform(.open(1)))
+            #expect(PanelInput.route(.open(0), rows: commandRows()) == .perform(.open(0)))
+            #expect(PanelInput.route(.open(1), rows: commandRows()) == .perform(.open(1)))
+            #expect(PanelInput.route(.open(2), rows: commandRows()) == .runCommand(.settings))
             #expect(PanelInput.route(.open(3), rows: commandRows()) == .switchMode(.content))
             #expect(PanelInput.route(.open(4), rows: commandRows()) == .switchMode(.symbols))
             #expect(PanelInput.route(.open(5), rows: commandRows()) == .ignore)
         }
 
-        @Test func fileActionsIgnoreTheCommandRowAndShiftToFileIndexes() {
-            for e in [PanelEffect.reveal(0), .quickLook(0), .copyPath(0), .showActions(0), .reveal(3)] {
+        @Test func fileActionsIgnoreTheCommandRowAndKeepFileIndexes() {
+            for e in [PanelEffect.reveal(2), .quickLook(2), .copyPath(2), .showActions(2), .reveal(3)] {
                 #expect(PanelInput.route(e, rows: commandRows()) == .ignore)
             }
-            #expect(PanelInput.route(.reveal(2), rows: commandRows()) == .perform(.reveal(1)))
-            #expect(PanelInput.route(.showActions(1), rows: commandRows()) == .perform(.showActions(0)))
+            #expect(PanelInput.route(.reveal(0), rows: commandRows()) == .perform(.reveal(0)))
+            #expect(PanelInput.route(.showActions(1), rows: commandRows()) == .perform(.showActions(1)))
         }
 
         @Test func commandNKeysStillOpenFilesOnly() {
-            var s = PanelState(query: "set", selection: 0, count: 5, files: 2, commands: 1)
+            var s = PanelState(query: "set", selection: 0, count: 5, files: 2)
             let effect = reduce(&s, .cmdDigit(1))
             #expect(PanelInput.route(effect, rows: commandRows()) == .perform(.open(0)))
             let past = reduce(&s, .cmdDigit(3))
@@ -116,6 +118,48 @@ extension AppTests {
             #expect(opened == 1)
         }
 
+        /// macOS 14+ ignores showSettingsWindow:, so the command performs the app
+        /// menu's Settings… item (⌘,), the one SwiftUI's Settings scene adds.
+        @Test func settingsCommandPerformsTheAppMenusSettingsItem() {
+            let target = MenuTarget()
+            let main = NSMenu(), appMenu = NSMenu()
+            appMenu.addItem(NSMenuItem(title: "About FSearch", action: #selector(MenuTarget.other), keyEquivalent: ""))
+            appMenu.addItem(NSMenuItem(title: "Hide", action: #selector(MenuTarget.other), keyEquivalent: "h"))
+            let settings = NSMenuItem(title: "Settings…", action: #selector(MenuTarget.settings), keyEquivalent: ",")
+            appMenu.addItem(settings)
+            for item in appMenu.items { item.target = target }
+            let top = NSMenuItem(title: "FSearch", action: nil, keyEquivalent: "")
+            top.submenu = appMenu
+            main.addItem(top)
+
+            #expect(PanelController.performSettingsMenuItem(in: main))
+            #expect(target.settingsHits == 1 && target.otherHits == 0)
+        }
+
+        @Test func noSettingsItemIsReportedNotGuessed() {
+            let main = NSMenu()
+            let shifted = NSMenuItem(title: "Other", action: #selector(MenuTarget.settings), keyEquivalent: ",")
+            shifted.keyEquivalentModifierMask = [.command, .shift]
+            let target = MenuTarget()
+            shifted.target = target
+            main.addItem(shifted)
+            #expect(!PanelController.performSettingsMenuItem(in: main))
+            #expect(!PanelController.performSettingsMenuItem(in: nil))
+            #expect(target.settingsHits == 0)
+        }
+
+        /// The real opener does nothing in the inert unit-test host: no activation, no menu item.
+        @Test func theSettingsOpenerIsInertInTheTestHost() {
+            #expect(Presentation.inert)
+            let target = MenuTarget()
+            let main = NSMenu()
+            let settings = NSMenuItem(title: "Settings…", action: #selector(MenuTarget.settings), keyEquivalent: ",")
+            settings.target = target
+            main.addItem(settings)
+            #expect(!PanelController.openSettingsWindow(menu: main))
+            #expect(target.settingsHits == 0)
+        }
+
         /// A key and its ⌘K menu item agree on whether the launcher goes away.
         @Test func effectsHideLikeTheirMenuItems() {
             #expect(PanelInput.menuAction(for: .open(0)) == .open)
@@ -132,4 +176,11 @@ extension AppTests {
             #expect(PanelInput.menuAction(for: .copyPath(0))?.hidesPanel == false)
         }
     }
+}
+
+@MainActor
+private final class MenuTarget: NSObject {
+    var settingsHits = 0, otherHits = 0
+    @objc func settings() { settingsHits += 1 }
+    @objc func other() { otherHits += 1 }
 }

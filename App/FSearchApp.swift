@@ -5,6 +5,7 @@ struct FSearchApp: App {
     @StateObject private var app: AppState
 
     init() {
+        LaunchOptions.current.configureHost()
         let state = AppState.live()
         _app = StateObject(wrappedValue: state)
         // Hosting unit tests: start nothing (no helper, hotkey, onboarding or Sparkle).
@@ -16,8 +17,11 @@ struct FSearchApp: App {
         }
     }
 
+    /// No menu-bar item while hosting unit tests; UI tests (test mode) click it, so it stays there.
+    static func showsMenuBarItem(_ options: LaunchOptions) -> Bool { !options.unitTestHost }
+
     var body: some Scene {
-        MenuBarExtra {
+        MenuBarExtra(isInserted: .constant(Self.showsMenuBarItem(app.options))) {
             MenuBarFixItem(app: app)
             MenuContent(app: app)
         } label: {

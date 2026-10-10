@@ -3,6 +3,7 @@ import FSearchKit
 import Foundation
 import Quartz
 import Testing
+
 @testable import FSearch
 
 extension AppTests {
@@ -127,7 +128,9 @@ extension AppTests {
             #expect(ws.run("/usr/bin/false", ["a"]) { _ in exited.set() })
             try ws.trash(URL(fileURLWithPath: f))
             ws.open(URL(string: "x-apple.systempreferences:x")!)
-            let want = ["open \(f)", "reveal \(f)", "openWith X.app \(f)", "run /usr/bin/false a", "trash \(f)", "open x-apple.systempreferences:x"]
+            let want = [
+                "open \(f)", "reveal \(f)", "openWith X.app \(f)", "run /usr/bin/false a", "trash \(f)", "open x-apple.systempreferences:x",
+            ]
             #expect(ws.actions == want)
             #expect(try String(contentsOf: log, encoding: .utf8) == want.joined(separator: "\n") + "\n")
             #expect(FileManager.default.fileExists(atPath: f))  // not trashed
@@ -159,7 +162,11 @@ extension AppTests {
             let env = TestEnv()
             defer { env.tearDown() }
             let menu = ActionsMenu.build(for: .file(Wire.hit("/p/x.txt")), app: env.app)
-            #expect(menu.items.map(\.title) == ["Open", "Open With", "Reveal in Finder", "Quick Look", "Copy Path", "Copy File", "Open Folder in Terminal", "", "Move to Trash"])
+            #expect(
+                menu.items.map(\.title) == [
+                    "Open", "Open With", "Reveal in Finder", "Quick Look", "Copy Path", "Copy File", "Open Folder in Terminal", "",
+                    "Move to Trash",
+                ])
             #expect(menu.items[7].isSeparatorItem)
             #expect(!menu.autoenablesItems)
             #expect(menu.item(withTitle: "Open With")?.isEnabled == false)
@@ -230,7 +237,8 @@ extension AppTests {
             defer { ActionsMenu.popUp = saved }
             ActionsMenu.show(for: .file(Wire.hit("/p/x.txt")), in: nil, app: env.app)
             #expect(shown.isEmpty)
-            let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 300, height: 200), styleMask: [.borderless], backing: .buffered, defer: true)
+            let panel = NSPanel(
+                contentRect: NSRect(x: 0, y: 0, width: 300, height: 200), styleMask: [.borderless], backing: .buffered, defer: true)
             panel.contentView = NSView()
             ActionsMenu.show(for: .file(Wire.hit("/p/x.txt")), in: panel, app: env.app)
             #expect(shown.first?.first == "Open")

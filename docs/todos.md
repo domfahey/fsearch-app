@@ -6,15 +6,6 @@ Detail for the bug-audit items is in `.superpowers/audit-round2.md`, and for the
 
 ## In flight
 
-- [ ] **Merge the final-review fix round** (branch `fix-final`). It covers:
-  - the panel's Settings command, which didn't open Settings on macOS 14+;
-  - uninstall safety: helpers awaiting approval, and never trashing the data folder while the CLI agent is installed;
-  - the Sparkle XPC strip moved into release.sh;
-  - full git history in the CI release job;
-  - command rows below the file results;
-  - the updater kept off in UI tests, and test isolation (log path, hotkey, menu-bar icon, window restoration, private pasteboard, one throwaway defaults file);
-  - docs, changelog, AppTests lint, and `xcode-select` respected.
-  *(on fix-final)*
 - [ ] **Makefile audit:** stricter shell, phony targets, `clean`, plus new `doctor`, `install` (developer prerequisites only), `setup` and `ci` targets. *(in progress)*
 - [ ] **Security best-practices audits** (app/platform, supply chain/CI/repo): triage the findings. *(results pending)*
 - [ ] **Docs and developer-docs audits:** apply the findings. *(results pending)*
@@ -42,6 +33,8 @@ Detail for the bug-audit items is in `.superpowers/audit-round2.md`, and for the
 - [ ] Indexing poll loops while the panel is hidden.
 - [ ] Build: `cargo build --locked`, and build the daemon before the CI release job unlocks the signing keychain.
 - [ ] Test-only API in shipped code: wrap it in `#if DEBUG`.
+- [ ] One source for launch options: `PanelController` still reads `LaunchOptions.current.showPanel`; use `app.options`.
+- [ ] One empty `com.domfahey.fsearch.apptests.unit.plist` stays in ~/Library/Preferences after a full AppTests run (cfprefsd writes it back); it is swept on the next run.
 - [ ] API hygiene: namespace FSearchKit's free functions (`reduce`, `canContinue`, `openAtLine`, …).
 - [ ] Raise the CI app unit-test coverage gate from 80% to 90% (the FSearchKit gate is already 90%).
 - [ ] CI benchmark baseline: add a `ci-macos-26` entry from a CI artifact, so the bench job can gate.

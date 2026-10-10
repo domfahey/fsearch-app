@@ -4,7 +4,7 @@ import KeyboardShortcuts
 
 /// "Remove Background Helper and Data…": undoes what the app set up on this Mac.
 /// Never touches a CLI daemon (`mt.nd.fsearch`); the data folder goes only if
-/// this app owns the daemon that uses it. Every side effect is injected.
+/// this app owns the daemon that uses it and no CLI login agent shares it. Every side effect is injected.
 @MainActor
 final class Uninstaller: ObservableObject {
     struct Report: Equatable {
@@ -18,6 +18,8 @@ final class Uninstaller: ObservableObject {
     /// The app's UserDefaults keys; the shortcut is reset separately.
     static let defaultsKeys = [
         "editor", "debugMode", "onboarded", "skippedFullDiskAccess", "dismissedFullDiskAccessReminder", "recentPaths",
+        // Sparkle's own.
+        "SUEnableAutomaticChecks", "SUHasLaunchedBefore", "SULastCheckTime", "SUSendProfileInfo",
     ]
     static let fullDiskAccessURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!
 
@@ -30,12 +32,14 @@ final class Uninstaller: ObservableObject {
     private let dataFolder: URL
     private let logFolder: URL
     private let exists: (URL) -> Bool
+    private let cliAgentInstalled: () -> Bool
     private let resetShortcut: () -> Void
 
     init(
         helper: HelperService?, loginItem: LoginItemService?, workspace: Workspace, defaults: UserDefaults,
         dataFolder: URL, logFolder: URL,
         exists: @escaping (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) },
+        cliAgentInstalled: @escaping () -> Bool = { FileManager.default.fileExists(atPath: DaemonManager.cliAgentPlist.path) },
         resetShortcut: @escaping () -> Void
     ) {
         self.helper = helper
@@ -45,6 +49,7 @@ final class Uninstaller: ObservableObject {
         self.dataFolder = dataFolder
         self.logFolder = logFolder
         self.exists = exists
+        self.cliAgentInstalled = cliAgentInstalled
         self.resetShortcut = resetShortcut
     }
 
@@ -60,13 +65,16 @@ final class Uninstaller: ObservableObject {
     }
 
     /// `ownsDaemon`: DaemonManager.ownsDaemon, read before anything is unregistered.
+    /// The helper is unregistered whenever it is registered at all (enabled or
+    /// awaiting approval); the data folder is trashed only when this app ran
+    /// the daemon, the helper is gone, and no CLI login agent shares the folder.
     func run(ownsDaemon: Bool) async {
         guard phase != .running else { return }
         phase = .running
         var r = Report()
         var helperGone = true
 
-        if ownsDaemon, let helper {
+        if let helper, helper.status == .enabled || helper.status == .requiresApproval {
             do {
                 try await helper.unregister()
                 r.removed.append("The background helper (search index service)")
@@ -85,12 +93,16 @@ final class Uninstaller: ObservableObject {
             }
         }
 
-        if ownsDaemon && helperGone {
-            trash(dataFolder, "The index and data folder", into: &r)
+        if cliAgentInstalled() {
+            r.kept.append(
+                "The data folder (\(dataFolder.path)) was left alone: the fsearch command-line tool's login agent (mt.nd.fsearch) is installed and its daemon uses the same index."
+            )
         } else if !ownsDaemon {
             r.kept.append(
-                "The data folder (\(dataFolder.path)) was left alone: its search daemon wasn't started by this app, so it may be in use by the fsearch command-line tool."
+                "The data folder (\(dataFolder.path)) was left alone: this app's background helper wasn't enabled, so the index there wasn't the app's to remove."
             )
+        } else if helperGone {
+            trash(dataFolder, "The index and data folder", into: &r)
         } else {
             r.kept.append("The data folder was left in place because the helper is still registered.")
         }

@@ -3,6 +3,7 @@ import FSearchKit
 import Foundation
 import SwiftUI
 import Testing
+
 @testable import FSearch
 
 extension AppTests {
@@ -91,8 +92,10 @@ extension AppTests {
             try? await Task.sleep(for: .milliseconds(100))
 
             app.debugMode = true
-            for (q, mode) in [("heron", SearchMode.names), ("re:(", .names), ("?", .names), ("needle", .content),
-                              ("handler", .symbols), ("grep:needle", .names), ("ext:swift", .content)] {
+            for (q, mode) in [
+                ("heron", SearchMode.names), ("re:(", .names), ("?", .names), ("needle", .content),
+                ("handler", .symbols), ("grep:needle", .names), ("ext:swift", .content),
+            ] {
                 app.search.mode = mode
                 app.search.query = q
                 await app.search.refresh()
@@ -142,7 +145,9 @@ extension AppTests {
             status.recoveryCheck = RecoveryCheck(interval: 0)
             env.app.status = status
             // A daemon marked failed while searches work gets re-checked.
-            env.daemon.onStatus = { n in if n <= 50 { throw DaemonError.disconnected }; return Wire.status() }
+            env.daemon.onStatus = { n in
+                if n <= 50 { throw DaemonError.disconnected }; return Wire.status()
+            }
             await env.app.daemon.refresh()
             #expect(env.app.daemon.state == .failed("The search helper isn't answering."))
 

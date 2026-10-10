@@ -44,9 +44,14 @@ final class PanelController: PanelHost {
         }
     }
 
+    /// A test-mode app (UI tests) must not take the user's own global shortcut.
+    static func registersGlobalHotkey(_ options: LaunchOptions) -> Bool { !options.testMode }
+
     func install(app: AppState) {
         self.app = app
-        KeyboardShortcuts.onKeyUp(for: .togglePanel) { [weak self] in self?.toggle(app: app) }
+        if Self.registersGlobalHotkey(app.options) {
+            KeyboardShortcuts.onKeyUp(for: .togglePanel) { [weak self] in self?.toggle(app: app) }
+        }
         if LaunchOptions.current.showPanel { show(app: app) }
     }
 
@@ -125,10 +130,37 @@ final class PanelController: PanelHost {
 
     /// Opens Settings, the same window the menu's SettingsLink opens. Never in
     /// the unit-test host: the window would come up over the user's apps.
-    static var openSettings: () -> Void = {
-        guard !Presentation.inert else { return }
+    static var openSettings: () -> Void = { openSettingsWindow() }
+
+    /// macOS 14+ only logs "Please use SettingsLink" for `showSettingsWindow:`,
+    /// so this performs the app menu's Settings… item (⌘,), which SwiftUI's
+    /// Settings scene adds to the (hidden) main menu even for a menu-bar app.
+    /// Does nothing, and returns false, in the inert unit-test host.
+    @discardableResult
+    static func openSettingsWindow(inert: Bool = Presentation.inert, menu: @autoclosure () -> NSMenu? = NSApp.mainMenu) -> Bool {
+        guard !inert else { return false }
         AppActivation.activate()
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        if performSettingsMenuItem(in: menu()) { return true }
+        Log.actions.error("Settings: no ⌘, item in the main menu")
+        return false
+    }
+
+    /// Performs the first item bound to plain ⌘, in `menu` or its submenus.
+    static func performSettingsMenuItem(in menu: NSMenu?) -> Bool {
+        guard let (owner, index) = settingsItem(in: menu) else { return false }
+        owner.performActionForItem(at: index)
+        return true
+    }
+
+    private static func settingsItem(in menu: NSMenu?) -> (NSMenu, Int)? {
+        guard let menu else { return nil }
+        for (i, item) in menu.items.enumerated() {
+            if item.keyEquivalent == "," && item.keyEquivalentModifierMask.intersection(.deviceIndependentFlagsMask) == .command {
+                return (menu, i)
+            }
+            if let found = settingsItem(in: item.submenu) { return found }
+        }
+        return nil
     }
 
     /// Runs an app command from its panel row and puts the launcher away.

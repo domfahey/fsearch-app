@@ -9,7 +9,9 @@
 #   scripts/coverage.sh --kit-only      FSearchKit package coverage only (swift test, no app host)
 #   --min PERCENT (or COVERAGE_MIN)     exit non-zero if FSearchKit line coverage, or FSearch.app
 #                                       coverage excluding system adapters, is below PERCENT.
-#                                       Combines with any mode; the FSearchKit gate runs unless --reuse.
+#                                       Combines with any mode. The FSearchKit gate runs with
+#                                       --kit-only and in the default (both suites) mode, not with
+#                                       --unit-only (CI's kit job gates FSearchKit already) or --reuse.
 #
 # Both suites need a logged-in GUI session and nobody using the Mac: the UI
 # tests synthesize keystrokes, and the unit-test host opens (unfocused) windows.
@@ -20,7 +22,7 @@
 # activation and Sparkle, which tests replace with fakes and never run for real.
 set -u -o pipefail
 cd "$(dirname "$0")/.." || exit 1
-export DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}
+export DEVELOPER_DIR=${DEVELOPER_DIR:-$(xcode-select -p)}
 OUT=${COVERAGE_OUT:-build/coverage}
 mode=both
 UNIT="$OUT/unit.xcresult" UI="$OUT/ui.xcresult"
@@ -72,7 +74,7 @@ PY
 }
 
 if [ "$mode" = kit ]; then kit_coverage; exit $?; fi
-if [ "$mode" != reuse ] && [ -n "$MIN" ]; then kit_coverage || rc=1; fi
+if [ "$mode" = both ] && [ -n "$MIN" ]; then kit_coverage || rc=1; fi
 
 if [ "$mode" != reuse ]; then
   rm -rf "$UNIT"

@@ -196,6 +196,18 @@ final class PanelUITests: PanelUITestCase {
         XCTAssertTrue(text("Open content results in:").exists)
     }
 
+    /// The panel's "FSearch Settings" command row opens the Settings window
+    /// (showSettingsWindow: is a no-op on macOS 14+). No fixture is named
+    /// "prefs", so the command is the first, selected row.
+    func testSettingsCommandOpensSettings() throws {
+        try launch()
+        try search("prefs")
+        waitFor(text("FSearch Settings"))
+        try pressReturnOnFallback("command-FSearch Settings")
+        waitFor(app.checkBoxes["Debug mode"], 10)
+        XCTAssertTrue(text("Open content results in:").exists)
+    }
+
     func testMenuBarItemListsTheMenu() throws {
         try launch()
         let item = app.statusItems["FSearch"]

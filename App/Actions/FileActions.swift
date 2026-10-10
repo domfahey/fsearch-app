@@ -12,7 +12,15 @@ enum FileActions {
         ? TestModeWorkspace(log: TestModeWorkspace.logFile(socketPath: LaunchOptions.current.socketPath))
         : SystemWorkspace()
     /// ⌘⇧C and "Copy File" write here: the general pasteboard, or a private one under test.
-    static var pasteboard: NSPasteboard = .general
+    static var pasteboard: NSPasteboard = defaultPasteboard(for: .current)
+
+    /// A private pasteboard in the unit-test host, so a copy made before a test
+    /// swaps in its own never reaches the user's clipboard. UI tests (test mode
+    /// in the app's own process) read the general pasteboard from the test
+    /// runner and restore the user's afterwards, so they keep it.
+    static func defaultPasteboard(for options: LaunchOptions) -> NSPasteboard {
+        options.unitTestHost ? NSPasteboard(name: NSPasteboard.Name("com.domfahey.fsearch.apptests.host")) : .general
+    }
 
     static func url(_ path: String) -> URL { URL(fileURLWithPath: path) }
 

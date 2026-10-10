@@ -43,12 +43,10 @@ public struct PanelState: Equatable, Sendable {
     public var selection: Int
     /// Every selectable row, the commands and "use with..." rows included.
     public var count: Int
-    /// The file (result) rows only, which ⌘1–9 open; nil means all rows are files.
+    /// The file (result) rows, which come first and are the only ones ⌘1–9 open; nil means all rows are files.
     public var files: Int?
-    /// App-command rows above the files; ⌘N counts files from after them.
-    public var commands: Int
-    public init(query: String = "", mode: SearchMode = .names, selection: Int = 0, count: Int = 0, files: Int? = nil, commands: Int = 0) {
-        (self.query, self.mode, self.selection, self.count, self.files, self.commands) = (query, mode, selection, count, files, commands)
+    public init(query: String = "", mode: SearchMode = .names, selection: Int = 0, count: Int = 0, files: Int? = nil) {
+        (self.query, self.mode, self.selection, self.count, self.files) = (query, mode, selection, count, files)
     }
 }
 
@@ -65,10 +63,10 @@ public func reduce(_ s: inout PanelState, _ key: PanelKey) -> PanelEffect {
     case .cmdY: return has ? .quickLook(s.selection) : .none
     case .cmdShiftC: return has ? .copyPath(s.selection) : .none
     case .cmdK: return has ? .showActions(s.selection) : .none
-    // ⌘N opens the Nth file; it never lands on a "use with..." row.
+    // ⌘N opens the Nth file; it never lands on a command or "use with..." row.
     case let .cmdDigit(n):
-        let files = min(max(0, s.count - s.commands), s.files ?? s.count)
-        return (1...9).contains(n) && n <= files ? .open(s.commands + n - 1) : .none
+        let files = min(s.count, s.files ?? s.count)
+        return (1...9).contains(n) && n <= files ? .open(n - 1) : .none
     case .escape:
         // Clear the query, then drop the content/symbols chip, then hide.
         if !s.query.isEmpty { s.query = ""; s.selection = 0; return .none }
