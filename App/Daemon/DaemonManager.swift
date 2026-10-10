@@ -98,6 +98,11 @@ final class DaemonManager: ObservableObject {
     /// socket (our helper yields to a CLI agent's daemon). Never in test mode.
     var ownsDaemon: Bool { DaemonPlan.owns(helperEnabled: service?.status == .enabled, holder: socketHolder()) }
 
+    /// Whether the data folder is the app's to remove; stricter than ``ownsDaemon`` (see `DaemonPlan.dataOwnership`).
+    var dataOwnership: DataOwnership {
+        DaemonPlan.dataOwnership(helperEnabled: service?.status == .enabled, holder: socketHolder())
+    }
+
     /// After timeouts, or a disconnect with no restarts left.
     var isUnresponsive: Bool { state == .failed(Self.unresponsiveMessage) }
 

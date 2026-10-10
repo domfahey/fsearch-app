@@ -4,7 +4,7 @@ import KeyboardShortcuts
 
 /// "Remove Background Helper and Data…": undoes what the app set up on this Mac.
 /// Never touches a CLI daemon (`mt.nd.fsearch`); the data folder goes only if
-/// this app owns the daemon that uses it and no CLI login agent shares it. Every side effect is injected.
+/// this app's helper positively holds it and no CLI login agent shares it. Every side effect is injected.
 ///
 /// What it removes: the helper and the "Open at login" registrations, the app's defaults
 /// (including Sparkle's) and shortcut, the debug log folder, and, only under the rule above, the
@@ -100,11 +100,11 @@ final class Uninstaller: ObservableObject {
             resetShortcut: { KeyboardShortcuts.reset(.togglePanel) })
     }
 
-    /// `ownsDaemon`: DaemonManager.ownsDaemon, read before anything is unregistered.
+    /// `ownership`: DaemonManager.dataOwnership, read before anything is unregistered.
     /// The helper is unregistered whenever it is registered at all (enabled or
-    /// awaiting approval); the data folder is trashed only when this app ran
-    /// the daemon, the helper is gone, and no CLI login agent shares the folder.
-    func run(ownsDaemon: Bool) async {
+    /// awaiting approval); the data folder is trashed only when this app's
+    /// helper held it, the helper is gone, and no CLI login agent shares the folder.
+    func run(ownership: DataOwnership) async {
         guard phase != .running else { return }
         phase = .running
         var r = Report()
@@ -133,10 +133,8 @@ final class Uninstaller: ObservableObject {
             r.kept.append(
                 "The data folder (\(dataFolder.path)) was left alone: the fsearch command-line tool's login agent (mt.nd.fsearch) is installed and its daemon uses the same index."
             )
-        } else if !ownsDaemon {
-            r.kept.append(
-                "The data folder (\(dataFolder.path)) was left alone: this app's background helper wasn't enabled, so the index there wasn't the app's to remove."
-            )
+        } else if let reason = Self.keptReason(ownership) {
+            r.kept.append("The data folder (\(dataFolder.path)) was left alone: \(reason)")
         } else if helperGone {
             trash(dataFolder, "The index and data folder", into: &r)
         } else {
@@ -149,6 +147,17 @@ final class Uninstaller: ObservableObject {
         r.removed.append("The app's settings and recent files")
 
         phase = .done(r)
+    }
+
+    /// Why the data folder isn't the app's to remove, or nil when it is.
+    private static func keptReason(_ ownership: DataOwnership) -> String? {
+        switch ownership {
+        case .ours: nil
+        case .helperOff: "this app's background helper wasn't enabled, so the index there wasn't the app's to remove."
+        case .otherDaemon: "another fsearch daemon, not this app's helper, is using the index there."
+        case .unconfirmed:
+            "FSearch couldn't confirm that the daemon using it is this app's helper. If nothing else uses it, move it to the Trash yourself."
+        }
     }
 
     /// Trashes a folder if it exists, recording the outcome in the report.

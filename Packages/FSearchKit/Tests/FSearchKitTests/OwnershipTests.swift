@@ -121,6 +121,19 @@ import Testing
     }
 }
 
+@Suite struct DataOwnershipTests {
+    /// The shared data folder is the app's to trash only when our helper is enabled and positively holds the socket.
+    @Test func onlyOurHoldingHelperOwnsTheData() {
+        #expect(DaemonPlan.dataOwnership(helperEnabled: true, holder: .ours) == .ours)
+        #expect(DaemonPlan.dataOwnership(helperEnabled: true, holder: .other) == .otherDaemon)
+        // No pid in socket.lock (an older daemon, or nothing running): not proof that the index is ours.
+        #expect(DaemonPlan.dataOwnership(helperEnabled: true, holder: .none) == .unconfirmed)
+        for h in [SocketHolder.ours, .none, .other] {
+            #expect(DaemonPlan.dataOwnership(helperEnabled: false, holder: h) == .helperOff)
+        }
+    }
+}
+
 @Suite struct HelperUpdateTests {
     @Test func aChangedHelperOfOursIsRestartedOnce() {
         #expect(DaemonPlan.helperUpdate(owns: true, justRegistered: false, stored: "1:10:5", current: "2:11:6") == .restartThenStore)

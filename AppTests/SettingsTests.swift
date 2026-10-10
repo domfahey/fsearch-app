@@ -77,7 +77,7 @@ extension AppTests {
             seed(env)
             let helper = FakeHelper(.enabled), login = FakeLoginItem(.enabled), box = Box()
             let u = make(env, helper: helper, login: login, shortcutResets: box)
-            await u.run(ownsDaemon: true)
+            await u.run(ownership: .ours)
             #expect(helper.unregistered == 1 && login.unregistered == 1)
             #expect(env.workspace.trashed == [data, logs])
             for k in Uninstaller.defaultsKeys { #expect(env.defaults.object(forKey: k) == nil) }
@@ -93,7 +93,7 @@ extension AppTests {
             defer { env.tearDown() }
             let helper = FakeHelper(.notRegistered), login = FakeLoginItem(.notRegistered)
             let u = make(env, helper: helper, login: login)
-            await u.run(ownsDaemon: false)
+            await u.run(ownership: .helperOff)
             #expect(helper.unregistered == 0 && login.unregistered == 0)
             #expect(env.workspace.trashed == [logs])
             guard case let .done(r) = u.phase else { Issue.record("not done"); return }
@@ -101,12 +101,37 @@ extension AppTests {
             #expect(!r.kept[0].contains("command-line"))
         }
 
+        /// Another daemon on the socket, or none we can name, keeps the data folder, and the report says which.
+        @Test func dataIsKeptUnlessOwnershipIsPositive() async {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            for (ownership, reason) in [(DataOwnership.otherDaemon, "another fsearch daemon"), (.unconfirmed, "couldn't confirm")] {
+                let helper = FakeHelper(.enabled)
+                let u = make(env, helper: helper, login: nil)
+                await u.run(ownership: ownership)
+                #expect(helper.unregistered == 1)
+                #expect(!env.workspace.trashed.contains(data), "\(ownership)")
+                guard case let .done(r) = u.phase else { Issue.record("not done"); return }
+                #expect(r.kept.count == 1 && r.kept[0].contains(reason) && !r.kept[0].contains("wasn't enabled"), "\(r.kept)")
+            }
+        }
+
+        @Test func theManagerReportsOwnershipFromTheHolder() {
+            let env = TestEnv(helper: FakeHelper(.enabled))
+            defer { env.tearDown() }
+            #expect(env.app.daemon.dataOwnership == .unconfirmed, "TestEnv's holder is none")
+            let ours = DaemonManager(client: env.daemon, service: FakeHelper(.enabled), socketHolder: { .ours }, defaults: env.defaults)
+            #expect(ours.dataOwnership == .ours)
+            let testMode = DaemonManager(client: env.daemon, service: nil, socketHolder: { .ours }, defaults: env.defaults)
+            #expect(testMode.dataOwnership == .helperOff, "test mode has no helper")
+        }
+
         @Test func helperAwaitingApprovalIsUnregisteredButDataKept() async {
             let env = TestEnv()
             defer { env.tearDown() }
             let helper = FakeHelper(.requiresApproval)
             let u = make(env, helper: helper, login: nil)
-            await u.run(ownsDaemon: false)
+            await u.run(ownership: .helperOff)
             #expect(helper.unregistered == 1)
             #expect(!env.workspace.trashed.contains(data))
             guard case let .done(r) = u.phase else { Issue.record("not done"); return }
@@ -119,7 +144,7 @@ extension AppTests {
             defer { env.tearDown() }
             let helper = FakeHelper(.enabled)
             let u = make(env, helper: helper, login: nil, cliAgent: true)
-            await u.run(ownsDaemon: true)
+            await u.run(ownership: .ours)
             #expect(helper.unregistered == 1)
             #expect(env.workspace.trashed == [logs])
             guard case let .done(r) = u.phase else { Issue.record("not done"); return }
@@ -131,7 +156,7 @@ extension AppTests {
             defer { env.tearDown() }
             let sparkle = ["SUEnableAutomaticChecks", "SUHasLaunchedBefore", "SULastCheckTime", "SUSendProfileInfo"]
             for k in sparkle { env.defaults.set(true, forKey: k) }
-            await make(env, helper: nil, login: nil).run(ownsDaemon: false)
+            await make(env, helper: nil, login: nil).run(ownership: .helperOff)
             for k in sparkle { #expect(env.defaults.object(forKey: k) == nil, "\(k)") }
         }
 
@@ -143,7 +168,7 @@ extension AppTests {
                 helper: helper, loginItem: nil, workspace: env.workspace, defaults: env.defaults,
                 dataFolder: data, logFolder: logs, exists: { _ in true }, cliAgentInstalled: { false },
                 resetShortcut: {})
-            await u.run(ownsDaemon: true)
+            await u.run(ownership: .ours)
             #expect(!env.workspace.trashed.contains(data))
             guard case let .done(r) = u.phase else { Issue.record("not done"); return }
             #expect(r.failures.count == 1 && r.kept.count == 1)
@@ -154,13 +179,13 @@ extension AppTests {
             defer { env.tearDown() }
             env.workspace.trashError = TestError("locked")
             let u = make(env, helper: FakeHelper(.enabled), login: nil)
-            await u.run(ownsDaemon: true)
+            await u.run(ownership: .ours)
             guard case let .done(r) = u.phase else { Issue.record("not done"); return }
             #expect(r.failures.count == 2)
 
             let u2 = make(env, helper: nil, login: nil, exists: { _ in false })
             env.workspace.trashError = nil
-            await u2.run(ownsDaemon: true)
+            await u2.run(ownership: .ours)
             #expect(env.workspace.trashed.isEmpty)
         }
 
