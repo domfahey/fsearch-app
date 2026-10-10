@@ -9,11 +9,11 @@ These steps remove the app, its background helper, its index and its logs.
 
 FSearch then:
 
-- turns off its background helper, only if FSearch started it. A helper from the fsearch command-line tool (`mt.nd.fsearch`) is never touched.
+- turns off its own background helper, whether it is running or still waiting for your approval in Login Items. A helper from the fsearch command-line tool (`mt.nd.fsearch`) is never touched.
 - turns off **Open FSearch at login**.
-- moves `~/Library/Application Support/FSearch` (the index) to the Trash, only if FSearch owns the helper. If a CLI daemon owns it, the folder stays and the window says so.
+- moves `~/Library/Application Support/FSearch` (the index) to the Trash, only if FSearch's helper was running the daemon and the CLI's login agent (`~/Library/LaunchAgents/mt.nd.fsearch.plist`) isn't installed. Otherwise the folder stays and the window says why.
 - moves `~/Library/Logs/FSearch` to the Trash.
-- clears its settings and recent files.
+- clears its settings, recent files and update-check settings.
 
 The window lists what it removed. It cannot remove Full Disk Access: press **Open Full Disk Access…** and remove the entry by hand (step 4). Then quit FSearch (step 1) and delete the app (step 3).
 

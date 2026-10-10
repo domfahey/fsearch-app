@@ -66,7 +66,7 @@ struct SettingsView: View {
                     Button("Cancel", role: .cancel) {}
                 } message: {
                     Text(
-                        "This turns off the helper FSearch started and moves its index, logs and settings to the Trash. A separately installed fsearch command-line tool is left alone. You can undo it from the Trash."
+                        "This turns off FSearch's background helper and moves its logs and settings to the Trash, and its index too unless the fsearch command-line tool shares it. A separately installed fsearch command-line tool is left alone. You can undo it from the Trash."
                     )
                 }
         case .running:
