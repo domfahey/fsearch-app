@@ -1,8 +1,10 @@
 import AppKit
 import FSearchKit
 
+/// The ⌘K menu of actions for a result.
 @MainActor
 enum ActionsMenu {
+    /// Pops the menu up near the panel's lower right.
     static func show(for item: ResultItem, in panel: NSPanel?, app: AppState) {
         let menu = build(for: item, app: app)
         guard let view = panel?.contentView else { return }
@@ -37,6 +39,7 @@ enum ActionsMenu {
         }
         menu.addItem(entry("Open", .open) { FileActions.open(item, editor: app.editor) })
         let with = NSMenuItem(title: "Open With", action: nil, keyEquivalent: "")
+        // Capped at 12 so the submenu stays short.
         let apps = FileActions.workspace.urlsForApplications(toOpen: FileActions.url(path)).prefix(12)
         if apps.isEmpty {
             with.isEnabled = false
@@ -71,6 +74,7 @@ enum ActionsMenu {
         return menu
     }
 
+    /// Carries a menu item's action closure, which `NSMenuItem` can only reach through an Objective-C selector.
     final class Target: NSObject {
         let action: @MainActor () -> Void
         init(_ a: @escaping @MainActor () -> Void) { action = a }

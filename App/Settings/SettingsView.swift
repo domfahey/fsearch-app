@@ -3,6 +3,7 @@ import FSearchKit
 import KeyboardShortcuts
 import SwiftUI
 
+/// The Settings window: shortcut, editor, login item, updates, debug mode and uninstall.
 struct SettingsView: View {
     @EnvironmentObject var app: AppState
     /// Editor.rawValue, "" = none: the same key as AppState.editorRaw (read as AppState.editor).

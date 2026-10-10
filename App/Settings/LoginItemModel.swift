@@ -5,9 +5,21 @@ import Foundation
 /// the last failure to change it (shown inline, never as an alert).
 @MainActor
 final class LoginItemModel: ObservableObject {
-    enum Display: Equatable { case unavailable, off, on, needsApproval }
+    /// What the toggle shows.
+    enum Display: Equatable {
+        /// No login item (test mode).
+        case unavailable
+        /// Not registered.
+        case off
+        /// Registered and enabled.
+        case on
+        /// Registered, waiting for approval in Login Items.
+        case needsApproval
+    }
 
+    /// The login item's state.
     @Published private(set) var display: Display = .off
+    /// The last failure to change the item, shown inline.
     @Published private(set) var error: String?
     private let service: LoginItemService?
 
@@ -30,6 +42,7 @@ final class LoginItemModel: ObservableObject {
     /// The toggle shows on while registered, even before approval.
     var isOn: Bool { display == .on || display == .needsApproval }
 
+    /// The line under the toggle.
     var statusText: String {
         switch display {
         case .unavailable: "Not available in this build."
@@ -39,6 +52,7 @@ final class LoginItemModel: ObservableObject {
         }
     }
 
+    /// Registers or unregisters the item, then re-reads its status.
     func set(_ on: Bool) async {
         guard let service else { return }
         error = nil
@@ -53,5 +67,6 @@ final class LoginItemModel: ObservableObject {
         refresh()
     }
 
+    /// Opens System Settings at Login Items.
     func openLoginItems() { service?.openSystemSettingsLoginItems() }
 }

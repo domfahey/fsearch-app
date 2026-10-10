@@ -4,24 +4,30 @@ import KeyboardShortcuts
 import SwiftUI
 import os
 
-/// Wording for the Full Disk Access step. Task 0 (docs/notes/fda-attribution.md)
-/// decides which variant is right; change it here only.
+/// Wording for the Full Disk Access step. Which variant is right depends on the attribution experiment still open in
+/// docs/release-checklist.md ("Task 0"); change the wording here only.
 /// - "Turn on FSearch": the app's grant covers the bundled helper.
 /// - "Add FSearch's helper": the user must add FSearch.app/Contents/Helpers/fsearch by hand.
 enum FDACopy {
+    /// The button that opens Privacy settings.
     static let buttonLabel = "Turn on FSearch"
+    /// What to do in Privacy settings.
     static let help = "In Privacy Settings, find FSearch in the list and turn it on."
     /// A daemon started from the CLI is a different binary with its own grant.
     static let existingDaemonHelp =
         "Full Disk Access belongs to the fsearch daemon that's already running. Grant it to your fsearch binary in Privacy Settings and restart that daemon, or skip for now."
+    /// Privacy settings' Full Disk Access list.
     static let settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!
 }
 
 /// Onboarding's state and steps, apart from the view so each path is testable.
 @MainActor
 final class OnboardingFlow: ObservableObject {
+    /// The page being shown.
     @Published var step: OnboardingStep
+    /// What has been learned from the system and the daemon.
     @Published var facts = OnboardingFacts()
+    /// Entries indexed so far, for the progress line.
     @Published private(set) var entries = 0
     /// While start() or restart() runs, the poll leaves the daemon alone so it
     /// can't overwrite their result (e.g. .needsApproval).
@@ -31,6 +37,7 @@ final class OnboardingFlow: ObservableObject {
     /// The poll's in-flight refresh(); cancelled before start()/restart() so a
     /// slow refresh can't publish over their result.
     private var pollRefresh: Task<Void, Never>?
+    /// The app state, whose daemon onboarding drives.
     let app: AppState
     private let defaults: UserDefaults
     /// Closes the onboarding window once the last step is done.
@@ -42,6 +49,7 @@ final class OnboardingFlow: ObservableObject {
         self.step = step
     }
 
+    /// Whether the daemon answers (even while indexing).
     var daemonRunning: Bool {
         switch app.daemon.state {
         case .running, .indexing: true
@@ -49,10 +57,13 @@ final class OnboardingFlow: ObservableObject {
         }
     }
 
+    /// Whether the current step's result is in.
     var canContinue: Bool { FSearchKit.canContinue(step, facts) }
 
+    /// Reads the saved "skipped" flag when the window opens.
     func appeared() { facts.skippedFullDiskAccess = defaults.bool(forKey: "skippedFullDiskAccess") }
 
+    /// Moves to the next step (starting the helper on reaching it) or finishes onboarding.
     func next() {
         if let n = OnboardingStep(rawValue: step.rawValue + 1) {
             Log.onboarding.info("step \(String(describing: self.step), privacy: .public) -> \(String(describing: n), privacy: .public)")
@@ -78,14 +89,17 @@ final class OnboardingFlow: ObservableObject {
         }
     }
 
+    /// Opens Privacy settings and notes that the user went there to turn Full Disk Access on.
     func turnOnFullDiskAccess() {
         Log.onboarding.info("opening System Settings for Full Disk Access")
         pressedTurnOn = true
         FileActions.workspace.open(FDACopy.settingsURL)
     }
 
+    /// Opens Privacy settings without arming the restart.
     func openPrivacySettings() { FileActions.workspace.open(FDACopy.settingsURL) }
 
+    /// Remembers that the user chose to go on without Full Disk Access; the menu bar then shows a gentle reminder.
     func skipFullDiskAccess() {
         Log.onboarding.info("skipped Full Disk Access")
         pressedTurnOn = false
@@ -119,6 +133,7 @@ final class OnboardingFlow: ObservableObject {
         await t.value
     }
 
+    /// Copies the daemon's state into ``facts``.
     func apply() {
         switch app.daemon.state {
         case let .running(s):
@@ -156,6 +171,7 @@ final class OnboardingFlow: ObservableObject {
     }
 }
 
+/// The first-launch window: the four steps of ``OnboardingStep``, driven by an ``OnboardingFlow``.
 struct OnboardingView: View {
     @StateObject private var flow: OnboardingFlow
     /// Observed directly: AppState doesn't forward DaemonManager's changes.

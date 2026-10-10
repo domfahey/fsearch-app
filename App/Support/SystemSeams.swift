@@ -10,6 +10,7 @@ import ServiceManagement
 /// The bundled helper's login item.
 @MainActor
 final class SMAppHelperService: HelperService {
+    /// The helper's launch agent, registered from the app bundle (Contents/Library/LaunchAgents).
     private var service: SMAppService { .agent(plistName: DaemonManager.agentPlistName) }
 
     var status: DaemonPlan.ServiceStatus {

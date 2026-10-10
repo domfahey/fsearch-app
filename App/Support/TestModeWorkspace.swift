@@ -9,16 +9,22 @@ import Foundation
 /// from the test daemon's temp folder. App lookups are real (read-only).
 @MainActor
 final class TestModeWorkspace: Workspace {
+    /// The file the actions are appended to.
     let log: URL
+    /// The actions of this process, oldest first.
     private(set) var actions: [String] = []
 
+    /// Creates a workspace that logs to `log`.
     init(log: URL) { self.log = log }
 
     /// Next to the test daemon's socket, inside its temp HOME.
+    ///
+    /// - Parameter socketPath: The test daemon's socket.
     static func logFile(socketPath: String) -> URL {
         DebugFormat.dataDir(socketPath: socketPath).appendingPathComponent("actions.log")
     }
 
+    /// Appends one line to `actions` and to the log file, creating the file and its folder on first use.
     private func record(_ line: String) {
         actions.append(line)
         let data = Data((line + "\n").utf8)

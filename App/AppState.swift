@@ -1,16 +1,26 @@
 import FSearchKit
 import SwiftUI
 
+/// The app's shared state: the daemon, the search model, recents, the debug log and the action-error line.
+///
+/// Built once by ``live(options:)``; tests build their own with fakes through the initializer.
 @MainActor
 final class AppState: ObservableObject {
+    /// How this process was launched.
     let options: LaunchOptions
+    /// The daemon's lifecycle and state.
     let daemon: DaemonManager
+    /// The search box's model.
     let search: SearchModel
+    /// Files recently opened from the panel.
     let recents: Recents
+    /// The debug search log; written only while ``debugMode`` is on.
     let log: SearchLog
+    /// Debug mode: log searches and show timings and the debug windows.
     @AppStorage("debugMode") var debugMode = false
     /// Editor for content hits: `Editor.rawValue`, "" for none.
     @AppStorage("editor") var editorRaw = ""
+    /// The chosen editor, if any.
     var editor: Editor? {
         get { Editor(rawValue: editorRaw) }
         set { editorRaw = newValue?.rawValue ?? "" }
@@ -18,6 +28,7 @@ final class AppState: ObservableObject {
     /// Bumped whenever the recents may have changed (a file opened or trashed),
     /// so the panel re-reads `recents.paths`, which aren't observable themselves.
     @Published private(set) var recentsGeneration = 0
+    /// Tells the panel to re-read the recents.
     func recentsChanged() { recentsGeneration += 1 }
     /// Opening a file makes it a recent.
     func openedRecent(_ path: String) {
@@ -36,6 +47,7 @@ final class AppState: ObservableObject {
     /// Bumped by every error, so a caller can tell whether its action reported one.
     private(set) var actionErrorCount = 0
 
+    /// Shows a one-line error in the panel footer, bringing the panel back if an action already hid it.
     func showActionError(_ message: String) {
         actionErrorCount += 1
         actionError = message
@@ -51,6 +63,9 @@ final class AppState: ObservableObject {
     }
 
     /// The running app: real daemon connections, real login item (none in test mode).
+    /// The running app's state.
+    ///
+    /// - Parameter options: The launch options.
     static func live(options: LaunchOptions = .current) -> AppState {
         AppState(
             options: options, defaults: options.testMode ? AppDefaults.store : .standard,
@@ -61,6 +76,17 @@ final class AppState: ObservableObject {
             control: DaemonClient(socketPath: options.socketPath))
     }
 
+    /// Creates the state from its parts.
+    ///
+    /// - Parameters:
+    ///   - options: The launch options.
+    ///   - defaults: Where recents and settings live.
+    ///   - helper: The helper's login item, or nil in test mode.
+    ///   - names: The connection for name searches.
+    ///   - content: The connection for content searches.
+    ///   - control: The connection for status and "Save Now".
+    ///   - clock: Timers for the daemon wait loops.
+    ///   - cliAgentInstalled: Whether the CLI's login agent exists.
     init(
         options: LaunchOptions, defaults: UserDefaults, helper: HelperService?,
         names: SearchBackend, content: SearchBackend, control: any DaemonControl,
@@ -84,9 +110,13 @@ final class AppState: ObservableObject {
     /// The restart budget and recovery check (shared by every panel open).
     var status: MenuBarStatus = .shared
 
-    /// Every finished search: results refill the restart budget and re-check a
+    /// Handles every finished search; wired to ``SearchModel/onSettled``.
+    ///
+    /// Results refill the restart budget and re-check a
     /// daemon marked down; a dropped connection restarts it, once per unit of
     /// the outage's budget (each restart searches again, and may fail again).
+    ///
+    /// - Parameter phase: How the search ended.
     func searchSettled(_ phase: SearchPhase) {
         switch phase {
         case .results:

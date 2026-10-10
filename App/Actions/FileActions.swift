@@ -3,6 +3,7 @@ import FSearchKit
 import Quartz
 import os
 
+/// Everything the panel does to a file, routed through ``workspace`` so test mode can record instead of act.
 @MainActor
 enum FileActions {
     /// Where actions go: the real workspace; in test mode one that only records
@@ -22,6 +23,7 @@ enum FileActions {
         options.unitTestHost ? NSPasteboard(name: NSPasteboard.Name("com.domfahey.fsearch.apptests.host")) : .general
     }
 
+    /// The file URL for a path.
     static func url(_ path: String) -> URL { URL(fileURLWithPath: path) }
 
     /// The editor command for a content hit, if an editor is chosen and installed.
@@ -48,18 +50,22 @@ enum FileActions {
         workspace.open(file)
     }
 
+    /// Shows the file in Finder.
     static func reveal(_ path: String) { workspace.activateFileViewerSelecting([url(path)]) }
 
+    /// Puts the path on the pasteboard as text.
     static func copyPath(_ path: String) {
         pasteboard.clearContents()
         pasteboard.setString(path, forType: .string)
     }
 
+    /// Puts the file itself on the pasteboard, so Finder can paste it.
     static func copyFile(_ path: String) {
         pasteboard.clearContents()
         pasteboard.writeObjects([url(path) as NSURL])
     }
 
+    /// Opens the file in a chosen app.
     static func openWith(_ path: String, app: URL) {
         workspace.open([url(path)], withApplicationAt: app, completion: nil)
     }
@@ -71,6 +77,11 @@ enum FileActions {
         return isDir.boolValue ? path : (path as NSString).deletingLastPathComponent
     }
 
+    /// Opens Terminal in the folder for `path`.
+    ///
+    /// - Parameters:
+    ///   - path: A result's path.
+    ///   - onError: Called on the main actor with a message if Terminal is missing or can't open it.
     static func openTerminal(at path: String, onError: @escaping @MainActor (String) -> Void) {
         let folder = terminalFolder(for: path)
         guard let terminal = workspace.urlForApplication(withBundleIdentifier: "com.apple.Terminal") else {
@@ -86,6 +97,9 @@ enum FileActions {
         }
     }
 
+    /// Moves the file to the Trash.
+    ///
+    /// - Throws: The workspace's error, after logging it (privately).
     static func trash(_ path: String) throws {
         do { try workspace.trash(url(path)) } catch {
             Log.actions.error("trash failed: \(error.localizedDescription, privacy: .private)")
@@ -115,6 +129,7 @@ final class QuickLookSource: NSObject, @preconcurrency QLPreviewPanelDataSource 
         return QLPreviewPanel.sharedPreviewPanelExists() && QLPreviewPanel.shared().isVisible
     }
 
+    /// Shows the preview for a file, or closes it if it is already up.
     func toggle(_ u: URL, inert: Bool = Presentation.inert) {
         if QLPreviewPanel.sharedPreviewPanelExists(), QLPreviewPanel.shared().isVisible { return close() }
         item = u
@@ -126,6 +141,7 @@ final class QuickLookSource: NSObject, @preconcurrency QLPreviewPanelDataSource 
         p.reloadData()
     }
 
+    /// Closes the preview if it is up.
     func close() {
         if QLPreviewPanel.sharedPreviewPanelExists(), QLPreviewPanel.shared().isVisible { QLPreviewPanel.shared().orderOut(nil) }
     }
@@ -133,12 +149,13 @@ final class QuickLookSource: NSObject, @preconcurrency QLPreviewPanelDataSource 
     func numberOfPreviewItems(in panel: QLPreviewPanel!) -> Int { item == nil ? 0 : 1 }
     func previewPanel(_ panel: QLPreviewPanel!, previewItemAt index: Int) -> (any QLPreviewItem)! { item as NSURL? }
 
+    /// A local key monitor, held while the preview is attached so it is installed once.
     private var keyMonitor: Any?
 
     /// The launcher took control of the preview.
     func attach(_ panel: QLPreviewPanel) {
         panel.dataSource = self
-        // The preview is key while it is up, so ⌘Y lands on it: close it, as ⌘Y toggles.
+        // The preview is key while it is up, so ⌘Y goes to it, not the launcher's key handling: close it here, as ⌘Y toggles.
         keyMonitor =
             keyMonitor
             ?? NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
@@ -151,6 +168,7 @@ final class QuickLookSource: NSObject, @preconcurrency QLPreviewPanelDataSource 
             }
     }
 
+    /// The launcher gave up control of the preview.
     func detach(_ panel: QLPreviewPanel) {
         panel.dataSource = nil
         if let m = keyMonitor { NSEvent.removeMonitor(m) }

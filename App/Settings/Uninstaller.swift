@@ -5,15 +5,36 @@ import KeyboardShortcuts
 /// "Remove Background Helper and Data…": undoes what the app set up on this Mac.
 /// Never touches a CLI daemon (`mt.nd.fsearch`); the data folder goes only if
 /// this app owns the daemon that uses it and no CLI login agent shares it. Every side effect is injected.
+///
+/// What it removes: the helper and the "Open at login" registrations, the app's defaults
+/// (including Sparkle's) and shortcut, the debug log folder, and, only under the rule above, the
+/// data folder (moved to the Trash, so it is recoverable).
+///
+/// Why the data folder is kept in the other cases: the index there is a daemon's, and it is not the app's to delete if a
+/// CLI daemon (or a helper that couldn't be unregistered and may still be writing) uses it. The report says which case applied.
+///
+/// It cannot remove the app's Full Disk Access grant; the report links to Privacy settings for that.
 @MainActor
 final class Uninstaller: ObservableObject {
+    /// What happened, shown to the user when it finishes.
     struct Report: Equatable {
+        /// Things taken away.
         var removed: [String] = []
+        /// Things deliberately left, with the reason.
         var kept: [String] = []
+        /// Things that should have gone but couldn't.
         var failures: [String] = []
     }
 
-    enum Phase: Equatable { case idle, running, done(Report) }
+    /// Where the run is.
+    enum Phase: Equatable {
+        /// Not started, or dismissed.
+        case idle
+        /// In progress; a second `run` is ignored.
+        case running
+        /// Finished, with the report.
+        case done(Report)
+    }
 
     /// The app's UserDefaults keys; the shortcut is reset separately.
     static let defaultsKeys = [
@@ -21,8 +42,10 @@ final class Uninstaller: ObservableObject {
         // Sparkle's own.
         "SUEnableAutomaticChecks", "SUHasLaunchedBefore", "SULastCheckTime", "SUSendProfileInfo",
     ]
+    /// Privacy settings' Full Disk Access list, where the user removes the entry by hand.
     static let fullDiskAccessURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!
 
+    /// Where the run is.
     @Published private(set) var phase: Phase = .idle
 
     private let helper: HelperService?
@@ -35,6 +58,18 @@ final class Uninstaller: ObservableObject {
     private let cliAgentInstalled: () -> Bool
     private let resetShortcut: () -> Void
 
+    /// Creates an uninstaller.
+    ///
+    /// - Parameters:
+    ///   - helper: The helper's login item, or nil in test mode.
+    ///   - loginItem: The app's own login item, or nil in test mode.
+    ///   - workspace: Moves folders to the Trash.
+    ///   - defaults: Where the app's settings live.
+    ///   - dataFolder: The daemon's data folder.
+    ///   - logFolder: The debug log's folder.
+    ///   - exists: Whether a folder exists.
+    ///   - cliAgentInstalled: Whether the CLI's login agent exists.
+    ///   - resetShortcut: Clears the global shortcut.
     init(
         helper: HelperService?, loginItem: LoginItemService?, workspace: Workspace, defaults: UserDefaults,
         dataFolder: URL, logFolder: URL,
@@ -115,6 +150,7 @@ final class Uninstaller: ObservableObject {
         phase = .done(r)
     }
 
+    /// Trashes a folder if it exists, recording the outcome in the report.
     private func trash(_ url: URL, _ what: String, into r: inout Report) {
         guard exists(url) else { return }
         do {
@@ -125,6 +161,8 @@ final class Uninstaller: ObservableObject {
         }
     }
 
+    /// Opens the Full Disk Access list.
     func openFullDiskAccess() { workspace.open(Self.fullDiskAccessURL) }
+    /// Closes the report.
     func dismiss() { phase = .idle }
 }

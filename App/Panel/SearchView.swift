@@ -3,18 +3,24 @@ import KeyboardShortcuts
 import SwiftUI
 
 extension KeyboardShortcuts.Name {
+    /// The global shortcut that shows the panel; ⌥ Space unless the user changed it.
     static let togglePanel = Self("togglePanel", default: .init(.space, modifiers: [.option]))
 }
 
+/// The panel's contents: the search field, the rows (files, commands, fallbacks) and the key hints.
+///
+/// Rows follow ``PanelRows``: files first, then app commands, then the two fallbacks.
 struct SearchView: View {
     @EnvironmentObject var app: AppState
     @Bindable var model: SearchModel
+    /// The keyboard state, reduced by ``reduce(_:_:)``.
     @State var state: PanelState
     @FocusState private var focused: Bool
     let onEffect: (PanelEffect, [ResultItem]) -> Void
     let onSelect: (Int) -> Void
     let onCommand: (AppCommand) -> Void
 
+    /// The file rows: recents for an empty query, the search results otherwise.
     private var shown: [ResultItem] {
         // Reading the generation makes a trash or open re-read the recents.
         _ = app.recentsGeneration
@@ -160,12 +166,14 @@ struct SearchView: View {
         }
     }
 
+    /// Re-runs the current query in another mode (the fallback rows).
     private func switchMode(_ m: SearchMode) {
         model.mode = m
         state.selection = 0
         Task { await model.refresh() }
     }
 
+    /// Routes a key press through ``PanelInput`` and ``reduce(_:_:)``, then performs the effect.
     private func handle(_ press: KeyPress) -> KeyPress.Result {
         let rows = rows
         state.query = model.query; state.mode = model.mode; state.count = rows.count; state.files = shown.count

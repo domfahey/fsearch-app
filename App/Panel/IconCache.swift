@@ -5,9 +5,11 @@ import UniformTypeIdentifiers
 /// thousands of icon lookups.
 @MainActor
 final class IconCache {
+    /// The one cache.
     static let shared = IconCache()
     private var byType: [String: NSImage] = [:]
 
+    /// The icon for a file: per type for files, directly for folders and apps (whose icons are their own).
     func icon(for path: String) -> NSImage {
         let url = URL(fileURLWithPath: path)
         let ext = url.pathExtension.lowercased()

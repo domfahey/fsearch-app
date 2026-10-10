@@ -10,6 +10,7 @@ import SwiftUI
 @MainActor @Observable
 final class MenuBarStatus {
     static let shared = MenuBarStatus()
+    /// The current warning, or nil when all is well.
     private(set) var warning: MenuBarWarning?
     /// Restarts left in the current daemon outage; refilled when results arrive.
     @ObservationIgnored var restartBudget = RestartBudget()
@@ -29,6 +30,7 @@ final class MenuBarStatus {
         return warning?.symbol ?? (UpdateReminderModel.shared.indicatorVisible ? "arrow.down.circle" : "magnifyingglass")
     }
 
+    /// Follows the daemon's state and the defaults (the skipped and dismissed flags) to keep ``warning`` current.
     private func bind(to daemon: DaemonManager) {
         guard !bound else { return }
         bound = true
@@ -62,9 +64,12 @@ final class MenuBarStatus {
 /// The reminder's actions, apart from the view so tests can run them.
 @MainActor
 enum FullDiskAccessReminder {
+    /// Privacy settings' Full Disk Access list.
     static let settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!
+    /// The defaults key for "Don't Remind Me".
     static let dismissedKey = "dismissedFullDiskAccessReminder"
 
+    /// Opens the Full Disk Access list.
     static func openSettings() { FileActions.workspace.open(settingsURL) }
 
     /// Stores the flag; the defaults-change notification re-evaluates the menu bar.

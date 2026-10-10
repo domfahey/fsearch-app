@@ -6,9 +6,17 @@ import os
 /// launch on macOS 14, so the onboarding window is hosted directly.
 @MainActor
 enum OnboardingLauncher {
-    enum Decision: Equatable { case showOnboarding, startDaemon }
+    /// What launch does about the helper.
+    enum Decision: Equatable {
+        /// First run: onboarding starts the helper at its helper step.
+        case showOnboarding
+        /// Onboarded already, or test mode: start the helper now.
+        case startDaemon
+    }
 
+    /// The onboarding window while it is open.
     private(set) static var window: NSWindow?
+    /// Watches the window so closing it can still start the helper.
     private static var closeObserver: NSObjectProtocol?
     /// Set once the helper has been started, by onboarding or on close.
     private(set) static var startedDaemon = false
@@ -48,6 +56,7 @@ enum OnboardingLauncher {
     /// Onboarding's own step 2 started the helper.
     static func noteDaemonStarted() { startedDaemon = true }
 
+    /// Closes the onboarding window if it is open.
     static func close() { window?.close() }
 
     /// Forgets a closed window's run, so a test can start over.
