@@ -12,7 +12,7 @@
 # CFBundleShortVersionString = VERSION; CFBundleVersion = `git rev-list --count HEAD`
 # (needs full history), which must exceed the last released build: the one recorded in
 # $LAST_BUILD_FILE (default release/last-build; written after a successful run) and the
-# highest of the other v* tags (`git rev-list --count <tag>`), whichever is higher.
+# highest v[0-9]* tag other than v$VERSION on HEAD (`git rev-list --count <tag>`), whichever is higher.
 # Prerequisites (checked up front): DEVELOPER_ID, a notarytool profile, a real Sparkle key.
 # Also needs Xcode, xcodegen, Rust (for build-daemon.sh) and a full git clone with its tags.
 # Environment: FSEARCH_PREBUILT=1 uses Vendor/fsearch as built; FSEARCH_PROJECT_READY=1
@@ -61,7 +61,7 @@ VERSION=${VERSION#v}
 [ "$(git rev-parse --is-shallow-repository)" = false ] \
   || fail "shallow clone: CFBundleVersion needs full history (git fetch --unshallow)"
 BUILD=$(git rev-list --count HEAD)
-# The last released build: the higher of the local record and the previous v* tag.
+# The last released build: the higher of the local record and the previous version tag.
 LAST_BUILD_FILE=${LAST_BUILD_FILE:-release/last-build}
 LAST=0; LAST_FROM=""
 if [ -f "$LAST_BUILD_FILE" ]; then
@@ -69,16 +69,19 @@ if [ -f "$LAST_BUILD_FILE" ]; then
   [[ "$LAST" =~ ^[0-9]+$ ]] || fail "$LAST_BUILD_FILE does not hold a build number"
   LAST_FROM=$LAST_BUILD_FILE
 fi
-# A fresh CI checkout has no release/ folder, so the tags are its record: every v* tag
-# not on HEAD is an earlier release, built as `git rev-list --count <tag>`.
-TAGS=$(git tag --list 'v*')
+# A fresh CI checkout has no release/ folder, so the tags are its record: every v[0-9]*
+# tag except this release's own (v$VERSION on HEAD) is an earlier release, built as
+# `git rev-list --count <tag>`. Another tag on HEAD is a release of this same build,
+# so re-tagging a released commit fails the check below.
+TAGS=$(git tag --list 'v[0-9]*')
 if [ "${GITHUB_ACTIONS:-}" = true ] && [ -z "$TAGS" ]; then
-  fail "no v* tags in this checkout; fetch them (actions/checkout fetch-depth: 0, fetch-tags: true)"
+  fail "no v[0-9]* tags in this checkout; fetch them (actions/checkout fetch-depth: 0, fetch-tags: true)"
 fi
-HEAD_TAGS=$'\n'$(git tag --points-at HEAD)$'\n'
+HEAD_SHA=$(git rev-parse HEAD)
 while IFS= read -r t; do
   [ -n "$t" ] || continue
-  case "$HEAD_TAGS" in *$'\n'"$t"$'\n'*) continue ;; esac
+  TAG_SHA=$(git rev-parse "$t^{commit}")
+  [ "$t" = "v$VERSION" ] && [ "$TAG_SHA" = "$HEAD_SHA" ] && continue
   TAG_BUILD=$(git rev-list --count "$t^{commit}")
   if [ "$TAG_BUILD" -gt "$LAST" ]; then LAST=$TAG_BUILD; LAST_FROM="tag $t"; fi
 done <<<"$TAGS"
@@ -87,7 +90,7 @@ if [ -n "$LAST_FROM" ]; then
     || fail "CFBundleVersion $BUILD is not greater than the last release's $LAST ($LAST_FROM); Sparkle would not offer it"
   echo "Last released build: $LAST ($LAST_FROM)"
 else
-  echo "No previous release found ($LAST_BUILD_FILE absent, no other v* tag): skipping the build-number check"
+  echo "No previous release found ($LAST_BUILD_FILE absent, no other v[0-9]* tag): skipping the build-number check"
 fi
 echo "Releasing $VERSION (build $BUILD), phase: $PHASE"
 OUT=build/release

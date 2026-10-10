@@ -96,7 +96,7 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
 - The daemon builds with `cargo build --locked` from the exact pinned commit (a protected tag on the fork), before the signing keychain is imported in CI.
 - `Package.resolved` is committed, and CI and release builds use only it.
 - CI actions are pinned to full commit SHAs. Workflows are read-only by default; the release job gets write for the draft release and attestation.
-- The CI release job builds the project, resolves the Swift packages and archives the app before it imports the signing keychain; after that it only signs, notarizes and packages. The build-number check also compares against earlier `v*` tags, so it runs in CI too. The secret-check hooks check every pushed commit in its own scratch folder, block on a file they can't check, match key file names case-insensitively and catch `ghr_` tokens; CI shellchecks them.
+- The CI release job builds the project, resolves the Swift packages and archives the app before it imports the signing keychain; after that it only signs, notarizes and packages. The build-number check also compares against earlier `v[0-9]*` tags, so it runs in CI too. The secret-check hooks check every pushed commit in its own scratch folder, block on a file they can't check, match key file names case-insensitively and catch `ghr_` tokens; CI shellchecks them.
 - An OpenSSF Scorecard workflow checks the repository's supply-chain security practices.
 - A daemon running from outside FSearch's own app counts as FSearch's helper only when it is signed with FSearch's Developer ID. A signature that merely claims the helper's identifier, which anyone can make, no longer counts.
 
