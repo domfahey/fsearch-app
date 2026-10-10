@@ -28,7 +28,7 @@ The icon changes to a magnifying glass with an exclamation mark. Open the menu t
 |---|---|
 | The search helper isn't running | Choose **Fix…**, then **Restart Daemon**. |
 | The search helper needs your approval | Choose **Fix…**, then **Open Login Items Settings** and turn FSearch on. See below. |
-| Full Disk Access is off, so some files won't be found | See [Grant Full Disk Access](../how-to/grant-full-disk-access.md). This one has no **Fix…** button. |
+| Full Disk Access is off, so some files won't be found | See [Grant Full Disk Access](../how-to/grant-full-disk-access.md). This one has no **Fix…** button. If you skipped the Full Disk Access step, the menu-bar icon is a quieter magnifying glass in a circle, and the menu offers **Turn On Full Disk Access…** (**Grant Full Disk Access to fsearch…** when the app is using your CLI daemon) and **Don't Remind Me**. |
 
 ## Files in Desktop, Documents, Downloads, Mail or iCloud Drive are missing
 

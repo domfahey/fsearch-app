@@ -67,6 +67,31 @@ extension AppTests {
     }
 
     @Suite @MainActor
+    struct FullDiskAccessReminderTests {
+        @Test func opensTheFullDiskAccessPane() {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            FullDiskAccessReminder.openSettings()
+            #expect(env.workspace.opened.map(\.absoluteString)
+                == ["x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"])
+        }
+
+        @Test func dontRemindMeStoresTheFlagThatHidesTheReminder() {
+            let name = "fda-reminder-\(UUID().uuidString)"
+            let defaults = UserDefaults(suiteName: name)!
+            defer { defaults.removePersistentDomain(forName: name) }
+            #expect(!defaults.bool(forKey: "dismissedFullDiskAccessReminder"))
+            let off = DaemonCondition.running(fullDiskAccess: false)
+            #expect(MenuBarWarning.evaluate(off, skippedFullDiskAccess: true,
+                                            dismissedReminder: defaults.bool(forKey: FullDiskAccessReminder.dismissedKey)) != nil)
+            FullDiskAccessReminder.dismiss(defaults: defaults)
+            #expect(defaults.bool(forKey: "dismissedFullDiskAccessReminder"))
+            #expect(MenuBarWarning.evaluate(off, skippedFullDiskAccess: true,
+                                            dismissedReminder: defaults.bool(forKey: FullDiskAccessReminder.dismissedKey)) == nil)
+        }
+    }
+
+    @Suite @MainActor
     struct UpdaterTests {
         @Test func placeholderKeyNeverStartsSparkle() async {
             #expect(!Updater.isConfigured)
