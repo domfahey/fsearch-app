@@ -4,22 +4,26 @@ Follow-ups not done yet, grouped by priority. "You" items need the maintainer: a
 
 ## P1: next batch (app code; starts when the app-coverage work merges)
 
-- [ ] **App commands in the search panel:** typing "settings", "preferences" or "prefs" (prefix match, so "set" works) shows an "FSearch Settings" row in its own section above the files; ↵ opens Settings. Matching is a pure FSearchKit function with tests; leave room for About and Quit rows later.
-- [ ] **Launch at login for the app itself:** a Settings toggle (SMAppService.mainApp). Today only the helper starts at login, so the menu-bar icon and hotkey are missing after a reboot until the app is opened.
-- [ ] **Uninstall from inside the app:** a Settings button, "Remove Background Helper and Data…", that unregisters the login item and moves the data folder to the Trash. Update docs/uninstall.md to point to it.
-- [ ] **Full Disk Access reminder after Skip:** the spec promises a gentle menu-bar reminder when onboarding's Full Disk Access step is skipped. Today `MenuBarWarning.evaluate` stays silent after a skip. Show a dismissable reminder and update docs/reference/troubleshooting.md.
-- [ ] **Unified logging:** `os.Logger` with subsystem `com.domfahey.fsearch` and categories (daemon, panel, onboarding), so users can filter Console.app. No crash reporting service.
-- [ ] **"Report an Issue…" menu item:** opens a new GitHub issue pre-filled with the app version, macOS version, chip and daemon status, for the user to review. Nothing is sent automatically.
-- [ ] **Use the faster PanelRows in the panel:** FSearchKit now builds `PanelRows(files:query:mode:)` once per query (about 103 µs down to 1.8 µs for 50 rows); SearchView still calls the old static functions per row. Build it once per refresh.
+- [x] **App commands in the search panel:** typing "settings", "preferences" or "prefs" (prefix match, so "set" works) shows an "FSearch Settings" row in its own section above the files; ↵ opens Settings. Matching is a pure FSearchKit function with tests; leave room for About and Quit rows later.
+- [x] **Launch at login for the app itself:** a Settings toggle (SMAppService.mainApp). Today only the helper starts at login, so the menu-bar icon and hotkey are missing after a reboot until the app is opened.
+- [x] **Uninstall from inside the app:** a Settings button, "Remove Background Helper and Data…", that unregisters the login item and moves the data folder to the Trash. Update docs/uninstall.md to point to it.
+- [x] **Full Disk Access reminder after Skip:** the spec promises a gentle menu-bar reminder when onboarding's Full Disk Access step is skipped. Today `MenuBarWarning.evaluate` stays silent after a skip. Show a dismissable reminder and update docs/reference/troubleshooting.md.
+- [x] **Unified logging:** `os.Logger` with subsystem `com.domfahey.fsearch` and categories (daemon, panel, onboarding), so users can filter Console.app. No crash reporting service.
+- [x] **"Report an Issue…" menu item:** opens a new GitHub issue pre-filled with the app version, macOS version, chip and daemon status, for the user to review. Nothing is sent automatically.
+- [x] **Use the faster PanelRows in the panel:** FSearchKit now builds `PanelRows(files:query:mode:)` once per query (about 103 µs down to 1.8 µs for 50 rows); SearchView still calls the old static functions per row. Build it once per refresh.
 - [ ] **Coverage gate in CI:** fail below 90% (FSearchKit and app), and post a report on each pull request. Uses the app-coverage script.
 - [ ] **Warnings as errors for our targets only:** set `SWIFT_TREAT_WARNINGS_AS_ERRORS` in project.yml for FSearch and the test targets (a command-line flag breaks KeyboardShortcuts). The two UI-test concurrency warnings must be gone first.
 - [ ] **Apply formatting:** run `make format` repo-wide in one commit with no other changes (259 style-only issues), then remove `continue-on-error` from the CI swift-format step.
 - [x] **docs/architecture.md:** describes AppTests, the seams, the UI tests and coverage.
-- [ ] **Help menu:** README, docs index, keyboard shortcuts, query syntax, changelog.
+- [x] **Help menu:** README, docs index, keyboard shortcuts, query syntax, changelog.
 
 ## P1: repository layout
 
 - [x] **Tidy the root folder:** community files (CODE_OF_CONDUCT, SECURITY, SUPPORT) live in `.github/`; architecture, privacy, roadmap and this file live in `docs/`. README, LICENSE, CHANGELOG, CONTRIBUTING and THIRD_PARTY_NOTICES stay at the root. Every link was updated and checked with scripts/check-links.sh.
+
+## P1: test safety
+
+- [ ] **App tests must never take focus:** some AppTests made the real launcher panel the key window, stealing keystrokes (fixed for the panel). Onboarding, Quick Look, the activate call, the UI-test guard, throwaway defaults for UI tests, and clipboard restore are in progress, along with the low-signal app tests. Until done: no AppTests or UI test runs while someone is using the Mac.
 
 ## P1: tests and benchmarks
 
