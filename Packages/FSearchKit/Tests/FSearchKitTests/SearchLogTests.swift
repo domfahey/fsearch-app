@@ -65,4 +65,13 @@ import Testing
         #expect(inode() == before)
         #expect(log.entries().count == 2)
     }
+
+    @Test func appendsDoNotAddBlankLines() throws {
+        let s = sandbox(); defer { try? FileManager.default.removeItem(at: s.dir) }
+        let log = SearchLog(file: s.file, cap: 100)
+        for i in 0..<3 { log.append(SearchModel.LogEntry(query: "q\(i)", mode: .names, resultCount: 0, tookUs: nil, roundTripMs: 0, error: nil), at: Date()) }
+        let raw = try String(contentsOf: s.file, encoding: .utf8)
+        #expect(!raw.contains("\n\n"))
+        #expect(raw.split(separator: "\n", omittingEmptySubsequences: false).count == 4)
+    }
 }

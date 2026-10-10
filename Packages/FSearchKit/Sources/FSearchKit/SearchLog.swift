@@ -45,7 +45,7 @@ public final class SearchLog: @unchecked Sendable {
         if !FileManager.default.fileExists(atPath: file.path) {
             FileManager.default.createFile(atPath: file.path, contents: nil)
         }
-        guard let fh = try? FileHandle(forWritingTo: file) else { return }
+        guard let fh = try? FileHandle(forUpdating: file) else { return }
         defer { try? fh.close() }
         let end = (try? fh.seekToEnd()) ?? 0
         if end > 0 {
