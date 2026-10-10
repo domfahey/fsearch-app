@@ -1,0 +1,15 @@
+version: 2
+updates:
+  # Actions are pinned to full commit SHAs with a version comment.
+  # Dependabot updates the SHA and the comment together.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14
+    commit-message:
+      prefix: "ci"
+# No swift entry for Packages/FSearchKit: it has no package dependencies.
+# The app's own packages (KeyboardShortcuts, Sparkle) are declared in
+# project.yml for XcodeGen, which Dependabot cannot read. Bump them by hand.
