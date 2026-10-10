@@ -49,10 +49,10 @@ enum LogEntryFactory {
 
     // PanelRows: map every selectable row for a 50-result list.
     b.measure("keystroke.panelRows.50") {
-        let n = PanelRows.count(files: 50, query: plain, mode: .names)
+        let rows = PanelRows(files: 50, query: plain, mode: .names)
         var acc = 0
-        for i in 0..<n {
-            if case .result(let r)? = PanelRows.row(at: i, files: 50, query: plain, mode: .names) { acc &+= r }
+        for i in 0..<rows.count {
+            if case .result(let r)? = rows.row(at: i) { acc &+= r }
         }
         blackHole(acc)
     }
