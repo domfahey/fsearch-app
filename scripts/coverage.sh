@@ -20,6 +20,15 @@
 # "Excluding system adapters" leaves out the functions in EXCLUDE below:
 # thin pass-throughs to SMAppService, NSWorkspace/Process/Trash, app
 # activation and Sparkle, which tests replace with fakes and never run for real.
+#
+# Prerequisites: Xcode, and `xcodegen generate` run once (FSearch.xcodeproj);
+# the daemon at Vendor/fsearch for the UI tests. It never launches the app outside
+# those test runs and never touches the real index or the user's real defaults.
+# Exit codes: 0 ok; 1 a test failed, a gate was missed or a report couldn't be
+# built; 2 bad usage or a malformed --min.
+#
+# No `set -e`: both suites should run and be reported even if the first fails, so
+# failures are collected in $rc. `-u -o pipefail` still catch typos and broken pipes.
 set -u -o pipefail
 cd "$(dirname "$0")/.." || exit 1
 export DEVELOPER_DIR=${DEVELOPER_DIR:-$(xcode-select -p)}
@@ -35,7 +44,9 @@ while [ $# -gt 0 ]; do
     *) args+=("$1"); shift ;;
   esac
 done
+# --min must be a plain decimal number (no sign, one dot at most).
 case "$MIN" in "" | *[!0-9.]* | *.*.*) [ -z "$MIN" ] || { echo "coverage: --min must be a number, got '$MIN'" >&2; exit 2; } ;; esac
+# Re-set the positional parameters to what remains after removing --min; ${args[@]+...} is safe when empty under `set -u`.
 set -- ${args[@]+"${args[@]}"}
 usage() { echo "usage: $0 [--unit-only | --kit-only | --reuse UNIT.xcresult [UI.xcresult]] [--min PERCENT]" >&2; exit 2; }
 case "${1:-}" in
@@ -49,6 +60,7 @@ mkdir -p "$OUT"
 rc=0
 # Throwaway defaults suites the tests leave behind (TestEnv, AppDefaults.testSuiteName);
 # never the real com.domfahey.fsearch.plist.
+# Only the apptests suites; the glob can't match com.domfahey.fsearch.plist.
 sweep_test_defaults() { rm -f "$HOME"/Library/Preferences/com.domfahey.fsearch.apptests.*.plist; }
 trap sweep_test_defaults EXIT
 
@@ -115,6 +127,7 @@ import json, re, sys
 # file name -> the functions (exact xccov names) of system adapters left out
 # of the second number. Listed one by one, so a new function in these files is
 # counted unless someone decides it is an adapter too.
+# SMAppService members shared by the helper and login-item adapters.
 _SM = ["service.getter", "status.getter", "register()", "unregister()", "openSystemSettingsLoginItems()"]
 EXCLUDE = {
     "SystemSeams.swift": [f"{c}.{f}" for c in ("SMAppHelperService", "SMAppLoginItemService") for f in _SM] + [
@@ -137,6 +150,7 @@ EXCLUDE = {
         "closure #1 in default argument 1 of static AppActivation.live(inert:activate:)",
     ],
 }
+# A renamed or removed excluded function is reported as a problem, so the list can't silently go stale.
 d = json.load(open(sys.argv[1]))
 app = next(t for t in d["targets"] if t["name"] == "FSearch.app")
 cov = exe = xcov = xexe = 0

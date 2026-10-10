@@ -2,9 +2,14 @@
 # Builds App/Resources/Credits.html (shown in the About window) from
 # THIRD_PARTY_NOTICES.md. Run after editing the notices; `--check` exits 1 if
 # the committed file is out of date.
+#
+# Usage: scripts/gen-credits.sh [--check]
+# Prerequisites: none beyond the macOS base tools. Writes only App/Resources/Credits.html.
+# Exit codes: 0 ok; 1 with --check when Credits.html differs from a fresh build.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 out=App/Resources/Credits.html
+# Build into a temp file first so --check can compare and a failure never leaves a half-written Credits.html.
 tmp=$(mktemp)
 trap 'rm -f "$tmp"' EXIT
 {
@@ -23,6 +28,7 @@ by Sindre Sorhus and <a href="https://sparkle-project.org">Sparkle</a>.</p>
 <p>Inspired by <a href="https://www.raycast.com">Raycast</a> and <a href="https://www.voidtools.com">Everything</a> by voidtools. Not affiliated with either.</p>
 <pre>
 EOF
+  # Escape the notices for the <pre> block (& first, so the other escapes aren't doubled).
   sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' THIRD_PARTY_NOTICES.md
   printf '</pre>\n</body></html>\n'
 } > "$tmp"

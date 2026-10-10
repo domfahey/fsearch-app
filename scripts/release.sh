@@ -5,6 +5,11 @@
 # (needs full history), which must exceed the last released build recorded in
 # $LAST_BUILD_FILE (default release/last-build; written after a successful run).
 # Prerequisites (checked up front): DEVELOPER_ID, a notarytool profile, a real Sparkle key.
+# Also needs Xcode, xcodegen, Rust (for build-daemon.sh) and a full git clone.
+#
+# Writes only under build/release/ and release/last-build. It never touches the
+# real index, ~/Library/Application Support/FSearch, LaunchAgents or ~/.local/bin.
+# Exit codes: 0 released; 1 any failed check or step (the message says which).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -43,6 +48,7 @@ fi
 echo "Releasing $VERSION (build $BUILD)"
 OUT=build/release
 rm -rf "$OUT"; mkdir -p "$OUT"
+# Staging folder for the DMG contents; removed however the script ends.
 STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT
 
@@ -57,6 +63,7 @@ xcodebuild -project FSearch.xcodeproj -scheme FSearch -configuration Release \
   CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO archive
 APP="$OUT/FSearch.xcarchive/Products/Applications/FSearch.app"
 
+# Hardened runtime + secure timestamp are required for notarization.
 sign() { codesign --force --options runtime --timestamp --sign "$DEVELOPER_ID" "$@"; }
 
 # Inside-out, as Sparkle's docs prescribe: Autoupdate and Updater.app, then the
