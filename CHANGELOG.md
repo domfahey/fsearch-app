@@ -61,27 +61,30 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
 ### Fixed
 
 - The panel no longer opens with its search field behind the menu bar on screens shorter than about 1290pt.
-- ↵ and the row shortcuts pressed before results arrive wait for them, instead of opening the previous query's result.
+- ↵ and the row shortcuts pressed before results arrive wait for them, instead of opening the previous query's result. New results put the selection back on the top row first, so a waiting key never opens a row picked from the old results. A waiting key is dropped if the panel is hidden, the search fails or the index is still building, and it acts on the rows shown while a filter is still being typed (`foo ext:`) instead of being swallowed.
 - The results list scrolls to the keyboard selection, and holding ↓/↑ (or ⌃N/⌃P) keeps moving it.
 - Opening or revealing a file that has moved or been deleted shows an error, keeps the panel up and doesn't add it to Recents. Open With reports launch errors.
-- Open Folder in Terminal on a package opens the folder containing it, and folders with a dot in their name show a folder icon.
+- Open Folder in Terminal on a package opens the folder containing it, and folders with a dot in their name show a folder icon, in Recents too.
 - ⌘Y, ⌘K and ⌘⇧C work on non-Latin keyboard layouts.
 - The app decides it owns the daemon from the process holding the socket (the `socket.lock` pid, inside the app bundle), not just from its login item. After our helper yields to a CLI daemon the app stops claiming it, and a running CLI daemon is never restarted.
 - A leftover fsearch CLI login-agent plist with no daemon behind it no longer leaves FSearch without a daemon: after 10 seconds it starts its own helper.
 - After the daemon drops, the panel restarts it up to three times per outage (it stopped after one), one restart at a time, and its "Indexing your disk…" auto-refresh now runs. The indexing poll no longer runs while the panel is hidden.
-- After an app update, FSearch restarts its own helper once so the new daemon binary runs.
-- Turning on Full Disk Access from the menu takes effect: FSearch restarts its helper when you come back.
-- Timeouts, and disconnects after the restarts run out, say "The search helper isn't answering" (also in the menu bar) instead of "Starting search…" forever.
+- After an app update, FSearch restarts its own helper once so the new daemon binary runs. The old helper still counts as FSearch's own while it runs from the Trash or Sparkle's temporary folder, so the restart happens.
+- Turning on Full Disk Access from the menu takes effect: FSearch restarts its helper as soon as the grant shows, or at the latest when you come back.
+- Timeouts, and disconnects after the restarts run out, say "The search helper isn't answering" (also in the menu bar) instead of "Starting search…" forever. The message clears as soon as a search works again.
 - Older CLI daemons whose status lacks newer fields no longer show a false failure warning.
 - Settings, Index Details and Search Log open in front, and the update-available reminder comes back after a relaunch.
 - The client checks the id on every reply from the daemon, so a stray or late line can never be shown as the answer to a different search.
-- In Inside files and Definitions, a filter word with no value (`kind: Deployment`, `limit: 10`, `path: str`) is searched as text instead of causing a daemon error or a match-all filter. A word starting with a double quote is always text. A key with no value yet (for example `ext:`) is still treated as a filter, as the daemon does.
+- In Inside files and Definitions, a filter word with no value (`kind: Deployment`, `limit: 10`, `path: str`) is searched as text instead of causing a daemon error or a match-all filter. A word starting with a double quote is always text, so `"ext:` no longer holds back the search. A key with no value yet (for example `ext:`) is still treated as a filter, as the daemon does.
 - While a filter value is still being typed (`foo size:`, `type:c`, `kind:fi`, `size:1mb..`), the panel keeps the current results instead of flashing an error and clearing the list. A half-typed filter no longer leaves stale rows up after the query is replaced or the mode changes.
 - Searching for an accented name (`café`) finds files whose names Mac apps stored in decomposed form.
-- Recents no longer checks every file's existence on each panel redraw.
+- Less work on the main thread: Recents no longer checks every file's existence on each panel redraw, the footer works out the return action once per selected row, and in debug mode the Search Log file is secured once instead of on every search.
 - After a failed search, the debug footer no longer shows the previous search's timing.
 - The menu-bar status no longer crashes when the app's defaults change off the main thread (a3ad0df).
 - ⌃N and ⌃P move the selection even when SwiftUI reports them as control characters (4c49488).
+- When the chosen editor doesn't handle open-at-line links, a content hit opens in it as a plain file, without the line, instead of not opening.
+- Remove Background Helper and Data… keeps the shared index unless FSearch's own helper is confirmed to hold it, and says why it kept it: the helper is off, another fsearch daemon holds it, or it couldn't confirm.
+- Move to Applications opens the moved copy only after the old one has quit.
 
 ### Security
 
@@ -95,5 +98,6 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
 - CI actions are pinned to full commit SHAs. Workflows are read-only by default; the release job gets write for the draft release and attestation.
 - The CI release job builds the project, resolves the Swift packages and archives the app before it imports the signing keychain; after that it only signs, notarizes and packages. The build-number check also compares against earlier `v*` tags, so it runs in CI too. The secret-check hooks check every pushed commit in its own scratch folder, block on a file they can't check, match key file names case-insensitively and catch `ghr_` tokens; CI shellchecks them.
 - An OpenSSF Scorecard workflow checks the repository's supply-chain security practices.
+- A daemon running from outside FSearch's own app counts as FSearch's helper only when it is signed with FSearch's Developer ID. A signature that merely claims the helper's identifier, which anyone can make, no longer counts.
 
 [Unreleased]: https://github.com/domfahey/fsearch-app/commits/main
