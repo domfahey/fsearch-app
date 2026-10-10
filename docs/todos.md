@@ -14,12 +14,12 @@ Follow-ups not done yet, grouped by priority. "You" items need the maintainer: a
 - [ ] **Coverage gate in CI:** fail below 90% (FSearchKit and app), and post a report on each pull request. Uses the app-coverage script.
 - [ ] **Warnings as errors for our targets only:** set `SWIFT_TREAT_WARNINGS_AS_ERRORS` in project.yml for FSearch and the test targets (a command-line flag breaks KeyboardShortcuts). The two UI-test concurrency warnings must be gone first.
 - [ ] **Apply formatting:** run `make format` repo-wide in one commit with no other changes (259 style-only issues), then remove `continue-on-error` from the CI swift-format step.
-- [x] **ARCHITECTURE.md:** describes AppTests, the seams, the UI tests and coverage.
+- [x] **docs/architecture.md:** describes AppTests, the seams, the UI tests and coverage.
 - [ ] **Help menu:** README, docs index, keyboard shortcuts, query syntax, changelog.
 
 ## P1: repository layout
 
-- [ ] **Tidy the root folder:** move CODE_OF_CONDUCT.md, SECURITY.md and SUPPORT.md to `.github/` (GitHub still finds them there); move ARCHITECTURE.md, PRIVACY.md, ROADMAP.md and todos.md into `docs/`. Keep README, LICENSE, CHANGELOG, CONTRIBUTING and THIRD_PARTY_NOTICES at the root. Update every link and check with scripts/check-links.sh. *(Queued after the docs pass.)*
+- [x] **Tidy the root folder:** community files (CODE_OF_CONDUCT, SECURITY, SUPPORT) live in `.github/`; architecture, privacy, roadmap and this file live in `docs/`. README, LICENSE, CHANGELOG, CONTRIBUTING and THIRD_PARTY_NOTICES stay at the root. Every link was updated and checked with scripts/check-links.sh.
 
 ## P1: tests and benchmarks
 
@@ -43,7 +43,7 @@ Follow-ups not done yet, grouped by priority. "You" items need the maintainer: a
 
 ## P2: later features
 
-- [ ] **Everything-style search window (v2):** a full window with a sortable results table (name, folder, size, kind, date modified), a status bar, match-case/regex/path toggles, filter chips, saved searches and a preview pane. See ROADMAP.md. Needs a design pass, and daemon paging for large result sets.
+- [ ] **Everything-style search window (v2):** a full window with a sortable results table (name, folder, size, kind, date modified), a status bar, match-case/regex/path toggles, filter chips, saved searches and a preview pane. See docs/roadmap.md. Needs a design pass, and daemon paging for large result sets.
 - [ ] **App Intents:** a "Search files" action for Shortcuts.
 - [ ] **URL scheme:** `fsearch://search?q=…` opens the panel with a query.
 
@@ -59,10 +59,10 @@ Follow-ups not done yet, grouped by priority. "You" items need the maintainer: a
 
 ## You: GitHub settings (repo-level changes; needs your go-ahead)
 
-- [ ] Turn on private vulnerability reporting (SECURITY.md already points to it).
+- [ ] Turn on private vulnerability reporting (.github/SECURITY.md already points to it).
 - [ ] Turn on Dependabot alerts and security updates, and secret scanning with push protection.
 - [ ] Protect `main`: require pull requests and green CI.
-- [ ] Turn on GitHub Discussions (SUPPORT.md already points to it).
+- [ ] Turn on GitHub Discussions (.github/SUPPORT.md already points to it).
 - [ ] Labels: `question`, `good first issue`, `help wanted`, `upstream (fsearch)`.
 - [ ] OpenSSF Scorecard workflow and badge.
 
@@ -73,7 +73,7 @@ Follow-ups not done yet, grouped by priority. "You" items need the maintainer: a
 
 ## You: releases (needs your Sparkle keys and Developer ID)
 
-- [ ] The release checklist's user steps: the Task 0 Full Disk Access attribution experiment (the docs say which binary to look for once it's settled), Sparkle keys, the first real release run. See [docs/release-checklist.md](docs/release-checklist.md).
+- [ ] The release checklist's user steps: the Task 0 Full Disk Access attribution experiment (the docs say which binary to look for once it's settled), Sparkle keys, the first real release run. See [docs/release-checklist.md](release-checklist.md).
 - [ ] Check the Zed, Sublime Text and BBEdit open-at-line commands on a Mac that has them.
 - [ ] Tag v0.1.0. Release notes come from CHANGELOG.md: one signed, notarized DMG with its SHA-256 checksum. Switch the changelog's `[Unreleased]` link to a compare link.
 - [ ] GitHub artifact attestations (provenance) and an SBOM for each release.
@@ -88,8 +88,8 @@ Follow-ups not done yet, grouped by priority. "You" items need the maintainer: a
 - [x] Leaked test daemon: a watchdog pipe kills it when the test process dies, and orphans are swept at start.
 - [x] Repo made public, with a description crediting fsearch and its inspirations, and topics.
 - [x] Docs following Diátaxis: index, first-search tutorial, how-to guides, reference (shortcuts, query syntax, settings, files, troubleshooting, FAQ) and ADRs 0001–0006.
-- [x] PRIVACY.md (fsearch itself has no network code), SUPPORT.md, ROADMAP.md, docs/install.md (Gatekeeper, first run, why not the App Store), docs/uninstall.md.
-- [x] ARCHITECTURE.md and CONTRIBUTING's "Running your own build" (local builds are signed for that Mac only).
+- [x] docs/privacy.md (fsearch itself has no network code), .github/SUPPORT.md, docs/roadmap.md, docs/install.md (Gatekeeper, first run, why not the App Store), docs/uninstall.md.
+- [x] docs/architecture.md and CONTRIBUTING's "Running your own build" (local builds are signed for that Mac only).
 - [x] Privacy manifest (`PrivacyInfo.xcprivacy`) and app category (Productivity).
 - [x] Release script verification (staple, signature, SHA-256 checksum).
 - [x] CI on macOS 14 (Xcode 16.2) and macOS 26.

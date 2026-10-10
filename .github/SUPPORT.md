@@ -22,8 +22,8 @@ To copy Index Details, open it from the menu bar with debug mode on. Click **Cop
 
 ## Feature requests
 
-Open a [feature request](https://github.com/domfahey/fsearch-app/issues/new?template=feature_request.yml). See also [ROADMAP.md](ROADMAP.md) for what is already planned.
+Open a [feature request](https://github.com/domfahey/fsearch-app/issues/new?template=feature_request.yml). See also [Roadmap](../docs/roadmap.md) for what is already planned.
 
 ## Security problems
 
-Do not open a public issue for a security problem. Follow [SECURITY.md](SECURITY.md) to report it privately.
+Do not open a public issue for a security problem. Follow [Security](SECURITY.md) to report it privately.

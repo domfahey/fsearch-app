@@ -35,16 +35,16 @@ Facts to look up.
 
 Why the app is built the way it is.
 
-- [Architecture](../ARCHITECTURE.md)
+- [Architecture](architecture.md)
 - [Architecture Decision Records](adr/README.md)
 
 ## Project
 
 - [Contributing](../CONTRIBUTING.md)
-- [Security](../SECURITY.md)
-- [Privacy](../PRIVACY.md)
-- [Support](../SUPPORT.md)
-- [Roadmap](../ROADMAP.md)
+- [Security](../.github/SECURITY.md)
+- [Privacy](privacy.md)
+- [Support](../.github/SUPPORT.md)
+- [Roadmap](roadmap.md)
 - [Changelog](../CHANGELOG.md)
 - [Release checklist](release-checklist.md)
 - [Design spec](superpowers/specs/2026-10-10-fsearch-app-design.md)

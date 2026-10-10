@@ -2,7 +2,7 @@
 
 This guide tells you how to set up, build, test and submit a change to FSearch for Mac. Please read it before you open a pull request.
 
-By taking part you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+By taking part you agree to follow the [Code of Conduct](.github/CODE_OF_CONDUCT.md).
 
 ## Set up
 
@@ -48,7 +48,7 @@ xcodebuild -project FSearch.xcodeproj -scheme FSearch -configuration Debug \
 - **Signing.** `project.yml` sets `CODE_SIGN_IDENTITY: "-"`, so local builds are ad-hoc signed. That is fine for development, and it needs no certificate.
 - **Permissions.** macOS ties Full Disk Access and the login item to an app's code signature, so an ad-hoc build is a different app to macOS than the released one. Grant Full Disk Access to your build on its own, and expect to grant it again after you rebuild. Onboarding walks you through it.
 - **Releases.** Developer ID signing and notarization live only in [`scripts/release.sh`](scripts/release.sh). They need the maintainer's credentials (`DEVELOPER_ID`, a `notarytool` profile and the Sparkle key), so you cannot produce a release build.
-- **Avoid clashing with other installs.** The app uses whichever daemon answers on `~/Library/Application Support/FSearch/fsearch.sock`, and it will not replace one it did not start. If the released FSearch or the `fsearch` CLI daemon is running, your build talks to that daemon. Your build also has the same bundle ID and login-agent label as the release, so quit the release app first. To run against a throwaway daemon, start one with a temporary `HOME` and `FSEARCH_ROOT` (see [`scripts/ui-smoke.sh`](scripts/ui-smoke.sh)) and launch the app with `-FSEARCH_SOCKET <that socket>`. In that test mode the app never registers the login item or restarts a daemon. See [ARCHITECTURE.md](ARCHITECTURE.md).
+- **Avoid clashing with other installs.** The app uses whichever daemon answers on `~/Library/Application Support/FSearch/fsearch.sock`, and it will not replace one it did not start. If the released FSearch or the `fsearch` CLI daemon is running, your build talks to that daemon. Your build also has the same bundle ID and login-agent label as the release, so quit the release app first. To run against a throwaway daemon, start one with a temporary `HOME` and `FSEARCH_ROOT` (see [`scripts/ui-smoke.sh`](scripts/ui-smoke.sh)) and launch the app with `-FSEARCH_SOCKET <that socket>`. In that test mode the app never registers the login item or restarts a daemon. See [Architecture](docs/architecture.md).
 - **Never run tests against your real index.** See [Tests](#tests).
 
 ## Code style
@@ -80,7 +80,7 @@ xcodebuild -project FSearch.xcodeproj -scheme FSearch -configuration Debug \
 
 ## Reporting bugs and ideas
 
-Use the issue templates. For a bug, include the Index Details output from debug mode and remove private paths first. Report security problems privately. See [SECURITY.md](SECURITY.md).
+Use the issue templates. For a bug, include the Index Details output from debug mode and remove private paths first. Report security problems privately. See [Security](.github/SECURITY.md).
 
 ## Updating dependencies
 
@@ -95,6 +95,6 @@ There is no CLA or DCO. By contributing, you agree that your work is released un
 
 ## See also
 
-- [Architecture](ARCHITECTURE.md)
+- [Architecture](docs/architecture.md)
 - [Release checklist](docs/release-checklist.md)
 - [Documentation hub](docs/README.md)

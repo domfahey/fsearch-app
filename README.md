@@ -47,12 +47,12 @@ The [documentation hub](docs/README.md) links everything. Common starting points
 - [Tutorial: your first search](docs/tutorial-first-search.md)
 - [Query syntax](docs/reference/query-syntax.md) and [keyboard shortcuts](docs/reference/keyboard-shortcuts.md)
 - [Troubleshooting](docs/reference/troubleshooting.md) and the [FAQ](docs/reference/faq.md)
-- [Architecture](ARCHITECTURE.md) and [decision records](docs/adr/README.md)
-- [Privacy](PRIVACY.md), [Support](SUPPORT.md), [Roadmap](ROADMAP.md) and the [Changelog](CHANGELOG.md)
+- [Architecture](docs/architecture.md) and [decision records](docs/adr/README.md)
+- [Privacy](docs/privacy.md), [Support](.github/SUPPORT.md), [Roadmap](docs/roadmap.md) and the [Changelog](CHANGELOG.md)
 
 ## How it works
 
-The app bundles a universal (arm64 and x86_64) fsearch daemon and registers it as a background login item with SMAppService. The app talks to the daemon over a local Unix socket in `~/Library/Application Support/FSearch`. If a daemon is already answering, such as one installed by the fsearch CLI (`fsearch install --login`), the app uses it. For the full picture, see [ARCHITECTURE.md](ARCHITECTURE.md).
+The app bundles a universal (arm64 and x86_64) fsearch daemon and registers it as a background login item with SMAppService. The app talks to the daemon over a local Unix socket in `~/Library/Application Support/FSearch`. If a daemon is already answering, such as one installed by the fsearch CLI (`fsearch install --login`), the app uses it. For the full picture, see [Architecture](docs/architecture.md).
 
 ## Development
 
@@ -100,11 +100,11 @@ and `cd Packages/FSearchKit && swift test`. Tests never touch your real index; s
 
 ## Privacy
 
-Your index and logs stay on your Mac. The app has no telemetry and makes no network requests of its own. The only network code is the Sparkle updater, which checks for updates once it is configured. See [PRIVACY.md](PRIVACY.md).
+Your index and logs stay on your Mac. The app has no telemetry and makes no network requests of its own. The only network code is the Sparkle updater, which checks for updates once it is configured. See [Privacy](docs/privacy.md).
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) and follow the [Code of Conduct](CODE_OF_CONDUCT.md). For questions and bug reports, see [SUPPORT.md](SUPPORT.md). To report a vulnerability, see [SECURITY.md](SECURITY.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) and follow the [Code of Conduct](.github/CODE_OF_CONDUCT.md). For questions and bug reports, see [Support](.github/SUPPORT.md). To report a vulnerability, see [Security](.github/SECURITY.md).
 
 ## License
 

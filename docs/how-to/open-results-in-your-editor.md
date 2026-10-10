@@ -23,7 +23,7 @@ The list shows **Default app** and only the supported editors installed on your 
 
 Each command is the tool inside the editor's app bundle. For Xcode it is `/usr/bin/xed`.
 
-VS Code, Cursor and Xcode have been checked on a real Mac. The Zed, Sublime Text and BBEdit paths have not been tested against a real install yet. If one of them does not work for you, please report it (see [Support](../../SUPPORT.md)).
+VS Code, Cursor and Xcode have been checked on a real Mac. The Zed, Sublime Text and BBEdit paths have not been tested against a real install yet. If one of them does not work for you, please report it (see [Support](../../.github/SUPPORT.md)).
 
 ## What opens when
 

@@ -46,7 +46,7 @@ Open **Search Log…** from the menu. It lists each search this app makes: time,
 - Turning debug mode off deletes the log and closes the debug windows.
 - Nothing is recorded while debug mode is off.
 
-See [Privacy](../../PRIVACY.md).
+See [Privacy](../privacy.md).
 
 ## See also
 

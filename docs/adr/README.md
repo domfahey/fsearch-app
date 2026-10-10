@@ -13,4 +13,4 @@ These records explain why FSearch for Mac is built the way it is. Each one state
 
 To add a record, copy the shape of an existing one, use the next number, and add a row here. Do not edit an accepted record to change its decision. Write a new one that supersedes it.
 
-For the big picture, see [Architecture](../../ARCHITECTURE.md). The original design is in the [design spec](../superpowers/specs/2026-10-10-fsearch-app-design.md).
+For the big picture, see [Architecture](../architecture.md). The original design is in the [design spec](../superpowers/specs/2026-10-10-fsearch-app-design.md).

@@ -43,8 +43,8 @@ You can remove the permission at any time in System Settings, under Privacy & Se
 
 ## Deleting your data
 
-To remove the app, its background helper, its index, and its logs, follow [docs/uninstall.md](docs/uninstall.md).
+To remove the app, its background helper, its index, and its logs, follow [docs/uninstall.md](uninstall.md).
 
 ## Questions
 
-For privacy questions, open an issue on the [GitHub repository](https://github.com/domfahey/fsearch-app/issues). For security problems, see [SECURITY.md](SECURITY.md).
+For privacy questions, open an issue on the [GitHub repository](https://github.com/domfahey/fsearch-app/issues). For security problems, see [Security](../.github/SECURITY.md).

@@ -52,4 +52,4 @@ See [Uninstall](../uninstall.md).
 ## See also
 
 - [Uninstall](../uninstall.md)
-- [Privacy](../../PRIVACY.md)
+- [Privacy](../privacy.md)
