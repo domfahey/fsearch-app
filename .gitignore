@@ -1,0 +1,8 @@
+.build/
+DerivedData/
+*.xcodeproj/
+Vendor/fsearch
+.superpowers/
+build/
+Vendor/fsearch.rev
+.worktrees*/

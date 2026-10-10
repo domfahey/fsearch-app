@@ -1,0 +1,48 @@
+name: FSearch
+options:
+  bundleIdPrefix: com.domfahey
+  deploymentTarget: { macOS: "14.0" }
+packages:
+  FSearchKit: { path: Packages/FSearchKit }
+  KeyboardShortcuts: { url: https://github.com/sindresorhus/KeyboardShortcuts, exactVersion: "2.4.0" }
+  Sparkle: { url: https://github.com/sparkle-project/Sparkle, exactVersion: "2.10.0" }
+targets:
+  FSearch:
+    type: application
+    platform: macOS
+    sources: [App]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.domfahey.fsearch
+        INFOPLIST_FILE: App/Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: App/Resources/FSearch.entitlements
+        CODE_SIGN_IDENTITY: "-"
+        ENABLE_HARDENED_RUNTIME: YES
+        SWIFT_VERSION: "6.0"
+        ARCHS: "arm64 x86_64"
+        ONLY_ACTIVE_ARCH: NO
+    dependencies:
+      - package: FSearchKit
+      - package: KeyboardShortcuts
+      - package: Sparkle
+    postCompileScripts:
+      - name: Embed fsearch daemon
+        basedOnDependencyAnalysis: false
+        script: |
+          set -e
+          test -x "$SRCROOT/Vendor/fsearch" || { echo "error: run scripts/build-daemon.sh"; exit 1; }
+          mkdir -p "$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers" "$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Library/LaunchAgents"
+          cp "$SRCROOT/Vendor/fsearch" "$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers/fsearch"
+          cp "$SRCROOT/App/Resources/LaunchAgent.plist" "$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Library/LaunchAgents/com.domfahey.fsearch.daemon.plist"
+          codesign --force --options runtime --timestamp=none --sign "${EXPANDED_CODE_SIGN_IDENTITY:--}" "$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers/fsearch"
+  AppUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources: [AppUITests]
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "6.0"
+        CODE_SIGN_IDENTITY: "-"
+        ENABLE_APP_SANDBOX: NO
+    dependencies: [{ target: FSearch }]

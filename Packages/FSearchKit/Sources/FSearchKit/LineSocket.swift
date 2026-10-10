@@ -1,0 +1,83 @@
+import Darwin
+import Foundation
+
+/// A blocking, newline-framed Unix-socket connection. Not thread-safe: the
+/// owner serializes calls.
+final class LineSocket {
+    private var fd: Int32 = -1
+    private var buffer = Data()
+    let path: String
+    let timeout: TimeInterval
+
+    init(path: String, timeout: TimeInterval) { (self.path, self.timeout) = (path, timeout) }
+    deinit { close() }
+
+    func close() {
+        if fd >= 0 { Darwin.close(fd) }
+        fd = -1
+        buffer.removeAll()
+    }
+
+    private func connectIfNeeded() throws {
+        if fd >= 0 { return }
+        let s = socket(AF_UNIX, SOCK_STREAM, 0)
+        guard s >= 0 else { throw DaemonError.disconnected }
+        var addr = sockaddr_un()
+        addr.sun_family = sa_family_t(AF_UNIX)
+        let fits = path.utf8.count < MemoryLayout.size(ofValue: addr.sun_path)
+        guard fits else { Darwin.close(s); throw DaemonError.disconnected }
+        withUnsafeMutableBytes(of: &addr.sun_path) { p in _ = path.withCString { strncpy(p.baseAddress!.assumingMemoryBound(to: CChar.self), $0, p.count - 1) } }
+        var tv = timeval(tv_sec: Int(timeout), tv_usec: Int32((timeout - Double(Int(timeout))) * 1_000_000))
+        setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
+        setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
+        var one: Int32 = 1
+        setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, &one, socklen_t(MemoryLayout<Int32>.size))
+        let len = socklen_t(MemoryLayout<sockaddr_un>.size)
+        let r = withUnsafePointer(to: &addr) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(s, $0, len) } }
+        guard r == 0 else { Darwin.close(s); throw DaemonError.disconnected }
+        fd = s
+    }
+
+    /// Send one line and read one line back. A connection that was already open
+    /// and fails with `.disconnected` (the daemon restarted or dropped it) is
+    /// re-dialled once and the line resent. Timeouts are not retried, and a fresh
+    /// dial is never retried.
+    func roundTrip(_ line: Data) throws -> Data {
+        let reused = fd >= 0
+        do {
+            return try exchange(line)
+        } catch DaemonError.disconnected where reused {
+            return try exchange(line)
+        }
+    }
+
+    /// One attempt. Any failure closes the connection, so the next attempt dials again.
+    private func exchange(_ line: Data) throws -> Data {
+        do {
+            try connectIfNeeded()
+            var out = line
+            out.append(UInt8(ascii: "\n"))
+            let sent = out.withUnsafeBytes { write(fd, $0.baseAddress, out.count) }
+            guard sent == out.count else { throw DaemonError.disconnected }
+            return try readLine()
+        } catch {
+            close()
+            throw error
+        }
+    }
+
+    private func readLine() throws -> Data {
+        var chunk = [UInt8](repeating: 0, count: 64 * 1024)
+        while true {
+            if let nl = buffer.firstIndex(of: UInt8(ascii: "\n")) {
+                let line = buffer[buffer.startIndex..<nl]
+                buffer.removeSubrange(buffer.startIndex...nl)
+                return Data(line)
+            }
+            let n = read(fd, &chunk, chunk.count)
+            if n > 0 { buffer.append(contentsOf: chunk[0..<n]); continue }
+            if n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK) { throw DaemonError.timeout }
+            throw DaemonError.disconnected
+        }
+    }
+}

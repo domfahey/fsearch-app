@@ -256,6 +256,22 @@ helper, or must the helper be added itself? Onboarding step 3's wording
 depends on the answer; its flow (watch `status.full_disk_access`) holds either
 way.
 
+## Implementation notes (v1)
+
+Where the shipped v1 differs from this spec:
+
+- The bundled LaunchAgent plist is `com.domfahey.fsearch.daemon.plist`, not
+  `<team-id>.fsearch.plist`.
+- The engine is built from the `domfahey/fsearch` fork at a pinned commit
+  (`scripts/build-daemon.sh`) until the upstream PRs merge; then it moves to an
+  upstream tag.
+- The ⌥-click debug toggle is replaced by a Debug Mode menu item (⌥⌘D) and a
+  toggle in Settings.
+- Index Details doesn't show the daemon's pid yet; that waits on upstream
+  `status` reporting it.
+- The Full Disk Access attribution experiment ("First step before building",
+  Task 0) is still open; it is tracked in `docs/release-checklist.md`.
+
 ## Out of scope for v1
 
 - The search window (v2), with clickable filter chips, sorting and previews.
