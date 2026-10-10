@@ -38,6 +38,7 @@ struct MenuContent: View {
             Divider()
         }
         SettingsLink { Text("Settings…") }
+        CheckForUpdatesItem()
         Button("Quit FSearch") { NSApp.terminate(nil) }
     }
 }

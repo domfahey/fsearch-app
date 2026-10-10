@@ -1,0 +1,72 @@
+name: CI
+on:
+  push:
+    branches: [main, v1]
+    tags: ['v*']
+  pull_request:
+
+# UI tests (AppUITests) are not run here: they need a logged-in GUI session and
+# accessibility permission that hosted runners don't grant reliably. Run locally.
+jobs:
+  kit:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - run: scripts/build-daemon.sh
+      - run: swift test
+        working-directory: Packages/FSearchKit
+
+  app:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - run: brew install xcodegen
+      - run: scripts/build-daemon.sh
+      - run: xcodegen generate
+      - run: >
+          xcodebuild -project FSearch.xcodeproj -scheme FSearch -configuration Debug
+          -derivedDataPath build CODE_SIGN_IDENTITY=- build
+
+  release:
+    # Only on version tags. Secrets are referenced by name; none live in the repo.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [kit, app]
+    runs-on: macos-15
+    env:
+      DEVELOPER_ID: ${{ secrets.DEVELOPER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - run: brew install xcodegen
+      - name: Import signing certificate
+        env:
+          CERT_P12_BASE64: ${{ secrets.DEVELOPER_ID_CERT_P12_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERT_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          echo "$CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security import "$RUNNER_TEMP/cert.p12" -k build.keychain -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+          rm "$RUNNER_TEMP/cert.p12"
+      - name: Store notary credentials
+        env:
+          APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
+          TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
+          APP_PASSWORD: ${{ secrets.NOTARY_APP_PASSWORD }}
+        run: xcrun notarytool store-credentials fsearch-notary --apple-id "$APPLE_ID" --team-id "$TEAM_ID" --password "$APP_PASSWORD"
+      - run: scripts/release.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FSearch-dmg
+          path: build/release/*.dmg
