@@ -227,8 +227,16 @@ final class TestEnv {
         FileActions.workspace = FakeWorkspace()
         FileActions.pasteboard = NSPasteboard(name: NSPasteboard.Name("com.domfahey.fsearch.apptests.idle"))
         pasteboard.releaseGlobally()
-        defaults.removePersistentDomain(forName: suite)
+        TestEnv.removeSuite(suite)
         try? FileManager.default.removeItem(at: dir)
+    }
+
+    /// Clears a throwaway suite and deletes the plist cfprefsd leaves behind.
+    static func removeSuite(_ name: String) {
+        UserDefaults(suiteName: name)?.removePersistentDomain(forName: name)
+        let plist = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Preferences/\(name).plist")
+        try? FileManager.default.removeItem(at: plist)
     }
 }
 

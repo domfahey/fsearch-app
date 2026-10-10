@@ -120,7 +120,7 @@ extension AppTests {
                                defaults: UserDefaults(suiteName: "com.domfahey.fsearch.apptests.panel")!, helper: nil,
                                names: StubDaemon(), content: StubDaemon(), control: StubDaemon())
             #expect(app.panel === PanelController.shared)
-            UserDefaults(suiteName: "com.domfahey.fsearch.apptests.panel")?.removePersistentDomain(forName: "com.domfahey.fsearch.apptests.panel")
+            TestEnv.removeSuite("com.domfahey.fsearch.apptests.panel")
         }
     }
 }
