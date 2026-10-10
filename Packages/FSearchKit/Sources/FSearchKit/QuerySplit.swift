@@ -1,5 +1,7 @@
 /// Content queries: the typed text is the pattern, except fsearch filters
-/// (`ext:rs`, `in:~/x`, `mtime:<7d`), which narrow the files searched.
+/// (`ext:rs`, `in:~/x`, `mtime:<7d`), which narrow the files searched. As in
+/// the daemon, a known key with an empty value (`ext:`) is still a filter, and
+/// keys match case-sensitively.
 /// Sending the text as `grep:...` instead would turn a second word into a
 /// name filter.
 ///
@@ -69,7 +71,7 @@ public enum QuerySplit {
 
     private static func isFilter(_ word: String) -> Bool {
         let plain = unquoted(word)
-        guard let colon = plain.firstIndex(of: ":"), plain.index(after: colon) < plain.endIndex else { return false }
+        guard let colon = plain.firstIndex(of: ":") else { return false }
         return keys.contains(String(plain[..<colon]))
     }
 }

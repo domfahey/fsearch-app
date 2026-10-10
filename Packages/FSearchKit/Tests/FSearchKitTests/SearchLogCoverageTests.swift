@@ -66,6 +66,22 @@ import Testing
         #expect(lines.count == 3)
     }
 
+    @Test func reopenedLogCountsTheLinesAlreadyThere() throws {
+        let s = sandbox(); defer { try? FileManager.default.removeItem(at: s.dir) }
+        try FileManager.default.createDirectory(at: s.file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let a = SearchLog(file: s.file, cap: 3)
+        for i in 0..<5 { a.append(entry("old\(i)"), at: Date()) }
+        let lines = { try String(contentsOf: s.file, encoding: .utf8).split(separator: "\n").count }
+        // A new instance starts from the 5 lines on disk: one more reaches 2x cap
+        // (no rewrite yet), the next goes over it and compacts.
+        let b = SearchLog(file: s.file, cap: 3)
+        b.append(entry("new0"), at: Date())
+        #expect(try lines() == 6)
+        b.append(entry("new1"), at: Date())
+        #expect(try lines() == 3)
+        #expect(b.entries().map(\.query) == ["old4", "new0", "new1"])
+    }
+
     @Test func corruptLinesCountTowardCompactionButNotEntries() throws {
         let s = sandbox(); defer { try? FileManager.default.removeItem(at: s.dir) }
         try FileManager.default.createDirectory(at: s.file.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -133,12 +149,20 @@ import Testing
         }
     }
 
-    @Test func concurrentAppendsAcrossCompactionStayWithinBounds() async {
+    @Test func concurrentAppendsAcrossCompactionStayWithinBounds() async throws {
         let s = sandbox(); defer { try? FileManager.default.removeItem(at: s.dir) }
-        let log = SearchLog(file: s.file, cap: 10)
+        let cap = 10
+        let log = SearchLog(file: s.file, cap: cap)
         await withTaskGroup(of: Void.self) { g in
             for t in 0..<4 { g.addTask { for i in 0..<40 { log.append(self.entry("t\(t)-\(i)"), at: Date()) } } }
         }
-        #expect(log.entries().count == 10)
+        let got = log.entries().map(\.query)
+        #expect(got.count == cap)
+        #expect(Set(got).count == cap, "no record duplicated by a compaction")
+        for t in 0..<4 {
+            let mine = got.filter { $0.hasPrefix("t\(t)-") }.map { Int($0.split(separator: "-")[1])! }
+            #expect(mine == mine.sorted(), "per-thread order holds across compaction")
+        }
+        #expect(try String(contentsOf: s.file, encoding: .utf8).split(separator: "\n").count <= 2 * cap)
     }
 }
