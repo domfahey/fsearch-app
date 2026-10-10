@@ -5,6 +5,7 @@ This checklist is for maintainers cutting a release of FSearch for Mac. Nothing 
 ## One-time user steps (not automated)
 
 - [ ] Generate the Sparkle EdDSA key pair: run Sparkle's `generate_keys` (from the Sparkle package's `bin/`). The private key goes in your Keychain; put the printed public key in `SUPublicEDKey` in `App/Resources/Info.plist`. Until this is done the key is `REPLACE_WITH_SPARKLE_PUBLIC_KEY`, the updater is not started, "Check for Updates…" is hidden, and `scripts/release.sh` refuses to run.
+- [ ] Back up the EdDSA private key: `generate_keys -x fsearch-sparkle-private.key` exports it from the Keychain; store the file in a password manager, never in the repo. Losing it means existing installs can't update. Restore on another Mac with `generate_keys -f fsearch-sparkle-private.key`.
 - [ ] Developer ID Application certificate installed; `export DEVELOPER_ID="Developer ID Application: Your Name (TEAMID)"`.
 - [ ] `xcrun notarytool store-credentials fsearch-notary`.
 - [ ] Set up the GitHub Pages site behind `SUFeedURL` (`https://domfahey.github.io/fsearch-app/appcast.xml`) once.
@@ -15,9 +16,9 @@ This checklist is for maintainers cutting a release of FSearch for Mac. Nothing 
 
 Run on a real Mac, on the DMG produced by `scripts/release.sh`.
 
-- [ ] Before building: bump `CFBundleShortVersionString` and `CFBundleVersion` in `App/Resources/Info.plist`.
+- [ ] Tag the release (`git tag v0.1.0`) and run `scripts/release.sh 0.1.0` (or run it on the tagged commit with no argument). It sets `CFBundleShortVersionString` from the version and `CFBundleVersion` from `git rev-list --count HEAD` (needs a full clone), and refuses to build if that number is not greater than the one in `release/last-build` (written after each successful run; keep it with your release records, or copy the last appcast's build number into it on a new machine). Debug builds say 0.1.0 (1) from `project.yml`.
 
-- [ ] First real release run only: verify the signing of Sparkle's nested code. `codesign -dvv` on `Sparkle.framework/Versions/B/{Autoupdate,Updater.app,XPCServices/Installer.xpc,XPCServices/Downloader.xpc}` shows the Developer ID authority, a timestamp and `flags=0x10000(runtime)`; `codesign -d --entitlements - .../Downloader.xpc` matches what the Sparkle package shipped (an empty dict as of 2.x via SPM); the `--deep --strict` verify passed.
+- [ ] First real release run only: verify the signing of Sparkle's nested code. `codesign -dvv` on `Sparkle.framework/Versions/B/{Autoupdate,Updater.app}` shows the Developer ID authority, a timestamp and `flags=0x10000(runtime)`; the `--deep --strict` verify passed. The app is not sandboxed, so a build phase deletes Sparkle's `XPCServices` (Installer.xpc, Downloader.xpc); `ls .../Sparkle.framework/Versions/B` must not list `XPCServices`, and the release script fails if it reappears.
 - [ ] The release script finished without error: it ran `stapler validate` on the app and DMG and `codesign --verify --deep --strict` on the app.
 - [ ] `spctl` accepts the DMG and the app (the release script prints "accepted" for both).
 - [ ] The DMG opens with FSearch.app beside an Applications shortcut.
@@ -35,7 +36,8 @@ Run on a real Mac, on the DMG produced by `scripts/release.sh`.
 - [ ] Upgrade over the previous version via Sparkle: Full Disk Access is still on, and the index wasn't rebuilt.
 - [ ] With the CLI's daemon running (`fsearch install --login`), the app uses it and doesn't start a second one.
 - [ ] Debug mode on: the search log fills; Clear Log empties it; debug off removes the file.
-- [ ] After verifying: run Sparkle's `generate_appcast` on `build/release` (it reads the EdDSA private key from your Keychain) and publish `appcast.xml`, the DMG and its `FSearch-<version>.dmg.sha256` (written by the release script; also attach both to the GitHub release) to the `SUFeedURL` GitHub Pages site; check that an older build sees the update.
+- [ ] Update test (before publishing to everyone): build a copy with a lowered version (`xcodebuild ... CURRENT_PROJECT_VERSION=0`, or edit the built app's `CFBundleVersion`), install it, run `defaults delete com.domfahey.fsearch SULastCheckTime` to clear Sparkle's check timer, and launch it: the update must be offered, install and relaunch. With FSearch in the background, a scheduled check shows the menu-bar icon change and **Update Available…** instead of a window.
+- [ ] After verifying: run Sparkle's `generate_appcast` on `build/release` (a local step for now, not CI; it reads the EdDSA private key from your Keychain). The app requires a signed feed (`SURequireSignedFeed`), so never hand-edit `appcast.xml` (release notes, minimum OS, phased rollout): re-run `generate_appcast` so the feed signature is regenerated. Then publish `appcast.xml`, the DMG and its `FSearch-<version>.dmg.sha256` (written by the release script; also attach both to the GitHub release) to the `SUFeedURL` GitHub Pages site; check that an older build sees the update.
 
 CI does not run the UI tests (no GUI session on hosted runners); run them locally.
 

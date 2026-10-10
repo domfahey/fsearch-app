@@ -13,6 +13,17 @@ Open **Settings…** from the menu-bar icon.
 | Open FSearch at login | On or off | Off | Opens the app when you log in, using a Login Item. Shows the real status: on, waiting for approval (with a button that opens Login Items), or off. A failure appears under the switch. |
 | Debug mode | On or off | Off | Shows the debug dot, timings, Index Details and Search Log. Turning it off deletes the search log. See [Turn on debug mode](../how-to/turn-on-debug-mode.md). |
 
+### Updates
+
+Shown only in releases that can update themselves (a build without the update signing key hides it, and so does the **Check for Updates…** menu item).
+
+| Setting | Values | Default | What it does |
+|---|---|---|---|
+| Automatically check for updates | On or off | On | Lets FSearch check for a new version in the background. Sparkle stores this itself (`SUEnableAutomaticChecks`). |
+| Check Now | Button | | Checks immediately. Disabled while a check is already running. |
+
+When a background check finds an update and FSearch isn't the front app, it doesn't open a window. The menu-bar icon changes to a down-arrow circle and the menu gets **Update Available…** at the top; choose it to see the update.
+
 **Remove Background Helper and Data…** sits below the options. After you confirm, it removes the helper, the login item, the data and log folders (to the Trash) and the app's settings. See [Uninstall](../uninstall.md).
 
 The same debug switch is in the menu as **Turn On Debug Mode** (⌥⌘D).
