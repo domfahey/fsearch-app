@@ -20,6 +20,8 @@ public struct PanelState: Equatable, Sendable {
 
 /// What a key does to the panel. No UI involved, so every binding is testable.
 public func reduce(_ s: inout PanelState, _ key: PanelKey) -> PanelEffect {
+    // Never act on a row that does not exist.
+    s.selection = min(max(0, s.selection), max(0, s.count - 1))
     let has = s.count > 0
     switch key {
     case .up: s.selection = max(0, s.selection - 1); return .none
@@ -36,6 +38,7 @@ public func reduce(_ s: inout PanelState, _ key: PanelKey) -> PanelEffect {
         if s.mode != .names { s.mode = .names; return .none }
         return .hide
     case .backspaceOnEmpty:
+        guard s.query.isEmpty else { return .none }
         s.mode = .names
         return .none
     }
