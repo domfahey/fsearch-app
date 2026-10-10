@@ -131,6 +131,27 @@ public struct DaemonStatus: Decodable, Equatable, Sendable {
     public let indexBytes, contentDocs, contentSegments, contentBytes, contentPending: Int
     /// Whether the daemon can read protected folders, and whether it owns the index (as opposed to following another daemon's).
     public let fullDiskAccess, owner: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case entries, dirs, overlay, removed, eventId, indexBytes, contentDocs, contentSegments, contentBytes, contentPending,
+            fullDiskAccess, owner
+    }
+
+    /// Only `entries` is required. Older daemons lack newer fields (`owner`
+    /// before fsearch 9560a09), which default to values that raise no warning:
+    /// a daemon from before followers existed is the owner, and an unknown
+    /// Full Disk Access state isn't reported as off.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        func int(_ k: CodingKeys) throws -> Int { try c.decodeIfPresent(Int.self, forKey: k) ?? 0 }
+        entries = try c.decode(Int.self, forKey: .entries)
+        (dirs, overlay, removed) = (try int(.dirs), try int(.overlay), try int(.removed))
+        eventId = try c.decodeIfPresent(UInt64.self, forKey: .eventId) ?? 0
+        (indexBytes, contentDocs, contentSegments) = (try int(.indexBytes), try int(.contentDocs), try int(.contentSegments))
+        (contentBytes, contentPending) = (try int(.contentBytes), try int(.contentPending))
+        fullDiskAccess = try c.decodeIfPresent(Bool.self, forKey: .fullDiskAccess) ?? true
+        owner = try c.decodeIfPresent(Bool.self, forKey: .owner) ?? true
+    }
 }
 
 /// Why a daemon call failed. Its `description` is user-facing text.

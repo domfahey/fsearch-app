@@ -8,8 +8,10 @@ public enum DaemonCondition: Equatable, Sendable {
     case indexing
     /// The bundled helper waits for approval in Login Items.
     case needsApproval
-    /// Not answering.
+    /// Not running: nothing answers, or the helper failed to start.
     case failed
+    /// There but not answering searches (timeouts, or the restarts ran out).
+    case unresponsive
 }
 
 /// A menu-bar warning: a "Fix…" problem, or a gentle reminder.
@@ -53,6 +55,7 @@ public struct MenuBarWarning: Equatable, Sendable {
     ) -> MenuBarWarning? {
         switch c {
         case .failed: MenuBarWarning(message: "The search helper isn't running", offersFix: true)
+        case .unresponsive: MenuBarWarning(message: "The search helper isn't answering", offersFix: true)
         case .needsApproval: MenuBarWarning(message: "The search helper needs your approval", offersFix: true)
         case let .running(fda) where !fda && !skippedFullDiskAccess:
             MenuBarWarning(message: "Full Disk Access is off, so some files won't be found", offersFix: false)

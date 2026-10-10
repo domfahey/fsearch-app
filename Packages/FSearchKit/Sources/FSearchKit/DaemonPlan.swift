@@ -3,9 +3,10 @@ import Foundation
 /// What the app does at launch about the search daemon.
 ///
 /// The invariant: the app never takes over. It never stops or replaces a daemon it didn't
-/// start: one that already answers (e.g. a CLI install's) is used, and so is a
-/// CLI login agent that is only briefly down. Only when nothing else is around
-/// does it register the bundled helper, and never again once it is enabled.
+/// start: one that already answers (e.g. a CLI install's) is used, and a CLI login agent
+/// that is only briefly down is waited for. Only when nothing answers does it register the
+/// bundled helper, and never again once it is enabled. (A registered helper can't take over
+/// either: the daemon exits when another one holds the socket lock.)
 public enum DaemonPlan: Equatable, Sendable {
     /// Use whatever answers (or will answer soon): just refresh.
     case useExisting
@@ -32,6 +33,13 @@ public enum DaemonPlan: Equatable, Sendable {
 
     /// How long to keep pinging before registering (a CLI daemon restarting).
     public static let recheckWindow: Duration = .seconds(3)
+    /// With a CLI login agent installed, its daemon gets longer to come back.
+    public static let cliRecheckWindow: Duration = .seconds(10)
+
+    /// The recheck window: longer when a CLI login agent is installed.
+    public static func recheckWindow(cliAgentInstalled: Bool) -> Duration {
+        cliAgentInstalled ? cliRecheckWindow : recheckWindow
+    }
 
     /// Chooses the launch plan.
     ///
@@ -39,22 +47,29 @@ public enum DaemonPlan: Equatable, Sendable {
     ///   - existingAnswers: Whether a daemon already answers a ping.
     ///   - ownStatus: The state of the helper bundled with the app.
     ///   - cliAgentInstalled: Whether a CLI login agent (`fsearch install --login`) exists, even if its daemon is briefly down.
-    /// - Returns: ``useExisting`` whenever something answers or a CLI agent is installed, even if our helper needs approval, so the user is never asked to approve a second daemon.
+    /// - Returns: ``useExisting`` whenever something answers; with a CLI agent installed,
+    ///   ``recheckThenRegister`` (a longer window, see ``recheckWindow(cliAgentInstalled:)``),
+    ///   so a restarting CLI daemon wins but a leftover plist doesn't leave the app without one.
     public static func decide(existingAnswers: Bool, ownStatus: ServiceStatus, cliAgentInstalled: Bool) -> DaemonPlan {
         if existingAnswers { return .useExisting }
         if ownStatus == .enabled { return .refreshOwn }
-        // Before approval: a CLI agent's daemon, even one restarting, is
-        // preferred to asking the user to approve a second daemon.
-        if cliAgentInstalled { return .useExisting }
+        // A CLI agent's daemon, even one restarting, is preferred to asking the
+        // user to approve a second daemon; but a leftover plist with nothing
+        // behind it (a failed install, a deleted binary) must not leave the app
+        // without any daemon, so wait for it, then fall back to ours.
+        if cliAgentInstalled { return .recheckThenRegister }
         if ownStatus == .requiresApproval { return .needsApproval }
         return .recheckThenRegister
     }
 
     /// The plan after the bounded re-ping of `.recheckThenRegister`.
     ///
-    /// - Parameter existingAnswers: Whether a daemon answered during the recheck window.
-    public static func afterRecheck(existingAnswers: Bool) -> DaemonPlan {
-        existingAnswers ? .useExisting : .registerBundled
+    /// - Parameters:
+    ///   - existingAnswers: Whether a daemon answered during the recheck window.
+    ///   - ownStatus: The helper's status; one awaiting approval isn't registered again.
+    public static func afterRecheck(existingAnswers: Bool, ownStatus: ServiceStatus) -> DaemonPlan {
+        if existingAnswers { return .useExisting }
+        return ownStatus == .requiresApproval ? .needsApproval : .registerBundled
     }
 
     /// The plan after a successful `register()`.
@@ -67,18 +82,60 @@ public enum DaemonPlan: Equatable, Sendable {
 
 /// Restart and no-answer decisions for a daemon the app is already managing.
 public extension DaemonPlan {
-    /// What a restart request does: just refresh, or re-register the helper.
+    /// What a restart request does.
     enum RestartAction: Equatable, Sendable {
         /// Leave the daemon running and re-read its state.
         case refreshOnly
         /// Unregister and register the app's own helper again.
         case reregister
+        /// Nothing answers and nothing is ours: start one the way launch does.
+        case start
     }
-    /// The app only restarts a daemon it registered itself; any other
-    /// (a CLI install's, a test daemon) is left running.
+    /// The app only restarts a daemon it owns; any other that answers (a CLI
+    /// install's, a test daemon) is left running. When nothing answers and
+    /// nothing is ours, it starts one the way launch does (`start()` rechecks
+    /// first, so a CLI daemon coming back still wins).
     ///
-    /// - Parameter owns: Whether the app registered the running helper.
-    static func restartAction(owns: Bool) -> RestartAction { owns ? .reregister : .refreshOnly }
+    /// - Parameters:
+    ///   - owns: Whether the daemon is ours (see ``owns(helperEnabled:holder:)``).
+    ///   - answers: Whether a daemon answers a ping.
+    static func restartAction(owns: Bool, answers: Bool) -> RestartAction {
+        if owns { return .reregister }
+        return answers ? .refreshOnly : .start
+    }
+
+    /// Whether the daemon is ours: our login item is enabled and the socket
+    /// isn't held by some other daemon (our helper yields to a CLI agent's).
+    ///
+    /// - Parameters:
+    ///   - helperEnabled: Whether our helper's login item is enabled.
+    ///   - holder: Who holds the daemon's socket.
+    static func owns(helperEnabled: Bool, holder: SocketHolder) -> Bool {
+        helperEnabled && holder != .other
+    }
+
+    /// What to do after launch about a helper that may run an older binary.
+    enum HelperUpdate: Equatable, Sendable {
+        /// Leave it alone.
+        case nothing
+        /// Just record the current identity.
+        case store
+        /// Restart our helper once, then record the identity.
+        case restartThenStore
+    }
+    /// After launch: a helper of ours still running an older binary (the app
+    /// was updated under it) is restarted once. A helper registered just now
+    /// already runs the current binary.
+    ///
+    /// - Parameters:
+    ///   - owns: Whether the daemon is ours; any other is never restarted.
+    ///   - justRegistered: Whether launch registered the helper just now.
+    ///   - stored: The identity last seen running.
+    ///   - current: The bundled binary's identity, nil if unreadable.
+    static func helperUpdate(owns: Bool, justRegistered: Bool, stored: String?, current: String?) -> HelperUpdate {
+        guard owns, let current, stored != current else { return .nothing }
+        return justRegistered ? .store : .restartThenStore
+    }
 
     /// How an unanswered refresh is reported.
     enum NoAnswer: Equatable, Sendable {

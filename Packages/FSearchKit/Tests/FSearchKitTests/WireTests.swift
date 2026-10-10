@@ -56,6 +56,20 @@ import Testing
         #expect(s.entries == 6646939 && s.fullDiskAccess && s.owner && s.eventId == 1304740247)
     }
 
+    /// A CLI daemon from before fsearch 9560a09 has no `owner` (and older ones
+    /// lack more): status still decodes, with defaults that raise no warning.
+    @Test func decodesAnOlderDaemonsStatus() throws {
+        let line = #"{"ok":true,"entries":12,"dirs":3,"overlay":0,"removed":0,"event_id":9}"#
+        let s = try decodeReply(Data(line.utf8), as: DaemonStatus.self)
+        #expect(s.entries == 12 && s.dirs == 3 && s.eventId == 9)
+        #expect(s.owner && s.fullDiskAccess)
+        #expect(s.indexBytes == 0 && s.contentDocs == 0 && s.contentSegments == 0 && s.contentBytes == 0 && s.contentPending == 0)
+        let bare = try decodeReply(Data(#"{"ok":true,"entries":1}"#.utf8), as: DaemonStatus.self)
+        #expect(bare.entries == 1 && bare.dirs == 0 && bare.eventId == 0)
+        // Not a status at all: still an error.
+        #expect(throws: DaemonError.self) { try decodeReply(Data(#"{"ok":true}"#.utf8), as: DaemonStatus.self) }
+    }
+
     @Test func errorsMapToDaemonError() {
         #expect(throws: DaemonError.indexing("indexing (first run scans the whole disk, ~20s)")) {
             try decodeReply(Data(#"{"ok":false,"error":"indexing (first run scans the whole disk, ~20s)"}"#.utf8), as: DaemonStatus.self)

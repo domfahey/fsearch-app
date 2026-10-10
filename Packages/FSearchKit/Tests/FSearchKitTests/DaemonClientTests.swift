@@ -34,6 +34,23 @@ import Testing
         #expect(Date().timeIntervalSince(t0) < 1.0)
     }
 
+    /// A socket served by another user is never trusted: no request is sent.
+    @Test func aPeerOfAnotherUserIsRefused() async throws {
+        let d = FakeDaemon { _ in ["ok": true] }
+        defer { d.stop() }
+        let stranger = DaemonClient(socketPath: d.path, expectedPeerUid: getuid() &+ 1)
+        await #expect(throws: DaemonError.disconnected) { try await stranger.ping() }
+        #expect(d.requests.isEmpty)
+        try await DaemonClient(socketPath: d.path).ping()
+        #expect(d.requests.count == 1)
+    }
+
+    @Test func peerCheckIsBySameUid() {
+        #expect(peerIsTrusted(peerUid: 501, expected: 501))
+        #expect(!peerIsTrusted(peerUid: 0, expected: 501))
+        #expect(!peerIsTrusted(peerUid: nil, expected: 501))
+    }
+
     @Test func hungDaemonTimesOut() async {
         let d = FakeDaemon { _ in nil }
         let c = DaemonClient(socketPath: d.path, timeout: 0.3)

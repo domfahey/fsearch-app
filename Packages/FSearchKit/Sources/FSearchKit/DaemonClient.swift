@@ -53,8 +53,10 @@ public final class DaemonClient: SearchBackend, @unchecked Sendable {
     /// - Parameters:
     ///   - socketPath: The daemon's Unix socket.
     ///   - timeout: Seconds one round trip may take before it fails with ``DaemonError/timeout``.
-    public init(socketPath: String = DaemonClient.defaultSocketPath, timeout: TimeInterval = 5) {
-        socket = LineSocket(path: socketPath, timeout: timeout)
+    ///   - expectedPeerUid: The only user whose socket is trusted: ours (tests vary it). A socket
+    ///     another user serves is never sent a query.
+    public init(socketPath: String = DaemonClient.defaultSocketPath, timeout: TimeInterval = 5, expectedPeerUid: uid_t = getuid()) {
+        socket = LineSocket(path: socketPath, timeout: timeout, expectedPeerUid: expectedPeerUid)
     }
 
     private func call<T: Decodable & Sendable>(_ req: Request, as: T.Type) async throws -> T {

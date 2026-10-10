@@ -150,8 +150,10 @@ final class FakeHelper: HelperService {
         status = statusAfterRegister
     }
 
+    /// Like SMAppService, unregistering takes a while: callers suspend here.
     func unregister() async throws {
         unregistered += 1
+        await Task.yield()
         status = .notRegistered
     }
 

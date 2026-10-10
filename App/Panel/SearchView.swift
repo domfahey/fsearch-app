@@ -75,8 +75,8 @@ struct SearchView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         if case .failed(.daemon) = model.phase {
-                        } else if let msg = UserMessage.forPhase(model.phase) {
-                            Text(msg).foregroundStyle(.secondary).padding(16)
+                        } else {
+                            PhaseMessage(model: model, daemon: app.daemon)
                         }
                         if QuerySyntax.isCheatSheet(model.query) {
                             cheatSheet
@@ -225,6 +225,20 @@ struct SearchView: View {
         case let .switchMode(m): switchMode(m)
         case let .runCommand(c): onCommand(c)
         case .ignore: break
+        }
+    }
+}
+
+/// What the panel says instead of results. Observes the daemon directly
+/// (AppState doesn't forward its changes), so the text changes when the
+/// restarts run out.
+private struct PhaseMessage: View {
+    @Bindable var model: SearchModel
+    @ObservedObject var daemon: DaemonManager
+
+    var body: some View {
+        if let msg = UserMessage.forPhase(model.phase, helperGaveUp: daemon.isUnresponsive) {
+            Text(msg).foregroundStyle(.secondary).padding(16)
         }
     }
 }

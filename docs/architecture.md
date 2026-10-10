@@ -47,11 +47,21 @@ The app logs through `os.Logger` (subsystem `com.domfahey.fsearch`, see `App/Sup
 
 - Something answers: use it (`useExisting`).
 - Our helper is already enabled: just refresh (`refreshOwn`).
-- A CLI agent is installed: use it, even if it is restarting.
+- A CLI agent is installed: ping again for 10 seconds (`cliRecheckWindow`), since its daemon may be restarting. If it still doesn't answer (a leftover plist from a failed install, or a deleted binary), fall back to the bundled helper.
 - Our helper is waiting in Login Items: show `needsApproval` and do not register again.
 - Otherwise ping again for 3 seconds (`recheckWindow`), then register the bundled helper.
 
-The app restarts only a daemon it registered (`ownsDaemon`: not test mode and our helper is `.enabled`). Restart means unregister, wait for the old daemon to stop answering, register. For any other daemon, "restart" just refreshes status. The panel spends at most 3 restarts per outage (`RestartBudget`), refilled when results arrive. The plist uses `KeepAlive` with `SuccessfulExit` false: launchd relaunches the daemon after a crash, but not after a clean exit 0, which is how it quits when another daemon already holds the socket.
+The app never stops, replaces or takes over a daemon it didn't start. It owns the daemon (`ownsDaemon`) only when our helper is `.enabled` and no other process holds the socket. It reads the pid the daemon writes to `<dataDir>/socket.lock` and checks with `proc_pidpath` that the process runs from inside `Bundle.main` (`SocketHolder`). It never locks that file. This matters because, since fsearch ba100f4, a CLI agent's daemon makes our helper yield. Our login item is then still enabled, but the daemon answering is the CLI's.
+
+Restart (`DaemonPlan.restartAction`) re-registers only a daemon the app owns: unregister, wait for the old daemon to stop answering, register. It leaves any other daemon that answers running and just refreshes status. When nothing answers and nothing is ours, it runs `start()` again, which rechecks first. One restart runs at a time, and callers arriving meanwhile wait for it. The panel spends at most 3 restarts per outage (`RestartBudget`), refilled when results arrive. Once they are spent, or a search times out, the state says the helper stopped answering, and the menu bar and panel show that instead of "Starting search…".
+
+Our helper is also restarted once in two cases. After an app update, launchd keeps running the old helper binary, so the app compares the bundled helper's identity (build, size and modification time, stored as `helperIdentity`) with the one last seen running. After the menu's "Turn On Full Disk Access…", the daemon fixes its skip list at start, so the next time the app becomes active it restarts the helper if Full Disk Access is still off.
+
+The plist uses `KeepAlive` with `SuccessfulExit` false. launchd relaunches the daemon after a crash, but not after a clean exit 0, which is how it quits when another daemon already holds the socket.
+
+The bundled helper writes no `daemon.log`. An `SMAppService` agent plist is fixed inside the signed bundle, and launchd doesn't expand `~` in `StandardErrorPath`, so the plist can't name a per-user log file. The helper's stderr goes nowhere, and Index Details says so when the log is empty. The CLI's login agent writes its plist at install time with an absolute path, so its daemon does log. A fix needs the daemon itself to open a log file in its data folder (an upstream ask).
+
+At launch, a second running copy of the app hands over to the first and quits. A copy run from a translocated path or a read-only volume (the DMG) offers to move itself to /Applications and quits, without registering the helper.
 
 ## Onboarding, errors and the menu bar
 
@@ -69,7 +79,7 @@ The daemon runs with the Full Disk Access you grant it and answers over a local 
 
 ## Test mode
 
-Launch the app with `-FSEARCH_SOCKET <path>` and `AppState.socketPath` uses that socket. In this mode the app never calls `SMAppService` (`ownStatus` is nil, `ownsDaemon` is false), never restarts anything, and skips onboarding. Tests supply the daemon themselves with a temporary `HOME` and `FSEARCH_ROOT`, so the real index, login items and `~/Library/Application Support/FSearch` are never touched.
+Launch a Debug build with `-FSEARCH_SOCKET <path>` and `AppState.socketPath` uses that socket. Release builds ignore this flag and the XCTest environment variables (`LaunchOptions.testHooksCompiledIn`). In this mode the app never calls `SMAppService` (`ownStatus` is nil, `ownsDaemon` is false), never restarts anything, and skips onboarding. Tests supply the daemon themselves with a temporary `HOME` and `FSEARCH_ROOT`, so the real index, login items and `~/Library/Application Support/FSearch` are never touched.
 
 ## Tests and benchmarks
 

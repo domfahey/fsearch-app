@@ -32,4 +32,10 @@ import Testing
         r.sessionWillFinish()
         #expect(!r.indicatorVisible)
     }
+
+    @Test func aRemindedUpdateIsLookedUpAgainAtLaunch() {
+        #expect(UpdateReminder.checkAtLaunch(persistedVisible: true, updaterRunning: true))
+        #expect(!UpdateReminder.checkAtLaunch(persistedVisible: true, updaterRunning: false))
+        #expect(!UpdateReminder.checkAtLaunch(persistedVisible: false, updaterRunning: true))
+    }
 }

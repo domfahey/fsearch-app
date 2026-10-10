@@ -28,8 +28,11 @@ final class AppState: ObservableObject {
     /// Bumped whenever the recents may have changed (a file opened or trashed),
     /// so the panel re-reads `recents.paths`, which aren't observable themselves.
     @Published private(set) var recentsGeneration = 0
-    /// Tells the panel to re-read the recents.
-    func recentsChanged() { recentsGeneration += 1 }
+    /// Tells the panel to re-read the recents, dropping Recents' existence cache first.
+    func recentsChanged() {
+        recents.invalidate()
+        recentsGeneration += 1
+    }
     /// Opening a file makes it a recent.
     func openedRecent(_ path: String) {
         recents.opened(path)
@@ -63,7 +66,6 @@ final class AppState: ObservableObject {
     }
 
     /// The running app: real daemon connections, real login item (none in test mode).
-    /// The running app's state.
     ///
     /// - Parameter options: The launch options.
     static func live(options: LaunchOptions = .current) -> AppState {
@@ -73,7 +75,11 @@ final class AppState: ObservableObject {
             // Two connections: names and content never wait on each other.
             names: DaemonClient(socketPath: options.socketPath),
             content: DaemonClient(socketPath: options.socketPath),
-            control: DaemonClient(socketPath: options.socketPath))
+            control: DaemonClient(socketPath: options.socketPath),
+            socketHolder: {
+                SocketHolder.read(dataDir: DebugFormat.dataDir(socketPath: options.socketPath), bundlePath: Bundle.main.bundlePath)
+            },
+            helperIdentity: { DaemonManager.bundledHelperIdentity() })
     }
 
     /// Creates the state from its parts.
@@ -87,14 +93,20 @@ final class AppState: ObservableObject {
     ///   - control: The connection for status and "Save Now".
     ///   - clock: Timers for the daemon wait loops.
     ///   - cliAgentInstalled: Whether the CLI's login agent exists.
+    ///   - socketHolder: Who holds the daemon's socket (decides ``DaemonManager/ownsDaemon``).
+    ///   - helperIdentity: The bundled helper binary's identity, to spot an app update.
     init(
         options: LaunchOptions, defaults: UserDefaults, helper: HelperService?,
         names: SearchBackend, content: SearchBackend, control: any DaemonControl,
         clock: DaemonClock = .live,
-        cliAgentInstalled: @escaping () -> Bool = { FileManager.default.fileExists(atPath: DaemonManager.cliAgentPlist.path) }
+        cliAgentInstalled: @escaping () -> Bool = { FileManager.default.fileExists(atPath: DaemonManager.cliAgentPlist.path) },
+        socketHolder: @escaping () -> SocketHolder = { .none },
+        helperIdentity: @escaping () -> String? = { nil }
     ) {
         self.options = options
-        daemon = DaemonManager(client: control, service: helper, cliAgentInstalled: cliAgentInstalled, clock: clock)
+        daemon = DaemonManager(
+            client: control, service: helper, cliAgentInstalled: cliAgentInstalled, clock: clock,
+            socketHolder: socketHolder, defaults: defaults, helperIdentity: helperIdentity)
         search = SearchModel(names: names, content: content)
         recents = Recents(defaults: defaults)
         log = SearchLog(file: options.searchLogFile)
@@ -133,10 +145,13 @@ final class AppState: ObservableObject {
             }
         case .failed(.disconnected):
             // `restart()` re-registers only a daemon the app owns; a CLI daemon is just re-checked.
-            guard status.restartBudget.spend() else { return }
+            // Out of restarts: say the helper isn't answering, not "Starting search…".
+            guard status.restartBudget.spend() else { daemon.markUnresponsive(); return }
             Task {
                 await daemon.restart(); await search.refresh()
             }
+        case .failed(.timeout):
+            daemon.markUnresponsive()
         default: break
         }
     }

@@ -28,8 +28,19 @@ enum Updater {
     /// Later calls do nothing.
     static func start() {
         guard shouldStart(configured: isConfigured, testMode: LaunchOptions.current.testMode), controller == nil else { return }
-        controller = SPUStandardUpdaterController(
+        let c = SPUStandardUpdaterController(
             startingUpdater: true, updaterDelegate: nil, userDriverDelegate: UpdateReminderDriver.shared)
+        controller = c
+        resumeReminder(model: .shared, updaterRunning: true) { c.updater.checkForUpdatesInBackground() }
+    }
+
+    /// The menu-bar reminder lives in memory: if the last run quit with one up,
+    /// look again in the background, which brings it back (gently) if the
+    /// update is still there. The flag is cleared, so it isn't asked twice.
+    static func resumeReminder(model: UpdateReminderModel, updaterRunning: Bool, check: () -> Void) {
+        guard UpdateReminder.checkAtLaunch(persistedVisible: model.persistedVisible, updaterRunning: updaterRunning) else { return }
+        model.clearPersisted()
+        check()
     }
 }
 
@@ -38,13 +49,28 @@ enum Updater {
 @MainActor @Observable
 final class UpdateReminderModel {
     static let shared = UpdateReminderModel()
+    /// Defaults key: the indicator was up when the app last changed it.
+    static let persistKey = "updateReminderVisible"
     /// The decision logic (in FSearchKit).
     private(set) var reminder = UpdateReminder()
     /// Whether the menu bar shows the indicator.
     var indicatorVisible: Bool { reminder.indicatorVisible }
+    @ObservationIgnored private let defaults: UserDefaults
+
+    /// Creates the model; `defaults` keeps the indicator across relaunches.
+    init(defaults: UserDefaults = AppDefaults.store) { self.defaults = defaults }
+
+    /// Whether the previous run left the indicator up.
+    var persistedVisible: Bool { defaults.bool(forKey: Self.persistKey) }
+    /// Forgets the persisted indicator (once the launch check has asked Sparkle again).
+    func clearPersisted() { defaults.removeObject(forKey: Self.persistKey) }
 
     /// Applies a change to the reminder; mutating through here triggers the redraw.
-    func update(_ change: (inout UpdateReminder) -> Void) { change(&reminder) }
+    /// Every change is persisted, so a relaunch can bring the reminder back.
+    func update(_ change: (inout UpdateReminder) -> Void) {
+        change(&reminder)
+        defaults.set(reminder.indicatorVisible, forKey: Self.persistKey)
+    }
 }
 
 /// Sparkle gentle reminders: an LSUIElement app is never frontmost, so a

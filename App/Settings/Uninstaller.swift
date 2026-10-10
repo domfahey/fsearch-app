@@ -39,6 +39,7 @@ final class Uninstaller: ObservableObject {
     /// The app's UserDefaults keys; the shortcut is reset separately.
     static let defaultsKeys = [
         "editor", "debugMode", "onboarded", "skippedFullDiskAccess", "dismissedFullDiskAccessReminder", "recentPaths",
+        "helperIdentity", "updateReminderVisible",
         // Sparkle's own.
         "SUEnableAutomaticChecks", "SUHasLaunchedBefore", "SULastCheckTime", "SUSendProfileInfo",
     ]

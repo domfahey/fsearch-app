@@ -24,7 +24,7 @@ struct IndexDetailsView: View {
             }
             Section("daemon.log (last 30 lines)") {
                 ScrollView {
-                    Text(logTail).font(.system(.caption, design: .monospaced))
+                    Text(Self.logText(logTail)).font(.system(.caption, design: .monospaced))
                         .frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled)
                 }.frame(height: 160)
             }
@@ -65,6 +65,12 @@ struct IndexDetailsView: View {
         skipped = s
         logTail = t
     }
+
+    /// Shown instead of an empty log: the bundled helper can't write one.
+    static let noLogNote =
+        "No daemon.log. FSearch's own background helper doesn't write one: its launchd plist is fixed inside the app and can't name a log file in your home folder. A daemon started by the fsearch command-line tool writes its log here."
+
+    static func logText(_ tail: String) -> String { tail.isEmpty ? noLogNote : tail }
 
     private func report() -> String {
         "state: \(app.daemon.state)\nskipped:\n\(skipped.joined(separator: "\n"))\nlog:\n\(logTail)"

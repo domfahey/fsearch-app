@@ -8,6 +8,8 @@ struct DaemonMessageLine: View {
     @Bindable var model: SearchModel
     @ObservedObject var daemon: DaemonManager
     @State private var host = HostWindow()
+    /// Bumped each time the panel comes on screen.
+    @State private var shown = 0
 
     /// Whether the daemon, or the last search, says the first index is still being built.
     private var isIndexing: Bool {
@@ -32,18 +34,41 @@ struct DaemonMessageLine: View {
         }
         // Restarts and recovery checks run in AppState.searchSettled, on every
         // finished search, not on phase changes this view happens to render.
-        .task(id: isIndexing) {
-            // Poll every ~2 s (up to ~5 min of visible polling) until the daemon
-            // answers or gives up. Paused while the panel is hidden.
-            var tries = 0
-            while isIndexing && tries < 150 && !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(2))
-                if Task.isCancelled { break }
-                guard host.window?.isVisible == true else { continue }
-                await daemon.refresh()
-                await model.refresh()
-                tries += 1
-            }
+        // Showing the panel again restarts a poll that stopped while hidden.
+        .task(id: PollKey(indexing: isIndexing, shown: shown)) {
+            let host = host
+            await Self.pollWhileIndexing(
+                isIndexing: { isIndexing }, visible: { host.window?.isVisible == true },
+                sleep: { try await Task.sleep(for: .seconds(2)) },
+                step: {
+                    await daemon.refresh()
+                    await model.refresh()
+                })
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didChangeOcclusionStateNotification)) { note in
+            guard let w = note.object as? NSWindow, w === host.window, w.occlusionState.contains(.visible) else { return }
+            shown &+= 1
+        }
+    }
+
+    private struct PollKey: Equatable {
+        let indexing: Bool
+        let shown: Int
+    }
+
+    /// Polls every ~2 s, up to `maxTries` times, until the daemon is done
+    /// indexing. Stops as soon as the panel is hidden (the view starts it
+    /// again when the panel shows), so a hidden panel never polls forever.
+    static func pollWhileIndexing(
+        isIndexing: () -> Bool, visible: () -> Bool, sleep: () async throws -> Void, step: () async -> Void,
+        maxTries: Int = 150
+    ) async {
+        var tries = 0
+        while isIndexing() && tries < maxTries && !Task.isCancelled {
+            try? await sleep()
+            if Task.isCancelled || !visible() { return }
+            await step()
+            tries += 1
         }
     }
 }
