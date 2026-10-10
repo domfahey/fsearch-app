@@ -40,6 +40,7 @@ public struct Hit: Decodable, Equatable, Sendable {
 public struct SearchReply: Decodable, Equatable, Sendable {
     public let tookUs: UInt64
     public let hits: [Hit]
+    public init(tookUs: UInt64, hits: [Hit]) { (self.tookUs, self.hits) = (tookUs, hits) }
 }
 
 public struct Match: Decodable, Equatable, Sendable {
