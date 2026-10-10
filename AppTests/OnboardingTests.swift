@@ -214,6 +214,7 @@ extension AppTests {
                 (.indexing, FakeHelper?.none, Wire.status()),
             ] {
                 let env = TestEnv(helper: helper)
+                defer { env.tearDown() }
                 env.daemon.onStatus = { _ in status }
                 await env.app.daemon.refresh()
                 let flow = OnboardingFlow(app: env.app, defaults: env.defaults, step: step)
@@ -221,19 +222,18 @@ extension AppTests {
                 let w = await render(OnboardingView(flow: flow).environmentObject(env.app), size: NSSize(width: 440, height: 300))
                 #expect(w.contentView != nil)
                 w.close()
-                env.tearDown()
             }
         }
 
         @Test func helperStepShowsFailureAndApproval() async {
             for fail in [true, false] {
                 let env = TestEnv(helper: FakeHelper(.notRegistered))
+                defer { env.tearDown() }
                 env.daemon.onStatus = { _ in throw DaemonError.disconnected }
                 if fail { await env.app.daemon.refresh() }
                 let flow = OnboardingFlow(app: env.app, defaults: env.defaults, step: .helper)
                 let w = await render(OnboardingView(flow: flow).environmentObject(env.app), size: NSSize(width: 440, height: 300))
                 w.close()
-                env.tearDown()
             }
         }
     }

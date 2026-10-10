@@ -28,6 +28,10 @@ case "${1:-}" in
 esac
 mkdir -p "$OUT"
 rc=0
+# Throwaway defaults suites the tests leave behind (TestEnv, AppDefaults.testSuiteName);
+# never the real com.domfahey.fsearch.plist.
+sweep_test_defaults() { rm -f "$HOME"/Library/Preferences/com.domfahey.fsearch.apptests.*.plist; }
+trap sweep_test_defaults EXIT
 
 if [ "$mode" != reuse ]; then
   rm -rf "$UNIT"

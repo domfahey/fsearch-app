@@ -130,11 +130,11 @@ extension AppTests {
         }
 
         @Test func defaultPanelHostIsTheLauncher() {
+            defer { TestEnv.removeSuite("com.domfahey.fsearch.apptests.panel") }
             let app = AppState(options: LaunchOptions(socketPath: "/nowhere.sock", testMode: true, unitTestHost: false, showPanel: false),
                                defaults: UserDefaults(suiteName: "com.domfahey.fsearch.apptests.panel")!, helper: nil,
                                names: StubDaemon(), content: StubDaemon(), control: StubDaemon())
             #expect(app.panel === PanelController.shared)
-            TestEnv.removeSuite("com.domfahey.fsearch.apptests.panel")
         }
     }
 }

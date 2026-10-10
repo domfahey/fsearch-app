@@ -77,9 +77,9 @@ extension AppTests {
         }
 
         @Test func dontRemindMeStoresTheFlagThatHidesTheReminder() {
-            let name = "fda-reminder-\(UUID().uuidString)"
+            let name = "com.domfahey.fsearch.apptests.\(UUID().uuidString)"
             let defaults = UserDefaults(suiteName: name)!
-            defer { defaults.removePersistentDomain(forName: name) }
+            defer { TestEnv.removeSuite(name) }
             #expect(!defaults.bool(forKey: "dismissedFullDiskAccessReminder"))
             let off = DaemonCondition.running(fullDiskAccess: false)
             #expect(MenuBarWarning.evaluate(off, skippedFullDiskAccess: true,
@@ -124,6 +124,7 @@ extension AppTests {
         @Test func menuContent() async {
             for debug in [false, true] {
                 let env = TestEnv()
+                defer { env.tearDown() }
                 env.app.debugMode = debug
                 let w = await render(VStack {
                     MenuBarFixItem(app: env.app)
@@ -131,7 +132,6 @@ extension AppTests {
                     MenuBarLabel(app: env.app)
                 })
                 w.close()
-                env.tearDown()
             }
         }
 
@@ -159,6 +159,7 @@ extension AppTests {
             w.close()
             for s in [DaemonManager.State.checking, .failed("down")] {
                 let e = TestEnv()
+                defer { e.tearDown() }
                 if case .failed = s {
                     e.daemon.onStatus = { _ in throw DaemonError.disconnected }
                     await e.app.daemon.refresh()
@@ -166,7 +167,6 @@ extension AppTests {
                 e.daemon.onStatus = { _ in throw CancellationError() }  // stays as it is
                 let w2 = await render(IndexDetailsView().environmentObject(e.app), size: NSSize(width: 520, height: 600))
                 w2.close()
-                e.tearDown()
             }
         }
 

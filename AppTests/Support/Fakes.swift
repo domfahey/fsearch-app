@@ -220,6 +220,7 @@ final class TestEnv {
     let app: AppState
 
     init(helper: FakeHelper? = nil, daemon: StubDaemon = StubDaemon()) {
+        _ = TestEnv.sweptStaleSuites
         defaults = UserDefaults(suiteName: suite)!
         dir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("fsa-unit-\(UUID().uuidString.prefix(8))")
         try! FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -254,6 +255,17 @@ final class TestEnv {
         TestEnv.removeSuite(suite)
         try? FileManager.default.removeItem(at: dir)
     }
+
+    /// Once per run: deletes suites an earlier, interrupted run left behind
+    /// (never the app's own test-mode suite, which this host has open).
+    static let sweptStaleSuites: Void = {
+        let prefs = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Preferences")
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: prefs.path)) ?? []
+        for n in names where n.hasPrefix("com.domfahey.fsearch.apptests.") && n.hasSuffix(".plist")
+            && n != AppDefaults.testSuiteName + ".plist" {
+            try? FileManager.default.removeItem(at: prefs.appendingPathComponent(n))
+        }
+    }()
 
     /// Clears a throwaway suite and deletes the plist cfprefsd leaves behind.
     static func removeSuite(_ name: String) {
