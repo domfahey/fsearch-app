@@ -8,7 +8,7 @@ FSearch for Mac bundles or links the components below. Each is used under its ow
 | KeyboardShortcuts | 2.4.0 | MIT | https://github.com/sindresorhus/KeyboardShortcuts |
 | Sparkle | 2.10.0 | MIT and others (see below) | https://github.com/sparkle-project/Sparkle |
 
-The fsearch commit is the one pinned in `scripts/build-daemon.sh`. It is built from the maintainer's fork (https://github.com/domfahey/fsearch), which tracks the upstream project above.
+The fsearch commit is the one pinned in `scripts/build-daemon.sh`. It is built from the fork https://github.com/domfahey/fsearch, which is the upstream project plus fixes and tests submitted upstream as pull requests #12–#14. The pin moves to an upstream tag once those merge.
 
 ## fsearch
 
