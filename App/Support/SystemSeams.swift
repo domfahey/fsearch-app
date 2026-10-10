@@ -26,6 +26,25 @@ final class SMAppHelperService: HelperService {
     func openSystemSettingsLoginItems() { SMAppService.openSystemSettingsLoginItems() }
 }
 
+/// The app's own login item (the main app, not the helper).
+@MainActor
+final class SMAppLoginItemService: LoginItemService {
+    private var service: SMAppService { .mainApp }
+
+    var status: DaemonPlan.ServiceStatus {
+        switch service.status {
+        case .enabled: .enabled
+        case .requiresApproval: .requiresApproval
+        case .notFound: .notFound
+        default: .notRegistered
+        }
+    }
+
+    func register() throws { try service.register() }
+    func unregister() async throws { try await service.unregister() }
+    func openSystemSettingsLoginItems() { SMAppService.openSystemSettingsLoginItems() }
+}
+
 /// NSWorkspace, Process and FileManager's Trash.
 @MainActor
 final class SystemWorkspace: Workspace {

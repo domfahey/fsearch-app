@@ -12,6 +12,16 @@ protocol HelperService: AnyObject {
     func openSystemSettingsLoginItems()
 }
 
+/// The app's own "Open FSearch at login" item (SMAppService.mainApp). The real
+/// one is `SMAppLoginItemService`; tests use a fake. nil in test mode: never touched.
+@MainActor
+protocol LoginItemService: AnyObject {
+    var status: DaemonPlan.ServiceStatus { get }
+    func register() throws
+    func unregister() async throws
+    func openSystemSettingsLoginItems()
+}
+
 /// What DaemonManager needs from a daemon connection: searches, plus "Save Now".
 protocol DaemonControl: SearchBackend {
     func save() async throws
