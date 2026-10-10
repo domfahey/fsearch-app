@@ -95,7 +95,10 @@ private struct IndexStatsSections: View {
         case .indexing:
             Section("Daemon") { Text("Indexing…").foregroundStyle(.secondary) }
         case .needsApproval:
-            Section("Daemon") { Text("Waiting for approval in Login Items.").foregroundStyle(.secondary) }
+            Section("Daemon") {
+                Text("Waiting for approval in Login Items.").foregroundStyle(.secondary)
+                Button("Open Login Items Settings") { daemon.openLoginItems() }
+            }
         }
     }
 

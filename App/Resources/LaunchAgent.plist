@@ -5,5 +5,8 @@
   <key>BundleProgram</key><string>Contents/Helpers/fsearch</string>
   <key>ProgramArguments</key><array><string>fsearch</string><string>serve</string></array>
   <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><true/>
+  <!-- Respawn only after a crash: the daemon exits 0 when another fsearch
+       daemon holds the socket lock (or it can't start), and must not be
+       relaunched forever. -->
+  <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
 </dict></plist>

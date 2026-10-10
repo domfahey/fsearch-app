@@ -13,6 +13,8 @@ final class MenuBarStatus {
     private(set) var warning: MenuBarWarning?
     /// Restarts left in the current daemon outage; refilled when results arrive.
     @ObservationIgnored var restartBudget = RestartBudget()
+    /// Rate-limits re-checking a daemon marked down while searches succeed.
+    @ObservationIgnored var recoveryCheck = RecoveryCheck()
     @ObservationIgnored private var bound = false
     @ObservationIgnored private var cancellables: Set<AnyCancellable> = []
 

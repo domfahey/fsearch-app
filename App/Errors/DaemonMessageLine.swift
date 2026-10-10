@@ -29,7 +29,17 @@ struct DaemonMessageLine: View {
         .background(HostWindowReader(host: host))
         .onChange(of: model.phase) { _, p in
             switch p {
-            case .results: MenuBarStatus.shared.restartBudget.reset()
+            case .results:
+                MenuBarStatus.shared.restartBudget.reset()
+                // Searches work, so a "failed" or "needs approval" warning is
+                // stale (e.g. the daemon came back): re-check, at most every 5 s.
+                let unhealthy = switch daemon.state {
+                case .failed, .needsApproval: true
+                default: false
+                }
+                if MenuBarStatus.shared.recoveryCheck.shouldRefresh(daemonUnhealthy: unhealthy) {
+                    Task { await daemon.refresh() }
+                }
             case .failed(.disconnected):
                 // One budget per outage, shared across panel opens. `restart()`
                 // re-registers only a daemon the app owns; a CLI daemon is just re-checked.
