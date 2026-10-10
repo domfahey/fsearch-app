@@ -1,6 +1,12 @@
 import Foundation
 
 /// Debug mode's search log: JSON lines, newest last, capped. Stays on this Mac.
+///
+/// Keep one shared instance per file: the in-memory line count is only
+/// correct for the instance that wrote the file. Appends go straight to the
+/// end of the file; once it holds more than 2x `cap` lines it is rewritten
+/// once with only the newest `cap`. Write errors are ignored on purpose:
+/// this is a debug log, and a failed write must never disturb a search.
 public final class SearchLog: @unchecked Sendable {
     public struct Record: Codable, Equatable, Sendable {
         public let time: Date
@@ -15,6 +21,8 @@ public final class SearchLog: @unchecked Sendable {
     public let file: URL
     private let cap: Int
     private let lock = NSLock()
+    /// Physical lines in the file, seeded by one read on first use.
+    private var lineCount: Int?
 
     public init(file: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/FSearch/searches.jsonl"), cap: Int = 10_000) {
         self.file = file
@@ -29,28 +37,65 @@ public final class SearchLog: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         let r = Record(time: t, query: e.query, mode: Self.mode(e.mode), results: e.resultCount, tookUs: e.tookUs, roundTripMs: e.roundTripMs, error: e.error)
         let enc = JSONEncoder(); enc.dateEncodingStrategy = .secondsSince1970
-        var all = read()
-        all.append(r)
-        // Trim in batches, once 10% over the cap (every append for tiny caps).
-        if all.count > cap + cap / 10 { all = Array(all.suffix(cap)) }
+        guard var line = try? enc.encode(r) else { return }
+        line.append(UInt8(ascii: "\n"))
+
+        if lineCount == nil { lineCount = rawLines().count }
         try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let body = all.compactMap { try? enc.encode($0) }.map { String(decoding: $0, as: UTF8.self) }.joined(separator: "\n") + "\n"
-        try? body.write(to: file, atomically: true, encoding: .utf8)
+        if !FileManager.default.fileExists(atPath: file.path) {
+            FileManager.default.createFile(atPath: file.path, contents: nil)
+        }
+        guard let fh = try? FileHandle(forWritingTo: file) else { return }
+        defer { try? fh.close() }
+        let end = (try? fh.seekToEnd()) ?? 0
+        if end > 0 {
+            // A partial last line (say, from a crash) must not swallow the new record.
+            try? fh.seek(toOffset: end - 1)
+            if (try? fh.read(upToCount: 1)) != Data([UInt8(ascii: "\n")]) {
+                _ = try? fh.seekToEnd()
+                try? fh.write(contentsOf: Data([UInt8(ascii: "\n")]))
+            }
+        }
+        _ = try? fh.seekToEnd()
+        try? fh.write(contentsOf: line)
+        lineCount = (lineCount ?? 0) + 1
+
+        if let n = lineCount, n > 2 * cap {
+            compact()
+        }
     }
 
     public func entries() -> [Record] {
         lock.lock(); defer { lock.unlock() }
-        return Array(read().suffix(cap))
+        return Array(readRecords().suffix(cap))
     }
 
     public func clear() {
         lock.lock(); defer { lock.unlock() }
         try? FileManager.default.removeItem(at: file)
+        lineCount = 0
     }
 
-    private func read() -> [Record] {
+    /// Rewrite the file with only the newest `cap` valid records. Caller holds the lock.
+    private func compact() {
+        let enc = JSONEncoder(); enc.dateEncodingStrategy = .secondsSince1970
+        let kept = readRecords().suffix(cap)
+        let body = kept.compactMap { try? enc.encode($0) }
+            .map { String(decoding: $0, as: UTF8.self) }
+            .joined(separator: "\n") + (kept.isEmpty ? "" : "\n")
+        try? body.write(to: file, atomically: true, encoding: .utf8)
+        lineCount = kept.count
+    }
+
+    /// Non-empty lines in the file, valid or not. Caller holds the lock.
+    private func rawLines() -> [Data] {
         guard let data = try? Data(contentsOf: file) else { return [] }
+        return data.split(separator: UInt8(ascii: "\n")).map { Data($0) }
+    }
+
+    /// Every valid record in file order; corrupt lines are skipped. Caller holds the lock.
+    private func readRecords() -> [Record] {
         let dec = JSONDecoder(); dec.dateDecodingStrategy = .secondsSince1970
-        return data.split(separator: UInt8(ascii: "\n")).compactMap { try? dec.decode(Record.self, from: Data($0)) }
+        return rawLines().compactMap { try? dec.decode(Record.self, from: $0) }
     }
 }
