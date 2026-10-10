@@ -176,9 +176,11 @@ final class FakeWorkspace: Workspace {
 
     func open(_ url: URL) { opened.append(url) }
 
+    /// Like NSWorkspace, the completion runs off the main thread.
     func open(_ urls: [URL], withApplicationAt app: URL, completion: (@Sendable (Error?) -> Void)?) {
         openedWith.append((urls, app))
-        completion?(openWithError)
+        let error = openWithError.map { $0 as NSError }
+        DispatchQueue.global().async { completion?(error) }
     }
 
     func activateFileViewerSelecting(_ urls: [URL]) { revealed.append(urls) }
@@ -188,7 +190,8 @@ final class FakeWorkspace: Workspace {
     func run(_ executable: String, _ arguments: [String], onExit: @escaping @Sendable (Int32) -> Void) -> Bool {
         runs.append((executable, arguments))
         guard runStarts else { return false }
-        if let s = runExitStatus { onExit(s) }
+        // Like Process.terminationHandler, off the main thread.
+        if let s = runExitStatus { DispatchQueue.global().async { onExit(s) } }
         return true
     }
 
@@ -201,8 +204,9 @@ final class FakeWorkspace: Workspace {
 @MainActor
 final class FakePanel: PanelHost {
     var isVisible = false
-    private(set) var shows = 0
+    private(set) var shows = 0, hides = 0
     func show(app: AppState) { shows += 1; isVisible = true }
+    func hide(returnFocus: Bool) { hides += 1; isVisible = false }
 }
 
 /// One app with fakes everywhere, a throwaway defaults suite and a temp folder.
@@ -220,6 +224,7 @@ final class TestEnv {
     let app: AppState
 
     init(helper: FakeHelper? = nil, daemon: StubDaemon = StubDaemon()) {
+        _ = TestEnv.sweptStaleSuites
         defaults = UserDefaults(suiteName: suite)!
         dir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("fsa-unit-\(UUID().uuidString.prefix(8))")
         try! FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -235,8 +240,7 @@ final class TestEnv {
         FileActions.workspace = workspace
         FileActions.pasteboard = pasteboard
         OnboardingLauncher.defaults = defaults
-        // Never take focus from whatever the user is doing.
-        AppActivation.activate = {}
+        // AppActivation needs no stub: in this host its real closure does nothing.
     }
 
     /// A real file in the temp folder (Recents only keeps files that exist).
@@ -255,6 +259,17 @@ final class TestEnv {
         TestEnv.removeSuite(suite)
         try? FileManager.default.removeItem(at: dir)
     }
+
+    /// Once per run: deletes suites an earlier, interrupted run left behind
+    /// (never the app's own test-mode suite, which this host has open).
+    static let sweptStaleSuites: Void = {
+        let prefs = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Preferences")
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: prefs.path)) ?? []
+        for n in names where n.hasPrefix("com.domfahey.fsearch.apptests.") && n.hasSuffix(".plist")
+            && n != AppDefaults.testSuiteName + ".plist" {
+            try? FileManager.default.removeItem(at: prefs.appendingPathComponent(n))
+        }
+    }()
 
     /// Clears a throwaway suite and deletes the plist cfprefsd leaves behind.
     static func removeSuite(_ name: String) {
@@ -277,16 +292,21 @@ func eventually(_ timeout: Duration = .seconds(3), _ cond: () -> Bool) async -> 
     return cond()
 }
 
-/// Hosts a view in a transparent window so SwiftUI evaluates its body and runs
-/// its onAppear/task modifiers. Close the returned window when done.
+/// Where render windows go: far off every screen (borderless windows aren't
+/// pulled back onto one), so nothing shows even if alpha were ignored.
+let offscreenOrigin = NSPoint(x: -20_000, y: -20_000)
+
+/// Hosts a view so SwiftUI evaluates its body and runs its onAppear/task
+/// modifiers, without anything the user could see or that could take the
+/// keyboard: off screen, fully transparent, deaf to the mouse, never key.
+/// Close the returned window when done.
 @MainActor
 func render<V: View>(_ view: V, size: NSSize = NSSize(width: 680, height: 460), settle: Duration = .milliseconds(150)) async -> NSWindow {
-    let w = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless], backing: .buffered, defer: false)
+    let w = HostSafeWindow(contentRect: NSRect(origin: offscreenOrigin, size: size), styleMask: [.borderless], backing: .buffered, defer: false)
     w.isReleasedWhenClosed = false
-    w.alphaValue = 0
-    w.ignoresMouseEvents = true
     w.contentView = NSHostingView(rootView: view)
-    w.orderFront(nil)
+    w.setFrameOrigin(offscreenOrigin)
+    Presentation.present(w, inert: true)
     try? await Task.sleep(for: settle)
     w.contentView?.layoutSubtreeIfNeeded()
     return w

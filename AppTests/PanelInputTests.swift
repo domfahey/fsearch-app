@@ -125,11 +125,11 @@ extension AppTests {
             #expect(PanelInput.menuAction(for: .showActions(0)) == nil)
             #expect(PanelInput.menuAction(for: .none) == nil)
             #expect(PanelInput.menuAction(for: .hide) == nil)
-        }
-
-        @Test func pressFromSwiftUIKeyPressFields() {
-            let p = P(key: "k", characters: "k", command: true, shift: false, control: false)
-            #expect(p.command && !p.shift && !p.control)
+            // ↵ and ⌘↵ go to another app and put the launcher away; ⌘Y and ⌘⇧C don't.
+            #expect(PanelInput.menuAction(for: .open(0))?.hidesPanel == true)
+            #expect(PanelInput.menuAction(for: .reveal(0))?.hidesPanel == true)
+            #expect(PanelInput.menuAction(for: .quickLook(0))?.hidesPanel == false)
+            #expect(PanelInput.menuAction(for: .copyPath(0))?.hidesPanel == false)
         }
     }
 }

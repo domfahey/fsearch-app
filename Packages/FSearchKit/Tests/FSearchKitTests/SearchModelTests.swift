@@ -289,3 +289,21 @@ final class RecordingBackend: SearchBackend, @unchecked Sendable {
         #expect(log.count == 2 && log[1].error != nil && log[1].resultCount == 0)
     }
 }
+
+/// onSettled fires on every finished search, even when the phase repeats.
+@MainActor
+@Test func settledFiresForEveryFinishedSearch() async {
+    let b = ScriptedBackend()
+    b.fail = .disconnected
+    let m = SearchModel(names: b, content: b)
+    var settled: [SearchPhase] = []
+    m.onSettled = { settled.append($0) }
+    m.query = "a"
+    await m.refresh()
+    await m.refresh()  // .failed(.disconnected) again: must still be reported
+    b.fail = nil
+    await m.refresh()
+    m.query = " "
+    await m.refresh()  // blank: nothing searched, nothing settled
+    #expect(settled == [.failed(.disconnected), .failed(.disconnected), .results])
+}

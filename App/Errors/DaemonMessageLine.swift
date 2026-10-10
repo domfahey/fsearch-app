@@ -18,7 +18,10 @@ struct DaemonMessageLine: View {
     }
 
     var body: some View {
-        Group {
+        VStack(spacing: 0) {
+            // Always present (a background on an empty Group is never created,
+            // which left `host.window` nil and the indexing poll idle forever).
+            HostWindowReader(host: host).frame(width: 0, height: 0)
             if case let .failed(.daemon(msg)) = model.phase {
                 Text(msg).font(.caption).foregroundStyle(.red).lineLimit(2)
                     .padding(.horizontal, 16).padding(.bottom, 6)
@@ -26,28 +29,8 @@ struct DaemonMessageLine: View {
                     .accessibilityIdentifier("queryError")
             }
         }
-        .background(HostWindowReader(host: host))
-        .onChange(of: model.phase) { _, p in
-            switch p {
-            case .results:
-                MenuBarStatus.shared.restartBudget.reset()
-                // Searches work, so a "failed" or "needs approval" warning is
-                // stale (e.g. the daemon came back): re-check, at most every 5 s.
-                let unhealthy = switch daemon.state {
-                case .failed, .needsApproval: true
-                default: false
-                }
-                if MenuBarStatus.shared.recoveryCheck.shouldRefresh(daemonUnhealthy: unhealthy) {
-                    Task { await daemon.refresh() }
-                }
-            case .failed(.disconnected):
-                // One budget per outage, shared across panel opens. `restart()`
-                // re-registers only a daemon the app owns; a CLI daemon is just re-checked.
-                guard MenuBarStatus.shared.restartBudget.spend() else { break }
-                Task { await daemon.restart(); await model.refresh() }
-            default: break
-            }
-        }
+        // Restarts and recovery checks run in AppState.searchSettled, on every
+        // finished search, not on phase changes this view happens to render.
         .task(id: isIndexing) {
             // Poll every ~2 s (up to ~5 min of visible polling) until the daemon
             // answers or gives up. Paused while the panel is hidden.

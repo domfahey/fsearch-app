@@ -34,6 +34,8 @@ cleanup() {
   kill -9 $DP 2>/dev/null
   wait $DP 2>/dev/null
   rm -rf "$H" "$LOG"
+  # The app's test-mode defaults suite (AppDefaults.testSuiteName).
+  rm -f "$HOME"/Library/Preferences/com.domfahey.fsearch.apptests.*.plist
 }
 trap cleanup EXIT
 for _ in $(seq 50); do [ -S "$SOCK" ] && break; sleep 0.2; done

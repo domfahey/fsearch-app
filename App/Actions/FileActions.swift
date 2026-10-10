@@ -5,8 +5,11 @@ import Quartz
 
 @MainActor
 enum FileActions {
-    /// Where actions go: the real workspace, or a fake under test.
-    static var workspace: Workspace = SystemWorkspace()
+    /// Where actions go: the real workspace; in test mode one that only records
+    /// (UI tests can press ↵ safely); a fake in unit tests.
+    static var workspace: Workspace = LaunchOptions.current.testMode
+        ? TestModeWorkspace(log: TestModeWorkspace.logFile(socketPath: LaunchOptions.current.socketPath))
+        : SystemWorkspace()
     /// ⌘⇧C and "Copy File" write here: the general pasteboard, or a private one under test.
     static var pasteboard: NSPasteboard = .general
 
@@ -91,7 +94,8 @@ enum FileActions {
 @MainActor
 final class QuickLookSource: NSObject, @preconcurrency QLPreviewPanelDataSource {
     static let shared = QuickLookSource()
-    private var item: URL?
+    /// What the preview shows (or would show, in the unit-test host).
+    private(set) var item: URL?
     /// True while the preview is being brought up, before it is visible.
     private(set) var opening = false
 
@@ -101,10 +105,11 @@ final class QuickLookSource: NSObject, @preconcurrency QLPreviewPanelDataSource 
         return QLPreviewPanel.sharedPreviewPanelExists() && QLPreviewPanel.shared().isVisible
     }
 
-    func toggle(_ u: URL) {
+    func toggle(_ u: URL, inert: Bool = Presentation.inert) {
         if QLPreviewPanel.sharedPreviewPanelExists(), QLPreviewPanel.shared().isVisible { return close() }
         item = u
-        guard let p = QLPreviewPanel.shared() else { return }
+        // The unit-test host never brings the preview up: it would take the keyboard.
+        guard !inert, let p = QLPreviewPanel.shared() else { return }
         opening = true
         defer { opening = false }
         p.makeKeyAndOrderFront(nil)

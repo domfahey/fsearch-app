@@ -20,7 +20,17 @@ extension AppTests {
             DebugMode.set(false, app: app, dismiss: nil)
             #expect(!app.debugMode)
             #expect(!FileManager.default.fileExists(atPath: app.log.file.path))
-            #expect(DebugMode.windowIDs == ["index", "log"])
+        }
+
+        /// Turning it off closes both debug windows; turning it on closes none.
+        @Test func turningOffDismissesTheDebugWindows() {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            var dismissed: [String] = []
+            DebugMode.set(true, app: env.app, dismissWindow: { dismissed.append($0) })
+            #expect(dismissed.isEmpty)
+            DebugMode.set(false, app: env.app, dismissWindow: { dismissed.append($0) })
+            #expect(dismissed == ["index", "log"])
         }
     }
 
@@ -29,7 +39,7 @@ extension AppTests {
         @Test func iconFollowsTheDaemon() async {
             let env = TestEnv()
             defer { env.tearDown() }
-            let status = MenuBarStatus()
+            let status = MenuBarStatus(defaults: env.defaults)
             #expect(status.icon(for: env.app) == "magnifyingglass")
             #expect(status.icon(for: env.app) == "magnifyingglass")  // binds once
             env.daemon.onStatus = { _ in throw DaemonError.disconnected }
@@ -37,13 +47,42 @@ extension AppTests {
             #expect(await eventually { status.warning?.offersFix == true })
             #expect(status.icon(for: env.app) == "exclamationmark.magnifyingglass")
 
-            env.daemon.onStatus = { _ in Wire.status(fullDiskAccess: true) }
-            await env.app.daemon.refresh()
-            #expect(await eventually { status.warning == nil })
+            // From failed straight to indexing: the warning goes.
             env.daemon.onStatus = { _ in throw DaemonError.indexing("indexing") }
             await env.app.daemon.refresh()
-            try? await Task.sleep(for: .milliseconds(30))
-            #expect(status.warning == nil)
+            #expect(await eventually { status.warning == nil })
+            #expect(status.icon(for: env.app) == "magnifyingglass")
+
+            // Its flags come from the injected defaults, not .standard.
+            env.defaults.set(true, forKey: "skippedFullDiskAccess")
+            env.daemon.onStatus = { _ in Wire.status(fullDiskAccess: false) }
+            await env.app.daemon.refresh()
+            #expect(await eventually { status.warning?.offersFullDiskAccess == true })
+        }
+
+        /// Defaults can change on any thread (the crash this guards against):
+        /// an off-main didChange post must not trap, and the warning follows it.
+        @Test func defaultsChangedOffMainUpdatesTheWarning() async {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let status = MenuBarStatus(defaults: env.defaults)
+            env.daemon.onStatus = { _ in Wire.status(fullDiskAccess: false) }
+            _ = status.icon(for: env.app)
+            await env.app.daemon.refresh()
+            #expect(await eventually { env.app.daemon.state == .running(Wire.status(fullDiskAccess: false)) })
+            // Not skipped: the plain "Full Disk Access is off" line, no reminder buttons.
+            #expect(await eventually { status.warning != nil })
+            #expect(status.warning?.offersFullDiskAccess == false)
+            let suite = env.suite
+            await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
+                DispatchQueue.global().async {
+                    let defaults = UserDefaults(suiteName: suite)!
+                    defaults.set(true, forKey: "skippedFullDiskAccess")
+                    NotificationCenter.default.post(name: UserDefaults.didChangeNotification, object: defaults)
+                    done.resume()
+                }
+            }
+            #expect(await eventually { status.warning?.offersFullDiskAccess == true })
         }
 
         @Test func approvalWarning() async {
@@ -77,9 +116,9 @@ extension AppTests {
         }
 
         @Test func dontRemindMeStoresTheFlagThatHidesTheReminder() {
-            let name = "fda-reminder-\(UUID().uuidString)"
+            let name = "com.domfahey.fsearch.apptests.\(UUID().uuidString)"
             let defaults = UserDefaults(suiteName: name)!
-            defer { defaults.removePersistentDomain(forName: name) }
+            defer { TestEnv.removeSuite(name) }
             #expect(!defaults.bool(forKey: "dismissedFullDiskAccessReminder"))
             let off = DaemonCondition.running(fullDiskAccess: false)
             #expect(MenuBarWarning.evaluate(off, skippedFullDiskAccess: true,
@@ -112,7 +151,8 @@ extension AppTests {
             #expect(c.icon(for: NSTemporaryDirectory()).size.width > 0)
         }
 
-        @Test func resultRows() async {
+        /// Render smoke test (coverage only): SwiftUI's text isn't readable in-process.
+        @Test func resultRowsRenderSmoke() async {
             let w = await render(VStack {
                 ResultRow(item: .file(Wire.hit("/p/heron.txt")), query: "her", selected: true)
                 ResultRow(item: .line(path: "/p/main.swift", match: Match(line: 3, text: "  func main()")), query: "main x", selected: false)
@@ -121,9 +161,12 @@ extension AppTests {
             w.close()
         }
 
-        @Test func menuContent() async {
+        /// Render smoke test (coverage only). The debug-only items are checked
+        /// end to end by AppUITests.testMenuBarItemListsTheMenu.
+        @Test func menuContentRenderSmoke() async {
             for debug in [false, true] {
                 let env = TestEnv()
+                defer { env.tearDown() }
                 env.app.debugMode = debug
                 let w = await render(VStack {
                     MenuBarFixItem(app: env.app)
@@ -131,11 +174,11 @@ extension AppTests {
                     MenuBarLabel(app: env.app)
                 })
                 w.close()
-                env.tearDown()
             }
         }
 
-        @Test func settings() async {
+        /// Render smoke test (coverage only); the Settings window is checked by AppUITests.
+        @Test func settingsRenderSmoke() async {
             let env = TestEnv()
             defer { env.tearDown() }
             env.workspace.apps = Dictionary(uniqueKeysWithValues: Editor.allCases.map { ($0.bundleId, URL(fileURLWithPath: "/Applications/\($0.rawValue).app")) })
@@ -152,25 +195,29 @@ extension AppTests {
             try? "started\nindexed 42\n".write(to: dataDir.appendingPathComponent("daemon.log"), atomically: true, encoding: .utf8)
             let w = await render(IndexDetailsView().environmentObject(env.app), size: NSSize(width: 520, height: 600), settle: .milliseconds(300))
             #expect(env.app.daemon.state == .running(Wire.status()))
+            // The view polls every second: each daemon state is picked up.
             env.daemon.onStatus = { _ in throw DaemonError.indexing("indexing") }
-            try? await Task.sleep(for: .milliseconds(1200))
+            #expect(await eventually { env.app.daemon.state == .indexing })
             env.daemon.onStatus = { _ in throw DaemonError.disconnected }
-            try? await Task.sleep(for: .milliseconds(1200))
+            #expect(await eventually { env.app.daemon.state == .needsApproval })
             w.close()
             for s in [DaemonManager.State.checking, .failed("down")] {
                 let e = TestEnv()
+                defer { e.tearDown() }
                 if case .failed = s {
                     e.daemon.onStatus = { _ in throw DaemonError.disconnected }
                     await e.app.daemon.refresh()
                 }
                 e.daemon.onStatus = { _ in throw CancellationError() }  // stays as it is
                 let w2 = await render(IndexDetailsView().environmentObject(e.app), size: NSSize(width: 520, height: 600))
-                w2.close()
-                e.tearDown()
+                defer { w2.close() }
+                if s == .checking { #expect(e.app.daemon.state == .checking) } else { #expect(e.app.daemon.state == .failed("The search helper isn't answering.")) }
             }
         }
 
-        @Test func searchLogShowsAndFilters() async {
+        /// Render smoke test plus the filter the view applies (the table's text
+        /// isn't readable in-process).
+        @Test func searchLogRenderSmokeAndFilter() async {
             let env = TestEnv()
             defer { env.tearDown() }
             env.app.debugMode = true
@@ -179,8 +226,12 @@ extension AppTests {
                 await env.app.search.refresh()
             }
             let w = await render(SearchLogView().environmentObject(env.app), size: NSSize(width: 760, height: 420), settle: .milliseconds(400))
+            defer { w.close() }
             #expect(env.app.log.entries().count == 2)
-            w.close()
+            // What the view filters (on a copy, off the main actor), as it does it.
+            let rows = env.app.log.entries()
+            #expect(DebugFormat.shown(rows, filter: "alp").map(\.query) == ["alpha"])
+            #expect(DebugFormat.shown(rows, filter: "").count == 2)
         }
     }
 }

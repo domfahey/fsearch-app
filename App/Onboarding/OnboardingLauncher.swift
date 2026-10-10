@@ -13,7 +13,7 @@ enum OnboardingLauncher {
     /// Set once the helper has been started, by onboarding or on close.
     private(set) static var startedDaemon = false
     /// Where "onboarded" is read; a throwaway suite under test.
-    static var defaults: UserDefaults = .standard
+    static var defaults: UserDefaults = AppDefaults.store
 
     private static var onboarded: Bool { defaults.bool(forKey: "onboarded") }
 
@@ -59,11 +59,11 @@ enum OnboardingLauncher {
     private static func show(app: AppState) {
         if let window {
             AppActivation.activate()
-            window.makeKeyAndOrderFront(nil)
+            Presentation.present(window)
             return
         }
         let flow = OnboardingFlow(app: app, defaults: defaults)
-        let w = NSWindow(contentViewController: NSHostingController(rootView: OnboardingView(flow: flow).environmentObject(app)))
+        let w = HostSafeWindow(contentViewController: NSHostingController(rootView: OnboardingView(flow: flow).environmentObject(app)))
         w.title = "Welcome to FSearch"
         w.styleMask = [.titled, .closable]
         w.isReleasedWhenClosed = false
@@ -73,7 +73,8 @@ enum OnboardingLauncher {
         }
         window = w
         AppActivation.activate()
-        w.makeKeyAndOrderFront(nil)
+        // The unit-test host orders it in invisibly and never key.
+        Presentation.present(w)
     }
 
     private static func didClose(app: AppState) {
@@ -90,7 +91,7 @@ enum OnboardingLauncher {
 /// The menu's "Finish Setup…" item, shown until onboarding is done.
 struct FinishSetupMenuItem: View {
     let app: AppState
-    @AppStorage("onboarded") private var onboarded = false
+    @AppStorage("onboarded", store: AppDefaults.store) private var onboarded = false
 
     var body: some View {
         if !onboarded { Button("Finish Setup…") { OnboardingLauncher.reopen(app: app) } }

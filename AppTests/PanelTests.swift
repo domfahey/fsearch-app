@@ -54,7 +54,11 @@ extension AppTests {
             pc.show(app: env.app)
             pc.perform(.copyPath(0), items)
             #expect(env.pasteboard.string(forType: .string) == path)
+            #expect(pc.isVisible)  // copying stays in the launcher
+            let count = env.pasteboard.changeCount
             pc.perform(.copyPath(3), items)  // no such row
+            #expect(env.pasteboard.changeCount == count)
+            #expect(pc.isVisible)
             pc.perform(.reveal(0), items)
             #expect(env.workspace.revealed == [[URL(fileURLWithPath: path)]])
             #expect(!pc.isVisible)
@@ -70,8 +74,9 @@ extension AppTests {
             #expect(!pc.isVisible)
         }
 
-        /// The search view in every state the panel can show.
-        @Test func searchViewStates() async {
+        /// Render smoke test: the search view in every state the panel can
+        /// show (for coverage); each query's model state is checked.
+        @Test func searchViewStatesRenderSmoke() async {
             let env = TestEnv()
             defer { env.tearDown() }
             let app = env.app
@@ -91,10 +96,19 @@ extension AppTests {
                 app.search.mode = mode
                 app.search.query = q
                 await app.search.refresh()
+                // The view's own refresh (on the query change) may still be in flight.
+                let settled = await eventually {
+                    switch q {
+                    case "re:(": app.search.phase == .failed(.daemon("regex parse error"))
+                    case "?", "ext:swift": app.search.phase == .idle  // cheat sheet; filter-only content query waits
+                    default: app.search.phase == .results && !app.search.items.isEmpty
+                    }
+                }
+                #expect(settled, "\(q): \(app.search.phase)")
                 try? await Task.sleep(for: .milliseconds(60))
             }
-            #expect(app.search.phase == .idle)  // filter-only content query waits
             app.showActionError("Couldn't open")
+            #expect(app.actionError == "Couldn't open")
             try? await Task.sleep(for: .milliseconds(60))
             pc.hide(returnFocus: false)
             app.debugMode = false
@@ -110,18 +124,23 @@ extension AppTests {
             env.app.search.query = "x"
             await env.app.search.refresh()
             #expect(await eventually { env.app.search.phase == .indexing })
-            try? await Task.sleep(for: .milliseconds(100))
+            // The message line polls the daemon (every ~2 s) while the panel is up.
+            let polled = await eventually(.seconds(5)) { env.daemon.statuses >= 1 }
+            #expect(polled, "the message line never polled: phase=\(env.app.search.phase)")
             pc.hide(returnFocus: false)
         }
 
+        /// Not a view behaviour: AppState reacts to every finished search, so a
+        /// repeated .failed(.disconnected) (which a phase-change observer in
+        /// the view could miss when .loading is never rendered) spends the
+        /// budget each time.
         @Test func resultsAndDisconnectsDriveTheRestartBudget() async {
             let env = TestEnv()
             defer { env.tearDown() }
-            let status = MenuBarStatus.shared
+            let status = MenuBarStatus(defaults: env.defaults)
             status.restartBudget = RestartBudget(max: 2)
             status.recoveryCheck = RecoveryCheck(interval: 0)
-            let pc = PanelController()
-            pc.show(app: env.app)
+            env.app.status = status
             // A daemon marked failed while searches work gets re-checked.
             env.daemon.onStatus = { n in if n <= 50 { throw DaemonError.disconnected }; return Wire.status() }
             await env.app.daemon.refresh()
@@ -136,24 +155,25 @@ extension AppTests {
             // A dropped connection restarts (each restart re-searches, which
             // fails again) until the outage's budget is spent, then stops.
             let statusCalls = env.daemon.statuses
+            let searches = env.daemon.searches.count
             env.daemon.onSearch = { _ in throw DaemonError.disconnected }
             env.app.search.query = "ab"
             await env.app.search.refresh()
-            let spent = await eventually { status.restartBudget.used == 2 }
-            #expect(spent, "used=\(status.restartBudget.used) phase=\(env.app.search.phase)")
+            let spent = await eventually { status.restartBudget.used == 2 && env.daemon.searches.count == searches + 3 }
+            #expect(spent, "used=\(status.restartBudget.used) searches=\(env.daemon.searches.count - searches)")
+            // In test mode a restart only re-checks the daemon: one status call each.
+            #expect(await eventually { env.daemon.statuses == statusCalls + 2 })
+            let afterBudget = (env.daemon.statuses, env.daemon.searches.count)
             try? await Task.sleep(for: .milliseconds(200))
             #expect(status.restartBudget.used == 2)
-            // In test mode a restart only re-checks the daemon.
-            #expect(env.daemon.statuses >= statusCalls + 2)
+            #expect(env.daemon.statuses == afterBudget.0, "no restart once the budget is spent")
+            #expect(env.daemon.searches.count == afterBudget.1)
 
             // Results again refill it.
             env.daemon.onSearch = { _ in SearchReply(tookUs: 1, hits: [Wire.hit("/p/a")]) }
             env.app.search.query = "abc"
             await env.app.search.refresh()
-            #expect(await eventually { status.restartBudget.used == 0 })
-            pc.hide(returnFocus: false)
-            status.restartBudget = RestartBudget()
-            status.recoveryCheck = RecoveryCheck()
+            #expect(status.restartBudget.used == 0)
         }
     }
 }

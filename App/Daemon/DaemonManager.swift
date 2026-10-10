@@ -17,7 +17,7 @@ final class DaemonManager: ObservableObject {
     @Published private(set) var state: State = .checking
     let client: any DaemonControl
     /// Our login item; nil in test mode, which never touches SMAppService.
-    private let service: HelperService?
+    let service: HelperService?
     private let cliAgentInstalled: () -> Bool
     private let clock: DaemonClock
 
