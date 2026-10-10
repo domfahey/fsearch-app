@@ -49,7 +49,9 @@ done
 
 # Short path (Unix socket paths max out at 104 bytes), with /tmp resolved to
 # /private/tmp: the daemon content-indexes only under HOME, compared by real path.
-WORK=$(cd "$(mktemp -d /tmp/fsb.XXXXXX)" && pwd -P)
+TMPW=$(mktemp -d /tmp/fsb.XXXXXX) || { echo "bench: cannot create a temp dir" >&2; exit 1; }
+WORK=$(cd "$TMPW" && pwd -P) || exit 1
+case "$WORK" in /private/tmp/fsb.*) ;; *) echo "bench: unexpected work dir: $WORK" >&2; exit 1 ;; esac
 cleanup() {
   local pid
   if [ -f "$WORK/daemon.pid" ]; then
@@ -60,7 +62,7 @@ cleanup() {
       kill -KILL "$pid" 2>/dev/null || true
     fi
   fi
-  rm -rf "$WORK"
+  case "$WORK" in /private/tmp/fsb.?*) rm -rf "$WORK" ;; esac
 }
 trap cleanup EXIT
 trap 'exit 130' INT TERM
