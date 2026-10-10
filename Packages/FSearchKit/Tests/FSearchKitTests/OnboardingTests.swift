@@ -14,8 +14,11 @@ import Testing
         #expect(canContinue(.fullDiskAccess, f))
     }
     @Test func hotkeyWarningWhenALauncherRuns() {
-        #expect(hotkeyWarning(defaultIsOptionSpace: true, runningBundleIds: ["com.raycast.macos"]) != nil)
-        #expect(hotkeyWarning(defaultIsOptionSpace: true, runningBundleIds: ["com.runningwithcrayons.Alfred"]) != nil)
+        let raycast = "Raycast uses ⌥ Space. Pick another shortcut, or turn Raycast's off."
+        let alfred = "Alfred may use ⌥ Space. Pick another shortcut, or change Alfred's."
+        #expect(hotkeyWarning(defaultIsOptionSpace: true, runningBundleIds: ["com.raycast.macos"]) == raycast)
+        #expect(hotkeyWarning(defaultIsOptionSpace: true, runningBundleIds: ["com.runningwithcrayons.Alfred"]) == alfred)
+        #expect(hotkeyWarning(defaultIsOptionSpace: true, runningBundleIds: ["com.runningwithcrayons.Alfred", "com.raycast.macos"]) == raycast, "Raycast takes precedence")
         #expect(hotkeyWarning(defaultIsOptionSpace: true, runningBundleIds: []) == nil)
         #expect(hotkeyWarning(defaultIsOptionSpace: false, runningBundleIds: ["com.raycast.macos"]) == nil)
     }
