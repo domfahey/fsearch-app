@@ -50,10 +50,13 @@ public final class SearchLog: @unchecked Sendable {
         line.append(UInt8(ascii: "\n"))
 
         if lineCount == nil { lineCount = rawLines().count }
-        try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let dir = file.deletingLastPathComponent()
+        try? FileManager.default.createDirectory(
+            at: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         if !FileManager.default.fileExists(atPath: file.path) {
-            FileManager.default.createFile(atPath: file.path, contents: nil)
+            FileManager.default.createFile(atPath: file.path, contents: nil, attributes: [.posixPermissions: 0o600])
         }
+        secure()
         guard let fh = try? FileHandle(forUpdating: file) else { return }
         defer { try? fh.close() }
         let end = (try? fh.seekToEnd()) ?? 0
@@ -94,7 +97,22 @@ public final class SearchLog: @unchecked Sendable {
             .map { String(decoding: $0, as: UTF8.self) }
             .joined(separator: "\n") + (kept.isEmpty ? "" : "\n")
         try? body.write(to: file, atomically: true, encoding: .utf8)
+        secure()
         lineCount = kept.count
+    }
+
+    /// The log holds search text: folder 0700, file 0600, both left out of backups.
+    /// Run after every create and after `compact` (an atomic rewrite makes a new file).
+    /// Caller holds the lock.
+    private func secure() {
+        let fm = FileManager.default
+        let dir = file.deletingLastPathComponent()
+        try? fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: dir.path)
+        try? fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
+        for var url in [dir, file] {
+            var v = URLResourceValues(); v.isExcludedFromBackup = true
+            try? url.setResourceValues(v)
+        }
     }
 
     /// Non-empty lines in the file, valid or not. Caller holds the lock.
