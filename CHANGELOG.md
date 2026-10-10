@@ -36,7 +36,7 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
 - App category set to Productivity (`LSApplicationCategoryType`).
 - Documentation ([docs/README.md](docs/README.md)): a first-search tutorial, how-to guides (including updating), reference pages (keyboard shortcuts, query syntax, settings, files and locations, troubleshooting, FAQ, known limitations), architecture decision records, install and uninstall guides, a privacy policy ([Privacy](docs/privacy.md)), support ([Support](.github/SUPPORT.md)) and a roadmap ([Roadmap](docs/roadmap.md)).
 - Development:
-  - Release tooling: `scripts/release.sh <version>` sets an increasing build number from git, signs, notarizes and staples, verifies the app and DMG signatures, and writes a SHA-256 checksum next to the DMG. A release checklist is in [docs/release-checklist.md](docs/release-checklist.md).
+  - Release tooling: `scripts/release.sh <version>` sets an increasing build number from git, signs, notarizes and staples, verifies the app and DMG signatures, and writes a SHA-256 checksum next to the DMG. A release runbook is in [docs/release-checklist.md](docs/release-checklist.md).
   - FSearchKit Swift package with unit and daemon integration tests. A separate UI smoke test (`scripts/ui-smoke.sh`) runs locally, not in CI.
   - Benchmarks: `scripts/bench.sh` measures keystroke, client and real-daemon performance and fails when a result regresses against `bench/baseline.json`. See [bench/README.md](bench/README.md).
   - A Makefile for common tasks (`make test`, `lint`, `type`, `bench`, `check`) and a `.swift-format` style config.

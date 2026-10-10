@@ -15,6 +15,6 @@ Distribute the app outside the Mac App Store as a signed, notarized DMG. Sign wi
 
 - The app can index and search the whole disk.
 - There is no App Store review or sandbox limit.
-- Each release needs signing and notarization, handled by `scripts/release.sh` and the [release checklist](../release-checklist.md).
+- Each release needs signing and notarization, handled by `scripts/release.sh` and the [release runbook](../release-checklist.md).
 - People find the app through GitHub, not the store.
 - Updates depend on the Sparkle key being set up. Until then, the updater stays off and **Check for Updates…** is hidden.

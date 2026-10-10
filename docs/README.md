@@ -50,7 +50,7 @@ Why the app is built the way it is.
 - [Roadmap](roadmap.md)
 - [Maintainer to-do list](todos.md)
 - [Changelog](../CHANGELOG.md)
-- [Release checklist](release-checklist.md)
+- [Release runbook](release-checklist.md)
 - [Third-party notices](../THIRD_PARTY_NOTICES.md)
 - [Benchmarks](../bench/README.md)
 

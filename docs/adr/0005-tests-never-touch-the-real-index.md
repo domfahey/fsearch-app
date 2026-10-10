@@ -23,4 +23,4 @@ A test that talks to your real daemon could read your real files, change your in
 - The UI smoke test needs a logged-in GUI session and accessibility permission, so it does not run in CI.
 - Test mode skips the real registration path, so that path is covered by the manual release checklist.
 
-See [Contributing](../../CONTRIBUTING.md) and the [release checklist](../release-checklist.md).
+See [Contributing](../../CONTRIBUTING.md) and the [release runbook](../release-checklist.md).

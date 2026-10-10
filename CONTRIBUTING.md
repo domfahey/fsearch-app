@@ -160,5 +160,5 @@ There is no CLA or DCO. By contributing, you agree that your work is released un
 ## See also
 
 - [Architecture](docs/architecture.md)
-- [Release checklist](docs/release-checklist.md)
+- [Release runbook](docs/release-checklist.md)
 - [Documentation hub](docs/README.md)
