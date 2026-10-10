@@ -123,4 +123,84 @@ import Testing
             try await c.grep(q: "", pattern: "(", mode: .regex)
         }
     }
+
+    // MARK: reply ids
+
+    @Test func aLeftoverReplyNeverReachesTheNextRequest() async throws {
+        // Request 1 gets its reply plus an extra line with id 1; request 2 must not see that extra.
+        let srv = RawServer { fd, _ in
+            var n = 0
+            while RawServer.readLine(fd) {
+                n += 1
+                if n == 1 {
+                    RawServer.send(fd, #"{"ok":true,"took_us":1,"hits":[{"path":"/one","kind":"file","size":0,"mtime":0,"score":0}],"id":1}"# + "\n")
+                    RawServer.send(fd, #"{"ok":true,"took_us":1,"hits":[{"path":"/extra","kind":"file","size":0,"mtime":0,"score":0}],"id":1}"# + "\n")
+                } else {
+                    RawServer.send(fd, #"{"ok":true,"took_us":1,"hits":[{"path":"/two","kind":"file","size":0,"mtime":0,"score":0}],"id":2}"# + "\n")
+                }
+            }
+            close(fd)
+        }
+        defer { srv.stop() }
+        let c = DaemonClient(socketPath: srv.path, timeout: 1)
+        #expect(try await c.search("a", limit: 1).hits.first?.path == "/one")
+        #expect(try await c.search("b", limit: 1).hits.first?.path == "/two")
+        #expect(srv.accepted == 1)
+    }
+
+    @Test func aStaleLineAheadOfTheRealReplyIsDiscarded() async throws {
+        let srv = RawServer { fd, _ in
+            var id = 0
+            while RawServer.readLine(fd) {
+                id += 1
+                RawServer.send(fd, #"{"ok":true,"took_us":1,"hits":[{"path":"/stale","kind":"file","size":0,"mtime":0,"score":0}],"id":0}"# + "\n")
+                RawServer.send(fd, #"{"ok":true,"took_us":1,"hits":[{"path":"/real\#(id)","kind":"file","size":0,"mtime":0,"score":0}],"id":\#(id)}"# + "\n")
+            }
+            close(fd)
+        }
+        defer { srv.stop() }
+        let c = DaemonClient(socketPath: srv.path, timeout: 1)
+        #expect(try await c.search("a", limit: 1).hits.first?.path == "/real1")
+        #expect(try await c.search("b", limit: 1).hits.first?.path == "/real2")
+    }
+
+    @Test func onlyMismatchedRepliesTimeOutAndFreshenTheConnection() async throws {
+        let srv = RawServer { fd, _ in
+            while RawServer.readLine(fd) {
+                RawServer.send(fd, #"{"ok":true,"id":777}"# + "\n")
+            }
+            close(fd)
+        }
+        defer { srv.stop() }
+        let c = DaemonClient(socketPath: srv.path, timeout: 0.3)
+        await #expect(throws: DaemonError.timeout) { try await c.ping() }
+        await #expect(throws: DaemonError.timeout) { try await c.ping() }
+        #expect(srv.accepted == 2, "the connection was closed after the timeout")
+    }
+
+    @Test func aChattyDaemonCannotHoldACallPastItsDeadline() async throws {
+        // Mismatched lines keep arriving faster than the per-read timeout; the call still ends.
+        let srv = RawServer { fd, _ in
+            _ = RawServer.readLine(fd)
+            for _ in 0..<40 {
+                RawServer.send(fd, #"{"ok":true,"id":777}"# + "\n")
+                Thread.sleep(forTimeInterval: 0.05)
+            }
+            close(fd)
+        }
+        defer { srv.stop() }
+        let c = DaemonClient(socketPath: srv.path, timeout: 0.4)
+        let t0 = Date()
+        await #expect(throws: DaemonError.timeout) { try await c.ping() }
+        #expect(Date().timeIntervalSince(t0) < 1.2)
+    }
+
+    @Test func repliesWithoutAnIdAreAccepted() async throws {
+        let srv = RawServer { fd, _ in
+            while RawServer.readLine(fd) { RawServer.send(fd, #"{"ok":true}"# + "\n") }
+            close(fd)
+        }
+        defer { srv.stop() }
+        try await DaemonClient(socketPath: srv.path, timeout: 1).ping()
+    }
 }

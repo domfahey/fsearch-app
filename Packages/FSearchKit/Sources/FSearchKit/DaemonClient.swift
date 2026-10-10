@@ -32,7 +32,8 @@ public final class DaemonClient: SearchBackend, @unchecked Sendable {
                     // A call cancelled while queued is skipped without touching the socket.
                     if cancelled.isSet { cont.resume(throwing: CancellationError()); return }
                     nextId += 1
-                    do { cont.resume(returning: try decodeReply(try socket.roundTrip(req.json(id: nextId)), as: T.self)) }
+                    let id = nextId
+                    do { cont.resume(returning: try decodeReply(try socket.roundTrip(req.json(id: id), accepts: { replyIsFor(id, $0) }), as: T.self)) }
                     catch { cont.resume(throwing: error) }
                 }
             }
@@ -58,6 +59,25 @@ public final class DaemonClient: SearchBackend, @unchecked Sendable {
 
     /// Ask the daemon to compact and save its index (debug mode's "Save Now").
     public func save() async throws { _ = try await call(.save, as: Pong.self) }
+}
+
+private struct ReplyId: Decodable {
+    let id: Int?
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: Key.self)
+        // A non-integer id is kept as "not ours" (-1 never matches: ids start at 1).
+        id = (try? c.decode(Int.self, forKey: .id)) ?? ((try? c.decodeNil(forKey: .id)) == false ? -1 : nil)
+    }
+    private enum Key: String, CodingKey { case id }
+}
+
+/// Whether a reply line answers request `id`. The daemon echoes the request's id (null
+/// if the request had none), so a line carrying a different id is a stale leftover.
+/// A line with no id, a null id, or no readable JSON object is accepted: the decode
+/// step then reports it properly instead of it being silently dropped.
+func replyIsFor(_ id: Int, _ line: Data) -> Bool {
+    guard let r = try? JSONDecoder().decode(ReplyId.self, from: line), let got = r.id else { return true }
+    return got == id
 }
 
 /// A thread-safe one-way flag, set by the cancellation handler and read on the queue.
