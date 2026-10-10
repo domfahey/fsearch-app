@@ -29,6 +29,9 @@ struct OnboardingView: View {
     @State private var busy = false
     /// Set when "Turn on FSearch" opens Settings; one restart on return clears it.
     @State private var pressedTurnOn = false
+    /// The poll's in-flight refresh(); cancelled before start()/restart() so a
+    /// slow refresh can't publish over their result.
+    @State private var pollRefresh: Task<Void, Never>?
 
     private static let pollInterval = Duration.seconds(1)
 
@@ -137,6 +140,7 @@ struct OnboardingView: View {
         OnboardingLauncher.noteDaemonStarted()
         busy = true
         Task {
+            await cancelPollRefresh()
             await app.daemon.start()
             busy = false
             apply()
@@ -148,8 +152,21 @@ struct OnboardingView: View {
         // Nothing talks to the daemon before the helper step: step 1 is only the shortcut.
         guard step != .welcome, !busy else { return }
         // A pending approval is re-checked when the app becomes active again.
-        if app.daemon.state != .needsApproval { await app.daemon.refresh() }
+        if app.daemon.state != .needsApproval {
+            let t = Task { await app.daemon.refresh() }
+            pollRefresh = t
+            // Closing the window cancels the poll loop; pass that on.
+            await withTaskCancellationHandler { await t.value } onCancel: { t.cancel() }
+            pollRefresh = nil
+        }
         apply()
+    }
+
+    /// refresh() returns without publishing once cancelled.
+    private func cancelPollRefresh() async {
+        guard let t = pollRefresh else { return }
+        t.cancel()
+        await t.value
     }
 
     private func apply() {
@@ -178,6 +195,7 @@ struct OnboardingView: View {
            restartAfterSettings(pressedTurnOn: pressedTurnOn, owns: app.daemon.ownsDaemon, fullDiskAccess: facts.fullDiskAccess) {
             pressedTurnOn = false
             busy = true
+            await cancelPollRefresh()
             await app.daemon.restart()
             busy = false
         }
