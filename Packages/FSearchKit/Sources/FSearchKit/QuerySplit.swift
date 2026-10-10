@@ -124,6 +124,26 @@ public enum QuerySplit {
         }
     }
 
+    /// True if rows for `answered` can stand in for `query` while its last word is a filter still being typed
+    /// (see ``endsInHalfTypedFilter(_:mode:)``): `answered` is the query before that word, or the query with less of
+    /// that word typed (`foo siz` for `foo size:`), each searched on the way there. Spaces at either end don't count.
+    /// A query that only starts with `answered` doesn't qualify: in `food ext:` over `foo`, `food` was never searched.
+    ///
+    /// - Parameters:
+    ///   - query: The typed text.
+    ///   - answered: The query the rows answer.
+    ///   - mode: The search mode, as for ``endsInHalfTypedFilter(_:mode:)``.
+    public static func halfTypedExtends(_ query: String, answered: String, mode: SearchMode = .names) -> Bool {
+        guard endsInHalfTypedFilter(query, mode: mode), let last = spacedWords(query).last else { return false }
+        let before = String(query.dropLast(last.word.count))
+        let a = answered.trimmingCharacters(in: .whitespaces)
+        if a == before.trimmingCharacters(in: .whitespaces) { return true }
+        let lead = String(before.drop { $0 == " " })
+        guard a.hasPrefix(lead) else { return false }
+        let typed = a.dropFirst(lead.count)
+        return !typed.isEmpty && last.word.hasPrefix(typed)
+    }
+
     /// `s` starts some value but isn't one yet.
     private static func isStrictPrefix(_ s: String, of values: Set<String>) -> Bool {
         !values.contains(s) && values.contains { $0.hasPrefix(s) }
