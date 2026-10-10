@@ -8,22 +8,37 @@ import Foundation
 /// once with only the newest `cap`. Write errors are ignored on purpose:
 /// this is a debug log, and a failed write must never disturb a search.
 public final class SearchLog: @unchecked Sendable {
+    /// One logged search, as stored on a line of the file.
     public struct Record: Codable, Equatable, Sendable {
+        /// When the search finished.
         public let time: Date
+        /// The query as typed. The log is local and only written in debug mode.
         public let query: String
+        /// `names`, `content` or `symbols`.
         public let mode: String
+        /// How many results came back.
         public let results: Int
+        /// The daemon's own time in microseconds, if it reported one.
         public let tookUs: UInt64?
+        /// Milliseconds from sending the request to the answer.
         public let roundTripMs: Double
+        /// The error's text, or nil on success.
         public let error: String?
     }
 
+    /// The log file.
     public let file: URL
+    /// How many records are kept and shown.
     private let cap: Int
     private let lock = NSLock()
     /// Physical lines in the file, seeded by one read on first use.
     private var lineCount: Int?
 
+    /// Creates a log.
+    ///
+    /// - Parameters:
+    ///   - file: The JSON-lines file; its folder is created on the first write.
+    ///   - cap: The records kept. The file may grow to twice this before it is compacted.
     public init(
         file: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/FSearch/searches.jsonl"),
         cap: Int = 10_000
@@ -40,6 +55,13 @@ public final class SearchLog: @unchecked Sendable {
         }
     }
 
+    /// Appends one record, then compacts the file if it has grown past twice the cap.
+    ///
+    /// Failures are swallowed: a debug log must never disturb a search.
+    ///
+    /// - Parameters:
+    ///   - e: The finished search.
+    ///   - t: When it finished.
     public func append(_ e: SearchModel.LogEntry, at t: Date) {
         lock.lock(); defer { lock.unlock() }
         let r = Record(
@@ -74,11 +96,13 @@ public final class SearchLog: @unchecked Sendable {
         }
     }
 
+    /// The newest records (at most the cap), oldest first; corrupt lines are skipped.
     public func entries() -> [Record] {
         lock.lock(); defer { lock.unlock() }
         return Array(readRecords().suffix(cap))
     }
 
+    /// Deletes the log file.
     public func clear() {
         lock.lock(); defer { lock.unlock() }
         try? FileManager.default.removeItem(at: file)

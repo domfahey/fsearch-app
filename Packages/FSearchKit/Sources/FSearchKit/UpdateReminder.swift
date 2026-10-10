@@ -1,8 +1,10 @@
 /// Decides when a scheduled update shows as a quiet menu-bar indicator instead of
 /// Sparkle's window (gentle reminders for a menu-bar app that is never frontmost).
 public struct UpdateReminder: Equatable, Sendable {
+    /// Whether the menu bar shows the quiet update indicator.
     public private(set) var indicatorVisible = false
 
+    /// Creates a reminder with no indicator.
     public init() {}
 
     /// Let Sparkle pop its window for a scheduled update only when the app is

@@ -12,8 +12,20 @@ import Foundation
 ///   `Contents/SharedSupport/bin/subl`), BBEdit (`com.barebones.bbedit`,
 ///   `Contents/Helpers/bbedit_tool`).
 public enum Editor: String, CaseIterable, Sendable {
-    case vscode, cursor, zed, sublime, bbedit, xcode
+    /// Visual Studio Code.
+    case vscode
+    /// Cursor.
+    case cursor
+    /// Zed.
+    case zed
+    /// Sublime Text.
+    case sublime
+    /// BBEdit.
+    case bbedit
+    /// Xcode.
+    case xcode
 
+    /// The app's bundle identifier, used to find it with Launch Services.
     public var bundleId: String {
         switch self {
         case .vscode: "com.microsoft.VSCode"
@@ -25,6 +37,7 @@ public enum Editor: String, CaseIterable, Sendable {
         }
     }
 
+    /// The name shown in menus.
     public var displayName: String {
         switch self {
         case .vscode: "Visual Studio Code"
@@ -37,13 +50,23 @@ public enum Editor: String, CaseIterable, Sendable {
     }
 }
 
+/// A process to launch: an absolute executable path and its arguments.
 public struct EditorCommand: Equatable, Sendable {
+    /// Absolute path of the editor's command-line tool.
     public let executable: String
+    /// Arguments for the tool, one per element.
     public let arguments: [String]
 }
 
 /// The command that opens `path` at `line`. Arguments go to the process as
 /// an array (never a shell string), so any path needs no quoting.
+///
+/// - Parameters:
+///   - e: The editor to use.
+///   - appURL: Where that editor's app bundle is installed.
+///   - path: The file to open.
+///   - line: The 1-based line to jump to.
+/// - Returns: The command to run; the CLI locations are listed in ``Editor``.
 public func openAtLine(_ e: Editor, appURL: URL, path: String, line: Int) -> EditorCommand {
     let app = appURL.path
     switch e {
@@ -58,6 +81,9 @@ public func openAtLine(_ e: Editor, appURL: URL, path: String, line: Int) -> Edi
 
 /// Editors present on this Mac. `lookup` maps a bundle id to its app URL
 /// (NSWorkspace.urlForApplication(withBundleIdentifier:) in the app).
+///
+/// - Parameter lookup: Finds an app by bundle id, or returns nil when it isn't installed.
+/// - Returns: Each installed editor with its app URL, in ``Editor`` declaration order.
 public func installedEditors(lookup: (String) -> URL?) -> [(Editor, URL)] {
     Editor.allCases.compactMap { e in lookup(e.bundleId).map { (e, $0) } }
 }

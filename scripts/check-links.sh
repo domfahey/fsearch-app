@@ -2,8 +2,13 @@
 # Check that every relative Markdown link in the repo resolves, and that a
 # #anchor points at a real heading. Skips build/, .build/, .superpowers/,
 # docs/superpowers/ and Vendor/. Exits non-zero if any link is broken.
+#
+# Usage: scripts/check-links.sh       (run from anywhere; it changes to the repo root)
+# Prerequisite: python3. Read-only: it only reads Markdown files.
+# Exit codes: 0 all links resolve; 1 at least one broken link or anchor.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# -I (isolated mode) so a stray PYTHON* variable or a module in the cwd can't change what runs.
 exec python3 -I - <<'PY'
 import os, re, sys
 from urllib.parse import unquote
@@ -20,16 +25,19 @@ for dp, dns, fns in os.walk("."):
     dns[:] = [d for d in dns if d not in SKIP and not skipped(os.path.normpath(os.path.join(rel_dir, d)))]
     files += [os.path.normpath(os.path.join(dp, f)) for f in fns if f.endswith(".md")]
 
+# Drop fenced and inline code first: links in examples are not real links.
 def strip_code(text):
     text = re.sub(r"^(```|~~~).*?^\1[ \t]*$", "", text, flags=re.S | re.M)
     return re.sub(r"`[^`\n]*`", "", text)
 
+# GitHub's heading anchor: lowercase, punctuation dropped, spaces to hyphens.
 def slug(h):
     h = re.sub(r"`", "", h.strip().lower())
     h = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", h)
     h = re.sub(r"[^\w\- ]", "", h, flags=re.U)
     return h.replace(" ", "-")
 
+# Per-file cache of heading anchors; a repeated heading gets -1, -2 ... as on GitHub.
 anchors = {}
 def anchors_of(path):
     if path not in anchors:

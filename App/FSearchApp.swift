@@ -1,7 +1,9 @@
 import SwiftUI
 
+/// The app: a menu-bar extra, a Settings scene and two debug windows. The floating panel is AppKit, installed by `PanelController`.
 @main
 struct FSearchApp: App {
+    /// Shared by every scene.
     @StateObject private var app: AppState
 
     init() {

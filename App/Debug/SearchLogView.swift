@@ -4,6 +4,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 import os
 
+/// Debug window: the search log, newest first, with a filter, export and clear.
 struct SearchLogView: View {
     @EnvironmentObject var app: AppState
     @State private var rows: [SearchLog.Record] = []

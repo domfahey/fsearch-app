@@ -1,18 +1,31 @@
 import Foundation
 import Observation
 
-public enum SearchMode: Equatable, Sendable { case names, content, symbols }
+/// What the search box searches.
+public enum SearchMode: Equatable, Sendable {
+    /// File names (the default).
+    case names
+    /// Text inside files.
+    case content
+    /// Symbol definitions in code.
+    case symbols
+}
 
+/// One result row: a file or a matching line.
 public enum ResultItem: Equatable, Identifiable, Sendable {
+    /// A file found by name.
     case file(Hit)
+    /// A line found inside a file.
     case line(path: String, match: Match)
 
+    /// The file the item is in.
     public var path: String {
         switch self {
         case let .file(h): h.path;
         case let .line(p, _): p
         }
     }
+    /// Unique within one result list: the path, plus the line number for lines.
     public var id: String {
         switch self {
         case let .file(h): h.path;
@@ -21,26 +34,57 @@ public enum ResultItem: Equatable, Identifiable, Sendable {
     }
 }
 
-public enum SearchPhase: Equatable, Sendable { case idle, loading, results, indexing, failed(DaemonError) }
+/// Where a search is, for the panel to render.
+public enum SearchPhase: Equatable, Sendable {
+    /// Nothing to search for.
+    case idle
+    /// A request is in flight.
+    case loading
+    /// Results (possibly none) are showing.
+    case results
+    /// The daemon is still building its first index.
+    case indexing
+    /// The search failed.
+    case failed(DaemonError)
+}
 
 /// One search box. Each refresh is a generation; only the newest one may
 /// publish, so slow answers to older queries are dropped.
+///
+/// - A newer ``refresh()`` cancels the older one's backend call; the older call returns
+///   without changing state or calling the callbacks.
+/// - ``onSearched`` and ``onSettled`` fire once for each search that finished as the newest
+///   generation, never for a cancelled or superseded one.
+/// - All state is main-actor isolated; the daemon call runs off the main actor.
 @MainActor @Observable
 public final class SearchModel {
+    /// What ``onSearched`` reports for one finished search.
     public struct LogEntry: Equatable, Sendable {
+        /// The query searched.
         public let query: String
+        /// The mode searched.
         public let mode: SearchMode
+        /// The results returned (0 on failure).
         public let resultCount: Int
+        /// The daemon's reported time, if any.
         public let tookUs: UInt64?
+        /// Milliseconds as seen by the app.
         public let roundTripMs: Double
+        /// The error's text, or nil.
         public let error: String?
     }
 
+    /// The text in the search box; set it, then call ``refresh()``.
     public var query = ""
+    /// The mode to search in.
     public var mode: SearchMode = .names
+    /// The current results.
     public private(set) var items: [ResultItem] = []
+    /// Where the current search is.
     public private(set) var phase: SearchPhase = .idle
+    /// The daemon's time for the results showing, if it reported one.
     public private(set) var lastTookUs: UInt64?
+    /// Called once for each search that completes as the newest generation, with its outcome (for the debug log).
     @ObservationIgnored public var onSearched: ((LogEntry) -> Void)?
     /// Called with the new phase every time a search finishes (results,
     /// indexing or failed), even when the phase is the same as before: a
@@ -55,11 +99,21 @@ public final class SearchModel {
     /// hung daemon costs one timeout, not one per keystroke.
     @ObservationIgnored private var inflight: Task<([ResultItem], UInt64), Error>?
 
+    /// Creates a model.
+    ///
+    /// - Parameters:
+    ///   - names: The backend for name searches.
+    ///   - content: The backend for content and symbol searches; a separate connection so a slow grep doesn't block name searches.
     public init(names: SearchBackend, content: SearchBackend) {
         self.names = names
         self.content = content
     }
 
+    /// Runs the search for the current ``query`` and ``mode`` and publishes the outcome.
+    ///
+    /// A query that is blank, is the "?" cheat sheet, or has an empty content pattern clears the results and sends nothing.
+    /// A query ending in a half-typed filter (`foo size:`) leaves everything as it is. A stale answer, or one cancelled by a
+    /// newer refresh, is dropped.
     public func refresh() async {
         // A filter still being typed (`foo size:`) is not a query yet: keep
         // what is showing, and let any search already under way finish.
@@ -99,11 +153,14 @@ public final class SearchModel {
         }
     }
 
+    /// Whether a content search has no pattern yet: an empty pattern would match every line.
     private static func emptyPattern(_ q: String, _ mode: SearchMode) -> Bool {
         mode == .names ? QuerySplit.contentSearch(q)?.pattern.isEmpty == true : QuerySplit.split(q).pattern.isEmpty
     }
 
     /// A query with nothing but spaces searches nothing.
+    ///
+    /// - Parameter q: The typed query.
     public nonisolated static func isBlank(_ q: String) -> Bool {
         q.trimmingCharacters(in: .whitespaces).isEmpty
     }
@@ -116,6 +173,7 @@ public final class SearchModel {
                 let r = try await content.grep(q: c.q, pattern: c.pattern, mode: c.mode)
                 return (lines(r), r.tookUs)
             }
+            // 50 rows fill the panel with room to scroll; more only slows the answer.
             let r = try await names.search(q, limit: 50)
             return (r.hits.map(ResultItem.file), r.tookUs)
         case .content, .symbols:
@@ -129,6 +187,7 @@ public final class SearchModel {
         r.files.flatMap { f in f.matches.map { ResultItem.line(path: f.path, match: $0) } }
     }
 
+    /// Tells the observers a search finished; `phase` is already updated.
     private func report(_ q: String, _ mode: SearchMode, _ n: Int, _ took: UInt64?, _ started: Date, _ err: String?) {
         onSearched?(
             LogEntry(query: q, mode: mode, resultCount: n, tookUs: took, roundTripMs: Date().timeIntervalSince(started) * 1000, error: err))

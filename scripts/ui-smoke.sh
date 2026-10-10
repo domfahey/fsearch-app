@@ -5,9 +5,20 @@
 # Extra arguments go to xcodebuild (e.g. -enableCodeCoverage YES -resultBundlePath x).
 # Exits non-zero if the daemon never comes up, a test fails, a test is
 # skipped, no test ran, or the app wrote its search log outside the temp HOME.
+#
+# Usage: scripts/ui-smoke.sh [xcodebuild args]
+# Prerequisites: Xcode, `xcodegen generate` run once, the daemon at Vendor/fsearch,
+# a logged-in GUI session with nobody using the Mac (the tests synthesize keys).
+# Never touches the real index or ~/Library/Application Support/FSearch: the daemon
+# gets a temp HOME and root, and the script checks that the real search log
+# stayed unchanged. It deletes only that temp folder and the apptests defaults suites.
+# Exit codes: 0 all tests passed; 1 any failure listed above; otherwise xcodebuild's status.
+#
+# No `set -e`: cleanup and the checks below must run even when xcodebuild fails.
 set -u -o pipefail
 cd "$(dirname "$0")/.." || exit 1
 export DEVELOPER_DIR=${DEVELOPER_DIR:-$(xcode-select -p)}
+# A short path under /private/tmp: a Unix socket path can be at most 104 bytes.
 H=/private/tmp/fsa-ui-$(openssl rand -hex 3)
 LOG=$(mktemp -t ui-smoke)
 SOCK="$H/Library/Application Support/FSearch/fsearch.sock"
@@ -24,10 +35,13 @@ echo x > "$R/duo/plover-two.txt"
 printf 'first line\nthe quokkaneedle line\nlast line\n' > "$R/notes.md"
 printf 'import Foundation\n\nfunc kestrelHandler() -> Int {\n    return 1\n}\n' > "$R/src/kestrel.swift"
 
+# "mtime size" of a file, or "absent": detects any write to the real search log.
 stamp() { if [ -e "$1" ]; then stat -f '%m %z' "$1"; else echo absent; fi; }
 REAL_BEFORE=$(stamp "$REAL_LOG")
 
+# The daemon indexes only $H/root and keeps its data under the temp HOME.
 HOME=$H FSEARCH_ROOT=$H/root Vendor/fsearch serve >/dev/null 2>&1 & DP=$!
+# Stop the daemon (TERM, then KILL after ~5 s), then delete the temp HOME.
 cleanup() {
   kill $DP 2>/dev/null
   for _ in $(seq 10); do kill -0 $DP 2>/dev/null || break; sleep 0.5; done

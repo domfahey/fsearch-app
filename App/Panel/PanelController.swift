@@ -6,16 +6,27 @@ import SwiftUI
 
 /// The floating launcher: a borderless panel over every Space, centred on
 /// the active screen, hidden when it loses focus.
+///
+/// Focus: the panel is non-activating, and ``show(app:)`` remembers the app that was in front
+/// (``hide(returnFocus:)`` hands focus back to it). Clicking another app hides the panel without
+/// returning focus, since the user already chose where it goes.
+///
+/// Inert host: in the unit-test host (``Presentation/inert``) the panel is ordered in invisibly,
+/// can't become key, and never activates the app or moves focus, so tests never disturb the user.
 @MainActor
 final class PanelController: PanelHost {
     static let shared = PanelController()
+    /// The panel, created on the first `show`.
     private(set) var panel: NSPanel?
+    /// Remembers the state at hide, so a quick reopen resumes.
     private var session = PanelSession()
     private weak var app: AppState?
+    /// The selected row, mirrored from the view so ``hide(returnFocus:)`` can save it.
     private(set) var selection = 0
     /// The app that was in front when the panel opened, to hand focus back to.
     private var previousApp: NSRunningApplication?
 
+    /// The panel window: key only outside the unit-test host, hides on resign, and hosts the Quick Look controller.
     final class Panel: NSPanel {
         /// The unit-test host's panel must never take the keyboard from the user.
         override var canBecomeKey: Bool { !LaunchOptions.current.unitTestHost }
@@ -47,6 +58,7 @@ final class PanelController: PanelHost {
     /// A test-mode app (UI tests) must not take the user's own global shortcut.
     static func registersGlobalHotkey(_ options: LaunchOptions) -> Bool { !options.testMode }
 
+    /// Connects the panel to the app and registers the global shortcut (not in test mode).
     func install(app: AppState) {
         self.app = app
         if Self.registersGlobalHotkey(app.options) {
@@ -57,8 +69,10 @@ final class PanelController: PanelHost {
 
     var isVisible: Bool { panel?.isVisible == true }
 
+    /// The shortcut and the menu's "Search…": show the panel, or hide it if it is up.
     func toggle(app: AppState) { panel?.isVisible == true ? hide() : show(app: app) }
 
+    /// Shows the panel on the screen holding the mouse, resuming the last query if it was hidden within the resume window.
     func show(app: AppState) {
         self.app = app
         let resumed = session.opened(at: Date())
@@ -80,6 +94,7 @@ final class PanelController: PanelHost {
         p.hasShadow = true
         p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         p.contentView = NSHostingView(rootView: view)
+        // 680 x 460 matches SearchView's frame; the origin below centres it horizontally and sits it a little above the screen's middle.
         p.setContentSize(NSSize(width: 680, height: 460))
         let mouse = NSEvent.mouseLocation
         if let screen = NSScreen.screens.first(where: { $0.frame.contains(mouse) }) ?? NSScreen.main {
@@ -100,7 +115,9 @@ final class PanelController: PanelHost {
         Presentation.present(p, inert: inert)
     }
 
-    /// `returnFocus` is false when hiding because the user clicked another app.
+    /// Hides the panel, saving its state for a quick reopen.
+    ///
+    /// - Parameter returnFocus: False when hiding because the user clicked another app, so focus isn't pulled back.
     func hide(returnFocus: Bool = true) {
         guard let p = panel, p.isVisible, let app else { return }
         session.hidden(PanelState(query: app.search.query, mode: app.search.mode, selection: selection), at: Date())
@@ -171,6 +188,11 @@ final class PanelController: PanelHost {
         hide(returnFocus: false)
     }
 
+    /// Carries out a panel key's effect on the results.
+    ///
+    /// - Parameters:
+    ///   - effect: What ``reduce(_:_:)`` asked for; indices are file indices.
+    ///   - items: The results showing; an index outside them is ignored.
     func perform(_ effect: PanelEffect, _ items: [ResultItem]) {
         guard let app else { return }
         switch effect {

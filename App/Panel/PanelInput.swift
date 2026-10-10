@@ -50,6 +50,7 @@ enum PanelInput {
         return Character(String(c).lowercased())
     }
 
+    /// What the view does with an effect once row indices are resolved.
     enum Route: Equatable {
         /// Pass the effect to the controller; its indexes are file indexes.
         case perform(PanelEffect)
@@ -57,6 +58,7 @@ enum PanelInput {
         case switchMode(SearchMode)
         /// Return on an app-command row.
         case runCommand(AppCommand)
+        /// Nothing: the row takes no such action.
         case ignore
     }
 
@@ -80,11 +82,13 @@ enum PanelInput {
         }
     }
 
+    /// Re-targets a file-only effect to its file index, or ignores it on a command or fallback row.
     private static func fileEffect(_ rows: PanelRows, _ i: Int, _ make: (Int) -> PanelEffect) -> Route {
         if case let .result(f)? = rows.row(at: i) { return .perform(make(f)) }
         return .ignore
     }
 
+    /// Convenience for tests: builds the rows from their inputs.
     static func route(_ effect: PanelEffect, files: Int, query: String, mode: SearchMode) -> Route {
         route(effect, rows: PanelRows(files: files, query: query, mode: mode))
     }

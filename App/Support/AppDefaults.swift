@@ -14,9 +14,16 @@ enum AppDefaults {
     /// Matches the sweep in scripts/coverage.sh and scripts/ui-smoke.sh.
     static let testSuiteName = "com.domfahey.fsearch.apptests.testmode"
 
+    /// The defaults every part of the app reads and writes: the real ones, or the throwaway suite in test mode.
     // UserDefaults is thread-safe; the SDK just doesn't mark it Sendable.
     nonisolated(unsafe) static let store: UserDefaults = make(testMode: LaunchOptions.current.testMode)
 
+    /// Picks the store for a launch.
+    ///
+    /// - Parameters:
+    ///   - testMode: Whether this is a UI-test launch or the unit-test host.
+    ///   - suiteName: The throwaway suite to use in test mode.
+    /// - Returns: `.standard` outside test mode; otherwise the suite, emptied first so no state leaks between runs.
     static func make(testMode: Bool, suiteName: String = testSuiteName) -> UserDefaults {
         guard testMode, let d = UserDefaults(suiteName: suiteName) else { return .standard }
         d.removePersistentDomain(forName: suiteName)

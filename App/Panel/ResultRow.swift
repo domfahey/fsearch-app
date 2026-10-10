@@ -1,9 +1,13 @@
 import FSearchKit
 import SwiftUI
 
+/// One result: the file's icon and name with its folder (or the matching line), the first query word highlighted.
 struct ResultRow: View {
+    /// The result shown.
     let item: ResultItem
+    /// The text to highlight in the name.
     let query: String
+    /// Whether the row is the selected one.
     let selected: Bool
 
     var body: some View {
@@ -26,6 +30,7 @@ struct ResultRow: View {
         }
     }
 
+    /// `s` with the first word of `q` marked, ignoring case.
     private func highlighted(_ s: String, _ q: String) -> AttributedString {
         var a = AttributedString(s)
         let word = q.split(separator: " ").first.map(String.init) ?? ""

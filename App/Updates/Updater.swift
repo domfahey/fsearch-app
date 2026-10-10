@@ -6,8 +6,12 @@ import SwiftUI
 
 /// Sparkle updater. Not started while Info.plist still carries the placeholder
 /// public key (see docs/release-checklist.md), so dev builds never prompt.
+///
+/// It also never starts in test mode (UI tests and the unit-test host): a launch there would
+/// check the real feed, write the check time into the real defaults and could put up windows.
 @MainActor
 enum Updater {
+    /// Whether Info.plist has a real Sparkle public key rather than the placeholder that dev builds carry.
     static let isConfigured: Bool = {
         let key = Bundle.main.object(forInfoDictionaryKey: "SUPublicEDKey") as? String ?? ""
         return !key.isEmpty && key != "REPLACE_WITH_SPARKLE_PUBLIC_KEY"
@@ -16,11 +20,12 @@ enum Updater {
     /// nil until `start()` runs with a real key.
     private(set) static var controller: SPUStandardUpdaterController?
 
-    /// Never under test: a UI-test launch would check the real feed, write
+    /// Whether to start Sparkle. Never under test: a UI-test launch would check the real feed, write
     /// SULastCheckTime to the real defaults and could put up update windows.
     static func shouldStart(configured: Bool, testMode: Bool) -> Bool { configured && !testMode }
 
     /// Called once at launch. Creates (and so starts) Sparkle only when configured, outside test mode.
+    /// Later calls do nothing.
     static func start() {
         guard shouldStart(configured: isConfigured, testMode: LaunchOptions.current.testMode), controller == nil else { return }
         controller = SPUStandardUpdaterController(
@@ -33,9 +38,12 @@ enum Updater {
 @MainActor @Observable
 final class UpdateReminderModel {
     static let shared = UpdateReminderModel()
+    /// The decision logic (in FSearchKit).
     private(set) var reminder = UpdateReminder()
+    /// Whether the menu bar shows the indicator.
     var indicatorVisible: Bool { reminder.indicatorVisible }
 
+    /// Applies a change to the reminder; mutating through here triggers the redraw.
     func update(_ change: (inout UpdateReminder) -> Void) { change(&reminder) }
 }
 
@@ -46,6 +54,7 @@ final class UpdateReminderModel {
 final class UpdateReminderDriver: NSObject, @preconcurrency SPUStandardUserDriverDelegate {
     static let shared = UpdateReminderDriver()
 
+    /// Opts in to Sparkle's gentle reminders.
     var supportsGentleScheduledUpdateReminders: Bool { true }
 
     func standardUserDriverShouldHandleShowingScheduledUpdate(
@@ -89,9 +98,11 @@ struct UpdateAvailableItem: View {
 /// Mirrors `SPUUpdater.automaticallyChecksForUpdates` (KVO) and writes changes back.
 @MainActor
 final class AutoCheckState: ObservableObject {
+    /// The "Automatically check" setting.
     @Published var automatic: Bool {
         didSet { if automatic != updater.automaticallyChecksForUpdates { updater.automaticallyChecksForUpdates = automatic } }
     }
+    /// False while a check is running.
     @Published private(set) var canCheck = false
     private let updater: SPUUpdater
     private var cancellables: Set<AnyCancellable> = []

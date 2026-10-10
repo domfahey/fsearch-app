@@ -3,6 +3,7 @@ import FSearchKit
 import SwiftUI
 import os
 
+/// Debug window: the daemon's index statistics, skipped folders and log tail, with Save Now and Restart Daemon.
 struct IndexDetailsView: View {
     @EnvironmentObject var app: AppState
     @State private var skipped: [String] = []

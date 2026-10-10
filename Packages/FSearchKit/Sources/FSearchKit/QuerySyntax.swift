@@ -1,6 +1,7 @@
 /// The query cheat sheet the panel shows when the query is just "?".
 /// Mirrors the daemon's filter keys (query.rs `Query::filter`).
 public enum QuerySyntax {
+    /// The syntax lines, each with a short meaning, in display order.
     public static let cheatSheet: [(syntax: String, meaning: String)] = [
         ("ext:rs,md", "files with these extensions"),
         ("in:~/Developer", "only under this folder"),

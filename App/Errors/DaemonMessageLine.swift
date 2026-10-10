@@ -9,6 +9,7 @@ struct DaemonMessageLine: View {
     @ObservedObject var daemon: DaemonManager
     @State private var host = HostWindow()
 
+    /// Whether the daemon, or the last search, says the first index is still being built.
     private var isIndexing: Bool {
         if daemon.state == .indexing { return true }
         switch model.phase {
@@ -52,6 +53,7 @@ final class HostWindow {
     weak var window: NSWindow?
 }
 
+/// Fills a `HostWindow` once the view lands in a window.
 private struct HostWindowReader: NSViewRepresentable {
     let host: HostWindow
 
