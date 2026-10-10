@@ -44,10 +44,11 @@ struct SearchView: View {
                 if app.debugMode { Circle().fill(.orange).frame(width: 6, height: 6).help("Debug mode") }
             }
             .padding(14)
+            DaemonMessageLine(model: model, daemon: app.daemon)
             Divider()
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
-                    if let msg = UserMessage.forPhase(model.phase) {
+                    if case .failed(.daemon) = model.phase {} else if let msg = UserMessage.forPhase(model.phase) {
                         Text(msg).foregroundStyle(.secondary).padding(16)
                     }
                     if !shown.isEmpty {

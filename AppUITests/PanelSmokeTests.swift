@@ -102,6 +102,15 @@ final class PanelSmokeTests: XCTestCase {
         field.typeKey("c", modifierFlags: [.command, .shift])
         XCTAssertEqual(NSPasteboard.general.string(forType: .string)?.hasSuffix("/🏡 a b.txt"), true)
 
+        // A bad query shows one line under the field, and results resume once it's fixed.
+        field.typeKey("a", modifierFlags: .command)
+        field.typeText("re:(")
+        XCTAssertTrue(app.staticTexts["queryError"].waitForExistence(timeout: 5))
+        field.typeKey("a", modifierFlags: .command)
+        field.typeText("heronfile")
+        XCTAssertTrue(app.staticTexts["heronfile.txt"].waitForExistence(timeout: 20))
+        XCTAssertFalse(app.staticTexts["queryError"].exists)
+
         field.typeKey(.escape, modifierFlags: [])
         XCTAssertEqual(field.value as? String ?? "", "")
     }
