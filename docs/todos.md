@@ -4,10 +4,6 @@ Open work, by priority. "You" items need the maintainer: a decision, credentials
 
 Detail for the bug-audit items is in `.superpowers/audit-round2.md`, and for the final-review fixes in `.superpowers/final-fix-brief.md`. Both are local working notes, not committed.
 
-## In flight
-
-- [ ] **Makefile audit:** stricter shell, phony targets, `clean`, plus new `doctor`, `install` (developer prerequisites only), `setup` and `ci` targets. *(in progress)*
-
 ## After the pull request merges
 
 - [ ] Stricter `main`: enforce for admins, require up-to-date branches, linear history, conversation resolution; squash-only merges; delete merged branches.
@@ -17,27 +13,12 @@ Detail for the bug-audit items is in `.superpowers/audit-round2.md`, and for the
 
 ## P1: bugs from audit round 2
 
-- [ ] **The panel opens partly off-screen** on displays shorter than about 1290pt (the built-in 1512×982 included). Clamp `y` in `PanelController`.
-- [ ] **Stale ↵:** while new results load, ↵ opens the previous query's hit. Tag results with the (query, mode) they answer, and hold actions until they match.
-- [ ] **The list doesn't scroll to the keyboard selection** past about row 10. Use `ScrollViewReader`.
-- [ ] **After an app update the old helper keeps running.** Store the helper's identity; at launch, if it changed and we own the daemon, restart once.
-- [ ] **A Full Disk Access grant made after onboarding never takes effect.** After "Turn On Full Disk Access…", restart the helper on the next activation, as onboarding does.
-- [ ] **A leftover CLI LaunchAgent plist with no running daemon** blocks our helper, and onboarding sticks at step 2. Recheck, then register; never take over a *running* CLI daemon.
-- [ ] **`ownsDaemon` trusts the login item, not the process serving the socket.** Decide from the socket holder: the pid in `socket.lock` and its path.
-- [ ] **Disconnect restarts aren't serialized.** Keep one in-flight restart.
-- [ ] **Content search for `kind: Deployment` or `size: 3`** is read as an empty filter. In content and symbols modes, only `key:value` counts as a filter.
-- [ ] **`limit:` is ignored in name searches**, because the app always sends JSON `limit: 50`. Leave out the JSON limit when the query has one.
-- [ ] **Accented names (NFD on disk, NFC typed) aren't found.** App-side mitigation: also send the NFD form and merge the results. The real fix is upstream.
-- [ ] **The socket accepts any same-user process.** Document this in docs/privacy.md, .github/SECURITY.md and docs/architecture.md (upstream fix below).
+All fixed; see the CHANGELOG.
 
 ## P2: smaller bugs and polish
 
-- [ ] Panel: key repeat for ↑/↓/⌃N/⌃P; missing files shouldn't open silently or land in Recents; Open With errors are dropped; Terminal on a package opens inside the bundle; dotted folder names get a document icon; ⌘Y and other letter shortcuts on non-Latin layouts; the ⌘K menu opens at a fixed point; ⌘⌃Y also triggers Quick Look; Quick Look has no arrow-key navigation.
-- [ ] Lifecycle: the helper writes no daemon.log; Settings and debug windows open behind other apps; the update reminder is lost on relaunch; status decoding is too strict for older CLI daemons (decode new fields optionally); no single-instance guard.
-- [ ] Search: a half-typed filter freezes stale results after paste or a mode change; partly typed filter values (`type:c`, `size:1mb..`) flash errors; a timeout or a spent restart budget shows "Starting search…" forever; Recents checks files on the main thread.
-- [ ] Indexing poll loops while the panel is hidden.
-- [ ] Build: `cargo build --locked`, and build the daemon before the CI release job unlocks the signing keychain.
-- [ ] Test-only API in shipped code: wrap it in `#if DEBUG`.
+- [ ] Panel: the ⌘K menu opens at a fixed point; ⌘⌃Y also triggers Quick Look; Quick Look has no arrow-key navigation.
+- [ ] Test-only API in shipped code: the `LaunchOptions` test hooks are now Debug-only; wrap the remaining test seams in `#if DEBUG` or confirm none are left.
 - [ ] One source for launch options: `PanelController` still reads `LaunchOptions.current.showPanel`; use `app.options`.
 - [ ] One empty `com.domfahey.fsearch.apptests.unit.plist` stays in ~/Library/Preferences after a full AppTests run (cfprefsd writes it back); it is swept on the next run.
 - [ ] API hygiene: namespace FSearchKit's free functions (`reduce`, `canContinue`, `openAtLine`, …).
@@ -72,7 +53,7 @@ Detail for the bug-audit items is in `.superpowers/audit-round2.md`, and for the
   - **check the connecting client's code signature** on the socket;
   - Unicode normalization and case folding for names and queries;
   - apply the query's `limit:` over the JSON limit;
-  - a daemon.log path option for the bundled helper.
+  - a daemon.log path option for the bundled helper: let the daemon open its own `daemon.log` via a flag or env var (SMAppService plists can't set a per-user `StandardErrorPath`).
 - [ ] Decide whether macOS 14 stays the minimum. Then drop the `macos-14` CI leg before GitHub retires that image (Nov 2, 2026), or move it to `macos-15`.
 
 ## You
@@ -93,11 +74,13 @@ Detail for the bug-audit items is in `.superpowers/audit-round2.md`, and for the
 - [ ] Re-record the benchmark baseline (`scripts/bench.sh --record`, after deleting this machine's entry).
 - [ ] Manual checks:
   - the ⌥Space hotkey and the Raycast warning;
-  - Zed, Sublime Text and BBEdit open-at-line;
   - Japanese and Chinese input in the panel;
   - ⌥⌘D with the menu closed;
-  - `defaults delete com.domfahey.fsearch` clears settings.
+  - `defaults delete com.domfahey.fsearch` clears settings;
+  - the panel frame on the built-in display, held ↵ replay, scrolling to the selection;
+  - editor URL schemes for VS Code and Cursor (and Zed, Sublime Text and BBEdit if installed).
 
 **Design and outreach**
+- [ ] Review the app's new launch-time "Move to Applications" alert wording.
 - [ ] App icon (original; no third-party assets) and README screenshots or a demo GIF.
 - [ ] Follow up on noahdunnagan/fsearch#18.
