@@ -2,7 +2,7 @@ name: CI
 on:
   push:
     branches: [main, v1]
-    tags: ['v*']
+    tags: ['v[0-9]*']
   pull_request:
 
 permissions:
