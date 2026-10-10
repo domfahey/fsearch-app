@@ -42,6 +42,10 @@ xcodebuild -project FSearch.xcodeproj -scheme FSearch -configuration Debug \
 | Warnings as errors | `make type` | `swift build --build-tests -Xswiftc -warnings-as-errors` in the package, plus a warnings check of the app build |
 | Benchmarks | `make bench` | `scripts/bench.sh` |
 | Lint, type and test together | `make check` | |
+| Everything CI runs, with the coverage gates | `make ci` | |
+| Check developer prerequisites | `make doctor` | |
+| Install developer prerequisites (not the app) | `make install` | `brew install xcodegen`, `rustup target add aarch64-apple-darwin x86_64-apple-darwin`, `make hooks` |
+| Remove build outputs / also the daemon and generated project | `make clean` / `make distclean` | |
 
 - Core tests need `Vendor/fsearch` from `make daemon`.
 - Markdown links: `scripts/check-links.sh` checks that every relative link and anchor resolves. CI runs it, so run it when you edit docs.

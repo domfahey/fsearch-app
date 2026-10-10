@@ -76,6 +76,9 @@ Run these from the repository root. `make help` lists every task.
 | Build with warnings as errors | `make type` |
 | Run the benchmarks | `make bench` |
 | Lint, type and test together | `make check` |
+| Everything CI runs, with coverage gates | `make ci` |
+| Check developer prerequisites, or install them (the app is not installed) | `make doctor`, `make install` |
+| Remove build outputs (`distclean` also removes the daemon and project) | `make clean` |
 | Run the panel UI smoke test (needs a logged-in GUI session and accessibility permission, so not in CI) | `make ui` |
 
 The raw commands are `scripts/build-daemon.sh`, `xcodegen generate`, then:
