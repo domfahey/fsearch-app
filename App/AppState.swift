@@ -16,6 +16,8 @@ final class AppState: ObservableObject {
     let recents = Recents(defaults: .standard)
     let log = SearchLog()
     @AppStorage("debugMode") var debugMode = false
+    /// Task 11 wires this to the settings picker.
+    var editorChoice: Editor?
 
     init() {
         // Two connections: names and content never wait on each other.

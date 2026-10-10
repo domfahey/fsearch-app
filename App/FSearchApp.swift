@@ -2,7 +2,16 @@ import SwiftUI
 
 @main
 struct FSearchApp: App {
-    @StateObject private var app = AppState()
+    @StateObject private var app: AppState
+
+    init() {
+        let state = AppState()
+        _app = StateObject(wrappedValue: state)
+        DispatchQueue.main.async {
+            PanelController.shared.install(app: state)
+            Task { await state.daemon.start() }
+        }
+    }
 
     var body: some Scene {
         MenuBarExtra("FSearch", systemImage: "magnifyingglass") {
