@@ -212,15 +212,91 @@ extension AppTests {
             #expect(PanelInput.gate(.enter, held: &held, model: model) == nil)
             #expect(PanelInput.gate(.down, held: &held, model: model) == .down)
             #expect(PanelInput.gate(.cmdDigit(1), held: &held, model: model) == nil)
-            #expect(PanelInput.replay(held: &held, model: model) == nil)  // still stale
+            #expect(PanelInput.replay(held: &held, model: model, visible: true) == nil)  // still stale
             await model.refresh()
             #expect(model.items == [.file(Wire.hit("/p/new.txt"))])
-            #expect(PanelInput.replay(held: &held, model: model) == .cmdDigit(1))
-            #expect(PanelInput.replay(held: &held, model: model) == nil)
+            #expect(PanelInput.replay(held: &held, model: model, visible: true) == .cmdDigit(1))
+            #expect(PanelInput.replay(held: &held, model: model, visible: true) == nil)
 
             // Recents (an empty names query) never wait on a search.
             model.query = ""
             #expect(PanelInput.gate(.enter, held: &held, model: model) == .enter)
+        }
+
+        /// A held key replays only on results the user can see: never once the panel is hidden, and never on a failed
+        /// or indexing settle (a ↵ on zero files would land on a fallback row and switch mode).
+        @Test func aHeldKeyReplaysOnlyOnVisibleResults() async {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let model = env.app.search
+            var held = HeldKey()
+            env.daemon.onSearch = { q in SearchReply(tookUs: 1, hits: [Wire.hit("/p/\(q).txt")]) }
+            model.query = "hidden"
+            #expect(PanelInput.gate(.enter, held: &held, model: model) == nil)
+            await model.refresh()
+            #expect(PanelInput.replay(held: &held, model: model, visible: false) == nil)
+            #expect(held.held == nil, "dropped, not kept for the next show")
+
+            for error in [DaemonError.daemon("bad filter"), .indexing("indexing 10%")] {
+                env.daemon.onSearch = { _ in throw error }
+                model.query = "q\(error)"
+                #expect(PanelInput.gate(.enter, held: &held, model: model) == nil)
+                await model.refresh()
+                #expect(model.resultsAreCurrent)
+                #expect(PanelInput.replay(held: &held, model: model, visible: true) == nil, "\(error)")
+                #expect(held.held == nil)
+            }
+        }
+
+        /// A filter still being typed keeps the rows of the query it extends, so ↵ acts on them rather than waiting for a
+        /// search that won't run until the filter is finished.
+        @Test func aHalfTypedFilterDoesntHoldAKey() async {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let model = env.app.search
+            env.daemon.onSearch = { q in SearchReply(tookUs: 1, hits: [Wire.hit("/p/\(q).txt")]) }
+            model.query = "foo"
+            await model.refresh()
+            model.query = "foo ext:"
+            await model.refresh()
+            #expect(!model.resultsAreCurrent && model.items.map(\.path) == ["/p/foo.txt"])
+            var held = HeldKey()
+            #expect(PanelInput.gate(.enter, held: &held, model: model) == .enter)
+            // In another mode, or over rows that aren't results, it still waits.
+            model.mode = .content
+            #expect(PanelInput.gate(.enter, held: &held, model: model) == nil)
+            model.mode = .names
+            env.daemon.onSearch = { _ in throw DaemonError.daemon("bad") }
+            model.query = "bar"
+            await model.refresh()
+            model.query = "bar ext:"
+            await model.refresh()
+            #expect(PanelInput.gate(.enter, held: &held, model: model) == nil)
+        }
+
+        /// New rows make a selection made on the old ones meaningless: it goes back to the top before a held key replays.
+        @Test func newRowsResetTheSelection() async {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let model = env.app.search
+            env.daemon.onSearch = { q in SearchReply(tookUs: 1, hits: [Wire.hit("/p/\(q)1"), Wire.hit("/p/\(q)2")]) }
+            model.query = "old"
+            await model.refresh()
+            var held = HeldKey(), selection = 0
+            model.query = "new"
+            let before = PanelInput.answer(model)
+            selection = 1  // ↓ on the old rows
+            #expect(PanelInput.gate(.enter, held: &held, model: model) == nil)
+            await model.refresh()
+            let after = PanelInput.answer(model)
+            let key = PanelInput.rowsChanged(from: before, to: after, selection: &selection, held: &held, model: model, visible: true)
+            #expect(key == .enter && selection == 0)
+
+            // The same rows answering again (an indexing poll) keep the selection.
+            selection = 1
+            #expect(
+                PanelInput.rowsChanged(from: after, to: after, selection: &selection, held: &held, model: model, visible: true) == nil)
+            #expect(selection == 1)
         }
 
         /// Item 12: folders, dotted ones included, and apps get their own icon, not their extension's.

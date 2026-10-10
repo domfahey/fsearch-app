@@ -129,10 +129,14 @@ enum PanelInput {
     }
 
     /// Whether the rows answer what is in the box. Recents (an empty names
-    /// query) wait on no search.
+    /// query) wait on no search. A filter still being typed (`foo ext:`) keeps
+    /// the results of the query it extends in the same mode, and no search runs
+    /// until it is finished, so those rows count too.
     @MainActor
     static func rowsAreCurrent(_ model: SearchModel) -> Bool {
-        model.resultsAreCurrent || (model.query.isEmpty && model.mode == .names)
+        if model.resultsAreCurrent || (model.query.isEmpty && model.mode == .names) { return true }
+        return model.phase == .results && model.mode == model.answered.mode && model.query.hasPrefix(model.answered.query)
+            && QuerySplit.endsInHalfTypedFilter(model.query, mode: model.mode)
     }
 
     /// The key to act on now, or nil while a result key waits for the results
@@ -143,10 +147,43 @@ enum PanelInput {
     }
 
     /// A held key to run now that the results answer its query, if they do.
+    ///
+    /// Only results the user can see replay it: a hidden panel, or a failed or indexing settle (a ↵ on zero files
+    /// would land on a fallback row and switch mode), drops it instead.
     @MainActor
-    static func replay(held: inout HeldKey, model: SearchModel) -> PanelKey? {
+    static func replay(held: inout HeldKey, model: SearchModel, visible: Bool) -> PanelKey? {
         guard held.held != nil, rowsAreCurrent(model) else { return nil }
+        guard visible, model.phase == .results else {
+            held.cancel()
+            return nil
+        }
         return held.resultsArrived(query: model.query, mode: model.mode)
+    }
+
+    /// What the rows answer, as the view watches it.
+    struct Answer: Equatable {
+        var query: String
+        var mode: SearchMode
+        var current: Bool
+    }
+
+    /// The model's ``Answer`` now.
+    @MainActor
+    static func answer(_ model: SearchModel) -> Answer {
+        Answer(query: model.answered.query, mode: model.answered.mode, current: rowsAreCurrent(model))
+    }
+
+    /// The rows changed. Rows for another query make a selection made on the
+    /// old ones meaningless, so it goes back to the top, and only then does a
+    /// held key replay (one handler, so the order is fixed).
+    ///
+    /// - Returns: The held key to run, if any.
+    @MainActor
+    static func rowsChanged(
+        from old: Answer, to new: Answer, selection: inout Int, held: inout HeldKey, model: SearchModel, visible: Bool
+    ) -> PanelKey? {
+        if old.query != new.query || old.mode != new.mode { selection = 0 }
+        return new.current ? replay(held: &held, model: model, visible: visible) : nil
     }
 
     /// The ⌘K menu action an effect is, so a key and its menu item agree on hiding the panel.
@@ -159,4 +196,11 @@ enum PanelInput {
         case .showActions, .none, .hide: nil
         }
     }
+}
+
+/// The panel's held key (see ``HeldKey``), owned by ``PanelController`` so
+/// hiding the panel drops it; the view reads and writes it.
+@MainActor
+final class HeldKeyBox {
+    var key = HeldKey()
 }

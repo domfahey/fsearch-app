@@ -25,6 +25,8 @@ final class PanelController: PanelHost {
     private(set) var selection = 0
     /// The app that was in front when the panel opened, to hand focus back to.
     private var previousApp: NSRunningApplication?
+    /// A result key waiting for results; hiding drops it, so it never runs behind the user's back.
+    let held = HeldKeyBox()
 
     /// The panel window: key only outside the unit-test host, hides on resign, and hosts the Quick Look controller.
     final class Panel: NSPanel {
@@ -79,8 +81,9 @@ final class PanelController: PanelHost {
         app.search.query = resumed.query
         app.search.mode = resumed.mode
         selection = resumed.selection
+        held.key.cancel()
         let view = SearchView(
-            model: app.search, state: resumed,
+            model: app.search, state: resumed, held: held, isVisible: { [weak self] in self?.isVisible == true },
             onEffect: { [weak self] effect, items in
                 self?.perform(effect, items)
             }, onSelect: { [weak self] in self?.selection = $0 },
@@ -119,6 +122,7 @@ final class PanelController: PanelHost {
     ///
     /// - Parameter returnFocus: False when hiding because the user clicked another app, so focus isn't pulled back.
     func hide(returnFocus: Bool = true) {
+        held.key.cancel()
         guard let p = panel, p.isVisible, let app else { return }
         session.hidden(PanelState(query: app.search.query, mode: app.search.mode, selection: selection), at: Date())
         p.orderOut(nil)
