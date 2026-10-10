@@ -24,6 +24,13 @@ Ideas and follow-ups not done yet. Most important first within each section. "Yo
   - a possible Raycast extension;
   - the upstream daemon changes (version in `status`, agent ownership, query log).
 
+## Found by benchmarks and cleanup
+
+- [ ] **PanelRows per keystroke:** mapping 52 rows takes about 75 µs, because each `row(at:)` re-runs `hasFallbacks`/`QuerySplit.hasContentKey` on the query. Compute it once per query. `scripts/bench.sh` (`keystroke.panelRows.50`) proves the gain.
+- [ ] **Leaked test daemon:** if `swift test` is killed (SIGKILL, CI timeout), RealDaemon's `fsearch serve` stays running under launchd with its temp HOME. Kill stale `/private/tmp/fsk-*` daemons at test start, and have the fixture's daemon exit when its parent dies (a watchdog pipe).
+- [ ] **Re-record the benchmark baseline on a quiet machine:** the committed one is provisional (recorded under load). Run `scripts/bench.sh --record` after deleting this machine's entry in `bench/baseline.json`.
+- [ ] **CI benchmark baseline:** add a `ci-macos-26` entry from a CI artifact so the CI bench job can gate, not just report.
+
 ## GitHub settings (needs your go-ahead; repo-level changes)
 
 - [ ] Turn on private vulnerability reporting (SECURITY.md already points to it).
