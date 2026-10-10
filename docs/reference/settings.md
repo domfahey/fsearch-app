@@ -19,7 +19,7 @@ Shown only in releases that can update themselves (a build without the update si
 
 | Setting | Values | Default | What it does |
 |---|---|---|---|
-| Automatically check for updates | On or off | On | Lets FSearch check for a new version in the background. Sparkle stores this itself (`SUEnableAutomaticChecks`). |
+| Automatically check for updates | On or off | Asked on the second launch | Lets FSearch check for a new version in the background. Sparkle stores this itself (`SUEnableAutomaticChecks`). |
 | Check Now | Button | | Checks immediately. Disabled while a check is already running. |
 
 When a background check finds an update and FSearch isn't the front app, it doesn't open a window. The menu-bar icon changes to a down-arrow circle and the menu gets **Update Available…** at the top; choose it to see the update.
