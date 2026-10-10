@@ -72,6 +72,9 @@ struct SearchView: View {
                 if app.debugMode, let us = model.lastTookUs {
                     Text(String(format: "%.1f ms · %d results", Double(us) / 1000, model.items.count)).foregroundStyle(.secondary)
                 }
+                if let err = app.actionError {
+                    Text(err).foregroundStyle(.red).lineLimit(1).accessibilityIdentifier("actionError")
+                }
                 Spacer()
                 hint(model.mode == .names ? "Open" : "Open at line", "↵")
                 hint("Reveal in Finder", "⌘↵")
@@ -117,7 +120,7 @@ struct SearchView: View {
         case (.return, false, _, _): .enter
         case (.escape, _, _, _): .escape
         case (KeyEquivalent("y"), true, false, _): .cmdY
-        case (KeyEquivalent("c"), true, true, _): .cmdShiftC
+        case (_, true, true, _) where press.key.character.lowercased() == "c": .cmdShiftC  // Shift makes it "C"
         case (KeyEquivalent("k"), true, false, _): .cmdK
         case (.delete, false, _, _) where model.query.isEmpty: .backspaceOnEmpty
         default: press.characters.first.flatMap { $0.wholeNumberValue }.flatMap { cmd ? PanelKey.cmdDigit($0) : nil }

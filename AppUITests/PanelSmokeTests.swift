@@ -1,4 +1,5 @@
 import Darwin
+import AppKit
 import XCTest
 
 /// Types a query into the real panel against a real, throwaway daemon.
@@ -11,6 +12,22 @@ import XCTest
 /// works where the runner is not sandboxed.
 @MainActor
 final class PanelSmokeTests: XCTestCase {
+    private var savedClipboard: String?
+
+    // ⌘⇧C overwrites the general pasteboard; put the user's text back afterwards.
+    override func setUp() {
+        super.setUp()
+        savedClipboard = NSPasteboard.general.string(forType: .string)
+    }
+
+    override func tearDown() {
+        if let s = savedClipboard {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(s, forType: .string)
+        }
+        super.tearDown()
+    }
+
     func testTypingShowsResults() throws {
         let env = ProcessInfo.processInfo.environment
         var socket = env["FSEARCH_SOCKET"]
@@ -54,6 +71,17 @@ final class PanelSmokeTests: XCTestCase {
         field.typeText("heronfile")
         let row = app.staticTexts["heronfile.txt"].waitForExistence(timeout: 20)
         XCTAssertTrue(row, row ? "" : "value=\(field.value as? String ?? "nil") " + app.debugDescription.components(separatedBy: "\n").filter { !$0.contains("MenuItem") && !$0.contains("Menu,") && !$0.contains("MenuBarItem") }.joined(separator: "\n"))
+        field.typeKey("c", modifierFlags: [.command, .shift])
+        XCTAssertEqual(NSPasteboard.general.string(forType: .string)?.hasSuffix("/proj/heronfile.txt"), true)
+
+        // A path with a space and an emoji copies intact.
+        field.typeKey("a", modifierFlags: .command)
+        field.typeText("a b")
+        let emojiRow = app.staticTexts["🏡 a b.txt"].waitForExistence(timeout: 20)
+        XCTAssertTrue(emojiRow)
+        field.typeKey("c", modifierFlags: [.command, .shift])
+        XCTAssertEqual(NSPasteboard.general.string(forType: .string)?.hasSuffix("/🏡 a b.txt"), true)
+
         field.typeKey(.escape, modifierFlags: [])
         XCTAssertEqual(field.value as? String ?? "", "")
     }

@@ -16,8 +16,24 @@ final class AppState: ObservableObject {
     let recents = Recents(defaults: .standard)
     let log = SearchLog()
     @AppStorage("debugMode") var debugMode = false
-    /// Task 11 wires this to the settings picker.
-    var editorChoice: Editor?
+    /// Editor for content hits: `Editor.rawValue`, "" for none.
+    @AppStorage("editor") var editorRaw = ""
+    var editor: Editor? {
+        get { Editor(rawValue: editorRaw) }
+        set { editorRaw = newValue?.rawValue ?? "" }
+    }
+    /// One-line failure from a file action, shown in the panel footer for a few seconds.
+    @Published var actionError: String?
+    private var errorClear: Task<Void, Never>?
+
+    func showActionError(_ message: String) {
+        actionError = message
+        errorClear?.cancel()
+        errorClear = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(5))
+            if !Task.isCancelled { self?.actionError = nil }
+        }
+    }
 
     init() {
         // Two connections: names and content never wait on each other.

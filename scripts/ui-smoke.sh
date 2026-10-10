@@ -8,7 +8,7 @@ export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 H=/private/tmp/fsa-ui-$(openssl rand -hex 3)
 LOG=$(mktemp -t ui-smoke)
 SOCK="$H/Library/Application Support/FSearch/fsearch.sock"
-mkdir -p "$H/root/proj"; echo x > "$H/root/proj/heronfile.txt"
+mkdir -p "$H/root/proj"; echo x > "$H/root/proj/heronfile.txt"; echo x > "$H/root/proj/🏡 a b.txt"
 HOME=$H FSEARCH_ROOT=$H/root Vendor/fsearch serve >/dev/null 2>&1 & DP=$!
 cleanup() {
   kill $DP 2>/dev/null

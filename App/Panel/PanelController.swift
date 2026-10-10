@@ -82,7 +82,7 @@ final class PanelController {
         case .none: break
         case .hide: hide()
         case let .open(i):
-            FileActions.open(items[i], editor: app.editorChoice)
+            FileActions.open(items[i], editor: app.editor)
             app.recents.opened(items[i].path)
             hide()
         case let .reveal(i): FileActions.reveal(items[i].path); hide()
