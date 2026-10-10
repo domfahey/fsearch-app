@@ -235,8 +235,7 @@ final class TestEnv {
         FileActions.workspace = workspace
         FileActions.pasteboard = pasteboard
         OnboardingLauncher.defaults = defaults
-        // Never take focus from whatever the user is doing.
-        AppActivation.activate = {}
+        // AppActivation needs no stub: in this host its real closure does nothing.
     }
 
     /// A real file in the temp folder (Recents only keeps files that exist).
@@ -277,16 +276,21 @@ func eventually(_ timeout: Duration = .seconds(3), _ cond: () -> Bool) async -> 
     return cond()
 }
 
-/// Hosts a view in a transparent window so SwiftUI evaluates its body and runs
-/// its onAppear/task modifiers. Close the returned window when done.
+/// Where render windows go: far off every screen (borderless windows aren't
+/// pulled back onto one), so nothing shows even if alpha were ignored.
+let offscreenOrigin = NSPoint(x: -20_000, y: -20_000)
+
+/// Hosts a view so SwiftUI evaluates its body and runs its onAppear/task
+/// modifiers, without anything the user could see or that could take the
+/// keyboard: off screen, fully transparent, deaf to the mouse, never key.
+/// Close the returned window when done.
 @MainActor
 func render<V: View>(_ view: V, size: NSSize = NSSize(width: 680, height: 460), settle: Duration = .milliseconds(150)) async -> NSWindow {
-    let w = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless], backing: .buffered, defer: false)
+    let w = HostSafeWindow(contentRect: NSRect(origin: offscreenOrigin, size: size), styleMask: [.borderless], backing: .buffered, defer: false)
     w.isReleasedWhenClosed = false
-    w.alphaValue = 0
-    w.ignoresMouseEvents = true
     w.contentView = NSHostingView(rootView: view)
-    w.orderFront(nil)
+    w.setFrameOrigin(offscreenOrigin)
+    Presentation.present(w, inert: true)
     try? await Task.sleep(for: settle)
     w.contentView?.layoutSubtreeIfNeeded()
     return w

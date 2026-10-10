@@ -82,7 +82,7 @@ struct MenuBarFixItem: View {
         if let w = MenuBarStatus.shared.warning {
             Text(w.message)
             if w.offersFix {
-                Button("Fix…") { NSApp.activate(); openWindow(id: "index") }
+                Button("Fix…") { AppActivation.activate(); openWindow(id: "index") }
             }
             if w.offersFullDiskAccess {
                 Button(MenuBarWarning.fullDiskAccessItemTitle(ownsDaemon: app.daemon.ownsDaemon)) {

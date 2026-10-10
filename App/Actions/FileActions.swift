@@ -91,7 +91,8 @@ enum FileActions {
 @MainActor
 final class QuickLookSource: NSObject, @preconcurrency QLPreviewPanelDataSource {
     static let shared = QuickLookSource()
-    private var item: URL?
+    /// What the preview shows (or would show, in the unit-test host).
+    private(set) var item: URL?
     /// True while the preview is being brought up, before it is visible.
     private(set) var opening = false
 
@@ -101,10 +102,11 @@ final class QuickLookSource: NSObject, @preconcurrency QLPreviewPanelDataSource 
         return QLPreviewPanel.sharedPreviewPanelExists() && QLPreviewPanel.shared().isVisible
     }
 
-    func toggle(_ u: URL) {
+    func toggle(_ u: URL, inert: Bool = Presentation.inert) {
         if QLPreviewPanel.sharedPreviewPanelExists(), QLPreviewPanel.shared().isVisible { return close() }
         item = u
-        guard let p = QLPreviewPanel.shared() else { return }
+        // The unit-test host never brings the preview up: it would take the keyboard.
+        guard !inert, let p = QLPreviewPanel.shared() else { return }
         opening = true
         defer { opening = false }
         p.makeKeyAndOrderFront(nil)

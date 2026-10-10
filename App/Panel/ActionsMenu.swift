@@ -6,7 +6,14 @@ enum ActionsMenu {
     static func show(for item: ResultItem, in panel: NSPanel?, app: AppState) {
         let menu = build(for: item, app: app)
         guard let view = panel?.contentView else { return }
-        menu.popUp(positioning: nil, at: NSPoint(x: view.bounds.maxX - 220, y: 40), in: view)
+        popUp(menu, NSPoint(x: view.bounds.maxX - 220, y: 40), view)
+    }
+
+    /// Shows the menu (modal, on screen). Never in the unit-test host; tests
+    /// may replace it to see what would have been shown.
+    static var popUp: @MainActor (NSMenu, NSPoint, NSView) -> Void = { menu, at, view in
+        guard !Presentation.inert else { return }
+        menu.popUp(positioning: nil, at: at, in: view)
     }
 
     /// ⌘K's menu for one result. Each item runs its action through `Target`.

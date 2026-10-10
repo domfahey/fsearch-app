@@ -59,11 +59,11 @@ enum OnboardingLauncher {
     private static func show(app: AppState) {
         if let window {
             AppActivation.activate()
-            window.makeKeyAndOrderFront(nil)
+            Presentation.present(window)
             return
         }
         let flow = OnboardingFlow(app: app, defaults: defaults)
-        let w = NSWindow(contentViewController: NSHostingController(rootView: OnboardingView(flow: flow).environmentObject(app)))
+        let w = HostSafeWindow(contentViewController: NSHostingController(rootView: OnboardingView(flow: flow).environmentObject(app)))
         w.title = "Welcome to FSearch"
         w.styleMask = [.titled, .closable]
         w.isReleasedWhenClosed = false
@@ -73,7 +73,8 @@ enum OnboardingLauncher {
         }
         window = w
         AppActivation.activate()
-        w.makeKeyAndOrderFront(nil)
+        // The unit-test host orders it in invisibly and never key.
+        Presentation.present(w)
     }
 
     private static func didClose(app: AppState) {

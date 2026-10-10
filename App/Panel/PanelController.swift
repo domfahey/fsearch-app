@@ -88,16 +88,8 @@ final class PanelController: PanelHost {
 
     /// Puts the panel on screen and makes it key. The inert unit-test host only
     /// orders it in, fully transparent and deaf to the mouse, and never key.
-    static func present(_ p: NSPanel, inert: Bool = LaunchOptions.current.unitTestHost) {
-        if inert {
-            p.alphaValue = 0
-            p.ignoresMouseEvents = true
-            p.orderFrontRegardless()
-        } else {
-            p.alphaValue = 1
-            p.ignoresMouseEvents = false
-            p.makeKeyAndOrderFront(nil)
-        }
+    static func present(_ p: NSPanel, inert: Bool = Presentation.inert) {
+        Presentation.present(p, inert: inert)
     }
 
     /// `returnFocus` is false when hiding because the user clicked another app.
@@ -106,7 +98,8 @@ final class PanelController: PanelHost {
         session.hidden(PanelState(query: app.search.query, mode: app.search.mode, selection: selection), at: Date())
         p.orderOut(nil)
         QuickLookSource.shared.close()
-        guard returnFocus && NSApp.isActive else { return }
+        // The unit-test host never moves focus between apps.
+        guard returnFocus && !Presentation.inert && NSApp.isActive else { return }
         // Hiding the app hands focus back to whatever was in front before, but it
         // would hide Settings, onboarding or a debug window too. With one of those
         // up, give focus straight to the app the panel was summoned over (if it
@@ -127,8 +120,10 @@ final class PanelController: PanelHost {
         }
     }
 
-    /// Opens Settings, the same window the menu's SettingsLink opens.
+    /// Opens Settings, the same window the menu's SettingsLink opens. Never in
+    /// the unit-test host: the window would come up over the user's apps.
     static var openSettings: () -> Void = {
+        guard !Presentation.inert else { return }
         AppActivation.activate()
         NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
     }

@@ -59,9 +59,44 @@ protocol PanelHost: AnyObject {
     func show(app: AppState)
 }
 
-/// Bringing FSearch to the front. Hosted unit tests replace it with a no-op so
-/// showing the panel or onboarding never takes focus from the user's apps.
+/// Bringing FSearch to the front. In the unit-test host the real closure does
+/// nothing, for every test, so showing the panel or onboarding never takes
+/// focus from the user's apps (tests need not remember to stub it).
 @MainActor
 enum AppActivation {
-    static var activate: @MainActor () -> Void = { NSApp.activate(ignoringOtherApps: true) }
+    static var activate: @MainActor () -> Void = live()
+
+    /// `inert` is read on every call: the unit-test host never activates.
+    static func live(inert: @escaping @MainActor () -> Bool = { Presentation.inert },
+                     activate real: @escaping @MainActor () -> Void = { NSApp.activate(ignoringOtherApps: true) }) -> @MainActor () -> Void {
+        { if !inert() { real() } }
+    }
+}
+
+/// Putting our windows on screen. The unit-test host (AppTests) shares the
+/// desktop with whatever the user is doing, so there every window is ordered
+/// in fully transparent and deaf to the mouse, and none can become key.
+@MainActor
+enum Presentation {
+    /// True in the AppTests host.
+    static var inert: Bool { LaunchOptions.current.unitTestHost }
+
+    /// Shows `w` and makes it key; the inert host only orders it in, invisibly.
+    static func present(_ w: NSWindow, inert: Bool = Presentation.inert) {
+        if inert {
+            w.alphaValue = 0
+            w.ignoresMouseEvents = true
+            w.orderFrontRegardless()
+        } else {
+            w.alphaValue = 1
+            w.ignoresMouseEvents = false
+            w.makeKeyAndOrderFront(nil)
+        }
+    }
+}
+
+/// A window that can never become key or main in the unit-test host.
+final class HostSafeWindow: NSWindow {
+    override var canBecomeKey: Bool { !LaunchOptions.current.unitTestHost && super.canBecomeKey }
+    override var canBecomeMain: Bool { !LaunchOptions.current.unitTestHost && super.canBecomeMain }
 }
