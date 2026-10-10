@@ -1,6 +1,6 @@
 # Query syntax
 
-FSearch passes your query to the fsearch daemon. This page lists what the app understands. Type `?` alone in the panel for a short version.
+This page lists the query syntax that FSearch for Mac passes to the fsearch daemon. Type `?` alone in the panel for a short version.
 
 ## Plain words
 
@@ -37,6 +37,10 @@ A filter is `key:value`. Keys are lowercase and case-sensitive. A word that star
 | `limit:` | A result limit, passed to the daemon | `limit:20` |
 
 An unknown `type:` or `kind:` value shows an error under the search field.
+
+### Typing a filter
+
+While the last word is a filter key with nothing after the colon, such as `foo size:`, the panel waits. It sends nothing and keeps the results already on screen until you type a value or a space. This avoids a flash of daemon errors while you type. A space after the colon (`foo size: `) ends the wait, and the empty filter is then sent as typed.
 
 ### Ranges
 
@@ -87,3 +91,9 @@ Content searches have a time budget of 250 ms.
 | `grep:"TODO fix" ext:rs` | Rust files containing the text `TODO fix` |
 | `regex:fn\s+main ext:rs` | Rust files with `fn main` |
 | `sym:SearchModel` | Where `SearchModel` is defined |
+
+## See also
+
+- [Keyboard shortcuts](keyboard-shortcuts.md)
+- [Tutorial: your first search](../tutorial-first-search.md)
+- [Troubleshooting](troubleshooting.md)
