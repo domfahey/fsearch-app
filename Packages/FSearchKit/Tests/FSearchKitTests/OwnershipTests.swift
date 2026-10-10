@@ -21,6 +21,67 @@ import Testing
         #expect(SocketHolder.classify(pid: 99, path: bundle + "/Contents/Helpers/fsearch", bundlePath: bundle + "/") == .ours)
     }
 
+    @Test func anUpdatedAppsOldHelperIsStillOurs() {
+        let bundle = "/Applications/FSearch.app"
+        // Sparkle or Finder swapped the bundle: the running helper now lives in the Trash or a temp dir.
+        for moved in [
+            "/Users/me/.Trash/FSearch.app/Contents/Helpers/fsearch",
+            "/private/var/folders/x/T/org.sparkle-project/FSearch.app/Contents/Helpers/fsearch",
+        ] {
+            #expect(SocketHolder.classify(pid: 99, path: moved, identifier: nil, bundlePath: bundle) == .ours, "\(moved)")
+        }
+        // Our helper's signing identifier, wherever it runs from (or with no path left to read).
+        let id = SocketHolder.helperIdentifier
+        #expect(SocketHolder.classify(pid: 99, path: "/private/tmp/x/fsearch", identifier: id, bundlePath: bundle) == .ours)
+        #expect(SocketHolder.classify(pid: 99, path: nil, identifier: id, bundlePath: bundle) == .ours)
+        #expect(SocketHolder.classify(pid: nil, path: nil, identifier: id, bundlePath: bundle) == SocketHolder.none)
+    }
+
+    @Test func anythingElseIsNeverOurs() {
+        let bundle = "/Applications/FSearch.app"
+        for path in [
+            "/opt/homebrew/bin/fsearch", "/Applications/Other.app/Contents/Helpers/fsearch",
+            "/Applications/XFSearch.app/Contents/Helpers/fsearch", "/Applications/FSearch.app/Contents/Helpers/fsearch2",
+            "/Applications/FSearch.app/Contents/MacOS/fsearch", "/x/FSearch.app/Contents/Helpers/fsearch/../../../evil",
+        ] {
+            #expect(
+                SocketHolder.classify(pid: 99, path: path, identifier: "fsearch", bundlePath: "/Applications/Mine.app") == .other, "\(path)"
+            )
+        }
+        for id in ["fsearch", "com.domfahey.fsearch", "com.domfahey.fsearch.daemon2", ""] {
+            #expect(
+                SocketHolder.classify(pid: 99, path: "/opt/homebrew/bin/fsearch", identifier: id, bundlePath: bundle) == .other, "\(id)")
+        }
+    }
+
+    @Test func readsThroughInjectedResolvers() throws {
+        let dir = tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try "4242".write(to: dir.appendingPathComponent("socket.lock"), atomically: true, encoding: .utf8)
+        let bundle = "/Applications/FSearch.app"
+        let ours = SocketHolder.read(
+            dataDir: dir, bundlePath: bundle, path: { $0 == 4242 ? "/tmp/gone/fsearch" : nil },
+            identifier: { $0 == 4242 ? SocketHolder.helperIdentifier : nil })
+        #expect(ours == .ours)
+        let other = SocketHolder.read(
+            dataDir: dir, bundlePath: bundle, path: { _ in "/opt/homebrew/bin/fsearch" }, identifier: { _ in "fsearch" })
+        #expect(other == .other)
+        let gone = SocketHolder.read(dataDir: dir, bundlePath: bundle, path: { _ in nil }, identifier: { _ in nil })
+        #expect(gone == SocketHolder.none)
+    }
+
+    @Test func readsARunningProcesssSigningIdentifier() throws {
+        // The linker signs every arm64 binary, ad hoc at least, so the test runner has an identifier.
+        let me = try #require(SocketHolder.signingIdentifier(pid: getpid()))
+        #expect(!me.isEmpty)
+        #expect(me != SocketHolder.helperIdentifier)
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/true")
+        try p.run()
+        p.waitUntilExit()
+        #expect(SocketHolder.signingIdentifier(pid: p.processIdentifier) == nil)
+    }
+
     private func tempDir() -> URL {
         let d = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("fsk-lock-\(UUID().uuidString.prefix(8))")
         try! FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
