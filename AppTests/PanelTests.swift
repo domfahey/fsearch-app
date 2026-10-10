@@ -28,7 +28,7 @@ extension AppTests {
             pc.show(app: env.app)
             #expect(pc.isVisible)
             #expect(pc.panel?.isFloatingPanel == true)
-            #expect(pc.panel?.canBecomeKey == false  // inert host)
+            #expect(pc.panel?.canBecomeKey == false)  // inert host
             #expect(env.app.search.query == "")
             env.app.search.query = "heron"
             env.app.search.mode = .content
