@@ -26,6 +26,7 @@ struct SettingsView: View {
             Text("Debug mode shows index details and records searches on this Mac only (last 10,000).")
                 .font(.caption).foregroundStyle(.secondary)
             loginSection
+            UpdatesSettingsSection()
             Section { removeSection }
         }
         .padding(20).frame(width: 440)

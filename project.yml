@@ -21,6 +21,9 @@ targets:
         SWIFT_VERSION: "6.0"
         ARCHS: "arm64 x86_64"
         ONLY_ACTIVE_ARCH: NO
+        # scripts/release.sh overrides both (version from the tag, build from git).
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
     dependencies:
       - package: FSearchKit
       - package: KeyboardShortcuts
@@ -35,6 +38,19 @@ targets:
           cp "$SRCROOT/Vendor/fsearch" "$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers/fsearch"
           cp "$SRCROOT/App/Resources/LaunchAgent.plist" "$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Library/LaunchAgents/com.domfahey.fsearch.daemon.plist"
           codesign --force --options runtime --timestamp=none --sign "${EXPANDED_CODE_SIGN_IDENTITY:--}" "$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers/fsearch"
+    postBuildScripts:
+      - name: Strip Sparkle XPC services
+        basedOnDependencyAnalysis: false
+        script: |
+          # Not sandboxed, so Sparkle's XPC services are unused. Removing them
+          # breaks the framework's seal, so re-sign it (the app is signed after this).
+          set -e
+          fw="$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH/Sparkle.framework"
+          if [ -d "$fw/Versions/B/XPCServices" ]; then
+            rm -rf "$fw/Versions/B/XPCServices"
+            rm -f "$fw/XPCServices"
+            codesign --force --options runtime --timestamp=none --sign "${EXPANDED_CODE_SIGN_IDENTITY:--}" "$fw"
+          fi
   AppUITests:
     type: bundle.ui-testing
     platform: macOS

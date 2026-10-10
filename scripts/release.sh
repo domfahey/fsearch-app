@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 # Build, sign, notarize and package a release DMG. Run from anywhere.
+# Usage: scripts/release.sh [VERSION]   (VERSION defaults to the exact tag at HEAD, minus a leading "v")
+# CFBundleShortVersionString = VERSION; CFBundleVersion = `git rev-list --count HEAD`
+# (needs full history), which must exceed the last released build recorded in
+# $LAST_BUILD_FILE (default release/last-build; written after a successful run).
 # Prerequisites (checked up front): DEVELOPER_ID, a notarytool profile, a real Sparkle key.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -22,7 +26,21 @@ KEY=$(/usr/libexec/PlistBuddy -c "Print SUPublicEDKey" App/Resources/Info.plist)
 { [ -n "$KEY" ] && [ "$KEY" != "REPLACE_WITH_SPARKLE_PUBLIC_KEY" ]; } \
   || fail "SUPublicEDKey in App/Resources/Info.plist is still the placeholder (see docs/release-checklist.md)"
 
-VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" App/Resources/Info.plist)
+VERSION=${1:-$(git describe --tags --exact-match 2>/dev/null || true)}
+VERSION=${VERSION#v}
+[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)?$ ]] \
+  || fail "no valid version: pass one (scripts/release.sh 0.1.0) or run on a tagged commit (got '${VERSION}')"
+[ "$(git rev-parse --is-shallow-repository)" = false ] \
+  || fail "shallow clone: CFBundleVersion needs full history (git fetch --unshallow)"
+BUILD=$(git rev-list --count HEAD)
+LAST_BUILD_FILE=${LAST_BUILD_FILE:-release/last-build}
+if [ -f "$LAST_BUILD_FILE" ]; then
+  LAST=$(tr -d '[:space:]' < "$LAST_BUILD_FILE")
+  [[ "$LAST" =~ ^[0-9]+$ ]] || fail "$LAST_BUILD_FILE does not hold a build number"
+  [ "$BUILD" -gt "$LAST" ] \
+    || fail "CFBundleVersion $BUILD is not greater than the last release's $LAST ($LAST_BUILD_FILE); Sparkle would not offer it"
+fi
+echo "Releasing $VERSION (build $BUILD)"
 OUT=build/release
 rm -rf "$OUT"; mkdir -p "$OUT"
 STAGE=$(mktemp -d)
@@ -35,21 +53,24 @@ xcodegen generate
 # script the single place that decides how every nested binary is signed.
 xcodebuild -project FSearch.xcodeproj -scheme FSearch -configuration Release \
   -archivePath "$OUT/FSearch.xcarchive" \
+  MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD" \
   CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO archive
 APP="$OUT/FSearch.xcarchive/Products/Applications/FSearch.app"
 
 sign() { codesign --force --options runtime --timestamp --sign "$DEVELOPER_ID" "$@"; }
 
-# Inside-out, as Sparkle's docs prescribe: its XPC services, Autoupdate and
-# Updater.app, then the framework, then our helper, then the app.
+# Inside-out, as Sparkle's docs prescribe: Autoupdate and Updater.app, then the
+# framework, then our helper, then the app. The XPC services are stripped at build
+# time (project.yml); the app isn't sandboxed, so they must not be present.
 SPARKLE="$APP/Contents/Frameworks/Sparkle.framework"
 SV="$SPARKLE/Versions/B"
 [ -d "$SV" ] || fail "Sparkle.framework/Versions/B not found in $APP"
-for c in "$SV/XPCServices/Installer.xpc" "$SV/XPCServices/Downloader.xpc" "$SV/Autoupdate" "$SV/Updater.app"; do
+for c in "$SV/Autoupdate" "$SV/Updater.app"; do
   [ -e "$c" ] || fail "expected Sparkle component missing: $c"
 done
-sign "$SV/XPCServices/Installer.xpc"
-sign --preserve-metadata=entitlements "$SV/XPCServices/Downloader.xpc"
+[ ! -e "$SV/XPCServices" ] || fail "Sparkle's XPCServices reappeared in $APP (see the 'Strip Sparkle XPC services' phase in project.yml)"
+BUILT_VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" "$APP/Contents/Info.plist")
+[ "$BUILT_VERSION" = "$BUILD" ] || fail "built CFBundleVersion is '$BUILT_VERSION', expected '$BUILD'"
 sign "$SV/Autoupdate"
 sign "$SV/Updater.app"
 sign "$SPARKLE"
@@ -79,5 +100,6 @@ spctl -a -t exec -vv "$APP" || fail "Gatekeeper rejected $APP"
 # Checksums to publish next to the DMG (verify with: shasum -a 256 -c FILE.dmg.sha256).
 (cd "$OUT" && shasum -a 256 "$(basename "$DMG")" > "$(basename "$DMG").sha256") \
   || fail "could not write checksum for $DMG"
+mkdir -p "$(dirname "$LAST_BUILD_FILE")"; echo "$BUILD" > "$LAST_BUILD_FILE"
 echo "SHA-256:"; cat "$DMG.sha256"
 echo "Now publish $DMG and $DMG.sha256 with appcast.xml (run Sparkle's generate_appcast on $OUT)."

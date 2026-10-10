@@ -21,7 +21,8 @@ final class MenuBarStatus {
     /// The menu-bar symbol; the first call also starts following `app.daemon`.
     func icon(for app: AppState) -> String {
         bind(to: app.daemon)
-        return warning?.symbol ?? "magnifyingglass"
+        // A waiting update shows quietly as a badge on the icon; warnings take priority.
+        return warning?.symbol ?? (UpdateReminderModel.shared.indicatorVisible ? "arrow.down.circle" : "magnifyingglass")
     }
 
     private func bind(to daemon: DaemonManager) {
@@ -79,6 +80,7 @@ struct MenuBarFixItem: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
+        UpdateAvailableItem()
         if let w = MenuBarStatus.shared.warning {
             Text(w.message)
             if w.offersFix {
