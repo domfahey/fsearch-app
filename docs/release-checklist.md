@@ -5,13 +5,15 @@
 - [ ] Generate the Sparkle EdDSA key pair: run Sparkle's `generate_keys` (from the Sparkle package's `bin/`). The private key goes in your Keychain; put the printed public key in `SUPublicEDKey` in `App/Resources/Info.plist`. Until this is done the key is `REPLACE_WITH_SPARKLE_PUBLIC_KEY`, the updater is not started, "Check for Updates…" is hidden, and `scripts/release.sh` refuses to run.
 - [ ] Developer ID Application certificate installed; `export DEVELOPER_ID="Developer ID Application: Your Name (TEAMID)"`.
 - [ ] `xcrun notarytool store-credentials fsearch-notary`.
-- [ ] For tag builds in CI: add repo secrets `DEVELOPER_ID`, `DEVELOPER_ID_CERT_P12_BASE64`, `DEVELOPER_ID_CERT_PASSWORD`, `KEYCHAIN_PASSWORD`, `NOTARY_APPLE_ID`, `NOTARY_TEAM_ID`, `NOTARY_APP_PASSWORD`.
+- [ ] For tag builds in CI: add repo secrets `DEVELOPER_ID`, `DEVELOPER_ID_CERT_P12_BASE64`, `DEVELOPER_ID_CERT_PASSWORD`, `KEYCHAIN_PASSWORD`, and an App Store Connect API key for notarytool: `NOTARY_API_KEY_P8_BASE64` (the .p8, base64), `NOTARY_API_KEY_ID`, `NOTARY_API_ISSUER_ID`.
 
 ## Per release
 
 Run on a real Mac, on the DMG produced by `scripts/release.sh`.
 
-- [ ] `spctl` accepts the DMG (the release script prints "accepted").
+- [ ] First real release run only: verify the signing of Sparkle's nested code. `codesign -dvv` on `Sparkle.framework/Versions/B/{Autoupdate,Updater.app,XPCServices/Installer.xpc,XPCServices/Downloader.xpc}` shows the Developer ID authority, a timestamp and `flags=0x10000(runtime)`; `codesign -d --entitlements - .../Downloader.xpc` matches what the Sparkle package shipped (an empty dict as of 2.x via SPM); the `--deep --strict` verify passed.
+- [ ] `spctl` accepts the DMG and the app (the release script prints "accepted" for both).
+- [ ] The DMG opens with FSearch.app beside an Applications shortcut.
 - [ ] Fresh install (new user account): opens with no Gatekeeper warning.
 - [ ] Onboarding: all four steps; the login item appears as FSearch; Full Disk Access as found in docs/notes/fda-attribution.md.
 - [ ] Task 0 FDA attribution experiment: re-confirm which binary (app vs. helper daemon) macOS lists and needs Full Disk Access.

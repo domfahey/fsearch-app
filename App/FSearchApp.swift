@@ -7,6 +7,7 @@ struct FSearchApp: App {
     init() {
         let state = AppState()
         _app = StateObject(wrappedValue: state)
+        Updater.start()
         DispatchQueue.main.async {
             PanelController.shared.install(app: state)
             Task { await state.daemon.start() }
