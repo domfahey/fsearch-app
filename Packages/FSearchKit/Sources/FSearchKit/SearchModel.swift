@@ -130,13 +130,46 @@ public final class SearchModel {
                 let r = try await content.grep(q: c.q, pattern: c.pattern, mode: c.mode)
                 return (lines(r), r.tookUs)
             }
-            let r = try await names.search(q, limit: 50)
-            return (r.hits.map(ResultItem.file), r.tookUs)
+            let forms = Self.normalForms(q)
+            if forms.count == 1 {
+                let r = try await names.search(q, limit: 50)
+                return (r.hits.map(ResultItem.file), r.tookUs)
+            }
+            var hits: [Hit] = [], took: UInt64 = 0
+            for form in forms {
+                let r = try await names.search(form, limit: 50)
+                (hits, took) = (hits + r.hits, took + r.tookUs)
+            }
+            return (Self.merged(hits, limit: QuerySplit.limit(q) ?? 50).map(ResultItem.file), took)
         case .content, .symbols:
             let (pattern, filters) = QuerySplit.split(q)
             let r = try await content.grep(q: filters, pattern: pattern, mode: mode == .symbols ? .symbol : .literal)
             return (lines(r), r.tookUs)
         }
+    }
+
+    /// The query, then its other Unicode normal forms. The daemon compares
+    /// bytes, and Mac apps write accented names in NFD while typing gives NFC,
+    /// so "café" would miss Café files. Plain ASCII has one form.
+    nonisolated static func normalForms(_ q: String) -> [String] {
+        if q.unicodeScalars.allSatisfy(\.isASCII) { return [q] }
+        var out: [String] = []
+        for form in [q, q.decomposedStringWithCanonicalMapping, q.precomposedStringWithCanonicalMapping]
+        where !out.contains(where: { $0.unicodeScalars.elementsEqual(form.unicodeScalars) }) {
+            out.append(form)
+        }
+        return out
+    }
+
+    /// Hits from several searches: one per path (String equality treats NFC
+    /// and NFD paths as one) with its best score, best first, up to `limit`.
+    nonisolated static func merged(_ hits: [Hit], limit: Int) -> [Hit] {
+        var best: [String: (order: Int, hit: Hit)] = [:]
+        for (i, h) in hits.enumerated() where best[h.path].map({ h.score > $0.hit.score }) ?? true {
+            best[h.path] = (best[h.path]?.order ?? i, h)
+        }
+        let sorted = best.values.sorted { ($0.hit.score, -$0.order) > ($1.hit.score, -$1.order) }
+        return sorted.prefix(max(0, limit)).map(\.hit)
     }
 
     private func lines(_ r: GrepReply) -> [ResultItem] {
