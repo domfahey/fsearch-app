@@ -56,7 +56,7 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
 - ↵ on an app, script, installer or internet location reveals it in Finder instead of launching it. ⌘K → Open still launches.
 - The panel shows at most 1000 results.
 - `limit:` now works in name searches, because the app no longer sends its own limit over it.
-- The debug search log folder is private (0700) and its file 0600, both excluded from backups. The privacy manifest uses reasons DDA9.1 and C617.1 (the app's own files) for file timestamps.
+- The debug search log folder is private (0700) and its file 0600, both excluded from backups. The privacy manifest gives one reason for file timestamps, C617.1: the app reads them only for its own files and never shows them.
 
 ### Fixed
 
