@@ -17,7 +17,8 @@ final class PanelController: PanelHost {
     private var previousApp: NSRunningApplication?
 
     final class Panel: NSPanel {
-        override var canBecomeKey: Bool { true }
+        /// The unit-test host's panel must never take the keyboard from the user.
+        override var canBecomeKey: Bool { !LaunchOptions.current.unitTestHost }
         override func resignKey() {
             super.resignKey()
             // UI tests keep the panel up even though the test runner holds focus.
@@ -81,8 +82,22 @@ final class PanelController: PanelHost {
         let front = NSWorkspace.shared.frontmostApplication
         previousApp = front == NSRunningApplication.current ? nil : front
         AppActivation.activate()
-        p.makeKeyAndOrderFront(nil)
+        Self.present(p)
         Task { await app.search.refresh() }
+    }
+
+    /// Puts the panel on screen and makes it key. The inert unit-test host only
+    /// orders it in, fully transparent and deaf to the mouse, and never key.
+    static func present(_ p: NSPanel, inert: Bool = LaunchOptions.current.unitTestHost) {
+        if inert {
+            p.alphaValue = 0
+            p.ignoresMouseEvents = true
+            p.orderFrontRegardless()
+        } else {
+            p.alphaValue = 1
+            p.ignoresMouseEvents = false
+            p.makeKeyAndOrderFront(nil)
+        }
     }
 
     /// `returnFocus` is false when hiding because the user clicked another app.
