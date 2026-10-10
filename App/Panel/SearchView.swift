@@ -48,7 +48,7 @@ struct SearchView: View {
             Divider()
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
-                    if let msg = UserMessage.forPhase(model.phase) {
+                    if case .failed(.daemon) = model.phase {} else if let msg = UserMessage.forPhase(model.phase) {
                         Text(msg).foregroundStyle(.secondary).padding(16)
                     }
                     if !shown.isEmpty {

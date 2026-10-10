@@ -1,3 +1,4 @@
+import AppKit
 import FSearchKit
 import SwiftUI
 
@@ -6,7 +7,7 @@ import SwiftUI
 struct DaemonMessageLine: View {
     @Bindable var model: SearchModel
     @ObservedObject var daemon: DaemonManager
-    @State private var restarts = 0
+    @State private var host = HostWindow()
 
     private var isIndexing: Bool {
         if daemon.state == .indexing { return true }
@@ -25,25 +26,55 @@ struct DaemonMessageLine: View {
                     .accessibilityIdentifier("queryError")
             }
         }
+        .background(HostWindowReader(host: host))
         .onChange(of: model.phase) { _, p in
             switch p {
-            case .results: restarts = 0
-            case .failed(.disconnected) where restarts < 3:
-                restarts += 1
-                Task { await daemon.start(); await model.refresh() }
+            case .results: MenuBarStatus.shared.restartBudget.reset()
+            case .failed(.disconnected):
+                // One budget per outage, shared across panel opens. `restart()`
+                // re-registers only a daemon the app owns; a CLI daemon is just re-checked.
+                guard MenuBarStatus.shared.restartBudget.spend() else { break }
+                Task { await daemon.restart(); await model.refresh() }
             default: break
             }
         }
         .task(id: isIndexing) {
-            // Poll every ~2 s (up to ~5 min) until the daemon answers or gives up.
+            // Poll every ~2 s (up to ~5 min of visible polling) until the daemon
+            // answers or gives up. Paused while the panel is hidden.
             var tries = 0
             while isIndexing && tries < 150 && !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(2))
                 if Task.isCancelled { break }
+                guard host.window?.isVisible == true else { continue }
                 await daemon.refresh()
                 await model.refresh()
                 tries += 1
             }
+        }
+    }
+}
+
+/// The window hosting a view, held weakly; reading it doesn't redraw anything.
+final class HostWindow {
+    weak var window: NSWindow?
+}
+
+private struct HostWindowReader: NSViewRepresentable {
+    let host: HostWindow
+
+    func makeNSView(context: Context) -> NSView {
+        let view = WindowTrackingView()
+        view.host = host
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    private final class WindowTrackingView: NSView {
+        var host: HostWindow?
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            host?.window = window
         }
     }
 }

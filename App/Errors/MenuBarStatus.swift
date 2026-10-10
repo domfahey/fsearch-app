@@ -5,11 +5,14 @@ import Observation
 import SwiftUI
 
 /// Turns the daemon's state (plus "skipped Full Disk Access") into a menu-bar warning.
-/// `@Observable` so the scene body re-reads the icon when the warning changes.
+/// `@Observable` so `MenuBarLabel` redraws the icon when the warning changes.
+/// Also holds the per-outage restart budget, shared by every panel open.
 @MainActor @Observable
 final class MenuBarStatus {
     static let shared = MenuBarStatus()
     private(set) var warning: MenuBarWarning?
+    /// Restarts left in the current daemon outage; refilled when results arrive.
+    @ObservationIgnored var restartBudget = RestartBudget()
     @ObservationIgnored private var bound = false
     @ObservationIgnored private var cancellables: Set<AnyCancellable> = []
 
@@ -37,6 +40,16 @@ final class MenuBarStatus {
                 if next != self?.warning { self?.warning = next }
             }
             .store(in: &cancellables)
+    }
+}
+
+/// The menu-bar icon. A View, so Observation tracks `warning` reliably.
+struct MenuBarLabel: View {
+    let app: AppState
+
+    var body: some View {
+        Image(systemName: MenuBarStatus.shared.icon(for: app))
+            .accessibilityLabel("FSearch")
     }
 }
 

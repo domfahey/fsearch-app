@@ -14,8 +14,11 @@ struct FSearchApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra("FSearch", systemImage: MenuBarStatus.shared.icon(for: app)) { MenuBarFixItem(app: app)
+        MenuBarExtra {
+            MenuBarFixItem(app: app)
             MenuContent(app: app)
+        } label: {
+            MenuBarLabel(app: app)
         }
         Settings { SettingsView().environmentObject(app) }
         Window("Index Details", id: "index") { IndexDetailsView().environmentObject(app) }
