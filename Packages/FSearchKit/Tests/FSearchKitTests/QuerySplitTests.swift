@@ -18,3 +18,15 @@ import Testing
         #expect(QuerySplit.split("   ext:md   ") == ("", "ext:md"))
     }
 }
+
+@Suite struct QuerySplitSpacingTests {
+    @Test func patternKeepsOriginalSpacing() {
+        #expect(QuerySplit.split("foo  bar") == ("foo  bar", ""))
+    }
+    @Test func patternSpacingSurvivesFilterRemoval() {
+        #expect(QuerySplit.split("foo  bar ext:rs") == ("foo  bar", "ext:rs"))
+    }
+    @Test func leadingSpacesAreTrimmed() {
+        #expect(QuerySplit.split("  indented code").pattern == "indented code")
+    }
+}

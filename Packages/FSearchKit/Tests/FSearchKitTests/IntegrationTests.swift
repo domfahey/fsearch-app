@@ -14,6 +14,8 @@ struct IntegrationTests {
 
     @Test func searchesByNameAndContent() async throws {
         let d = try RealDaemon(files: ["proj/heronfile.txt": "one\n  a heron needle  \n", "🏡 notes/a b.md": "x"])
+        // Keep the daemon alive until the test ends, not just its last use of `d`.
+        defer { withExtendedLifetime(d) {} }
         let c = DaemonClient(socketPath: d.socketPath)
         try await waitReady(c)
         let names = try await c.search("heronfile", limit: 50)

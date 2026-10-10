@@ -5,15 +5,34 @@
 public enum QuerySplit {
     static let keys: Set<String> = ["ext", "type", "kind", "in", "size", "mtime", "modified", "re", "path", "limit"]
 
+    /// The pattern keeps the typed spacing (only leading and trailing spaces
+    /// are dropped); filters are returned joined by single spaces.
     public static func split(_ query: String) -> (pattern: String, filters: String) {
-        var pattern: [Substring] = [], filters: [Substring] = []
-        for word in query.split(separator: " ", omittingEmptySubsequences: true) {
-            if let colon = word.firstIndex(of: ":"), keys.contains(String(word[..<colon])), word.index(after: colon) < word.endIndex {
-                filters.append(word)
-            } else {
-                pattern.append(word)
+        var pattern = "", filters: [Substring] = []
+        var space = ""   // whitespace typed before the current word
+        var i = query.startIndex
+        while i < query.endIndex {
+            if query[i].isWhitespace {
+                space.append(query[i])
+                i = query.index(after: i)
+                continue
             }
+            let start = i
+            while i < query.endIndex, !query[i].isWhitespace { i = query.index(after: i) }
+            let word = query[start..<i]
+            if isFilter(word) {
+                filters.append(word)   // its surrounding spacing is dropped
+            } else {
+                if !pattern.isEmpty { pattern += space }
+                pattern += word
+            }
+            space = ""
         }
-        return (pattern.joined(separator: " "), filters.joined(separator: " "))
+        return (pattern, filters.joined(separator: " "))
+    }
+
+    private static func isFilter(_ word: Substring) -> Bool {
+        guard let colon = word.firstIndex(of: ":"), word.index(after: colon) < word.endIndex else { return false }
+        return keys.contains(String(word[..<colon]))
     }
 }
