@@ -16,3 +16,11 @@ import Testing
         for a in [MenuAction.copyPath, .copyFile, .quickLook, .trash] { #expect(!a.hidesPanel) }
     }
 }
+
+@Suite struct MenuActionErrorTests {
+    @Test func anErrorKeepsThePanelUpSoItCanBeRead() {
+        #expect(MenuAction.openTerminal.hidesPanel(errored: false))
+        #expect(!MenuAction.openTerminal.hidesPanel(errored: true))
+        #expect(!MenuAction.copyPath.hidesPanel(errored: false))
+    }
+}

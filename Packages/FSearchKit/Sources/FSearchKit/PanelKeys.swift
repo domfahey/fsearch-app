@@ -26,6 +26,9 @@ public enum MenuAction: CaseIterable, Hashable, Sendable {
         }
     }
 
+    /// An action that failed straight away keeps the launcher up so its error line can be read.
+    public func hidesPanel(errored: Bool) -> Bool { hidesPanel && !errored }
+
     /// Opening a file, in any app, makes it a recent.
     public var recordsRecent: Bool { self == .open || self == .openWith }
 }

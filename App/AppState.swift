@@ -26,8 +26,15 @@ final class AppState: ObservableObject {
     @Published var actionError: String?
     private var errorClear: Task<Void, Never>?
 
+    /// Bumped by every error, so a caller can tell whether its action reported one.
+    private(set) var actionErrorCount = 0
+
     func showActionError(_ message: String) {
+        actionErrorCount += 1
         actionError = message
+        // An action that sends you to another app hides the launcher; if it fails
+        // afterwards, bring the launcher back (query and selection resume) so the error is seen.
+        if !PanelController.shared.isVisible { PanelController.shared.show(app: self) }
         errorClear?.cancel()
         errorClear = Task { [weak self] in
             try? await Task.sleep(for: .seconds(5))

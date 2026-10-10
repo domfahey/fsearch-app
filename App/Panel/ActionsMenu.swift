@@ -10,10 +10,12 @@ enum ActionsMenu {
         func entry(_ title: String, _ kind: MenuAction, _ action: @escaping @MainActor () -> Void) -> NSMenuItem {
             let i = NSMenuItem(title: title, action: #selector(Target.run(_:)), keyEquivalent: "")
             let t = Target {
+                let errors = app.actionErrorCount
                 action()
                 if kind.recordsRecent { app.recents.opened(path) }
-                // Like ↵: the user went to another app, so the launcher goes away.
-                if kind.hidesPanel { PanelController.shared.hide() }
+                // Like ↵: the user went to another app, so the launcher goes away,
+                // unless the action already failed and its error line needs reading.
+                if kind.hidesPanel(errored: app.actionErrorCount != errors) { PanelController.shared.hide() }
             }
             i.target = t
             i.representedObject = t  // the item keeps its target alive

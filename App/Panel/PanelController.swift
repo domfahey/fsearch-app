@@ -47,6 +47,8 @@ final class PanelController {
         if CommandLine.arguments.contains("-UITestShowPanel") { show(app: app) }
     }
 
+    var isVisible: Bool { panel?.isVisible == true }
+
     func toggle(app: AppState) { panel?.isVisible == true ? hide() : show(app: app) }
 
     func show(app: AppState) {
