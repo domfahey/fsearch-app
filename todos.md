@@ -12,8 +12,8 @@ Ideas and follow-ups not done yet. Most important first within each section. "Yo
 - [ ] **Unified logging:** `os.Logger` with subsystem `com.domfahey.fsearch` and categories (daemon, panel, onboarding), so users can filter Console.app. No crash reporting service.
 - [ ] **"Report an Issue…" menu item:** opens a new GitHub issue pre-filled with the app version, macOS version, chip and daemon status, for the user to review. Nothing is sent automatically.
 - [ ] **`LSApplicationCategoryType`** in Info.plist (`public.app-category.productivity`).
-- [ ] **Release script verification:** `xcrun stapler validate` and `codesign --verify --deep --strict` on the finished DMG; publish SHA-256 checksums.
-- [ ] **CI on the oldest supported macOS:** run the FSearchKit tests on the `macos-14` runner too. Today everything runs on macOS 26 with Apple silicon.
+- [x] **Release script verification:** `xcrun stapler validate` and `codesign --verify --deep --strict` on the finished DMG; publish SHA-256 checksums.
+- [x] **CI on the oldest supported macOS:** run the FSearchKit tests on the `macos-14` runner too. Today everything runs on macOS 26 with Apple silicon.
 - [ ] **Makefile:** `make lint`, `format`, `type`, `test`, `ui`, `coverage`, `bench`, matching the fsearch repo. CI calls the same targets.
 - [ ] **Lint in CI:** `swift format lint` with the repo's `.swift-format`, plus shellcheck and actionlint, and the `scripts/gen-credits.sh --check` drift check.
 - [ ] **Coverage gate in CI:** fail below 90%, and post a report on each pull request.
