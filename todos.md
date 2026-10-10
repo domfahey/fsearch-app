@@ -17,6 +17,10 @@ Follow-ups not done yet, grouped by priority. "You" items need the maintainer: a
 - [ ] **ARCHITECTURE.md:** update "There is no separate AppTests target" once the app unit-test target lands.
 - [ ] **Help menu:** README, docs index, keyboard shortcuts, query syntax, changelog.
 
+## P1: repository layout
+
+- [ ] **Tidy the root folder:** move CODE_OF_CONDUCT.md, SECURITY.md and SUPPORT.md to `.github/` (GitHub still finds them there); move ARCHITECTURE.md, PRIVACY.md, ROADMAP.md and todos.md into `docs/`. Keep README, LICENSE, CHANGELOG, CONTRIBUTING and THIRD_PARTY_NOTICES at the root. Update every link and check with scripts/check-links.sh. *(Queued after the docs pass.)*
+
 ## P1: tests and benchmarks
 
 - [ ] **Re-record the benchmark baseline on a quiet machine:** the committed one is provisional (recorded under load). Delete this machine's entry in `bench/baseline.json`, then `scripts/bench.sh --record`.
