@@ -42,20 +42,24 @@ final class MenuBarStatus {
         Publishers.CombineLatest(daemon.$state, skipped)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] state, _ in
-                let condition: DaemonCondition =
-                    switch state {
-                    case .checking: .checking
-                    case let .running(s): .running(fullDiskAccess: s.fullDiskAccess)
-                    case .indexing: .indexing
-                    case .needsApproval: .needsApproval
-                    case .failed: .failed
-                    }
                 let next = MenuBarWarning.evaluate(
-                    condition, skippedFullDiskAccess: defaults.bool(forKey: "skippedFullDiskAccess"),
+                    MenuBarStatus.condition(state), skippedFullDiskAccess: defaults.bool(forKey: "skippedFullDiskAccess"),
                     dismissedReminder: defaults.bool(forKey: FullDiskAccessReminder.dismissedKey))
                 if next != self?.warning { self?.warning = next }
             }
             .store(in: &cancellables)
+    }
+
+    /// The daemon's state as the menu bar sees it.
+    nonisolated static func condition(_ state: DaemonManager.State) -> DaemonCondition {
+        switch state {
+        case .checking: .checking
+        case let .running(s): .running(fullDiskAccess: s.fullDiskAccess)
+        case .indexing: .indexing
+        case .needsApproval: .needsApproval
+        case .failed(DaemonManager.unresponsiveMessage): .unresponsive
+        case .failed: .failed
+        }
     }
 }
 
@@ -66,6 +70,13 @@ enum FullDiskAccessReminder {
     static let dismissedKey = "dismissedFullDiskAccessReminder"
 
     static func openSettings() { FileActions.workspace.open(settingsURL) }
+
+    /// The menu's Full Disk Access item. For our own helper, a grant only
+    /// takes effect after a restart, so arm one for when the app is active again.
+    static func turnOn(daemon: DaemonManager) {
+        if daemon.ownsDaemon { daemon.armFullDiskAccessRestart() }
+        openSettings()
+    }
 
     /// Stores the flag; the defaults-change notification re-evaluates the menu bar.
     static func dismiss(defaults: UserDefaults = AppDefaults.store) { defaults.set(true, forKey: dismissedKey) }
@@ -97,7 +108,7 @@ struct MenuBarFixItem: View {
             }
             if w.offersFullDiskAccess {
                 Button(MenuBarWarning.fullDiskAccessItemTitle(ownsDaemon: app.daemon.ownsDaemon)) {
-                    FullDiskAccessReminder.openSettings()
+                    FullDiskAccessReminder.turnOn(daemon: app.daemon)
                 }
                 Button("Don't Remind Me") { FullDiskAccessReminder.dismiss() }
             }

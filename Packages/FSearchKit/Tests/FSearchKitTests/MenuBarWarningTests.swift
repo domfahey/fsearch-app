@@ -55,4 +55,11 @@ import Testing
         #expect(MenuBarWarning.fullDiskAccessItemTitle(ownsDaemon: true) == "Turn On Full Disk Access…")
         #expect(MenuBarWarning.fullDiskAccessItemTitle(ownsDaemon: false) == "Grant Full Disk Access to fsearch…")
     }
+
+    @Test func anUnresponsiveHelperSaysSo() {
+        let w = MenuBarWarning.evaluate(.unresponsive, skippedFullDiskAccess: false)
+        #expect(w?.message == "The search helper isn't answering")
+        #expect(w?.offersFix == true)
+        #expect(w?.offersFullDiskAccess == false)
+    }
 }

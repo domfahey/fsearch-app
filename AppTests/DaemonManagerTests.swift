@@ -12,10 +12,14 @@ struct AppTests {}
 extension AppTests {
     @Suite @MainActor
     struct DaemonManagerTests {
-        private func manager(_ helper: FakeHelper?, _ daemon: StubDaemon = StubDaemon(), cli: Bool = false, clock: FakeClock = FakeClock())
-            -> DaemonManager
-        {
-            DaemonManager(client: daemon, service: helper, cliAgentInstalled: { cli }, clock: clock.clock)
+        private func manager(
+            _ helper: FakeHelper?, _ daemon: StubDaemon = StubDaemon(), cli: Bool = false, clock: FakeClock = FakeClock(),
+            holder: @escaping () -> SocketHolder = { .none }, defaults: UserDefaults = TestEnv.emptySuite(TestEnv.unitSuite),
+            identity: @escaping () -> String? = { nil }
+        ) -> DaemonManager {
+            DaemonManager(
+                client: daemon, service: helper, cliAgentInstalled: { cli }, clock: clock.clock, socketHolder: holder,
+                defaults: defaults, helperIdentity: identity)
         }
 
         @Test func testModeOnlyRefreshesAndNeverOwns() async {
@@ -54,10 +58,24 @@ extension AppTests {
         @Test func prefersARestartingCLIAgent() async {
             let h = FakeHelper(.notRegistered)
             let d = StubDaemon()
-            d.onPing = { _ in false }
+            // Back after ~5 s: within the CLI agent's 10 s window.
+            d.onPing = { $0 >= 20 }
             let m = manager(h, d, cli: true)
             await m.start()
             #expect(h.registered == 0)
+            #expect(m.state == .running(Wire.status()))
+        }
+
+        /// Item 17: a CLI plist with nothing behind it doesn't leave the app without a daemon.
+        @Test func aLeftoverCLIPlistFallsBackToOurHelper() async {
+            let h = FakeHelper(.notRegistered)
+            let d = StubDaemon()
+            d.onPing = { _ in false }
+            let clock = FakeClock()
+            let m = manager(h, d, cli: true, clock: clock)
+            await m.start()
+            #expect(clock.slept.filter { $0 == .milliseconds(250) }.count == 40)
+            #expect(h.registered == 1)
             #expect(m.state == .running(Wire.status()))
         }
 
@@ -269,6 +287,175 @@ extension AppTests {
         @Test func cliAgentPlistIsOnlyAPath() {
             #expect(DaemonManager.cliAgentPlist.path.hasSuffix("Library/LaunchAgents/mt.nd.fsearch.plist"))
             #expect(DaemonManager.agentPlistName == "com.domfahey.fsearch.daemon.plist")
+        }
+
+        // MARK: ownership (item 18) and the never-take-over invariant
+
+        @Test func ownershipComesFromTheSocketHolder() {
+            let h = FakeHelper(.enabled)
+            var holder = SocketHolder.ours
+            let m = manager(h, holder: { holder })
+            #expect(m.ownsDaemon)
+            holder = .none  // our helper between restarts
+            #expect(m.ownsDaemon)
+            holder = .other  // our helper yielded to a CLI agent's daemon
+            #expect(!m.ownsDaemon)
+            h.status = .notRegistered
+            holder = .ours
+            #expect(!m.ownsDaemon)
+        }
+
+        /// The invariant: a running CLI daemon is never stopped, replaced or taken over,
+        /// whether or not our login item is enabled, by restart or start.
+        @Test(arguments: [DaemonPlan.ServiceStatus.enabled, .notRegistered, .requiresApproval, .notFound])
+        func aRunningCLIDaemonIsAlwaysLeftAlone(own: DaemonPlan.ServiceStatus) async {
+            let h = FakeHelper(own)
+            let d = StubDaemon()  // the CLI daemon answers
+            let m = manager(h, d, cli: true, holder: { .other })
+            await m.start()
+            await m.restart()
+            await m.restart()
+            #expect(h.unregistered == 0)
+            #expect(h.registered == 0)
+            #expect(!m.ownsDaemon)
+            #expect(m.state == .running(Wire.status()))
+        }
+
+        /// Item 17: nothing answers and nothing is ours: restart starts one (after the recheck).
+        @Test func restartWithNothingAnsweringStartsOne() async {
+            let h = FakeHelper(.notRegistered)
+            let d = StubDaemon()
+            d.onPing = { _ in false }
+            let m = manager(h, d)
+            await m.restart()
+            #expect(h.unregistered == 0)
+            #expect(h.registered == 1)
+            #expect(m.state == .running(Wire.status()))
+        }
+
+        /// Item 19: concurrent restarts share one unregister/register.
+        @Test func concurrentRestartsAreSerialized() async {
+            let h = FakeHelper(.enabled)
+            let d = StubDaemon()
+            d.onPing = { _ in false }
+            let m = manager(h, d)
+            async let a: Void = m.restart()
+            async let b: Void = m.restart()
+            async let c: Void = m.restart()
+            _ = await (a, b, c)
+            #expect(h.unregistered == 1)
+            #expect(h.registered == 1)
+            #expect(m.state == .running(Wire.status()))
+            // Once it's done, a new restart runs again.
+            await m.restart()
+            #expect(h.unregistered == 2)
+        }
+
+        // MARK: item 15, a helper left running across an app update
+
+        @Test func anUpdatedHelperOfOursIsRestartedOnce() async {
+            let defaults = TestEnv.emptySuite(TestEnv.unitSuite)
+            defer { _ = TestEnv.emptySuite(TestEnv.unitSuite) }
+            defaults.set("1:10:5", forKey: DaemonManager.helperIdentityKey)
+            let h = FakeHelper(.enabled)
+            let m = manager(h, holder: { .ours }, defaults: defaults, identity: { "2:11:6" })
+            await m.start()
+            #expect(h.unregistered == 1)
+            #expect(h.registered == 1)
+            #expect(defaults.string(forKey: DaemonManager.helperIdentityKey) == "2:11:6")
+            await m.start()
+            #expect(h.unregistered == 1, "only once")
+        }
+
+        @Test func anUpdateNeverRestartsSomeoneElsesDaemon() async {
+            let defaults = TestEnv.emptySuite(TestEnv.unitSuite)
+            defer { _ = TestEnv.emptySuite(TestEnv.unitSuite) }
+            defaults.set("1", forKey: DaemonManager.helperIdentityKey)
+            let h = FakeHelper(.enabled)
+            let m = manager(h, holder: { .other }, defaults: defaults, identity: { "2" })
+            await m.start()
+            #expect(h.unregistered == 0 && h.registered == 0)
+            #expect(defaults.string(forKey: DaemonManager.helperIdentityKey) == "1")
+        }
+
+        @Test func aFreshlyRegisteredHelperIsOnlyRecorded() async {
+            let defaults = TestEnv.emptySuite(TestEnv.unitSuite)
+            defer { _ = TestEnv.emptySuite(TestEnv.unitSuite) }
+            let h = FakeHelper(.notRegistered)
+            let d = StubDaemon()
+            d.onPing = { _ in false }
+            let m = manager(h, d, defaults: defaults, identity: { "2" })
+            await m.start()
+            #expect(h.registered == 1 && h.unregistered == 0)
+            #expect(defaults.string(forKey: DaemonManager.helperIdentityKey) == "2")
+        }
+
+        @Test func helperIdentityIsBuildSizeAndTime() throws {
+            let f = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("fsa-helper-\(UUID().uuidString.prefix(6))")
+            defer { try? FileManager.default.removeItem(at: f) }
+            try Data("abc".utf8).write(to: f)
+            try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 1000)], ofItemAtPath: f.path)
+            #expect(DaemonManager.helperIdentity(helper: f, build: "7") == "7:3:1000")
+            #expect(DaemonManager.helperIdentity(helper: f, build: nil) == "?:3:1000")
+            #expect(DaemonManager.helperIdentity(helper: f.appendingPathExtension("gone"), build: "7") == nil)
+            // The unit-test host's bundle has no helper at all in some builds; either way no crash.
+            _ = DaemonManager.bundledHelperIdentity()
+        }
+
+        // MARK: item 16, Full Disk Access granted from the menu
+
+        @Test func aMenuGrantRestartsOurHelperOnReturn() async {
+            let h = FakeHelper(.enabled)
+            let d = StubDaemon()
+            d.onStatus = { _ in Wire.status(fullDiskAccess: false) }
+            d.onPing = { _ in false }
+            let m = manager(h, d, holder: { .ours })
+            await m.refresh()
+            await m.appBecameActive()
+            #expect(h.unregistered == 0, "not armed")
+            m.armFullDiskAccessRestart()
+            await m.appBecameActive()
+            #expect(h.unregistered == 1)
+            #expect(!m.fullDiskAccessRestartArmed)
+            await m.appBecameActive()
+            #expect(h.unregistered == 1, "once")
+        }
+
+        @Test func aMenuGrantNeverRestartsAnotherDaemonOrAWorkingOne() async {
+            let h = FakeHelper(.enabled)
+            let d = StubDaemon()
+            d.onStatus = { _ in Wire.status(fullDiskAccess: false) }
+            let other = manager(h, d, holder: { .other })
+            await other.refresh()
+            other.armFullDiskAccessRestart()
+            await other.appBecameActive()
+            #expect(h.unregistered == 0)
+
+            d.onStatus = { _ in Wire.status(fullDiskAccess: true) }
+            let granted = manager(h, d, holder: { .ours })
+            await granted.refresh()
+            granted.armFullDiskAccessRestart()
+            await granted.appBecameActive()
+            #expect(h.unregistered == 0)
+
+            let unknown = manager(h, d, holder: { .ours })  // still .checking
+            unknown.armFullDiskAccessRestart()
+            await unknown.appBecameActive()
+            #expect(h.unregistered == 0)
+            #expect(!unknown.fullDiskAccessRestartArmed)
+        }
+
+        // MARK: item 30
+
+        @Test func unresponsiveIsItsOwnFailure() async {
+            let m = manager(nil)
+            #expect(!m.isUnresponsive)
+            m.markUnresponsive()
+            #expect(m.isUnresponsive)
+            #expect(MenuBarStatus.condition(m.state) == .unresponsive)
+            #expect(MenuBarStatus.condition(.failed("other")) == .failed)
+            await m.refresh()
+            #expect(!m.isUnresponsive)
         }
     }
 }

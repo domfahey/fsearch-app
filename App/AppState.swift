@@ -18,11 +18,13 @@ final class AppState: ObservableObject {
     /// Bumped whenever the recents may have changed (a file opened or trashed),
     /// so the panel re-reads `recents.paths`, which aren't observable themselves.
     @Published private(set) var recentsGeneration = 0
+    // MERGE (r2c): call `recents.invalidate()` here first, once Recents has it,
+    // so its existence cache is dropped whenever the recents change.
     func recentsChanged() { recentsGeneration += 1 }
     /// Opening a file makes it a recent.
     func openedRecent(_ path: String) {
         recents.opened(path)
-        recentsChanged()
+        recentsChanged()  // the only bump site; trash goes through recentsChanged() too
     }
 
     /// One-line failure from a file action, shown in the panel footer for a few seconds.
@@ -58,17 +60,25 @@ final class AppState: ObservableObject {
             // Two connections: names and content never wait on each other.
             names: DaemonClient(socketPath: options.socketPath),
             content: DaemonClient(socketPath: options.socketPath),
-            control: DaemonClient(socketPath: options.socketPath))
+            control: DaemonClient(socketPath: options.socketPath),
+            socketHolder: {
+                SocketHolder.read(dataDir: DebugFormat.dataDir(socketPath: options.socketPath), bundlePath: Bundle.main.bundlePath)
+            },
+            helperIdentity: { DaemonManager.bundledHelperIdentity() })
     }
 
     init(
         options: LaunchOptions, defaults: UserDefaults, helper: HelperService?,
         names: SearchBackend, content: SearchBackend, control: any DaemonControl,
         clock: DaemonClock = .live,
-        cliAgentInstalled: @escaping () -> Bool = { FileManager.default.fileExists(atPath: DaemonManager.cliAgentPlist.path) }
+        cliAgentInstalled: @escaping () -> Bool = { FileManager.default.fileExists(atPath: DaemonManager.cliAgentPlist.path) },
+        socketHolder: @escaping () -> SocketHolder = { .none },
+        helperIdentity: @escaping () -> String? = { nil }
     ) {
         self.options = options
-        daemon = DaemonManager(client: control, service: helper, cliAgentInstalled: cliAgentInstalled, clock: clock)
+        daemon = DaemonManager(
+            client: control, service: helper, cliAgentInstalled: cliAgentInstalled, clock: clock,
+            socketHolder: socketHolder, defaults: defaults, helperIdentity: helperIdentity)
         search = SearchModel(names: names, content: content)
         recents = Recents(defaults: defaults)
         log = SearchLog(file: options.searchLogFile)
@@ -103,10 +113,13 @@ final class AppState: ObservableObject {
             }
         case .failed(.disconnected):
             // `restart()` re-registers only a daemon the app owns; a CLI daemon is just re-checked.
-            guard status.restartBudget.spend() else { return }
+            // Out of restarts: say the helper isn't answering, not "Starting search…".
+            guard status.restartBudget.spend() else { daemon.markUnresponsive(); return }
             Task {
                 await daemon.restart(); await search.refresh()
             }
+        case .failed(.timeout):
+            daemon.markUnresponsive()
         default: break
         }
     }

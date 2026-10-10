@@ -1,6 +1,8 @@
 /// The daemon's condition, reduced to what the menu bar cares about.
 public enum DaemonCondition: Equatable, Sendable {
     case checking, running(fullDiskAccess: Bool), indexing, needsApproval, failed
+    /// It is there but stopped answering (timeouts, or restarts ran out).
+    case unresponsive
 }
 
 /// A menu-bar warning: a "Fix…" problem, or a gentle reminder.
@@ -31,6 +33,7 @@ public struct MenuBarWarning: Equatable, Sendable {
     ) -> MenuBarWarning? {
         switch c {
         case .failed: MenuBarWarning(message: "The search helper isn't running", offersFix: true)
+        case .unresponsive: MenuBarWarning(message: "The search helper isn't answering", offersFix: true)
         case .needsApproval: MenuBarWarning(message: "The search helper needs your approval", offersFix: true)
         case let .running(fda) where !fda && !skippedFullDiskAccess:
             MenuBarWarning(message: "Full Disk Access is off, so some files won't be found", offersFix: false)
