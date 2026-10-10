@@ -9,6 +9,7 @@
   <key>CFBundleVersion</key><string>1</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
+  <key>NSHumanReadableCopyright</key><string>© 2026 Dominic Fahey. MIT License. Built on fsearch by Noah Dunnagan (MIT).</string>
   <key>SUFeedURL</key><string>https://domfahey.github.io/fsearch-app/appcast.xml</string>
   <key>SUPublicEDKey</key><string>REPLACE_WITH_SPARKLE_PUBLIC_KEY</string>
 </dict></plist>

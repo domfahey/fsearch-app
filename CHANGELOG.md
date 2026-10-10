@@ -28,6 +28,7 @@ Nothing has been released yet. Version 0.1.0 will be the first release.
 - Release script, CI workflow and release checklist.
 - FSearchKit Swift package with unit, integration and UI smoke tests.
 - Third-party notices for fsearch, KeyboardShortcuts and Sparkle ([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
+- About FSearch window (menu bar) crediting fsearch by Noah Dunnagan, with the full third-party licenses (`scripts/gen-credits.sh` builds it from THIRD_PARTY_NOTICES.md).
 
 ### Fixed
 
