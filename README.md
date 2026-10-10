@@ -7,14 +7,14 @@
 
 A fast, keyboard-driven file search launcher for the Mac menu bar, built on [fsearch](https://github.com/noahdunnagan/fsearch) by Noah Dunnagan.
 
-Press a hotkey, type, and find any file by name or by what is inside it. FSearch for Mac is a native SwiftUI and AppKit app for macOS 14 and later. It is a graphical front end for the fsearch daemon, which does all the indexing and searching: the app bundles a pinned build of fsearch and talks to it over its socket API. This is an independent project and is not affiliated with fsearch or its author.
+Press a hotkey, type, and find any file by name, or search inside text and code files. FSearch for Mac is a native SwiftUI and AppKit app for macOS 14 and later. It is a graphical front end for the fsearch daemon, which does all the indexing and searching: the app bundles a pinned build of fsearch and talks to it over its socket API. This is an independent project and is not affiliated with fsearch or its author.
 
-> There is no screenshot yet. Run the app, or follow the [first-search tutorial](docs/tutorial-first-search.md), to see the panel.
+> There is no screenshot yet. Run the app, or follow [Tutorial: your first search](docs/tutorial-first-search.md), to see the panel.
 
 ## Features
 
 - Launcher panel on ⌥Space (configurable), with file icons, match highlighting and the folder in grey.
-- Search by name, search inside files, or find definitions.
+- Search by name, search inside text and code files, or find definitions.
 - Query filters such as `ext:`, `in:`, `type:`, `size:` and `mtime:`. Type `?` for the cheat sheet.
 - Recent files when the query is empty. Reopen the panel within 60 seconds to resume.
 - Actions: open, open at a line in your editor, reveal, Quick Look, copy, open with, move to Trash, and drag a result out.
@@ -35,7 +35,7 @@ Press a hotkey, type, and find any file by name or by what is inside it. FSearch
 
 FSearch for Mac is unreleased: nothing has been published yet, and 0.1.0 will be the first release. When it is, download the DMG from the [Releases](https://github.com/domfahey/fsearch-app/releases) page and drag FSearch to Applications.
 
-Until then, build from source. See [Development](#development). For step-by-step setup, see [docs/install.md](docs/install.md). To remove the app, see [docs/uninstall.md](docs/uninstall.md).
+Until then, build from source. See [Development](#development). For step-by-step setup, see [Install FSearch for Mac](docs/install.md). To remove the app, see [Uninstall FSearch for Mac](docs/uninstall.md).
 
 ## Quick start
 
@@ -43,16 +43,17 @@ Until then, build from source. See [Development](#development). For step-by-step
 2. Press ⌥Space and start typing. Press ↵ to open the selected file, or ⌘↵ to reveal it in Finder.
 3. Below the results, choose **Search inside files** or **Find definitions** to change what the query searches. Type `?` alone to see the query syntax.
 
-For a guided walk, see the [tutorial](docs/tutorial-first-search.md). For every key, see [keyboard shortcuts](docs/reference/keyboard-shortcuts.md).
+For a guided walk, see [Tutorial: your first search](docs/tutorial-first-search.md). For every key, see [Keyboard shortcuts](docs/reference/keyboard-shortcuts.md).
 
 ## Documentation
 
 The [documentation hub](docs/README.md) links everything. Common starting points:
 
 - [Tutorial: your first search](docs/tutorial-first-search.md)
-- [Query syntax](docs/reference/query-syntax.md) and [keyboard shortcuts](docs/reference/keyboard-shortcuts.md)
-- [Troubleshooting](docs/reference/troubleshooting.md) and the [FAQ](docs/reference/faq.md)
-- [Architecture](docs/architecture.md) and [decision records](docs/adr/README.md)
+- [Query syntax](docs/reference/query-syntax.md) and [Keyboard shortcuts](docs/reference/keyboard-shortcuts.md)
+- [Troubleshooting](docs/reference/troubleshooting.md), the [FAQ](docs/reference/faq.md) and [Known limitations](docs/reference/limitations.md)
+- [Update FSearch for Mac](docs/how-to/update.md)
+- [Architecture](docs/architecture.md) and [Architecture Decision Records](docs/adr/README.md)
 - [Privacy](docs/privacy.md), [Support](.github/SUPPORT.md), [Roadmap](docs/roadmap.md) and the [Changelog](CHANGELOG.md)
 
 ## How it works
@@ -61,40 +62,15 @@ The app bundles a universal (arm64 and x86_64) fsearch daemon and registers it a
 
 ## Development
 
-### Prerequisites
+To build, test and submit a change, see [Contributing](CONTRIBUTING.md). It covers the prerequisites, every `make` task, the test tiers and the release scripts. Run `make help` to list the tasks.
 
-- Xcode 16 or later (Swift 6). CI uses Xcode 26.6. The Makefile and scripts use `DEVELOPER_DIR` if set, otherwise the Xcode that `xcode-select -p` reports; select one with `sudo xcode-select -s /Applications/Xcode.app` or `export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
-- Rust via [rustup](https://rustup.rs), with both macOS targets: `rustup target add aarch64-apple-darwin x86_64-apple-darwin`.
-- XcodeGen: `brew install xcodegen`.
-
-### Build and test
-
-Run these from the repository root. `make help` lists every task.
-
-| Task | Command |
-|---|---|
-| Build the pinned fsearch daemon into `Vendor/fsearch` (everything else needs it) | `make daemon` |
-| Generate the Xcode project and build the universal Debug app (as CI does) | `make build` |
-| Run the FSearchKit tests, against a real daemon in a temporary `HOME` | `make test` |
-| Lint swift-format, credits, shell scripts and workflows | `make lint` |
-| Build with warnings as errors | `make type` |
-| Run the benchmarks | `make bench` |
-| Lint, type and test together | `make check` |
-| Everything CI runs, with coverage gates | `make ci` |
-| Check developer prerequisites, or install them (the app is not installed) | `make doctor`, `make install` |
-| Remove build outputs (`distclean` also removes the daemon and project) | `make clean` |
-| Run the end-to-end UI tests (needs a logged-in GUI session and accessibility permission, so not in CI) | `make ui` |
-| Coverage of both app suites (unit and UI tests) merged, plus FSearchKit. The full number needs a GUI session; CI gates the unit tests alone | `make coverage` |
-
-The raw commands are `scripts/build-daemon.sh`, `xcodegen generate`, then:
+The short version, from the repository root:
 
 ```sh
-xcodebuild -project FSearch.xcodeproj -scheme FSearch -configuration Debug \
-  -derivedDataPath build -destination 'generic/platform=macOS' \
-  CODE_SIGN_IDENTITY=- build
+make daemon   # build the pinned fsearch daemon into Vendor/fsearch
+make build    # generate the Xcode project and build the Debug app
+make test     # run the FSearchKit tests
 ```
-
-and `cd Packages/FSearchKit && swift test`. Tests never touch your real index; see [CONTRIBUTING.md](CONTRIBUTING.md#tests). Releases: `scripts/release.sh` and [docs/release-checklist.md](docs/release-checklist.md).
 
 ### Project layout
 
@@ -106,7 +82,7 @@ and `cd Packages/FSearchKit && swift test`. Tests never touch your real index; s
 | `Packages/FSearchKit/` | Core logic and its unit and integration tests |
 | `scripts/` | Daemon build, release, benchmark, UI smoke and docs check scripts |
 | `bench/` | Benchmark baseline and notes |
-| `docs/` | User and developer documentation, decision records, release checklist |
+| `docs/` | User and developer documentation, decision records, release runbook |
 
 ## Privacy
 
@@ -114,11 +90,11 @@ Your index and logs stay on your Mac. The app has no telemetry and makes no netw
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) and follow the [Code of Conduct](.github/CODE_OF_CONDUCT.md). For questions and bug reports, see [Support](.github/SUPPORT.md). To report a vulnerability, see [Security](.github/SECURITY.md).
+See [Contributing](CONTRIBUTING.md) and follow the [Code of Conduct](.github/CODE_OF_CONDUCT.md). For questions and bug reports, see [Support](.github/SUPPORT.md). To report a vulnerability, see [Security](.github/SECURITY.md).
 
 ## License
 
-MIT. See [LICENSE](LICENSE). Bundled components are covered in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+MIT. See [LICENSE](LICENSE). Bundled components are covered in [Third-party notices](THIRD_PARTY_NOTICES.md).
 
 ## Acknowledgements
 

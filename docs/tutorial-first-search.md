@@ -52,7 +52,7 @@ You can also press Backspace in an empty field to remove the chip.
 
 ## 6. Find a definition
 
-Type the name of a function or type, for example `SearchModel`. Select **Find definitions** and press Return. The chip now says **Definitions**, and rows show the lines that define that name.
+Type the name of a function or type from your own code. Select **Find definitions** and press Return. The chip now says **Definitions**, and rows show the lines that define that name.
 
 ## 7. Use the actions menu
 
@@ -69,7 +69,7 @@ Type a name, select a result, and press ⌘K. A menu opens with:
 
 Choose one with the mouse or the arrow keys. Actions that take you to another app, such as Open and Reveal in Finder, hide the panel. Quick Look, Copy Path and Copy File leave it open.
 
-Move to Trash moves the file to the Trash. It has no direct shortcut.
+Move to Trash moves the file to the Trash and keeps the panel open. It has no direct shortcut.
 
 You can also drag a result row into Finder, Mail or another app.
 

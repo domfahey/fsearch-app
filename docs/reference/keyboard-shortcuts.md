@@ -75,7 +75,7 @@ If an action fails, the panel stays up (or comes back) and shows the error in it
 | Search… | | Open the panel |
 | Index Details… | | Debug mode only |
 | Search Log… | | Debug mode only |
-| Turn On Debug Mode or Turn Off Debug Mode | ⌥⌘D | Toggle [debug mode](../how-to/turn-on-debug-mode.md) |
+| Turn On Debug Mode or Turn Off Debug Mode | ⌥⌘D | Toggle [debug mode](../how-to/turn-on-debug-mode.md). A menu-item shortcut: it works while the menu is open, not as a global hotkey. |
 | Finish Setup… | | Shown until the welcome window is done |
 | Help | | A submenu: FSearch Help, Keyboard Shortcuts, Query Syntax, Changelog, Privacy, and **Report an Issue…**, which opens a pre-filled GitHub bug report (versions, chip and daemon state; never paths or queries) |
 | About FSearch | | |

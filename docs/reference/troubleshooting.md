@@ -64,7 +64,7 @@ These are the exact texts the panel shows when a search cannot return results.
 
 | You see | Meaning | What to do |
 |---|---|---|
-| Starting search… | The app cannot reach the daemon yet, or it did not answer in time. | See [Starting search…](#starting-search-does-not-go-away). |
+| Starting search… | The app cannot reach the daemon yet, or it did not answer in time. | See ["Starting search…" does not go away](#starting-search-does-not-go-away). |
 | Indexing your disk… results will appear shortly | The first index is still being built. | Wait. See [Indexing](#indexing-your-disk-results-will-appear-shortly). |
 | Unexpected reply from the search daemon: *detail* | The daemon answered with something the app does not understand, for example `reply has no "hits"`. This usually means the app and the daemon are different versions. | Quit and reopen FSearch. If it persists, [report it](../../.github/SUPPORT.md) with the detail text. |
 | *The daemon's own message* (in red) | The daemon rejected the query. | Fix the query. |
@@ -75,16 +75,30 @@ In the debug-mode Search Log, a failed search is recorded as "Can't reach the se
 
 - Add text after `grep:`, `regex:` or `sym:`. With nothing after the colon, no search runs.
 - Content search needs the daemon's content index. In Index Details, check the content "Waiting to be indexed" count.
+- Check that the file is in scope. See [Text inside a file is not found](#text-inside-a-file-is-not-found).
+
+## Text inside a file is not found
+
+Search inside files reads only text and code files up to 1 MB under your home folder. It does not read PDF, Word or Pages files, and it skips folders such as `node_modules`, `.git`, `build`, `dist`, `vendor` and `Library`, and the inside of `.app` bundles. If the file is a different type, too large or in a skipped folder, search finds it by name only. A search that runs out of its 250 ms budget can also return partial results: add a filter such as `ext:` or `in:` to read fewer files. See [What content search covers](query-syntax.md#what-content-search-covers).
+
+## A file that exists is not found
+
+| Check | What to do |
+|---|---|
+| The file is in Desktop, Documents, Downloads, Mail or iCloud Drive | Turn on Full Disk Access. See [Grant Full Disk Access](../how-to/grant-full-disk-access.md). |
+| The name has accented letters | Matching folds case for A to Z only and does not normalize Unicode. Search for a part of the name without the accented letter. See [Known limitations](limitations.md#case-folding-and-accented-names). |
+| The file was only just created | Wait a moment and search again. The daemon watches for changes, and Index Details shows pending changes. |
+| The file is on an external drive | External drives are untested and probably not indexed. See [Known limitations](limitations.md). |
+| There are more than 50 matches | The panel shows 50. Add words or filters to narrow the search. |
+| A `!word` is in the query | `!word` drops a file when its name or any parent folder name contains the word. |
+
+## Index Details says "Follower"
+
+In Index Details, **Role** reads **Follower** when another daemon owns the index and writes it. That is normal when the app uses the daemon from the fsearch CLI, or when two daemons share the data folder. A follower serves searches from the index the owner saves, and takes over if the owner stops. You do not need to fix anything unless searches fail. If they do, see [Starting search…](#starting-search-does-not-go-away).
 
 ## Still stuck
 
 Quit FSearch from the menu and open it again. Then see [Support](../../.github/SUPPORT.md).
-
-## See also
-
-- [Turn on debug mode](../how-to/turn-on-debug-mode.md)
-- [Files and locations](files-and-locations.md)
-- [FAQ](faq.md)
 
 ## Collecting logs
 
@@ -97,3 +111,10 @@ log stream --predicate 'subsystem == "com.domfahey.fsearch"' --level debug
 In Console.app, choose your Mac, then search for `subsystem:com.domfahey.fsearch`. Turn on Action > Include Debug Messages to see routine polls.
 
 File paths, queries and file names are never logged in the clear. They show as `<private>` unless private data is enabled for logging on your Mac.
+
+## See also
+
+- [Turn on debug mode](../how-to/turn-on-debug-mode.md)
+- [Files and locations](files-and-locations.md)
+- [Known limitations](limitations.md)
+- [FAQ](faq.md)

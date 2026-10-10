@@ -10,6 +10,10 @@ These records explain why FSearch for Mac is built the way it is. Each one state
 | [0004](0004-two-socket-connections-and-latest-wins.md) | Two socket connections, and the latest search wins | Accepted |
 | [0005](0005-tests-never-touch-the-real-index.md) | Tests never touch the real index | Accepted |
 | [0006](0006-not-on-the-mac-app-store.md) | Not on the Mac App Store | Accepted |
+| [0007](0007-test-seams-inert-test-host-and-test-mode.md) | Test seams, inert test host and test mode | Accepted |
+| [0008](0008-strip-sparkles-xpc-services.md) | Strip Sparkle's XPC services (not sandboxed) | Accepted |
+| [0009](0009-coverage-gates.md) | Coverage gates (FSearchKit 90%, app unit tests 80%) | Accepted |
+| [0010](0010-pin-the-daemon-to-a-fork-commit.md) | Pin the daemon to a fork commit until upstream merges | Accepted |
 
 To add a record, copy the shape of an existing one, use the next number, and add a row here. Do not edit an accepted record to change its decision. Write a new one that supersedes it.
 

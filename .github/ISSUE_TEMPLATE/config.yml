@@ -1,5 +1,11 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Ask a question
+    url: https://github.com/domfahey/fsearch-app/discussions
+    about: Ask how something works, or share an idea, in GitHub Discussions.
+  - name: Read the troubleshooting guide
+    url: https://github.com/domfahey/fsearch-app/blob/main/docs/reference/troubleshooting.md
+    about: Many common problems have a fix here.
   - name: Report a security vulnerability
     url: https://github.com/domfahey/fsearch-app/security/advisories/new
     about: Please report security problems privately, not in a public issue.

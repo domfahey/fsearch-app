@@ -25,26 +25,23 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
 - Settings: "Open FSearch at login", with the real login-item status, and "Remove Background Helper and Data…" to uninstall from inside the app. It removes FSearch's own helper (also one still awaiting approval) and moves the logs and settings to the Trash. The index goes too only if FSearch's helper ran the daemon and the fsearch CLI's login agent isn't installed, since the two share one data folder.
 - After you skip Full Disk Access during setup, a quiet menu-bar reminder offers "Turn On Full Disk Access…" and "Don't Remind Me". It clears itself once access is granted.
 - Help menu (FSearch Help, Keyboard Shortcuts, Query Syntax, Changelog, Privacy) and "Report an Issue…", which opens a pre-filled GitHub bug form with versions, chip and daemon state. It never includes paths or queries.
-- Unified logging (`os.Logger`, subsystem `com.domfahey.fsearch`). Paths and queries are never logged in the clear. See Troubleshooting → Collecting logs.
-- Debug mode (⌥⌘D or Settings): Index Details, a Search Log, and timings in the footer. The Search Log records only this app's own searches, keeps at most 10,000, and stays on this Mac.
-- Errors show inline in the panel and in the menu bar.
+- Unified logging (`os.Logger`, subsystem `com.domfahey.fsearch`). Paths and queries are never logged in the clear. See [Collecting logs](docs/reference/troubleshooting.md#collecting-logs).
+- Debug mode (the menu item, whose ⌥⌘D shortcut works while the menu is open, or Settings): Index Details, a Search Log, and timings in the footer. The Search Log records only this app's own searches, keeps at most 10,000, and stays on this Mac.
+- Errors show inline in the panel and in the menu bar. Errors from the search daemon read as plain sentences (for example "Can't reach the search daemon"), in the panel and in the debug Search Log, and decode errors name the daemon's own field names.
 - Settings for the hotkey, the editor and debug mode.
 - Sparkle updater. It stays inactive until the signing keys are configured. Scheduled updates show as a quiet menu-bar reminder ("Update Available…"), Settings has an Updates section (automatic checks, Check Now), feeds must be signed, system profiling is off, and Sparkle's unused XPC services are removed.
 - About FSearch window crediting fsearch by Noah Dunnagan, with the full third-party licenses. It also credits Raycast and Everything as inspiration.
 - Third-party notices for fsearch, KeyboardShortcuts and Sparkle ([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
 - Privacy manifest declaring no tracking, no data collection and the required-reason APIs the app uses (UserDefaults, file timestamps).
 - App category set to Productivity (`LSApplicationCategoryType`).
-- Release tooling: `scripts/release.sh <version>` sets an increasing build number from git, signs, notarizes and staples, verifies the app and DMG signatures, and writes a SHA-256 checksum next to the DMG. A release checklist is in [docs/release-checklist.md](docs/release-checklist.md).
-- FSearchKit Swift package with unit and daemon integration tests. A separate UI smoke test (`scripts/ui-smoke.sh`) runs locally, not in CI.
-- Benchmarks: `scripts/bench.sh` measures keystroke, client and real-daemon performance and fails when a result regresses against `bench/baseline.json`. See [bench/README.md](bench/README.md).
-- A Makefile for common tasks (`make test`, `lint`, `type`, `bench`, `check`) and a `.swift-format` style config.
-- CI runs the FSearchKit tests on macOS 14 (Xcode 16.2) and macOS 26 (Xcode 26.6), builds the universal app, runs the app's unit tests (AppTests), gates coverage (FSearchKit at 90%, the app's unit tests at 80%), treats compiler warnings as errors, blocks on swift-format lint, checks Markdown links, lints the scripts and workflows, and reports benchmarks.
-- Open-source project files: contributing guide, security policy, code of conduct, architecture overview, issue and pull request templates, CODEOWNERS, and Dependabot for GitHub Actions.
-- Documentation ([docs/README.md](docs/README.md)): a first-search tutorial, how-to guides, reference pages (keyboard shortcuts, query syntax, settings, files and locations, troubleshooting, FAQ), architecture decision records, install and uninstall guides, a privacy policy ([Privacy](docs/privacy.md)), support ([Support](.github/SUPPORT.md)) and a roadmap ([Roadmap](docs/roadmap.md)).
-
-### Changed
-
-- Errors from the search daemon read as plain sentences (for example "Can't reach the search daemon"), in the panel and in the debug Search Log, and decode errors name the daemon's own field names.
+- Documentation ([docs/README.md](docs/README.md)): a first-search tutorial, how-to guides (including updating), reference pages (keyboard shortcuts, query syntax, settings, files and locations, troubleshooting, FAQ, known limitations), architecture decision records, install and uninstall guides, a privacy policy ([Privacy](docs/privacy.md)), support ([Support](.github/SUPPORT.md)) and a roadmap ([Roadmap](docs/roadmap.md)).
+- Development:
+  - Release tooling: `scripts/release.sh <version>` sets an increasing build number from git, signs, notarizes and staples, verifies the app and DMG signatures, and writes a SHA-256 checksum next to the DMG. A release runbook is in [docs/release-checklist.md](docs/release-checklist.md).
+  - FSearchKit Swift package with unit and daemon integration tests. A separate UI smoke test (`scripts/ui-smoke.sh`) runs locally, not in CI.
+  - Benchmarks: `scripts/bench.sh` measures keystroke, client and real-daemon performance and fails when a result regresses against `bench/baseline.json`. See [bench/README.md](bench/README.md).
+  - A Makefile for common tasks (`make test`, `apptest`, `lint`, `type`, `bench`, `check`) and a `.swift-format` style config.
+  - CI runs the FSearchKit tests on macOS 14 (Xcode 16.2) and macOS 26 (Xcode 26.6), builds the universal app, runs the app's unit tests (AppTests), gates coverage (FSearchKit at 90%, the app's unit tests at 80%), treats compiler warnings as errors, blocks on swift-format lint, checks Markdown links, lints the scripts and workflows, and reports benchmarks.
+  - Open-source project files: contributing guide, security policy, code of conduct, architecture overview, issue and pull request templates, CODEOWNERS, and Dependabot for GitHub Actions.
 
 ### Fixed
 

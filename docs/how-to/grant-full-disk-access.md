@@ -18,13 +18,13 @@ After setup:
 
 1. Open System Settings, then Privacy & Security, then Full Disk Access.
 2. Turn on FSearch.
-3. Quit and reopen FSearch, or use **Restart Daemon** in the Index Details window (see [Turn on debug mode](turn-on-debug-mode.md)).
+3. Restart the helper: turn on debug mode, open **Index Details…** and press **Restart Daemon** (see [Turn on debug mode](turn-on-debug-mode.md)). Quitting the app does not restart the helper, so the grant does not take effect until you restart it.
 
 To check, turn on debug mode and look for "Full Disk Access: On" in Index Details.
 
 ## If you use the fsearch CLI daemon
 
-Full Disk Access belongs to whichever daemon is running. If the app is using your CLI daemon, grant access to your `fsearch` binary and restart that daemon. See [Use FSearch with the fsearch CLI](use-with-the-fsearch-cli.md).
+Full Disk Access belongs to whichever daemon is running. If the app is using your CLI daemon, the third setup step shows **Open Privacy Settings** instead of **Turn on FSearch**. Press it, add your `fsearch` binary to the list and turn it on, then restart that daemon from the CLI. **Restart Daemon** in Index Details only checks again for a daemon the app did not start. See [Use FSearch with the fsearch CLI](use-with-the-fsearch-cli.md).
 
 ## Skip it
 
@@ -36,9 +36,8 @@ If you close the welcome window without granting or skipping, the menu bar shows
 
 macOS ties the grant to the program's code signature. A build you compile yourself with an ad-hoc signature (`CODE_SIGN_IDENTITY=-`) has a new identity each time, so you may need to turn the entry off and on again, or remove and re-add it, after each rebuild. The release app is signed with a Developer ID, and its grant is meant to carry across updates.
 
-Which binary macOS lists for the bundled helper (the app or the helper) is still being confirmed. It is tracked in the [release checklist](../release-checklist.md).
-
 ## See also
 
+- [Known limitations](../reference/limitations.md)
 - [Troubleshooting](../reference/troubleshooting.md)
 - [Privacy](../privacy.md)

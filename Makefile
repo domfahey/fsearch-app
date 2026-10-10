@@ -26,7 +26,7 @@ XCODEBUILD ?= xcodebuild -project FSearch.xcodeproj -scheme FSearch -configurati
 	-derivedDataPath build -destination 'generic/platform=macOS' CODE_SIGN_IDENTITY=-
 
 .DEFAULT_GOAL := help
-.PHONY: help install install-tools setup doctor daemon project build test ui coverage bench \
+.PHONY: help install install-tools setup doctor daemon project build test apptest ui coverage coverage-kit bench \
 	format format-check lint type check ci hooks clean distclean
 
 help: ## List targets
@@ -111,11 +111,17 @@ build: project ## Build the universal Debug app (same as CI)
 test: Vendor/fsearch ## Run FSearchKit tests (builds Vendor/fsearch if missing)
 	$(Q)cd Packages/FSearchKit && swift test
 
+apptest: Vendor/fsearch ## Run the app unit tests (AppTests) and report their coverage
+	$(Q)scripts/coverage.sh --unit-only
+
 ui: Vendor/fsearch ## End-to-end UI tests; needs an idle logged-in GUI session
 	$(Q)scripts/ui-smoke.sh
 
 coverage: Vendor/fsearch ## Coverage report for FSearchKit and both app suites (UI tests need a GUI session)
 	$(Q)scripts/coverage.sh
+
+coverage-kit: Vendor/fsearch ## Coverage report for FSearchKit only
+	$(Q)scripts/coverage.sh --kit-only
 
 bench: Vendor/fsearch ## Run the benchmarks
 	$(Q)scripts/bench.sh
@@ -136,6 +142,7 @@ lint: ## Lint swift-format (LINT_FORMAT=0 skips), links, credits, shell scripts,
 	else echo "shellcheck not installed; skipped (brew install shellcheck)"; fi
 	$(Q)if command -v actionlint >/dev/null; then actionlint; \
 	else echo "actionlint not installed; skipped (brew install actionlint)"; fi
+	@echo "lint: ok"
 
 type: project ## Warnings-as-errors package build, plus app warnings check
 	$(Q)cd Packages/FSearchKit && swift build --build-tests -Xswiftc -warnings-as-errors
