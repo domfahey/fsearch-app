@@ -88,7 +88,7 @@ doctor: ## Check developer prerequisites; non-zero if a required one is missing
 		else bad "Vendor/fsearch is not universal ($${archs:-unreadable})" "make daemon"; fi; \
 		want=$$(grep -m1 '^REV=' scripts/build-daemon.sh | grep -o '[0-9a-f]\{40\}' || true); \
 		have=$$(cat Vendor/fsearch.rev 2>/dev/null || true); \
-		if [ -n "$$want" ] && [ -n "$$have" ] && [ "$$want" != "$$have" ]; then bad "Vendor/fsearch is not the pinned revision" "make daemon"; fi; \
+		if [ -n "$$want" ] && [ -n "$$have" ]; then case "$$want" in "$$have"*) ;; *) bad "Vendor/fsearch is not the pinned revision" "make daemon" ;; esac; fi; \
 	else bad "Vendor/fsearch not built" "make daemon"; fi; \
 	opt shellcheck "brew install shellcheck"; \
 	opt actionlint "brew install actionlint"; \
