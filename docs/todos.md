@@ -70,7 +70,7 @@ Follow-ups not done yet, grouped by priority. "You" items need the maintainer: a
 - [x] Protect `main`: pull requests and green CI (lint, app, kit on macOS 14 and 26) required; admins can still push in an emergency.
 - [x] Turn on GitHub Discussions (.github/SUPPORT.md already points to it).
 - [x] Labels: `question`, `good first issue`, `help wanted`, `upstream (fsearch)`.
-- [ ] OpenSSF Scorecard workflow and badge.
+- [x] OpenSSF Scorecard workflow and badge (runs on push to main and weekly).
 
 ## You: before announcing
 
