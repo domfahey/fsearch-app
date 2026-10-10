@@ -51,7 +51,7 @@ struct MenuContent: View {
             Divider()
             Button(HelpLinks.reportTitle) { HelpLinks.reportIssue(daemon: app.daemon, workspace: FileActions.workspace) }
         }
-        Button("About FSearch") { NSApp.activate(ignoringOtherApps: true); NSApp.orderFrontStandardAboutPanel(nil) }
+        Button("About FSearch") { AppActivation.activate(); NSApp.orderFrontStandardAboutPanel(nil) }
         SettingsLink { Text("Settings…") }
         CheckForUpdatesItem()
         Button("Quit FSearch") { NSApp.terminate(nil) }

@@ -48,6 +48,7 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
 
 ### Fixed
 
+- After the daemon drops, the panel restarts it up to three times per outage (it stopped after one), and its "Indexing your disk…" auto-refresh now runs.
 - While a filter value is still being typed (for example `foo size:`), the panel keeps the current results instead of sending an incomplete query and flashing an error.
 - The client checks the id on every reply from the daemon, so a stray or late line can never be shown as the answer to a different search.
 - In content search, a filter key with no value yet (for example `ext:`) is treated as a filter, as the daemon does, instead of as search text.

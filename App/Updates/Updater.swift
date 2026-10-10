@@ -57,7 +57,7 @@ final class UpdateReminderDriver: NSObject, @preconcurrency SPUStandardUserDrive
             $0.willShow(bySparkle: handleShowingUpdate, userInitiated: state.userInitiated)
         }
         // Sparkle's own window is about to appear: bring it to the front.
-        if handleShowingUpdate { NSApp.activate(ignoringOtherApps: true) }
+        if handleShowingUpdate { AppActivation.activate() }
     }
 
     func standardUserDriverDidReceiveUserAttention(forUpdate update: SUAppcastItem) {
@@ -74,7 +74,7 @@ struct UpdateAvailableItem: View {
     var body: some View {
         if UpdateReminderModel.shared.indicatorVisible, let controller = Updater.controller {
             Button("Update Available…") {
-                NSApp.activate(ignoringOtherApps: true)
+                AppActivation.activate()
                 controller.checkForUpdates(nil)
             }
             Divider()

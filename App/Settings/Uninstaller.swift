@@ -16,7 +16,7 @@ final class Uninstaller: ObservableObject {
     enum Phase: Equatable { case idle, running, done(Report) }
 
     /// The app's UserDefaults keys; the shortcut is reset separately.
-    static let defaultsKeys = ["editor", "debugMode", "onboarded", "skippedFullDiskAccess", "recentPaths"]
+    static let defaultsKeys = ["editor", "debugMode", "onboarded", "skippedFullDiskAccess", "dismissedFullDiskAccessReminder", "recentPaths"]
     static let fullDiskAccessURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!
 
     @Published private(set) var phase: Phase = .idle

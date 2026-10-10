@@ -35,7 +35,7 @@ Follow-ups not done yet, grouped by priority. "You" items need the maintainer: a
 
 ## P1: test safety
 
-- [ ] **App tests must never take focus:** some AppTests made the real launcher panel the key window, stealing keystrokes (fixed for the panel). Onboarding, Quick Look, the activate call, the UI-test guard, throwaway defaults for UI tests, and clipboard restore are in progress, along with the low-signal app tests. Until done: no AppTests or UI test runs while someone is using the Mac.
+- [x] **App tests must never take focus:** some AppTests made the real launcher panel the key window, stealing keystrokes (fixed for the panel). Onboarding, Quick Look, the activate call, the UI-test guard, throwaway defaults for UI tests, and clipboard restore are in progress, along with the low-signal app tests. Until done: no AppTests or UI test runs while someone is using the Mac.
 
 ## P1: tests and benchmarks
 
@@ -44,6 +44,8 @@ Follow-ups not done yet, grouped by priority. "You" items need the maintainer: a
 
 ## P2: code quality and polish
 
+- [ ] **AppTests cleanup at end of run:** throwaway `com.domfahey.fsearch.apptests.*` plists are swept at the start of the next run but about 24 remain after each run; remove them in teardown too.
+- [ ] **UI-test builds register the global ⌥Space hotkey** while running; skip hotkey registration in test mode.
 - [ ] **Test-only API in shipped code:** wrap `OnboardingLauncher.reset()` and the `private(set)` widenings added for AppTests in `#if DEBUG`.
 - [ ] **One source for launch options:** `PanelController` reads `LaunchOptions.current.showPanel`; use `app.options` like everything else.
 - [x] **Docs best-practice pass:** README points to the docs index; troubleshooting shows the new error texts; query syntax explains that half-typed filters wait; ARCHITECTURE mentions reply ids; a Markdown link check in CI.
