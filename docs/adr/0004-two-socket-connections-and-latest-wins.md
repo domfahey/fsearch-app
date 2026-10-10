@@ -9,6 +9,12 @@ The app searches on every keystroke, with no delay. A name search takes a few mi
 
 The daemon answers each connection in order. If name and content searches shared a connection, a slow content search would hold back the name results for the next keystroke. Also, answers can arrive after you have typed more, and must not replace newer results.
 
+## Considered options
+
+- One connection for everything. A slow content search would hold back the next name search.
+- A new connection for every request. This costs a connection setup on every keystroke.
+- Two long-lived connections, one for names and one for content. This is the choice below.
+
 ## Decision
 
 - Use two connections to the daemon. One carries name searches. The other carries content and definition searches. Each connection sends one request at a time, so replies never cross.

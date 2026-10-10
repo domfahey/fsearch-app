@@ -7,6 +7,12 @@ Status: Accepted
 
 A test that talks to your real daemon could read your real files, change your index, or register a login item on the machine that runs it. The app also has a real daemon on developer Macs.
 
+## Considered options
+
+- Test against the real daemon and index. This is risky for the person running the tests.
+- Mock the daemon everywhere. This would miss real protocol and daemon bugs.
+- Start a real daemon under a temporary `HOME`, and use fakes for unit tests. This is the choice below.
+
 ## Decision
 
 - Integration tests run against a real fsearch daemon that the test starts itself, with a temporary `HOME` and `FSEARCH_ROOT` so it only sees test files. This is the same isolation the fsearch Rust tests use.
