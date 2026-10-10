@@ -7,18 +7,18 @@ Ideas and follow-ups not done yet. Most important first within each section. "Yo
 - [ ] **App commands in the search panel:** typing "settings", "preferences" or "prefs" (a prefix match, so "set" works) shows an "FSearch Settings" row in its own section above the files; ↵ opens Settings. Matching is a pure FSearchKit function with tests; leave room for About and Quit rows later.
 - [ ] **Launch at login for the app itself.** A Settings toggle (SMAppService.mainApp). Today only the helper starts at login, so the menu-bar icon and hotkey are missing after a reboot until the app is opened.
 - [ ] **Uninstall from inside the app.** A Settings button, "Remove Background Helper and Data…": unregister the login item and move the data folder to the Trash. Document the Full Disk Access entry the user should remove by hand.
-- [ ] **Uninstall documentation.** A page covering the login item, the data folder (`~/Library/Application Support/FSearch`), the logs (`~/Library/Logs/FSearch`) and the Full Disk Access entry.
+- [x] **Uninstall documentation.** A page covering the login item, the data folder (`~/Library/Application Support/FSearch`), the logs (`~/Library/Logs/FSearch`) and the Full Disk Access entry.
 - [x] **Privacy manifest** (`PrivacyInfo.xcprivacy`): no tracking, no data collection, plus the required-reason APIs used (UserDefaults, file timestamps).
-- [ ] **PRIVACY.md:** what the index holds, that it stays on the Mac, no telemetry, Sparkle only checks for updates. Link it from the README and the About window.
+- [x] **PRIVACY.md:** what the index holds, that it stays on the Mac, no telemetry, Sparkle only checks for updates. Link it from the README and the About window.
 - [ ] **Unified logging:** `os.Logger` with subsystem `com.domfahey.fsearch` and categories (daemon, panel, onboarding), so users can filter Console.app. No crash reporting service.
 - [ ] **"Report an Issue…" menu item:** opens a new GitHub issue pre-filled with the app version, macOS version, chip and daemon status, for the user to review. Nothing is sent automatically.
 - [x] **`LSApplicationCategoryType`** in Info.plist (`public.app-category.productivity`).
 - [x] **Release script verification:** `xcrun stapler validate` and `codesign --verify --deep --strict` on the finished DMG; publish SHA-256 checksums.
 - [x] **CI on the oldest supported macOS:** run the FSearchKit tests on the `macos-14` runner too. Today everything runs on macOS 26 with Apple silicon.
-- [ ] **Makefile:** `make lint`, `format`, `type`, `test`, `ui`, `coverage`, `bench`, matching the fsearch repo. CI calls the same targets.
-- [ ] **Lint in CI:** `swift format lint` with the repo's `.swift-format`, plus shellcheck and actionlint, and the `scripts/gen-credits.sh --check` drift check.
+- [x] **Makefile:** `make lint`, `format`, `type`, `test`, `ui`, `coverage`, `bench`, matching the fsearch repo. CI calls the same targets.
+- [x] **Lint in CI:** `swift format lint` with the repo's `.swift-format`, plus shellcheck and actionlint, and the `scripts/gen-credits.sh --check` drift check.
 - [ ] **Coverage gate in CI:** fail below 90%, and post a report on each pull request.
-- [ ] **ROADMAP.md:**
+- [x] **ROADMAP.md:**
   - the v2 search window;
   - clickable filter chips;
   - a possible Raycast extension;
@@ -26,7 +26,7 @@ Ideas and follow-ups not done yet. Most important first within each section. "Yo
 
 ## Found by benchmarks and cleanup
 
-- [ ] **PanelRows per keystroke:** mapping 52 rows takes about 75 µs, because each `row(at:)` re-runs `hasFallbacks`/`QuerySplit.hasContentKey` on the query. Compute it once per query. `scripts/bench.sh` (`keystroke.panelRows.50`) proves the gain.
+- [x] **PanelRows per keystroke** (FSearchKit done; SearchView must build `PanelRows` once per refresh to get the speedup): mapping 52 rows takes about 75 µs, because each `row(at:)` re-runs `hasFallbacks`/`QuerySplit.hasContentKey` on the query. Compute it once per query. `scripts/bench.sh` (`keystroke.panelRows.50`) proves the gain.
 - [ ] **Leaked test daemon:** if `swift test` is killed (SIGKILL, CI timeout), RealDaemon's `fsearch serve` stays running under launchd with its temp HOME. Kill stale `/private/tmp/fsk-*` daemons at test start, and have the fixture's daemon exit when its parent dies (a watchdog pipe).
 - [ ] **Re-record the benchmark baseline on a quiet machine:** the committed one is provisional (recorded under load). Run `scripts/bench.sh --record` after deleting this machine's entry in `bench/baseline.json`.
 - [ ] **CI benchmark baseline:** add a `ci-macos-26` entry from a CI artifact so the CI bench job can gate, not just report.
@@ -35,9 +35,9 @@ Ideas and follow-ups not done yet. Most important first within each section. "Yo
 
 - [ ] **Formatting:** commit a `.swift-format` config (4-space indent, 140 columns) and apply it repo-wide (143 style-only issues today). Do it in one commit with no other changes.
 - [ ] **Warnings as errors for our targets only:** set `SWIFT_TREAT_WARNINGS_AS_ERRORS` in project.yml for FSearch and the test targets. A command-line flag breaks KeyboardShortcuts, which builds with `-suppress-warnings`.
-- [ ] **Readable errors:** `DaemonError` has no `LocalizedError`, so the search log stores raw enum text (`daemon("bad regex")`), and one decode message says `tookUs` (a Swift name) instead of `took_us`. Tests label both as current-but-wrong.
-- [ ] **Reply ids:** DaemonClient never checks the `id` in replies; LineSocket would hand leftover buffered lines to the next request if the daemon ever sent two. Neither can happen with today's daemon, but checking ids makes it robust.
-- [ ] **Half-typed filters:** a content query like `foo size:` briefly sends an incomplete filter, and the daemon's error flashes under the field until the value is typed.
+- [x] **Readable errors:** `DaemonError` has no `LocalizedError`, so the search log stores raw enum text (`daemon("bad regex")`), and one decode message says `tookUs` (a Swift name) instead of `took_us`. Tests label both as current-but-wrong.
+- [x] **Reply ids:** DaemonClient never checks the `id` in replies; LineSocket would hand leftover buffered lines to the next request if the daemon ever sent two. Neither can happen with today's daemon, but checking ids makes it robust.
+- [x] **Half-typed filters:** a content query like `foo size:` briefly sends an incomplete filter, and the daemon's error flashes under the field until the value is typed.
 - [ ] **Small panel polish:**
   - the ⌘K menu opens at a fixed point instead of next to the selected row;
   - ⌘⌃Y also triggers Quick Look;
@@ -93,5 +93,5 @@ Ideas and follow-ups not done yet. Most important first within each section. "Yo
 
 - [ ] **App Intents:** a "Search files" action for Shortcuts.
 - [ ] **URL scheme:** `fsearch://search?q=…` opens the panel with a query.
-- [ ] **ARCHITECTURE.md:** a one-page map of the app, the daemon, the socket and the login item, for contributors.
+- [x] **ARCHITECTURE.md:** a one-page map of the app, the daemon, the socket and the login item, for contributors.
 - [ ] Stop duplicate CHANGELOG/About drift by generating more from one source if it grows.
