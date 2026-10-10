@@ -26,12 +26,18 @@ final class DaemonManager: ObservableObject {
         await refresh()
     }
 
+    /// A cancelled caller (e.g. a closed window) leaves the state alone.
     func refresh() async {
         for _ in 0..<50 {
+            if Task.isCancelled { return }
             do { state = .running(try await client.status()); return }
             catch DaemonError.indexing { state = .indexing; return }
-            catch { try? await Task.sleep(for: .milliseconds(200)) }
+            catch is CancellationError { return }
+            catch {
+                do { try await Task.sleep(for: .milliseconds(200)) } catch { return }
+            }
         }
+        if Task.isCancelled { return }
         state = .failed("The search helper isn't answering.")
     }
 

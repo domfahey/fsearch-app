@@ -37,6 +37,7 @@ struct MenuContent: View {
             Button("Search Log…") { openWindow(id: "log") }
             Divider()
         }
+        FinishSetupMenuItem(app: app)
         SettingsLink { Text("Settings…") }
         Button("Quit FSearch") { NSApp.terminate(nil) }
     }
