@@ -13,6 +13,8 @@ final class PanelController {
     private var session = PanelSession()
     private weak var app: AppState?
     private var selection = 0
+    /// The app that was in front when the panel opened, to hand focus back to.
+    private var previousApp: NSRunningApplication?
 
     final class Panel: NSPanel {
         override var canBecomeKey: Bool { true }
@@ -75,6 +77,8 @@ final class PanelController {
             p.setFrameOrigin(NSPoint(x: f.midX - 340, y: f.midY - 30 + f.height / 6))
         }
         panel = p
+        let front = NSWorkspace.shared.frontmostApplication
+        previousApp = front == NSRunningApplication.current ? nil : front
         NSApp.activate(ignoringOtherApps: true)
         p.makeKeyAndOrderFront(nil)
         Task { await app.search.refresh() }
@@ -86,8 +90,25 @@ final class PanelController {
         session.hidden(PanelState(query: app.search.query, mode: app.search.mode, selection: selection), at: Date())
         p.orderOut(nil)
         QuickLookSource.shared.close()
-        // Hiding the app hands focus back to whatever was in front before.
-        if returnFocus && NSApp.isActive { NSApp.hide(nil) }
+        guard returnFocus && NSApp.isActive else { return }
+        // Hiding the app hands focus back to whatever was in front before, but it
+        // would hide Settings, onboarding or a debug window too. With one of those
+        // up, give focus straight to the app the panel was summoned over (if it
+        // was another app and is still running); our windows stay where they were.
+        if Self.otherWindowsVisible(except: p) {
+            if let prev = previousApp, !prev.isTerminated { prev.activate() }
+        } else {
+            NSApp.hide(nil)
+        }
+        previousApp = nil
+    }
+
+    /// A regular window of ours is on screen: titled, not a panel (the launcher,
+    /// Quick Look) and not the menu-bar item's borderless window.
+    private static func otherWindowsVisible(except panel: NSWindow) -> Bool {
+        NSApp.windows.contains { w in
+            w !== panel && w.isVisible && !(w is NSPanel) && w.styleMask.contains(.titled)
+        }
     }
 
     private func perform(_ effect: PanelEffect, _ items: [ResultItem]) {
@@ -102,7 +123,7 @@ final class PanelController {
         case .hide: hide()
         case let .open(i):
             FileActions.open(items[i], editor: app.editor)
-            app.recents.opened(items[i].path)
+            app.openedRecent(items[i].path)
             hide()
         case let .reveal(i): FileActions.reveal(items[i].path); hide()
         case let .quickLook(i): FileActions.quickLook(items[i].path)

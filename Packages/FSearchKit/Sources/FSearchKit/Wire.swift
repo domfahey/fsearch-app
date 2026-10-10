@@ -41,6 +41,16 @@ public struct SearchReply: Decodable, Equatable, Sendable {
     public let tookUs: UInt64
     public let hits: [Hit]
     public init(tookUs: UInt64, hits: [Hit]) { (self.tookUs, self.hits) = (tookUs, hits) }
+
+    private enum CodingKeys: String, CodingKey { case tookUs, hits, files }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        // A grep:/regex:/sym: word in the query makes the daemon answer with lines.
+        if !c.contains(.hits) && c.contains(.files) {
+            throw DaemonError.badReply("got a content-search reply where file names were expected")
+        }
+        (tookUs, hits) = (try c.decode(UInt64.self, forKey: .tookUs), try c.decode([Hit].self, forKey: .hits))
+    }
 }
 
 public struct Match: Decodable, Equatable, Sendable {
@@ -94,5 +104,21 @@ public func decodeReply<T: Decodable>(_ line: Data, as: T.Type) throws -> T {
         throw msg.hasPrefix("indexing") ? DaemonError.indexing(msg) : DaemonError.daemon(msg)
     }
     do { return try dec.decode(T.self, from: line) }
+    catch let e as DaemonError { throw e }
+    catch let e as DecodingError { throw DaemonError.badReply(describe(e)) }
     catch { throw DaemonError.badReply(String(describing: error)) }
+}
+
+/// One short line for a reply that didn't have the expected shape.
+private func describe(_ e: DecodingError) -> String {
+    func at(_ c: DecodingError.Context) -> String {
+        let path = c.codingPath.map { $0.intValue.map(String.init) ?? $0.stringValue }.joined(separator: ".")
+        return path.isEmpty ? "" : " at \(path)"
+    }
+    switch e {
+    case let .keyNotFound(key, c): return "reply has no \"\(key.stringValue)\"" + at(c)
+    case let .typeMismatch(_, c), let .valueNotFound(_, c): return "unexpected value in reply" + at(c)
+    case let .dataCorrupted(c): return "unreadable reply" + at(c)
+    @unknown default: return "unreadable reply"
+    }
 }

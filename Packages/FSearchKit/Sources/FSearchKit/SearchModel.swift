@@ -54,7 +54,9 @@ public final class SearchModel {
         inflight?.cancel()
         inflight = nil
         let gen = generation, q = query, mode = self.mode
-        if q.trimmingCharacters(in: .whitespaces).isEmpty {
+        // Nothing to send: a blank query, the "?" cheat sheet, or a content
+        // query made only of filters (an empty pattern matches every line).
+        if Self.isBlank(q) || QuerySyntax.isCheatSheet(q) || (mode != .names && QuerySplit.split(q).pattern.isEmpty) {
             (items, phase, lastTookUs) = ([], .idle, nil)
             return
         }
@@ -78,19 +80,34 @@ public final class SearchModel {
         } catch {
             guard gen == generation else { return }
             (items, phase) = ([], .failed(.badReply(String(describing: error))))
+            report(q, mode, 0, nil, started, String(describing: error))
         }
+    }
+
+    /// A query with nothing but spaces searches nothing.
+    public nonisolated static func isBlank(_ q: String) -> Bool {
+        q.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     private func run(_ q: String, _ mode: SearchMode) async throws -> ([ResultItem], UInt64) {
         switch mode {
         case .names:
+            // grep:/regex:/sym: make the daemon answer with lines: run it as the content search it is.
+            if let c = QuerySplit.contentSearch(q) {
+                let r = try await content.grep(q: c.q, pattern: c.pattern, mode: c.mode)
+                return (lines(r), r.tookUs)
+            }
             let r = try await names.search(q, limit: 50)
             return (r.hits.map(ResultItem.file), r.tookUs)
         case .content, .symbols:
             let (pattern, filters) = QuerySplit.split(q)
             let r = try await content.grep(q: filters, pattern: pattern, mode: mode == .symbols ? .symbol : .literal)
-            return (r.files.flatMap { f in f.matches.map { ResultItem.line(path: f.path, match: $0) } }, r.tookUs)
+            return (lines(r), r.tookUs)
         }
+    }
+
+    private func lines(_ r: GrepReply) -> [ResultItem] {
+        r.files.flatMap { f in f.matches.map { ResultItem.line(path: f.path, match: $0) } }
     }
 
     private func report(_ q: String, _ mode: SearchMode, _ n: Int, _ took: UInt64?, _ started: Date, _ err: String?) {

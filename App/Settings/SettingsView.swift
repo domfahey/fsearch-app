@@ -5,7 +5,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var app: AppState
-    /// Editor.rawValue, "" = none. Task 11 reads the same key into AppState.editorChoice.
+    /// Editor.rawValue, "" = none: the same key as AppState.editorRaw (read as AppState.editor).
     @AppStorage("editor") private var editor = ""
     @Environment(\.dismissWindow) private var dismissWindow
 

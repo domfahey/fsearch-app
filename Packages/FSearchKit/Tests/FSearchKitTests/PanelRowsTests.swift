@@ -27,3 +27,15 @@ import Testing
         #expect(PanelRow.result(0).mode == nil)
     }
 }
+
+@Suite struct PanelRowsEdgeTests {
+    @Test func whitespaceOnlyQueryHasNoFallbacks() {
+        #expect(PanelRows.count(files: 0, query: "   ", mode: .names) == 0)
+    }
+    @Test func cheatSheetHasNoFallbacks() {
+        #expect(PanelRows.count(files: 0, query: "?", mode: .names) == 0)
+    }
+    @Test func contentKeyQueryHasNoFallbacks() {
+        #expect(PanelRows.count(files: 2, query: "grep:needle", mode: .names) == 2)
+    }
+}

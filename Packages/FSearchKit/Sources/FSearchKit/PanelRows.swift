@@ -15,10 +15,12 @@ public enum PanelRow: Equatable, Sendable {
 }
 
 /// The two "Use <query> with..." rows come after the files, so the keyboard
-/// reaches them: they exist only for a non-empty query in names mode.
+/// reaches them: they exist only for a non-blank query in names mode (the
+/// same blank check as SearchModel), not for the "?" cheat sheet, and not
+/// when the query already searches inside files (`grep:` and friends).
 public enum PanelRows {
-    static func hasFallbacks(query: String, mode: SearchMode) -> Bool {
-        mode == .names && !query.isEmpty
+    public static func hasFallbacks(query: String, mode: SearchMode) -> Bool {
+        mode == .names && !SearchModel.isBlank(query) && !QuerySyntax.isCheatSheet(query) && !QuerySplit.hasContentKey(query)
     }
 
     public static func count(files: Int, query: String, mode: SearchMode) -> Int {

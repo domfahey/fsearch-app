@@ -199,3 +199,74 @@ private func waitUntilStarted(_ b: some StartSignal) async throws {
         #expect(log.map(\.query) == ["new"], "the late reply to the old query is not reported")
     }
 }
+
+/// Records every call so tests can check what reached the daemon.
+final class RecordingBackend: SearchBackend, @unchecked Sendable {
+    private let lock = NSLock()
+    private var _calls: [String] = []
+    var calls: [String] { lock.withLock { _calls } }
+    var throwOther = false
+    func search(_ q: String, limit: Int) async throws -> SearchReply {
+        lock.withLock { _calls.append("search \(q)") }
+        if throwOther { throw CocoaError(.fileReadUnknown) }
+        return SearchReply(tookUs: 1, hits: [])
+    }
+    func grep(q: String, pattern: String, mode: GrepMode) async throws -> GrepReply {
+        lock.withLock { _calls.append("grep \(q)|\(pattern)|\(mode.rawValue)") }
+        let json = #"{"ok":true,"took_us":5,"source":"index","candidates":1,"read":1,"complete":true,"files":[{"path":"/r/g.txt","matches":[{"line":1,"text":"x"}]}]}"#
+        return try decodeReply(Data(json.utf8), as: GrepReply.self)
+    }
+    func status() async throws -> DaemonStatus { throw DaemonError.disconnected }
+    func ping() async throws {}
+}
+
+@MainActor @Suite struct SearchModelEdgeTests {
+    @Test func contentModeFilterOnlyIsIdle() async throws {
+        let hang = HangingBackend(hangingQuery: "slow")
+        let content = RecordingBackend()
+        let m = SearchModel(names: hang, content: content)
+        m.query = "slow"
+        let first = Task { await m.refresh() }
+        try await waitUntilStarted(hang)
+        m.mode = .content
+        m.query = "ext:rs in:~/x"
+        await m.refresh()
+        await first.value
+        #expect(hang.cancelled, "the search in flight is cancelled")
+        #expect(content.calls.isEmpty, "an empty pattern is never sent")
+        #expect(m.phase == .idle && m.items.isEmpty)
+        m.mode = .symbols
+        await m.refresh()
+        #expect(content.calls.isEmpty && m.phase == .idle)
+    }
+
+    @Test func namesModeWithGrepKeyRunsAContentSearch() async {
+        let names = RecordingBackend(), content = RecordingBackend()
+        let m = SearchModel(names: names, content: content)
+        m.query = "main regex:ne+dle"
+        await m.refresh()
+        #expect(names.calls.isEmpty)
+        #expect(content.calls == ["grep main|ne+dle|regex"])
+        #expect(m.phase == .results && m.items.first?.path == "/r/g.txt")
+    }
+
+    @Test func questionMarkShowsTheCheatSheetWithoutSearching() async {
+        let names = RecordingBackend()
+        let m = SearchModel(names: names, content: RecordingBackend())
+        m.query = "?"
+        await m.refresh()
+        #expect(names.calls.isEmpty && m.phase == .idle && m.items.isEmpty)
+    }
+
+    @Test func otherErrorsAreReportedToo() async {
+        let names = RecordingBackend()
+        names.throwOther = true
+        let m = SearchModel(names: names, content: RecordingBackend())
+        var log: [SearchModel.LogEntry] = []
+        m.onSearched = { log.append($0) }
+        m.query = "x"
+        await m.refresh()
+        guard case .failed(.badReply) = m.phase else { Issue.record("phase \(m.phase)"); return }
+        #expect(log.count == 1 && log[0].error != nil && log[0].resultCount == 0)
+    }
+}

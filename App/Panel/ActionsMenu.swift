@@ -12,7 +12,7 @@ enum ActionsMenu {
             let t = Target {
                 let errors = app.actionErrorCount
                 action()
-                if kind.recordsRecent { app.recents.opened(path) }
+                if kind.recordsRecent { app.openedRecent(path) }
                 // Like ↵: the user went to another app, so the launcher goes away,
                 // unless the action already failed and its error line needs reading.
                 if kind.hidesPanel(errored: app.actionErrorCount != errors) { PanelController.shared.hide() }
@@ -45,6 +45,7 @@ enum ActionsMenu {
         menu.addItem(entry("Move to Trash", .trash) {
             do {
                 try FileActions.trash(path)
+                app.recentsChanged()   // an empty query shows Recents: drop the trashed row
                 Task { await app.search.refresh() }
             } catch {
                 app.showActionError("Couldn't move to Trash: \(error.localizedDescription)")
