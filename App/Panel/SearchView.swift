@@ -15,14 +15,20 @@ struct SearchView: View {
     let onSelect: (Int) -> Void
 
     private var shown: [ResultItem] {
-        model.query.isEmpty && model.mode == .names
+        // Reading the generation makes a trash or open re-read the recents.
+        _ = app.recentsGeneration
+        return model.query.isEmpty && model.mode == .names
             ? app.recents.paths.map { .file(Hit(path: $0, kind: "file", size: 0, mtime: 0, score: 0)) }
             : model.items
     }
 
     private var rowCount: Int { PanelRows.count(files: shown.count, query: model.query, mode: model.mode) }
     /// Content and symbol rows highlight the pattern, not the filters.
-    private var highlightQuery: String { model.mode == .names ? model.query : QuerySplit.split(model.query).pattern }
+    private var highlightQuery: String {
+        if model.mode != .names { return QuerySplit.split(model.query).pattern }
+        return QuerySplit.contentSearch(model.query)?.pattern ?? model.query
+    }
+    private var showsLines: Bool { if case .line = shown.first { true } else { false } }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -51,8 +57,11 @@ struct SearchView: View {
                     if case .failed(.daemon) = model.phase {} else if let msg = UserMessage.forPhase(model.phase) {
                         Text(msg).foregroundStyle(.secondary).padding(16)
                     }
+                    if QuerySyntax.isCheatSheet(model.query) {
+                        cheatSheet
+                    }
                     if !shown.isEmpty {
-                        section(model.query.isEmpty ? "Recent" : (model.mode == .names ? "Files" : "Inside files"))
+                        section(model.query.isEmpty ? "Recent" : (showsLines ? "Inside files" : "Files"))
                         ForEach(Array(shown.enumerated()), id: \.element.id) { i, item in
                             ResultRow(item: item, query: highlightQuery, selected: i == state.selection)
                                 .onTapGesture(count: 2) { onEffect(.open(i), shown) }
@@ -60,7 +69,7 @@ struct SearchView: View {
                                 .draggable(URL(fileURLWithPath: item.path))
                         }
                     }
-                    if model.mode == .names && !model.query.isEmpty {
+                    if PanelRows.hasFallbacks(query: model.query, mode: model.mode) {
                         section("Use “\(model.query)” with…")
                         fallback("Search inside files", "doc.text.magnifyingglass", selected: state.selection == shown.count) { switchMode(.content) }
                         fallback("Find definitions", "function", selected: state.selection == shown.count + 1) { switchMode(.symbols) }
@@ -77,7 +86,7 @@ struct SearchView: View {
                     Text(err).foregroundStyle(.red).lineLimit(1).accessibilityIdentifier("actionError")
                 }
                 Spacer()
-                hint(model.mode == .names ? "Open" : "Open at line", "↵")
+                hint(showsLines ? "Open at line" : "Open", "↵")
                 hint("Reveal in Finder", "⌘↵")
                 hint("Actions", "⌘K")
             }
@@ -88,6 +97,21 @@ struct SearchView: View {
         .onAppear { focused = true }
         .onChange(of: state.selection) { onSelect(state.selection) }
         .onKeyPress(phases: .down) { press in handle(press) }
+    }
+
+    /// "?" in the field: the query syntax instead of results.
+    private var cheatSheet: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            section("Query syntax")
+            ForEach(QuerySyntax.cheatSheet, id: \.syntax) { row in
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    Text(row.syntax).font(.system(size: 13, design: .monospaced)).frame(width: 220, alignment: .leading)
+                    Text(row.meaning).foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 16).padding(.vertical, 3)
+            }
+        }
+        .accessibilityIdentifier("cheatSheet")
     }
 
     private func section(_ t: String) -> some View {
@@ -112,7 +136,7 @@ struct SearchView: View {
     }
 
     private func handle(_ press: KeyPress) -> KeyPress.Result {
-        state.query = model.query; state.mode = model.mode; state.count = rowCount
+        state.query = model.query; state.mode = model.mode; state.count = rowCount; state.files = shown.count
         let cmd = press.modifiers.contains(.command), shift = press.modifiers.contains(.shift), ctrl = press.modifiers.contains(.control)
         let key: PanelKey? = switch (press.key, cmd, shift, ctrl) {
         case (.upArrow, _, _, _), (KeyEquivalent("p"), false, false, true): .up

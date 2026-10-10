@@ -159,3 +159,14 @@ import Testing
         #expect(PanelKey.commandLetter("x", shift: false) == nil)
     }
 }
+
+@Suite struct CmdDigitFilesOnlyTests {
+    @Test func cmdDigitPastTheFilesIsIgnored() {
+        // Two files plus the two "use with..." rows: ⌘3 and ⌘4 don't switch mode.
+        var s = PanelState(query: "abc", count: 4, files: 2)
+        #expect(reduce(&s, .cmdDigit(2)) == .open(1))
+        #expect(reduce(&s, .cmdDigit(3)) == .none)
+        #expect(reduce(&s, .cmdDigit(4)) == .none)
+        #expect(s.mode == .names)
+    }
+}

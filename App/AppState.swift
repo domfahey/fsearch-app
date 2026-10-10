@@ -22,6 +22,16 @@ final class AppState: ObservableObject {
         get { Editor(rawValue: editorRaw) }
         set { editorRaw = newValue?.rawValue ?? "" }
     }
+    /// Bumped whenever the recents may have changed (a file opened or trashed),
+    /// so the panel re-reads `recents.paths`, which aren't observable themselves.
+    @Published private(set) var recentsGeneration = 0
+    func recentsChanged() { recentsGeneration += 1 }
+    /// Opening a file makes it a recent.
+    func openedRecent(_ path: String) {
+        recents.opened(path)
+        recentsChanged()
+    }
+
     /// One-line failure from a file action, shown in the panel footer for a few seconds.
     @Published var actionError: String?
     private var errorClear: Task<Void, Never>?

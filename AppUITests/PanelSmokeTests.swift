@@ -59,6 +59,8 @@ final class PanelSmokeTests: XCTestCase {
             }
             try FileManager.default.createDirectory(atPath: root + "/proj", withIntermediateDirectories: true)
             try "x".write(toFile: root + "/proj/heronfile.txt", atomically: true, encoding: .utf8)
+            // A name with an emoji and spaces, like the one ui-smoke.sh makes.
+            try "x".write(toFile: root + "/proj/🏡 a b.txt", atomically: true, encoding: .utf8)
             daemon.executableURL = URL(fileURLWithPath: bin)
             daemon.arguments = ["serve"]
             daemon.environment = ["HOME": home, "FSEARCH_ROOT": root]
@@ -69,7 +71,8 @@ final class PanelSmokeTests: XCTestCase {
         }
 
         let app = XCUIApplication()
-        app.launchArguments = ["-UITestShowPanel", "-FSEARCH_SOCKET", socket!]
+        // -debugMode NO: a test never writes to the user's real search log.
+        app.launchArguments = ["-UITestShowPanel", "-FSEARCH_SOCKET", socket!, "-debugMode", "NO"]
         app.launch()
         defer { app.terminate() }
         let field = app.textFields["searchField"]

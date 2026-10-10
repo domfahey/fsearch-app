@@ -62,3 +62,20 @@ import Testing
         #expect(throws: DaemonError.self) { try decodeReply(Data("not json".utf8), as: SearchReply.self) }
     }
 }
+
+@Suite struct WireReplyShapeTests {
+    @Test func grepReplyToANameSearchIsAClearError() {
+        let line = #"{"ok":true,"took_us":900,"source":"index","candidates":3,"read":3,"complete":true,"files":[]}"#
+        #expect(throws: DaemonError.badReply("got a content-search reply where file names were expected")) {
+            try decodeReply(Data(line.utf8), as: SearchReply.self)
+        }
+    }
+    @Test func missingFieldNamesTheField() {
+        do {
+            _ = try decodeReply(Data(#"{"ok":true,"took_us":1}"#.utf8), as: SearchReply.self)
+            Issue.record("decoded a reply with no hits")
+        } catch let DaemonError.badReply(msg) {
+            #expect(msg == #"reply has no "hits""#)
+        } catch { Issue.record("unexpected \(error)") }
+    }
+}
