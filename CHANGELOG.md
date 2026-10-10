@@ -35,9 +35,16 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
 - A Makefile for common tasks (`make test`, `lint`, `type`, `bench`, `check`) and a `.swift-format` style config.
 - CI runs the FSearchKit tests on macOS 14 (Xcode 16.2) and macOS 26 (Xcode 26.6), builds the universal app, lints the scripts and workflows, and reports benchmarks.
 - Open-source project files: contributing guide, security policy, code of conduct, architecture overview, issue and pull request templates, CODEOWNERS, and Dependabot for GitHub Actions.
+- Documentation ([docs/README.md](docs/README.md)): a first-search tutorial, how-to guides, reference pages (keyboard shortcuts, query syntax, settings, files and locations, troubleshooting, FAQ), architecture decision records, install and uninstall guides, a privacy policy ([PRIVACY.md](PRIVACY.md)), support ([SUPPORT.md](SUPPORT.md)) and a roadmap ([ROADMAP.md](ROADMAP.md)).
+
+### Changed
+
+- Errors from the search daemon read as plain sentences (for example "Can't reach the search daemon"), in the panel and in the debug Search Log, and decode errors name the daemon's own field names.
 
 ### Fixed
 
+- While a filter value is still being typed (for example `foo size:`), the panel keeps the current results instead of sending an incomplete query and flashing an error.
+- The client checks the id on every reply from the daemon, so a stray or late line can never be shown as the answer to a different search.
 - In content search, a filter key with no value yet (for example `ext:`) is treated as a filter, as the daemon does, instead of as search text.
 - After a failed search, the debug footer no longer shows the previous search's timing.
 

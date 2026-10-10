@@ -19,12 +19,12 @@ Follow-ups not done yet, grouped by priority. "You" items need the maintainer: a
 
 ## P1: tests and benchmarks
 
-- [x] **Leaked test daemon:** if `swift test` is killed (SIGKILL, CI timeout), RealDaemon's `fsearch serve` stays running under launchd with its temp HOME. Fixed: a watchdog pipe kills it when the test process dies, and orphans are swept at start.
 - [ ] **Re-record the benchmark baseline on a quiet machine:** the committed one is provisional (recorded under load). Delete this machine's entry in `bench/baseline.json`, then `scripts/bench.sh --record`.
 - [ ] **CI benchmark baseline:** add a `ci-macos-26` entry from a CI artifact so the CI bench job can gate, not just report.
 
 ## P2: code quality and polish
 
+- [ ] **Docs best-practice pass:** README points to the docs index; troubleshooting shows the new error texts; query syntax explains that half-typed filters wait; ARCHITECTURE mentions reply ids; a Markdown link check in CI. *(In progress.)*
 - [ ] **Small panel polish:**
   - the ⌘K menu opens at a fixed point instead of next to the selected row;
   - ⌘⌃Y also triggers Quick Look;
@@ -64,7 +64,6 @@ Follow-ups not done yet, grouped by priority. "You" items need the maintainer: a
 
 ## You: before announcing
 
-- [ ] Push the unreleased work to `main`: the public page doesn't credit fsearch or show the new docs until then.
 - [ ] Open a friendly issue on noahdunnagan/fsearch about the app, the name "FSearch for Mac", and the plan to offer it upstream.
 - [ ] **App icon:** original, with light and dark variants. No Raycast or other third-party assets.
 - [ ] Screenshots and a short demo GIF for the README (light and dark).
@@ -81,6 +80,8 @@ Follow-ups not done yet, grouped by priority. "You" items need the maintainer: a
 
 ## Done
 
+- [x] Unreleased work pushed to `main`: the public page credits fsearch and has the docs.
+- [x] Leaked test daemon: a watchdog pipe kills it when the test process dies, and orphans are swept at start.
 - [x] Repo made public, with a description crediting fsearch and its inspirations, and topics.
 - [x] Docs following Diátaxis: index, first-search tutorial, how-to guides, reference (shortcuts, query syntax, settings, files, troubleshooting, FAQ) and ADRs 0001–0006.
 - [x] PRIVACY.md (fsearch itself has no network code), SUPPORT.md, ROADMAP.md, docs/install.md (Gatekeeper, first run, why not the App Store), docs/uninstall.md.
@@ -91,5 +92,5 @@ Follow-ups not done yet, grouped by priority. "You" items need the maintainer: a
 - [x] Makefile, `.swift-format` config, and CI lint job (credits drift, scripts, workflows, swift-format report-only).
 - [x] Readable daemon errors and reply id checks.
 - [x] PanelRows built once per query in FSearchKit; half-typed filters wait for their value.
-- [x] Changelog audited against git history.
+- [x] Changelog audited against git history (twice; latest covers readable errors, reply ids, half-typed filters and the docs).
 - [x] Dependabot `cooldown` checked against GitHub's options reference.
