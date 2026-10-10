@@ -68,7 +68,6 @@ Follow-ups not done yet, grouped by priority. "You" items need the maintainer: a
 
 ## You: before announcing
 
-- [ ] Open a friendly issue on noahdunnagan/fsearch about the app, the name "FSearch for Mac", and the plan to offer it upstream.
 - [ ] **App icon:** original, with light and dark variants. No Raycast or other third-party assets.
 - [ ] Screenshots and a short demo GIF for the README (light and dark).
 
@@ -84,6 +83,7 @@ Follow-ups not done yet, grouped by priority. "You" items need the maintainer: a
 
 ## Done
 
+- [x] Told the fsearch maintainer: https://github.com/noahdunnagan/fsearch/issues/18 (name, upstream, three daemon changes). Follow up on the reply.
 - [x] Unreleased work pushed to `main`: the public page credits fsearch and has the docs.
 - [x] Leaked test daemon: a watchdog pipe kills it when the test process dies, and orphans are swept at start.
 - [x] Repo made public, with a description crediting fsearch and its inspirations, and topics.
