@@ -6,7 +6,7 @@ import Testing
 
 extension AppTests {
     @Suite @MainActor
-    struct UpdaterTests {
+    struct UpdateReminderDriverTests {
         @Test func notStartedWithThePlaceholderKey() {
             #expect(!Updater.isConfigured)
             #expect(Updater.controller == nil)
