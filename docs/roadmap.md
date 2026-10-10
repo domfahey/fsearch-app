@@ -8,13 +8,16 @@ Nothing has been released yet. Version 0.1.0 will be the first release. See the 
 
 The launcher panel, opened with a shortcut. It searches by name, inside files, and for definitions. It includes the query filters, recent files, the actions menu, and debug mode.
 
+Also in v1:
+
+- App commands in the panel ("settings" opens Settings).
+- Open FSearch at login.
+- An in-app uninstall button. See [Uninstall](uninstall.md).
+- Unified logging.
+- Report an Issue in the Help menu.
+
 ## Next
 
-- App commands in the panel, with a Settings screen.
-- Launch FSearch itself at login.
-- An in-app uninstall button. Until then, see [docs/uninstall.md](uninstall.md).
-- Unified logging.
-- A Report an Issue action in the app.
 - Accessibility and localization.
 
 ## v2: an Everything-style search window

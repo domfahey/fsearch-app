@@ -19,7 +19,11 @@ Press a hotkey, type, and find any file by name or by what is inside it. FSearch
 - Recent files when the query is empty. Reopen the panel within 60 seconds to resume.
 - Actions: open, open at a line in your editor, reveal, Quick Look, copy, open with, move to Trash, and drag a result out.
 - Four-step onboarding, with a warning if another launcher holds your hotkey.
+- App commands in the panel: type `settings` (or `prefs`) to get to Settings.
+- Settings for the hotkey, the editor for content results, Open FSearch at login, and an in-app uninstall ("Remove Background Helper and Data…").
+- A quiet menu-bar reminder when Full Disk Access is off, and a Help menu with Report an Issue… (a pre-filled GitHub report without paths or queries).
 - Debug mode with Index Details, a local Search Log and timings.
+- Updates through Sparkle, once a release is signed, shown as a quiet menu-bar reminder.
 - Works alongside the fsearch CLI: it never stops or replaces a daemon it did not start.
 
 ## Requirements
@@ -76,7 +80,8 @@ Run these from the repository root. `make help` lists every task.
 | Build with warnings as errors | `make type` |
 | Run the benchmarks | `make bench` |
 | Lint, type and test together | `make check` |
-| Run the panel UI smoke test (needs a logged-in GUI session and accessibility permission, so not in CI) | `make ui` |
+| Run the end-to-end UI tests (needs a logged-in GUI session and accessibility permission, so not in CI) | `make ui` |
+| Coverage of both app suites (unit and UI tests) merged, plus FSearchKit. The full number needs a GUI session; CI gates the unit tests alone | `make coverage` |
 
 The raw commands are `scripts/build-daemon.sh`, `xcodegen generate`, then:
 
@@ -93,7 +98,8 @@ and `cd Packages/FSearchKit && swift test`. Tests never touch your real index; s
 | Path | What it holds |
 |---|---|
 | `App/` | The app: panel, actions, daemon manager, onboarding, settings, debug views, updater |
-| `AppUITests/` | UI smoke test for the panel |
+| `AppTests/` | The app's unit tests, hosted in the app with fakes for the daemon, login items and Trash, and windows that never show (run in CI) |
+| `AppUITests/` | End-to-end UI tests: the panel, keys, actions, Settings and the menu-bar item against a throwaway daemon (`make ui`, needs a GUI session) |
 | `Packages/FSearchKit/` | Core logic and its unit and integration tests |
 | `scripts/` | Daemon build, release, benchmark, UI smoke and docs check scripts |
 | `bench/` | Benchmark baseline and notes |
