@@ -93,3 +93,7 @@ A Homebrew cask is planned for after the first release. It will point at the rel
 
 - [Changelog](../CHANGELOG.md)
 - [Contributing](../CONTRIBUTING.md)
+
+## CI release job (environment approval, provenance)
+
+CI release flow. Push a tag only on a commit of `main` (the job refuses any other tag). The `release` job waits for approval of the `release` environment, builds the daemon first with `cargo build --locked` on the pinned Rust toolchain (`RUST_TOOLCHAIN` in `ci.yml`), then unlocks the signing keychain, signs and notarizes, writes a build provenance attestation, and creates a draft GitHub release with the DMG, `.sha256` and `.intoto.jsonl` attestation bundle. XcodeGen is installed by `scripts/install-xcodegen.sh` from a pinned, checksum-verified release, and Swift packages resolve from the committed `Package.resolved`; when you bump a dependency or the toolchain, update those pins (and `Package.resolved`) in their own reviewed commit. Check on the downloaded DMG that `shasum -a 256 -c FSearch-<version>.dmg.sha256` and `gh attestation verify FSearch-<version>.dmg -R domfahey/fsearch-app` pass, then publish the draft.

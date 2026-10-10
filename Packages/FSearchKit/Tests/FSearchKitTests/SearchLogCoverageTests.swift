@@ -171,3 +171,50 @@ import Testing
         #expect(try String(contentsOf: s.file, encoding: .utf8).split(separator: "\n").count <= 2 * cap)
     }
 }
+
+@Suite struct SearchLogPermissionTests {
+    func mode(_ url: URL) -> Int {
+        let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
+        return (attrs?[.posixPermissions] as? NSNumber)?.intValue ?? -1
+    }
+    func excluded(_ url: URL) -> Bool {
+        (try? url.resourceValues(forKeys: [.isExcludedFromBackupKey]))?.isExcludedFromBackup ?? false
+    }
+    func entry(_ q: String) -> SearchModel.LogEntry {
+        SearchModel.LogEntry(query: q, mode: .names, resultCount: 0, tookUs: nil, roundTripMs: 0, error: nil)
+    }
+
+    @Test func folderIs0700AndFileIs0600AndBothSkipBackup() {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("fsk-logperm-\(UUID())", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = dir.appendingPathComponent("logs/searches.jsonl")
+        let log = SearchLog(file: file)
+        log.append(entry("a"), at: Date())
+        #expect(mode(file.deletingLastPathComponent()) == 0o700)
+        #expect(mode(file) == 0o600)
+        #expect(excluded(file.deletingLastPathComponent()))
+        #expect(excluded(file))
+    }
+
+    @Test func compactKeepsTheFilePrivate() {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("fsk-logperm-\(UUID())", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = dir.appendingPathComponent("searches.jsonl")
+        let log = SearchLog(file: file, cap: 2)
+        for i in 0..<6 { log.append(entry("q\(i)"), at: Date()) }  // 5 > 2*cap lines: compacted
+        #expect(log.entries().map(\.query) == ["q4", "q5"])
+        #expect(mode(file) == 0o600)
+        #expect(excluded(file))
+    }
+
+    @Test func anExistingLooseFolderAndFileAreTightened() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("fsk-logperm-\(UUID())", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o755])
+        let file = dir.appendingPathComponent("searches.jsonl")
+        FileManager.default.createFile(atPath: file.path, contents: Data(), attributes: [.posixPermissions: 0o644])
+        SearchLog(file: file).append(entry("a"), at: Date())
+        #expect(mode(dir) == 0o700)
+        #expect(mode(file) == 0o600)
+    }
+}

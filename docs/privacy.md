@@ -17,7 +17,7 @@ The daemon can only index what macOS lets it read. See [Full Disk Access](#full-
 
 ## Debug search log
 
-Debug mode is off by default. It is turned on in Settings, or with Turn On Debug Mode in the menu bar (⌥⌘D).
+Debug mode is off by default. It is turned on in Settings, or with Turn On Debug Mode in the menu bar (⌥⌘D, which works while the menu-bar menu is open).
 
 While debug mode is on, FSearch writes one line for each search it runs in the panel. Each line has the time, the query, the search mode, the number of results, and the timings. Your search text is in the log.
 
@@ -25,6 +25,11 @@ While debug mode is on, FSearch writes one line for each search it runs in the p
 - It only records searches from this app. It does not record searches from the fsearch CLI or other apps.
 - Turning debug mode off deletes the log.
 - Clear Log, in the Search Log window, empties it at any time.
+- The log folder is readable only by your account (mode 0700), the file is private to you (0600), and both are left out of Time Machine backups.
+
+## Known limitations
+
+The index and the daemon's socket live in your account's data folder and are not encrypted. Other programs running as your macOS user may be able to read the index files or reach the daemon, which holds any Full Disk Access you granted. Programs running as other users cannot. FSearch does not add its own protection on top of macOS file permissions here. This is tracked with the upstream fsearch project, and these notes will be updated when it is addressed. If this matters to you, skip Full Disk Access, keep the Mac's accounts separate, and remove the index with the steps in [uninstall.md](uninstall.md) when you no longer need it.
 
 ## Nothing leaves your Mac
 

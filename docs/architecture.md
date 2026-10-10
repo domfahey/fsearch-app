@@ -59,6 +59,10 @@ The app restarts only a daemon it registered (`ownsDaemon`: not test mode and ou
 
 `DaemonManager.state` is `checking`, `running`, `indexing`, `needsApproval` or `failed`. [`MenuBarStatus`](../App/Errors/MenuBarStatus.swift) maps it, plus the skip flag, through `MenuBarWarning.evaluate` to the menu-bar symbol and a message. Failure and approval offer "Fix…", which opens Index Details; missing Full Disk Access is only a reminder. [`DaemonMessageLine`](../App/Errors/DaemonMessageLine.swift) shows the same problems in the panel and drives recovery checks and restarts.
 
+## Security notes
+
+The daemon runs with the Full Disk Access you grant it and answers over a local socket in your user account's data folder. At present the daemon does not verify which program is on the other end of that socket, so other programs that run as the same macOS user may be able to use it. The index is also stored in that folder as ordinary files readable by your account. This matches the trust boundary in [SECURITY.md](../.github/SECURITY.md): a program already running as you can read your files anyway, but the daemon's Full Disk Access reaches folders that program could not otherwise open. Peer verification is an open request to the upstream fsearch project; the app does not work around it.
+
 ## Debug mode
 
 `debugMode` (menu item or Settings, `DebugMode.set`) adds Index Details and Search Log windows, an orange dot in the panel, and per-search timing. `SearchModel.onSearched` feeds `SearchLog` only while it is on; turning it off deletes the log and closes both windows.

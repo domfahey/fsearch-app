@@ -13,8 +13,8 @@
 #                                       --kit-only and in the default (both suites) mode, not with
 #                                       --unit-only (CI's kit job gates FSearchKit already) or --reuse.
 #
-# Both suites need a logged-in GUI session and nobody using the Mac: the UI
-# tests synthesize keystrokes, and the unit-test host opens (unfocused) windows.
+# The UI tests need a logged-in GUI session and nobody using the Mac, since they
+# synthesize keystrokes. The unit-test host is inert: no window becomes key or visible.
 # Output goes to build/coverage/ (COVERAGE_OUT overrides).
 #
 # "Excluding system adapters" leaves out the functions in EXCLUDE below:
@@ -91,7 +91,9 @@ if [ "$mode" = both ] && [ -n "$MIN" ]; then kit_coverage || rc=1; fi
 if [ "$mode" != reuse ]; then
   rm -rf "$UNIT"
   echo "== AppTests (unit)"
+  # In CI the packages must come from the committed Package.resolved (scripts/generate-project.sh).
   xcodebuild test -project FSearch.xcodeproj -scheme FSearch -derivedDataPath build \
+    ${CI:+-onlyUsePackageVersionsFromResolvedFile} \
     -only-testing:AppTests -enableCodeCoverage YES -resultBundlePath "$UNIT" > "$OUT/unit.log" 2>&1 || rc=1
   grep -E 'Test run with|error:|\*\* TEST' "$OUT/unit.log" | sort -u
   if [ "$mode" = both ]; then

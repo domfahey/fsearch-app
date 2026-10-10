@@ -52,13 +52,19 @@ rm -rf "$OUT"; mkdir -p "$OUT"
 STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT
 
-scripts/build-daemon.sh
-xcodegen generate
+# CI builds the daemon before it imports the signing keychain and sets FSEARCH_PREBUILT=1,
+# so third-party build scripts never run while the Developer ID key is unlocked.
+if [ "${FSEARCH_PREBUILT:-}" = 1 ]; then
+  [ -x Vendor/fsearch ] || fail "FSEARCH_PREBUILT=1 but Vendor/fsearch is missing (run scripts/build-daemon.sh first)"
+else
+  scripts/build-daemon.sh
+fi
+scripts/generate-project.sh
 # Archive ad-hoc signed; the Developer ID signature is applied below, inside-out,
 # by hand. That keeps team/profile settings out of the project and makes this
 # script the single place that decides how every nested binary is signed.
 xcodebuild -project FSearch.xcodeproj -scheme FSearch -configuration Release \
-  -archivePath "$OUT/FSearch.xcarchive" \
+  -archivePath "$OUT/FSearch.xcarchive" -onlyUsePackageVersionsFromResolvedFile \
   MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD" \
   CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO archive
 APP="$OUT/FSearch.xcarchive/Products/Applications/FSearch.app"
@@ -86,9 +92,17 @@ BUILT_VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" "$APP/Content
 sign "$SV/Autoupdate"
 sign "$SV/Updater.app"
 sign "$SPARKLE"
-sign "$APP/Contents/Helpers/fsearch"
+sign --identifier com.domfahey.fsearch.daemon "$APP/Contents/Helpers/fsearch"
 sign --entitlements "$ENTITLEMENTS" "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"
+
+# No nested binary may carry an entitlement that weakens the hardened runtime.
+BAD_ENT='com.apple.security.get-task-allow|com.apple.security.cs.allow-jit|com.apple.security.cs.disable-library-validation|com.apple.security.cs.allow-dyld-environment-variables'
+while IFS= read -r -d '' f; do
+  file -b "$f" | grep -q 'Mach-O' || continue
+  ENTS=$(codesign -d --entitlements - --xml "$f" 2>/dev/null || true)
+  if grep -Eq "$BAD_ENT" <<<"$ENTS"; then fail "forbidden entitlement in $f"; fi
+done < <(find "$APP" -type f -print0)   # includes the app's own executable
 
 # DMG with the app and an /Applications symlink for drag-install.
 DMG="$OUT/FSearch-$VERSION.dmg"
