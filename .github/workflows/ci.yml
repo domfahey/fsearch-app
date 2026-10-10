@@ -100,6 +100,10 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 60
     environment: release
+    env:
+      # release.sh resolves and archives in this derived-data folder; the steps below
+      # resolve into it before the keychain exists.
+      RELEASE_DERIVED_DATA: build/release-derived
     concurrency:
       group: release
       cancel-in-progress: false
@@ -111,9 +115,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # release.sh numbers the build from the full history (git rev-list --count),
-          # and the next step needs origin/main.
+          # release.sh numbers the build from the full history (git rev-list --count) and
+          # checks it against the previous v* tag's; the next step needs origin/main.
           fetch-depth: 0
+          fetch-tags: true
           persist-credentials: false
       - name: Refuse a tag that is not on main
         run: |
@@ -128,6 +133,19 @@ jobs:
       # Build the daemon before the signing keychain exists: its third-party crates'
       # build scripts must never run while codesign access to the Developer ID key is unlocked.
       - run: scripts/build-daemon.sh
+      # Likewise generate the project, resolve the Swift packages (only the versions in the
+      # committed Package.resolved) and archive the app before the keychain exists. After
+      # it, release.sh --sign only signs, notarizes and packages: nothing is fetched or built.
+      - run: scripts/generate-project.sh
+      - name: Resolve Swift packages
+        run: >
+          xcodebuild -resolvePackageDependencies -project FSearch.xcodeproj -scheme FSearch
+          -derivedDataPath "$RELEASE_DERIVED_DATA" -onlyUsePackageVersionsFromResolvedFile
+      - name: Build the release archive (unsigned)
+        env:
+          FSEARCH_PREBUILT: '1'
+          FSEARCH_PROJECT_READY: '1'
+        run: scripts/release.sh --prepare
       - name: Import signing certificate
         env:
           CERT_P12_BASE64: ${{ secrets.DEVELOPER_ID_CERT_P12_BASE64 }}
@@ -163,12 +181,11 @@ jobs:
           xcrun notarytool store-credentials fsearch-notary \
             --key "$KEYFILE" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" \
             --keychain "$KEYCHAIN"
-      - name: Build, sign, notarize
+      - name: Sign, notarize, package
         env:
           DEVELOPER_ID: ${{ secrets.DEVELOPER_ID }}
-          # The daemon was built above, before the keychain existed.
-          FSEARCH_PREBUILT: '1'
-        run: scripts/release.sh
+        # Signs the archive built above, before the keychain existed; builds nothing.
+        run: scripts/release.sh --sign
       - name: Attest build provenance
         id: attest
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
