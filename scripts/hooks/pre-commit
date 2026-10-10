@@ -1,15 +1,25 @@
 #!/bin/bash
 # Blocks commits that stage key files or secret-looking content. It checks the
 # staged blob (`git show ":$f"`), not the working-tree file, so `git add -p` and
-# edits after staging cannot slip a secret past it.
+# edits after staging cannot slip a secret past it. A staged file that can't be
+# written out blocks the commit rather than going unchecked.
 root=$(git rev-parse --show-toplevel)
 files=()
 while IFS= read -r -d '' f; do files+=("$f"); done < <(git diff --cached --name-only -z --diff-filter=ACMR)
 [ ${#files[@]} -eq 0 ] && exit 0
-tmp=$(mktemp -d) || exit 1
+tmp=$(mktemp -d) || { echo "secret check: cannot create a scratch directory" >&2; exit 1; }
 trap 'rm -rf "$tmp"' EXIT
+fail=0
+check=()
 for f in "${files[@]}"; do
-  mkdir -p "$tmp/$(dirname "$f")"
-  git show ":$f" > "$tmp/$f" 2>/dev/null || true
+  # A submodule entry (mode 160000) is a commit, not a file.
+  case "$(git ls-files -s -- "$f")" in 160000\ *) continue ;; esac
+  if ! { mkdir -p "$tmp/$(dirname "$f")" && git show ":$f" > "$tmp/$f"; }; then
+    echo "secret check: could not write the staged $f to check it" >&2; fail=1; continue
+  fi
+  check+=("$f")
 done
-cd "$tmp" && exec "$root/scripts/hooks/check-secrets.sh" "${files[@]}"
+if [ ${#check[@]} -gt 0 ]; then
+  (cd "$tmp" && "$root/scripts/hooks/check-secrets.sh" "${check[@]}") || fail=1
+fi
+exit $fail
