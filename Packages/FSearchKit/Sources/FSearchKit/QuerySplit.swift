@@ -33,13 +33,14 @@ public enum QuerySplit {
     public static func unquoted(_ word: String) -> String { word.replacingOccurrences(of: "\"", with: "") }
 
     /// A name query holding `grep:`/`content:`/`regex:`/`sym:`/`symbol:` is a
-    /// content search: that word's value is the pattern (the last one wins,
+    /// content search: that word's value is the pattern (possibly empty; the last one wins,
     /// as in the daemon) and the other words pick the files.
     public static func contentSearch(_ query: String) -> (q: String, pattern: String, mode: GrepMode)? {
         var rest: [String] = [], found: (String, GrepMode)?
         for word in words(query) {
             let plain = unquoted(word)
-            if let colon = plain.firstIndex(of: ":"), let mode = contentKeys[String(plain[..<colon])], plain.index(after: colon) < plain.endIndex {
+            // An empty value counts too: the daemon still runs a content search for it.
+            if let colon = plain.firstIndex(of: ":"), let mode = contentKeys[String(plain[..<colon])] {
                 found = (String(plain[plain.index(after: colon)...]), mode)
             } else {
                 rest.append(word)

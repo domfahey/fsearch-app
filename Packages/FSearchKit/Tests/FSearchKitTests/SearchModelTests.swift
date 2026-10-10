@@ -240,6 +240,23 @@ final class RecordingBackend: SearchBackend, @unchecked Sendable {
         #expect(content.calls.isEmpty && m.phase == .idle)
     }
 
+    @Test func namesModeEmptyContentKeyIsIdle() async throws {
+        let hang = HangingBackend(hangingQuery: "slow")
+        let content = RecordingBackend()
+        let m = SearchModel(names: hang, content: content)
+        m.query = "slow"
+        let first = Task { await m.refresh() }
+        try await waitUntilStarted(hang)
+        for q in ["grep:", #"grep:"""#, "main regex:", "sym:"] {
+            m.query = q
+            await m.refresh()
+            #expect(m.phase == .idle && m.items.isEmpty, "\(q) waits for a pattern")
+        }
+        await first.value
+        #expect(hang.cancelled, "the search in flight is cancelled")
+        #expect(content.calls.isEmpty, "an empty pattern is never sent")
+    }
+
     @Test func namesModeWithGrepKeyRunsAContentSearch() async {
         let names = RecordingBackend(), content = RecordingBackend()
         let m = SearchModel(names: names, content: content)

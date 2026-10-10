@@ -72,8 +72,18 @@ import Testing
     }
     @Test func noKeyNoContentSearch() {
         #expect(QuerySplit.contentSearch("main.rs ext:rs") == nil)
-        #expect(QuerySplit.contentSearch("grep:") == nil)
         #expect(QuerySplit.contentSearch("std::grep") == nil)
+    }
+}
+
+@Suite struct EmptyContentKeyTests {
+    // The daemon treats an empty-valued content key as a content search too.
+    @Test func emptyValueStillCountsAsTheKey() {
+        let c = QuerySplit.contentSearch("main grep:")
+        #expect(c?.pattern == "" && c?.mode == .literal && c?.q == "main")
+        #expect(QuerySplit.contentSearch(#"grep:"""#)?.pattern == "")
+        #expect(QuerySplit.contentSearch("regex:")?.mode == .regex)
+        #expect(QuerySplit.contentSearch("sym:")?.mode == .symbol)
     }
 }
 

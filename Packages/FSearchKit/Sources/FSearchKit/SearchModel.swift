@@ -55,8 +55,9 @@ public final class SearchModel {
         inflight = nil
         let gen = generation, q = query, mode = self.mode
         // Nothing to send: a blank query, the "?" cheat sheet, or a content
-        // query made only of filters (an empty pattern matches every line).
-        if Self.isBlank(q) || QuerySyntax.isCheatSheet(q) || (mode != .names && QuerySplit.split(q).pattern.isEmpty) {
+        // query made only of filters, or a name query whose grep:/sym: has no
+        // value yet (an empty pattern matches every line).
+        if Self.isBlank(q) || QuerySyntax.isCheatSheet(q) || Self.emptyPattern(q, mode) {
             (items, phase, lastTookUs) = ([], .idle, nil)
             return
         }
@@ -82,6 +83,10 @@ public final class SearchModel {
             (items, phase) = ([], .failed(.badReply(String(describing: error))))
             report(q, mode, 0, nil, started, String(describing: error))
         }
+    }
+
+    private static func emptyPattern(_ q: String, _ mode: SearchMode) -> Bool {
+        mode == .names ? QuerySplit.contentSearch(q)?.pattern.isEmpty == true : QuerySplit.split(q).pattern.isEmpty
     }
 
     /// A query with nothing but spaces searches nothing.
