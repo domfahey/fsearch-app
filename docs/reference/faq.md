@@ -52,11 +52,11 @@ Search inside files reads text and code files only. It does not read PDF, Word (
 
 ## Why can't it find a file with an accent in its name?
 
-Matching ignores case for the letters A to Z only, and FSearch does not normalize Unicode. A name stored in one form of an accented letter may not match the same letter typed in the other form. Try the part of the name before or after the accented letter. See [Known limitations](limitations.md#case-folding-and-accented-names).
+Matching ignores case for the letters A to Z only, so `É` and `é` may not match. Accented names are found in both Unicode forms, so `café` finds a file that a Mac app stored in the other form. See [Known limitations](limitations.md#case-folding-and-accented-names).
 
 ## Why do I only see 50 results?
 
-The panel asks for up to 50 results. Add words or filters such as `ext:` or `in:` to narrow the list. See [Known limitations](limitations.md#the-50-result-cap).
+Name searches return up to 50 results. To get more, add `limit:`, such as `limit:200`. The panel shows at most 1000. You can also add words or filters such as `ext:` or `in:` to narrow the list. See [Known limitations](limitations.md#the-50-result-cap).
 
 ## Does it search external drives?
 

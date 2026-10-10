@@ -15,13 +15,13 @@ PDF, Word (`.docx`) and Pages files are not read. They are still found by name. 
 
 ## Case folding and accented names
 
-Name search ignores case for the letters A to Z only. It does not fold case for other letters, such as `É` and `é`.
+Name search ignores case for the letters A to Z only. It does not fold case for other letters, such as `É` and `é`, so they may not match.
 
-It also does not normalize Unicode. macOS can store an accented letter in two forms: one character, or a letter plus a combining mark. A name stored in one form may not match the same text typed in the other form. If an accented name is not found, search for the part of the name without the accented letter.
+Accented names are found in both forms. macOS can store an accented letter as one character or as a letter plus a combining mark. When a name query has an accented letter, the panel also searches the other form and merges the results. So `café` finds a file that a Mac app stored in either form.
 
 ## The 50-result cap
 
-The panel asks for up to 50 results. In name search, `limit:` has no effect today, because the panel sends its own limit. In a search inside files, `limit:` limits how many files are returned. To see fewer, narrower results, add words or filters such as `ext:` and `in:`.
+Name searches return up to 50 results. Add `limit:` to ask for more or fewer, for example `invoice limit:200`. The panel shows at most 1000 results. In a search inside files, `limit:` limits how many files are returned. To see fewer, narrower results, add words or filters such as `ext:` and `in:`.
 
 ## The 250 ms budget for content search
 

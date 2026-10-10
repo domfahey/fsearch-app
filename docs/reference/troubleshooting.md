@@ -86,10 +86,10 @@ Search inside files reads only text and code files up to 1 MB under your home fo
 | Check | What to do |
 |---|---|
 | The file is in Desktop, Documents, Downloads, Mail or iCloud Drive | Turn on Full Disk Access. See [Grant Full Disk Access](../how-to/grant-full-disk-access.md). |
-| The name has accented letters | Matching folds case for A to Z only and does not normalize Unicode. Search for a part of the name without the accented letter. See [Known limitations](limitations.md#case-folding-and-accented-names). |
+| The name has accented letters | Accented names are found in both Unicode forms. Case folding covers A to Z only, so `É` and `é` may not match. If the name is still not found, search for a part of it without the accented letter. See [Known limitations](limitations.md#case-folding-and-accented-names). |
 | The file was only just created | Wait a moment and search again. The daemon watches for changes, and Index Details shows pending changes. |
 | The file is on an external drive | External drives are untested and probably not indexed. See [Known limitations](limitations.md). |
-| There are more than 50 matches | The panel shows 50. Add words or filters to narrow the search. |
+| There are more than 50 matches | Name searches show up to 50. Add `limit:` (the panel shows at most 1000), or add words or filters to narrow the search. |
 | A `!word` is in the query | `!word` drops a file when its name or any parent folder name contains the word. |
 
 ## Index Details says "Follower"
