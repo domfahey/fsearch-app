@@ -67,27 +67,51 @@ echo "== combined ($(basename "$REPORT"))"
 xcrun xccov view --report --only-targets "$REPORT"
 
 xcrun xccov view --report --json "$REPORT" > "$OUT/report.json"
-python3 -I - "$OUT/report.json" <<'PY'
+python3 -I - "$OUT/report.json" <<'PY' || rc=1
 import json, re, sys
-# file name -> function-name pattern of system adapters left out of the second number
+# file name -> the functions (exact xccov names) of system adapters left out
+# of the second number. Listed one by one, so a new function in these files is
+# counted unless someone decides it is an adapter too.
+_SM = ["service.getter", "status.getter", "register()", "unregister()", "openSystemSettingsLoginItems()"]
 EXCLUDE = {
-    "SystemSeams.swift": r".",                                    # SMAppService, NSWorkspace, Process, Trash
-    "Updater.swift": r"UpdateCheckState|CheckForUpdatesButton|static Updater\.start\(\)",  # Sparkle
-    "Seams.swift": r"AppActivation\.activate",                    # NSApp.activate
+    "SystemSeams.swift": [f"{c}.{f}" for c in ("SMAppHelperService", "SMAppLoginItemService") for f in _SM] + [
+        "SystemWorkspace.ws.getter", "SystemWorkspace.open(_:)",
+        "SystemWorkspace.open(_:withApplicationAt:completion:)",
+        "closure #1 in SystemWorkspace.open(_:withApplicationAt:completion:)",
+        "SystemWorkspace.activateFileViewerSelecting(_:)",
+        "SystemWorkspace.urlForApplication(withBundleIdentifier:)",
+        "SystemWorkspace.urlsForApplications(toOpen:)",
+        "SystemWorkspace.run(_:_:onExit:)", "closure #1 in SystemWorkspace.run(_:_:onExit:)",
+        "SystemWorkspace.trash(_:)",
+    ],
+    "Updater.swift": [                                            # Sparkle
+        "static Updater.start()", "variable initialization expression of UpdateCheckState._canCheck",
+        "UpdateCheckState.init(updater:)", "CheckForUpdatesButton.init(controller:)",
+        "implicit closure #1 in CheckForUpdatesButton.init(controller:)",
+        "CheckForUpdatesButton.body.getter", "closure #1 in CheckForUpdatesButton.body.getter",
+    ],
+    "Seams.swift": [                                              # NSApp.activate
+        "closure #1 in default argument 1 of static AppActivation.live(inert:activate:)",
+    ],
 }
 d = json.load(open(sys.argv[1]))
 app = next(t for t in d["targets"] if t["name"] == "FSearch.app")
 cov = exe = xcov = xexe = 0
-rows, excluded = [], []
+rows, excluded, problems = [], [], []
 for f in app["files"]:
     fc, fe = f["coveredLines"], f["executableLines"]
-    pat = EXCLUDE.get(f["name"])
+    names = EXCLUDE.get(f["name"], [])
     ec = ee = 0
-    if pat:
-        for fn in f["functions"]:
-            if re.search(pat, fn["name"]):
-                ec += fn["coveredLines"]; ee += fn["executableLines"]
-                excluded.append((f["name"], fn["name"], fn["coveredLines"], fn["executableLines"]))
+    found = set()
+    for fn in f["functions"]:
+        if fn["name"] in names:
+            found.add(fn["name"])
+            ec += fn["coveredLines"]; ee += fn["executableLines"]
+            excluded.append((f["name"], fn["name"], fn["coveredLines"], fn["executableLines"]))
+    for missing in sorted(set(names) - found):
+        problems.append(f"{f['name']}: excluded function not in the report (renamed?): {missing}")
+    if ee > fe or ec > fc:
+        problems.append(f"{f['name']}: excludes {ee} lines of {fe} executable")
     cov += fc; exe += fe; xcov += fc - ec; xexe += fe - ee
     rows.append((f["name"], fc, fe))
 print("\n== FSearch.app per file")
@@ -98,5 +122,7 @@ for fname, fn, c, e in excluded:
     print(f"  {c:3d}/{e:<3d}  {fname}: {fn}")
 print(f"\nFSearch.app raw:                        {100 * cov / exe:.2f}% ({cov}/{exe})")
 print(f"FSearch.app excluding system adapters:  {100 * xcov / xexe:.2f}% ({xcov}/{xexe})")
+for p in problems: print(f"coverage: {p}", file=sys.stderr)
+sys.exit(1 if problems else 0)
 PY
 exit $rc
