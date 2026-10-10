@@ -84,10 +84,10 @@ jobs:
       - name: Check Markdown links
         run: scripts/check-links.sh
       - name: Syntax-check shell scripts
-        run: for f in scripts/*.sh; do bash -n "$f"; done
+        run: for f in scripts/*.sh scripts/hooks/*; do bash -n "$f"; done
       - run: brew install actionlint shellcheck
       - run: actionlint
-      - run: shellcheck -S warning scripts/*.sh
+      - run: shellcheck -S warning scripts/*.sh scripts/hooks/*
       - name: swift format lint
         run: xcrun swift format lint --strict --configuration .swift-format -r App AppTests AppUITests Packages/FSearchKit/Sources Packages/FSearchKit/Tests
 
