@@ -55,6 +55,19 @@ public enum QuerySplit {
         return found.map { (rest.joined(separator: " "), $0.0, $0.1) }
     }
 
+    /// True if the daemon will read a `limit:` word in the query (quotes
+    /// dropped, as it does), whatever its value.
+    public static func hasLimitWord(_ query: String) -> Bool {
+        words(query).contains { unquoted($0).hasPrefix("limit:") }
+    }
+
+    /// The typed `limit:` value (the last one wins, as in the daemon), or nil
+    /// when there is none or it isn't a number.
+    public static func limit(_ query: String) -> Int? {
+        guard let last = words(query).map(unquoted).last(where: { $0.hasPrefix("limit:") }) else { return nil }
+        return Int(last.dropFirst("limit:".count))
+    }
+
     /// True if the query has a content key, so a name search would get lines back.
     public static func hasContentKey(_ query: String) -> Bool { contentSearch(query) != nil }
 

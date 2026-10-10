@@ -64,6 +64,10 @@ public final class SearchModel {
     /// hung daemon costs one timeout, not one per keystroke.
     @ObservationIgnored private var inflight: Task<([ResultItem], UInt64), Error>?
 
+    /// The most rows the panel shows, however many the daemon sends back
+    /// (`limit:100000` asks for that many).
+    public nonisolated static let shownLimit = 1000
+
     public init(names: SearchBackend, content: SearchBackend) {
         self.names = names
         self.content = content
@@ -89,7 +93,8 @@ public final class SearchModel {
         let task = Task { try await self.run(q, mode) }
         inflight = task
         do {
-            let (found, took) = try await task.value
+            let (all, took) = try await task.value
+            let found = Array(all.prefix(Self.shownLimit))
             guard gen == generation else { return }
             (items, phase, lastTookUs, answered) = (found, .results, took, (q, mode))
             report(q, mode, found.count, took, started, nil)

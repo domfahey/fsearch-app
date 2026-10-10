@@ -4,6 +4,7 @@ public enum GrepMode: String, Sendable { case literal, regex, symbol }
 
 /// One request to the daemon. Name search is the default op.
 public enum Request: Sendable {
+    /// `limit` is left out when `q` has its own `limit:` word.
     case search(q: String, limit: Int)
     case grep(q: String, pattern: String, mode: GrepMode, budgetMs: Int)
     case status
@@ -15,7 +16,10 @@ public enum Request: Sendable {
     public func json(id: Int) -> Data {
         var o: [String: Any] = ["id": id]
         switch self {
-        case let .search(q, limit): o["q"] = q; o["limit"] = limit
+        case let .search(q, limit):
+            o["q"] = q
+            // The daemon applies JSON fields after `q`: a JSON limit would override a typed `limit:`.
+            if !QuerySplit.hasLimitWord(q) { o["limit"] = limit }
         case let .grep(q, pattern, mode, budget):
             o["op"] = "grep"; o["q"] = q; o["pattern"] = pattern; o["mode"] = mode.rawValue; o["budget_ms"] = budget
         case .status: o["op"] = "status"
