@@ -12,12 +12,17 @@ struct SearchView: View {
     @State var state: PanelState
     @FocusState private var focused: Bool
     let onEffect: (PanelEffect, [ResultItem]) -> Void
+    let onSelect: (Int) -> Void
 
     private var shown: [ResultItem] {
         model.query.isEmpty && model.mode == .names
             ? app.recents.paths.map { .file(Hit(path: $0, kind: "file", size: 0, mtime: 0, score: 0)) }
             : model.items
     }
+
+    private var rowCount: Int { PanelRows.count(files: shown.count, query: model.query, mode: model.mode) }
+    /// Content and symbol rows highlight the pattern, not the filters.
+    private var highlightQuery: String { model.mode == .names ? model.query : QuerySplit.split(model.query).pattern }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -48,7 +53,7 @@ struct SearchView: View {
                     if !shown.isEmpty {
                         section(model.query.isEmpty ? "Recent" : (model.mode == .names ? "Files" : "Inside files"))
                         ForEach(Array(shown.enumerated()), id: \.element.id) { i, item in
-                            ResultRow(item: item, query: model.query, selected: i == state.selection)
+                            ResultRow(item: item, query: highlightQuery, selected: i == state.selection)
                                 .onTapGesture(count: 2) { onEffect(.open(i), shown) }
                                 .onTapGesture { state.selection = i }
                                 .draggable(URL(fileURLWithPath: item.path))
@@ -56,8 +61,8 @@ struct SearchView: View {
                     }
                     if model.mode == .names && !model.query.isEmpty {
                         section("Use “\(model.query)” with…")
-                        fallback("Search inside files", "doc.text.magnifyingglass") { switchMode(.content) }
-                        fallback("Find definitions", "function") { switchMode(.symbols) }
+                        fallback("Search inside files", "doc.text.magnifyingglass", selected: state.selection == shown.count) { switchMode(.content) }
+                        fallback("Find definitions", "function", selected: state.selection == shown.count + 1) { switchMode(.symbols) }
                     }
                 }
                 .padding(.bottom, 6)
@@ -77,6 +82,7 @@ struct SearchView: View {
         .frame(width: 680, height: 460)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
         .onAppear { focused = true }
+        .onChange(of: state.selection) { onSelect(state.selection) }
         .onKeyPress(phases: .down) { press in handle(press) }
     }
 
@@ -84,9 +90,11 @@ struct SearchView: View {
         Text(t).font(.system(size: 11)).foregroundStyle(.secondary).padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 4)
     }
 
-    private func fallback(_ t: String, _ icon: String, action: @escaping () -> Void) -> some View {
+    private func fallback(_ t: String, _ icon: String, selected: Bool, action: @escaping () -> Void) -> some View {
         HStack(spacing: 10) { Image(systemName: icon).frame(width: 22); Text(t) }
-            .padding(.horizontal, 12).padding(.vertical, 6).contentShape(Rectangle()).onTapGesture(perform: action)
+            .padding(.horizontal, 12).padding(.vertical, 6)
+            .background(selected ? Color.primary.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 8))
+            .contentShape(Rectangle()).onTapGesture(perform: action)
     }
 
     private func hint(_ t: String, _ k: String) -> some View {
@@ -95,11 +103,12 @@ struct SearchView: View {
 
     private func switchMode(_ m: SearchMode) {
         model.mode = m
+        state.selection = 0
         Task { await model.refresh() }
     }
 
     private func handle(_ press: KeyPress) -> KeyPress.Result {
-        state.query = model.query; state.mode = model.mode; state.count = shown.count
+        state.query = model.query; state.mode = model.mode; state.count = rowCount
         let cmd = press.modifiers.contains(.command), shift = press.modifiers.contains(.shift), ctrl = press.modifiers.contains(.control)
         let key: PanelKey? = switch (press.key, cmd, shift, ctrl) {
         case (.upArrow, _, _, _), (KeyEquivalent("p"), false, false, true): .up
@@ -115,11 +124,20 @@ struct SearchView: View {
         }
         guard let key else { return .ignored }
         let effect = reduce(&state, key)
-        if model.query != state.query || model.mode != state.mode {
-            model.query = state.query; model.mode = state.mode
-            Task { await model.refresh() }
+        // A query change refreshes through .onChange; only a mode change alone needs it here.
+        let modeChanged = model.mode != state.mode
+        let queryChanged = model.query != state.query
+        model.query = state.query; model.mode = state.mode
+        if modeChanged && !queryChanged { Task { await model.refresh() } }
+        // Rows past the files are the "use with..." rows: Return switches mode, other actions don't apply.
+        switch effect {
+        case let .open(i) where i >= shown.count:
+            if let m = PanelRows.row(at: i, files: shown.count, query: model.query, mode: model.mode)?.mode { switchMode(m) }
+        case let .reveal(i), let .quickLook(i), let .copyPath(i), let .showActions(i):
+            if i < shown.count { onEffect(effect, shown) }
+        default:
+            onEffect(effect, shown)
         }
-        onEffect(effect, shown)
         return .handled
     }
 }
