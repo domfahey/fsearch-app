@@ -135,12 +135,13 @@ final class AppState: ObservableObject {
             status.restartBudget.reset()
             // Searches work, so a "failed" or "needs approval" warning is
             // stale (e.g. the daemon came back): re-check, at most every 5 s.
+            // "Isn't answering" is plainly wrong now: re-check at once.
             let unhealthy =
                 switch daemon.state {
                 case .failed, .needsApproval: true
                 default: false
                 }
-            if status.recoveryCheck.shouldRefresh(daemonUnhealthy: unhealthy) {
+            if daemon.isUnresponsive || status.recoveryCheck.shouldRefresh(daemonUnhealthy: unhealthy) {
                 Task { await daemon.refresh() }
             }
         case .failed(.disconnected):

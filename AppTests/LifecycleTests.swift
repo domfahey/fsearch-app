@@ -25,6 +25,20 @@ extension AppTests {
             #expect(await eventually { !app.daemon.isUnresponsive })
         }
 
+        /// "Isn't answering" never outlives the next results: the recovery check's throttle doesn't apply to it.
+        @Test func resultsClearUnresponsiveAtOnce() async {
+            let env = TestEnv(helper: FakeHelper(.enabled))
+            defer { env.tearDown() }
+            let app = env.app
+            app.status = MenuBarStatus(defaults: env.defaults)
+            let checked = app.status.recoveryCheck.shouldRefresh(daemonUnhealthy: true)
+            #expect(checked, "a check just ran")
+            app.searchSettled(.failed(.timeout))
+            #expect(app.daemon.isUnresponsive)
+            app.searchSettled(.results)
+            #expect(await eventually { !app.daemon.isUnresponsive })
+        }
+
         @Test func aTimeoutIsUnresponsive() {
             let env = TestEnv()
             defer { env.tearDown() }
