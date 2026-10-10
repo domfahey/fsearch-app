@@ -1,7 +1,9 @@
 /// Content queries: the typed text is the pattern, except fsearch filters
-/// (`ext:rs`, `in:~/x`, `mtime:<7d`), which narrow the files searched. As in
-/// the daemon, a known key with an empty value (`ext:`) is still a filter, and
-/// keys match case-sensitively.
+/// (`ext:rs`, `in:~/x`, `mtime:<7d`), which narrow the files searched. Keys
+/// match case-sensitively, as in the daemon. Unlike the daemon, a word is a
+/// filter only when it has a value: a bare key (`kind: Deployment`,
+/// `limit: 10`) and a word that starts with a quote (`"ext:rs"`) are text,
+/// since sent as filters they'd be daemon errors or a match-all `path:`.
 /// Sending the text as `grep:...` instead would turn a second word into a
 /// name filter.
 ///
@@ -81,9 +83,10 @@ public enum QuerySplit {
         return out
     }
 
+    /// `key:value` with a known key, no quote before the colon, and a value
+    /// that isn't empty once its quotes are dropped.
     private static func isFilter(_ word: String) -> Bool {
-        let plain = unquoted(word)
-        guard let colon = plain.firstIndex(of: ":") else { return false }
-        return keys.contains(String(plain[..<colon]))
+        guard let colon = word.firstIndex(of: ":"), keys.contains(String(word[..<colon])) else { return false }
+        return !unquoted(String(word[word.index(after: colon)...])).isEmpty
     }
 }
