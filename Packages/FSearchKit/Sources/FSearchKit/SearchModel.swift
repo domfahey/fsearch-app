@@ -41,6 +41,15 @@ public final class SearchModel {
     public private(set) var items: [ResultItem] = []
     public private(set) var phase: SearchPhase = .idle
     public private(set) var lastTookUs: UInt64?
+    /// The query and mode that `items` (and `phase`) answer. It lags `query`
+    /// and `mode` from the moment they change until that search settles.
+    public private(set) var answered: (query: String, mode: SearchMode) = ("", .names)
+    /// True only while `items` answer the query and mode now in the box: false
+    /// from the keystroke (or mode change) until its search settles, while a
+    /// half-typed filter keeps older rows up, and when a late reply answers a
+    /// query that has since changed. Acting on a row (↵, ⌘↵, ⌘Y, ⌘K, ⌘1–9)
+    /// should wait for it, or a stale row is opened.
+    public var resultsAreCurrent: Bool { answered.query == query && answered.mode == mode }
     @ObservationIgnored public var onSearched: ((LogEntry) -> Void)?
     /// Called with the new phase every time a search finishes (results,
     /// indexing or failed), even when the phase is the same as before: a
@@ -72,7 +81,7 @@ public final class SearchModel {
         // query made only of filters, or a name query whose grep:/sym: has no
         // value yet (an empty pattern matches every line).
         if Self.isBlank(q) || QuerySyntax.isCheatSheet(q) || Self.emptyPattern(q, mode) {
-            (items, phase, lastTookUs) = ([], .idle, nil)
+            (items, phase, lastTookUs, answered) = ([], .idle, nil, (q, mode))
             return
         }
         phase = .loading
@@ -82,19 +91,19 @@ public final class SearchModel {
         do {
             let (found, took) = try await task.value
             guard gen == generation else { return }
-            (items, phase, lastTookUs) = (found, .results, took)
+            (items, phase, lastTookUs, answered) = (found, .results, took, (q, mode))
             report(q, mode, found.count, took, started, nil)
         } catch is CancellationError {
             // Superseded by a newer refresh (or the caller went away): no state change.
             return
         } catch let e as DaemonError {
             guard gen == generation else { return }
-            (items, lastTookUs) = ([], nil)
+            (items, lastTookUs, answered) = ([], nil, (q, mode))
             if case .indexing = e { phase = .indexing } else { phase = .failed(e) }
             report(q, mode, 0, nil, started, String(describing: e))
         } catch {
             guard gen == generation else { return }
-            (items, phase, lastTookUs) = ([], .failed(.badReply(String(describing: error))), nil)
+            (items, phase, lastTookUs, answered) = ([], .failed(.badReply(String(describing: error))), nil, (q, mode))
             report(q, mode, 0, nil, started, String(describing: error))
         }
     }
