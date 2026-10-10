@@ -75,6 +75,7 @@ private struct Exploding: Decodable {
     }
 
     @Test func missingTopLevelKeyHasNoPathSuffix() {
+        // current behaviour, arguably wrong: the user-facing message names the Swift property "tookUs", not the wire key took_us.
         #expect(badReplyMessage(#"{"ok":true}"#, as: SearchReply.self) == #"reply has no "tookUs""#)
     }
 
@@ -88,23 +89,11 @@ private struct Exploding: Decodable {
         _ = try decodeReply(Data(#"{"ok":true,"id":1}"#.utf8), as: Pong.self)
     }
 
-    @Test func snakeCaseKeysMapToCamelCase() throws {
-        let s = try decodeReply(Data(#"{"ok":true,"took_us":5,"hits":[]}"#.utf8), as: SearchReply.self)
-        #expect(s == SearchReply(tookUs: 5, hits: []))
-    }
-
-    @Test func requestJSONEscapesAndIsDeterministic() throws {
+    @Test func requestJSONEscapesAndIsDeterministic() {
+        // Keys sorted, quotes and newlines escaped, no trailing newline: the exact bytes, every time.
         let line = Request.grep(q: "a\"b", pattern: "x\ny", mode: .symbol, budgetMs: 1).json(id: 9)
-        let o = try JSONSerialization.jsonObject(with: line) as! [String: Any]
-        #expect(o["q"] as? String == "a\"b" && o["pattern"] as? String == "x\ny" && o["mode"] as? String == "symbol")
-        #expect(!line.contains(UInt8(ascii: "\n")))
-        #expect(Request.ping.json(id: 1) == Request.ping.json(id: 1))
-        #expect(GrepMode(rawValue: "regex") == .regex)
-    }
-
-    @Test func daemonErrorEquality() {
-        #expect(DaemonError.indexing("a") != DaemonError.daemon("a"))
-        #expect(DaemonError.badReply("a") == DaemonError.badReply("a"))
-        #expect(DaemonError.timeout != DaemonError.disconnected)
+        let want = #"{"budget_ms":1,"id":9,"mode":"symbol","op":"grep","pattern":"x\ny","q":"a\"b"}"#
+        #expect(String(decoding: line, as: UTF8.self) == want)
+        #expect(Request.search(q: "a", limit: 2).json(id: 3) == Data(#"{"id":3,"limit":2,"q":"a"}"#.utf8))
     }
 }

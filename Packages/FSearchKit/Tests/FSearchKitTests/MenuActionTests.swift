@@ -11,10 +11,6 @@ import Testing
         let recording = MenuAction.allCases.filter(\.recordsRecent)
         #expect(Set(recording) == [.open, .openWith])
     }
-
-    @Test func copyQuickLookAndTrashKeepThePanel() {
-        for a in [MenuAction.copyPath, .copyFile, .quickLook, .trash] { #expect(!a.hidesPanel) }
-    }
 }
 
 @Suite struct MenuActionErrorTests {

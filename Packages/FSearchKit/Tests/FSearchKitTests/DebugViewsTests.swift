@@ -29,13 +29,12 @@ import Testing
         #expect(DebugFormat.roundTrip(12.34) == "12.3 ms")
     }
 
-    @Test func formatsBytes() {
-        // Same formatter and style, so the result holds in any locale.
-        for n in [0, 1_000_000, Int.max] {
-            let want = ByteCountFormatter.string(fromByteCount: Int64(n), countStyle: .file)
-            #expect(DebugFormat.bytes(n) == want)
-            #expect(!want.isEmpty)
-        }
+    @Test func bytesUseDecimalFileUnits() {
+        // The text is locale-dependent, so compare against the formatter. What
+        // this pins is the style: .file (1000-based, as Finder shows sizes), not .memory.
+        let n: Int64 = 1_000_000
+        #expect(DebugFormat.bytes(Int(n)) == ByteCountFormatter.string(fromByteCount: n, countStyle: .file))
+        #expect(DebugFormat.bytes(Int(n)) != ByteCountFormatter.string(fromByteCount: n, countStyle: .memory))
     }
 
     @Test func dataDirIsTheSocketsFolder() {
@@ -52,6 +51,15 @@ import Testing
         #expect(DebugFormat.FileStamp(of: f) == a)
         try Data("a\nbb\n".utf8).write(to: f)
         #expect(DebugFormat.FileStamp(of: f) != a)
+        // Same size, new modification date: the date alone must change the stamp.
+        let b = try #require(DebugFormat.FileStamp(of: f))
+        try Data("a\ncc\n".utf8).write(to: f)
+        let later = Date(timeIntervalSince1970: 1_900_000_000)
+        try FileManager.default.setAttributes([.modificationDate: later], ofItemAtPath: f.path)
+        let c = try #require(DebugFormat.FileStamp(of: f))
+        #expect(c.size == b.size)
+        #expect(c.modified == later)
+        #expect(c != b)
     }
 
     @Test func tailReadsOnlyTheEndAndWholeLines() throws {
@@ -62,9 +70,9 @@ import Testing
         let all = (0..<5000).map { "line \($0)" }.joined(separator: "\n") + "\n"
         try all.write(to: f, atomically: true, encoding: .utf8)
         #expect(DebugFormat.tail(of: f, lines: 3, maxBytes: 1024) == "line 4997\nline 4998\nline 4999")
-        let small = DebugFormat.tail(of: f, lines: 100, maxBytes: 40)
-        #expect(small.split(separator: "\n").allSatisfy { $0.hasPrefix("line ") })
-        #expect(small.hasSuffix("line 4999"))
+        // 45 bytes is four 10-byte lines plus the last 5 bytes ("4995\n") of a
+        // fifth: that partial first line is dropped.
+        #expect(DebugFormat.tail(of: f, lines: 100, maxBytes: 45) == "line 4996\nline 4997\nline 4998\nline 4999")
         #expect(DebugFormat.tail(of: dir.appendingPathComponent("nope"), lines: 3, maxBytes: 100) == "")
     }
 

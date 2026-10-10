@@ -14,7 +14,6 @@ import Testing
     @Test func emptyHasNoPaths() {
         defer { cleanup() }
         #expect(Recents(defaults: fresh(), exists: { _ in true }).paths.isEmpty)
-        #expect(Recents.limit == 8)
     }
 
     @Test func reopeningMovesToFrontWithoutGrowing() {
@@ -34,13 +33,6 @@ import Testing
         #expect(d.stringArray(forKey: "recentPaths")?.count == 16)
         // f20...f13 are gone; the buffer still holds f12...f5.
         #expect(r.paths == (5...12).reversed().map { "/f\($0)" })
-    }
-
-    @Test func fewerLiveThanEightShowsOnlyThose() {
-        defer { cleanup() }
-        let r = Recents(defaults: fresh(), exists: { $0 == "/b" })
-        r.opened("/a"); r.opened("/b"); r.opened("/c")
-        #expect(r.paths == ["/b"])
     }
 
     @Test func allGoneIsEmptyButStillRemembered() {

@@ -19,6 +19,46 @@ import Testing
     }
 }
 
+/// Parity with the daemon's `Query::filter` (fsearch src/query.rs). The keys
+/// are copied from the daemon's match arms, not from QuerySplit.keys.
+@Suite struct QuerySplitDaemonParityTests {
+    static let daemonFilterKeys = ["ext", "type", "kind", "in", "size", "mtime", "modified", "re", "path", "limit"]
+    static let daemonContentKeys: [(String, GrepMode)] = [("grep", .literal), ("content", .literal), ("regex", .regex), ("sym", .symbol), ("symbol", .symbol)]
+
+    @Test(arguments: daemonFilterKeys)
+    func everyDaemonFilterKeyIsSplitOff(_ key: String) {
+        #expect(QuerySplit.split("todo \(key):v") == ("todo", "\(key):v"))
+    }
+
+    @Test(arguments: daemonContentKeys)
+    func everyDaemonContentKeyStartsAContentSearch(_ key: String, _ mode: GrepMode) {
+        let c = QuerySplit.contentSearch("main \(key):needle")
+        #expect(c?.q == "main" && c?.pattern == "needle" && c?.mode == mode)
+    }
+
+    @Test func emptyValueIsStillAFilter() {
+        // The daemon's split_once(':') gives ("ext", ""), and filter() takes it.
+        #expect(QuerySplit.split("todo ext:") == ("todo", "ext:"))
+        #expect(QuerySplit.split("in:") == ("", "in:"))
+    }
+
+    @Test func keysAreCaseSensitive() {
+        // The daemon matches keys exactly: EXT:rs is a plain word to it.
+        #expect(QuerySplit.split("todo EXT:rs") == ("todo EXT:rs", ""))
+        #expect(QuerySplit.contentSearch("GREP:x") == nil)
+    }
+
+    @Test func lastContentKeyWins() {
+        let c = QuerySplit.contentSearch("grep:a regex:b")
+        #expect(c?.pattern == "b" && c?.mode == .regex && c?.q == "")
+    }
+
+    @Test func contentKeysInContentModeStayInThePattern() {
+        // A content-mode query is already the pattern: grep:/regex: in it are text, not filters.
+        #expect(QuerySplit.split("grep:a regex:b ext:rs") == ("grep:a regex:b", "ext:rs"))
+    }
+}
+
 @Suite struct QuerySplitSpacingTests {
     @Test func patternKeepsOriginalSpacing() {
         #expect(QuerySplit.split("foo  bar") == ("foo  bar", ""))

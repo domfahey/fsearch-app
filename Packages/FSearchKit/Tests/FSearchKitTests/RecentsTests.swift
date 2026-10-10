@@ -22,10 +22,11 @@ import Testing
         #expect(r.paths == ["/f5", "/f10", "/f9", "/f8", "/f7", "/f6", "/f4", "/f3"])
     }
 
-    @Test func goneFilesAreLeftOut() {
-        let r = Recents(defaults: fresh(), exists: { $0 != "/gone" })
-        r.opened("/gone"); r.opened("/here")
-        #expect(r.paths == ["/here"])
+    @Test func goneFilesAreLeftOutAndOlderOnesFillIn() {
+        // Ten opened, the two newest since deleted: eight older ones still show.
+        let r = Recents(defaults: fresh(), exists: { $0 != "/f10" && $0 != "/f9" })
+        for i in 1...10 { r.opened("/f\(i)") }
+        #expect(r.paths == (1...8).reversed().map { "/f\($0)" })
     }
 
     @Test func persists() {

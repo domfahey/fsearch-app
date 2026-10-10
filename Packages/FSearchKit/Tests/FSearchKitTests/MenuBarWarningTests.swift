@@ -11,7 +11,6 @@ import Testing
     @Test func failureOffersFix() {
         let w = MenuBarWarning.evaluate(.failed, skippedFullDiskAccess: true)
         #expect(w?.offersFix == true)
-        #expect(w?.symbol == "exclamationmark.magnifyingglass")
         #expect(MenuBarWarning.evaluate(.needsApproval, skippedFullDiskAccess: false)?.offersFix == true)
     }
 

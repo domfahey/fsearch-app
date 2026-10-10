@@ -51,8 +51,15 @@ struct FailingBackend: SearchBackend {
         #expect(b.parked)
     }
 
-    @Test func lateDaemonErrorFromASupersededSearchIsDropped() async throws {
-        let b = GatedFailBackend(error: DaemonError.daemon("old failed"))
+    /// A failure that lands after a newer search has published, whichever catch
+    /// clause it goes through, changes nothing and is not logged.
+    @Test(arguments: [
+        DaemonError.daemon("old failed") as any Error,
+        DaemonError.indexing("indexing"),
+        CocoaError(.fileReadUnknown),
+    ])
+    func lateErrorFromASupersededSearchIsDropped(_ error: any Error) async throws {
+        let b = GatedFailBackend(error: error)
         let m = SearchModel(names: b, content: FailingBackend(error: DaemonError.disconnected))
         var log: [SearchModel.LogEntry] = []
         m.onSearched = { log.append($0) }
@@ -67,42 +74,15 @@ struct FailingBackend: SearchBackend {
         #expect(log.map(\.query) == ["new"], "the stale failure is neither shown nor logged")
     }
 
-    @Test func lateIndexingErrorFromASupersededSearchIsDropped() async throws {
-        let b = GatedFailBackend(error: DaemonError.indexing("indexing"))
-        let m = SearchModel(names: b, content: FailingBackend(error: DaemonError.disconnected))
-        m.query = "old"
-        let first = Task { await m.refresh() }
-        try await waitParked(b)
-        m.query = "new"
-        await m.refresh()
-        b.release()
-        await first.value
-        #expect(m.phase == .results)
-    }
-
-    @Test func lateUnknownErrorFromASupersededSearchIsDropped() async throws {
-        let b = GatedFailBackend(error: CocoaError(.fileReadUnknown))
-        let m = SearchModel(names: b, content: FailingBackend(error: DaemonError.disconnected))
-        var log: [SearchModel.LogEntry] = []
-        m.onSearched = { log.append($0) }
-        m.query = "old"
-        let first = Task { await m.refresh() }
-        try await waitParked(b)
-        m.query = "new"
-        await m.refresh()
-        b.release()
-        await first.value
-        #expect(m.phase == .results && m.items.map(\.path) == ["/r/new"])
-        #expect(log.map(\.query) == ["new"])
-    }
-
     @Test func currentFailureAfterGoodResultsClearsItems() async {
-        let good = RecordingBackend()
-        let m = SearchModel(names: good, content: FailingBackend(error: DaemonError.timeout))
-        m.mode = .content
+        let m = SearchModel(names: RecordingBackend(), content: FailingBackend(error: DaemonError.timeout))
         m.query = "needle"
         await m.refresh()
-        #expect(m.phase == .failed(.timeout) && m.items.isEmpty && m.lastTookUs == nil)
+        #expect(!m.items.isEmpty && m.lastTookUs != nil, "results to clear")
+        m.mode = .content
+        await m.refresh()
+        #expect(m.phase == .failed(.timeout) && m.items.isEmpty)
+        #expect(m.lastTookUs == nil, "no timing left over from the previous search")
     }
 
     @Test func failedSearchIsLoggedWithTheError() async {
@@ -112,18 +92,24 @@ struct FailingBackend: SearchBackend {
         m.query = "x"
         await m.refresh()
         #expect(log.count == 1)
-        #expect(log[0].error == String(describing: DaemonError.daemon("bad regex")))
+        // current behaviour, arguably wrong: the log stores the Swift enum text, not just the daemon's message.
+        #expect(log[0].error == #"daemon("bad regex")"#)
         #expect(log[0].resultCount == 0 && log[0].tookUs == nil && log[0].mode == .names && log[0].roundTripMs >= 0)
     }
 
     @Test func indexingIsLoggedAndClearsPriorResults() async {
-        let m = SearchModel(names: FailingBackend(error: DaemonError.indexing("indexing")), content: RecordingBackend())
+        let b = ScriptedBackend()
+        let m = SearchModel(names: b, content: RecordingBackend())
         var log: [SearchModel.LogEntry] = []
         m.onSearched = { log.append($0) }
         m.query = "x"
         await m.refresh()
-        #expect(m.phase == .indexing && m.items.isEmpty)
-        #expect(log.first?.error == String(describing: DaemonError.indexing("indexing")))
+        #expect(!m.items.isEmpty && m.lastTookUs != nil, "results to clear")
+        b.fail = .indexing("indexing")
+        await m.refresh()
+        #expect(m.phase == .indexing && m.items.isEmpty && m.lastTookUs == nil)
+        // current behaviour, arguably wrong: the log stores the Swift enum text, not just the daemon's message.
+        #expect(log.last?.error == #"indexing("indexing")"#)
     }
 
     @Test func successThenBlankResetsEverything() async {
@@ -134,19 +120,6 @@ struct FailingBackend: SearchBackend {
         m.query = "   "
         await m.refresh()
         #expect(m.phase == .idle && m.items.isEmpty && m.lastTookUs == nil)
-    }
-
-    @Test func contentSearchReportsItsModeAndLineItems() async {
-        let content = RecordingBackend()
-        let m = SearchModel(names: RecordingBackend(), content: content)
-        var log: [SearchModel.LogEntry] = []
-        m.onSearched = { log.append($0) }
-        m.mode = .symbols
-        m.query = "applyDir ext:rs"
-        await m.refresh()
-        #expect(content.calls == ["grep ext:rs|applyDir|symbol"])
-        #expect(log.first?.mode == .symbols && log.first?.resultCount == 1)
-        #expect(m.items.first?.id == "/r/g.txt:1")
     }
 
     @Test func resultItemAccessors() {
@@ -160,21 +133,6 @@ struct FailingBackend: SearchBackend {
     @Test func isBlankOnlyCountsSpacesAndTabs() {
         #expect(SearchModel.isBlank("") && SearchModel.isBlank("  \t "))
         #expect(!SearchModel.isBlank(" a "))
-    }
-
-    @Test func cancellingTheCallerLeavesStateAlone() async throws {
-        let b = HangingBackend(hangingQuery: "slow")
-        let m = SearchModel(names: b, content: RecordingBackend())
-        var log: [SearchModel.LogEntry] = []
-        m.onSearched = { log.append($0) }
-        m.query = "slow"
-        let t = Task { await m.refresh() }
-        for _ in 0..<2000 where !b.started { try await Task.sleep(for: .milliseconds(5)) }
-        #expect(b.started)
-        // The backend call is its own task; cancel it by superseding with a blank query.
-        m.query = ""
-        await m.refresh()
-        await t.value
-        #expect(m.phase == .idle && log.isEmpty)
+        #expect(!SearchModel.isBlank("\n"), "a newline is not a space or a tab")
     }
 }

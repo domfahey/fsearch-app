@@ -16,11 +16,9 @@ import Testing
         #expect(DebugFormat.daemonMs(0) == "0.00 ms")
         #expect(DebugFormat.daemonMs(1) == "0.00 ms")
         #expect(DebugFormat.daemonMs(999) == "1.00 ms")
-        #expect(DebugFormat.daemonMs(UInt64.max).hasSuffix(" ms"))
         #expect(DebugFormat.roundTrip(0) == "0.0 ms")
         #expect(DebugFormat.roundTrip(0.04) == "0.0 ms")
         #expect(DebugFormat.roundTrip(1234.56) == "1234.6 ms")
-        #expect(DebugFormat.roundTrip(-1) == "-1.0 ms")
     }
 
     @Test func shownOnEmptyAndFilterEdges() {

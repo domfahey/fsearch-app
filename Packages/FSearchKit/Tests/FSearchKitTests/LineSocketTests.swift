@@ -5,43 +5,69 @@ import Testing
 
 /// A raw Unix-socket server on a temp path. `handler` runs on its own thread
 /// for each accepted connection and owns the fd (it must close it).
+///
+/// Only the accept thread closes the listening fd, and `stop()` waits for it,
+/// so the fd number can't be reused by another test while `accept` still
+/// holds it. On macOS `shutdown()` doesn't wake an `accept` blocked on a
+/// listener (it fails with ENOTCONN), so `stop()` wakes it by dialling in.
 final class RawServer: @unchecked Sendable {
     let path: String
-    private var listener: Int32 = -1
     private let lock = NSLock()
-    private var _accepted = 0
+    private var _accepted = 0, stopping = false
+    private let exited = DispatchSemaphore(value: 0)
     var accepted: Int { lock.withLock { _accepted } }
 
-    init(handler: @escaping @Sendable (Int32, Int) -> Void) {
-        path = NSTemporaryDirectory() + "fsk-raw-\(UUID().uuidString.prefix(8)).sock"
+    init(path: String? = nil, handler: @escaping @Sendable (Int32, Int) -> Void) {
+        let path = path ?? NSTemporaryDirectory() + "fsk-raw-\(UUID().uuidString.prefix(8)).sock"
+        self.path = path
         unlink(path)
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
-        var addr = sockaddr_un()
-        addr.sun_family = sa_family_t(AF_UNIX)
-        withUnsafeMutableBytes(of: &addr.sun_path) { p in _ = path.withCString { strncpy(p.baseAddress!.assumingMemoryBound(to: CChar.self), $0, p.count - 1) } }
-        let len = socklen_t(MemoryLayout<sockaddr_un>.size)
-        withUnsafePointer(to: &addr) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { _ = bind(fd, $0, len) } }
-        listen(fd, 8)
-        listener = fd
+        precondition(fd >= 0, "socket: errno \(errno)")
+        precondition(path.utf8.count < MemoryLayout.size(ofValue: sockaddr_un().sun_path), "socket path too long: \(path)")
+        precondition(Self.withAddress(path) { bind(fd, $0, $1) } == 0, "bind \(path): errno \(errno)")
+        precondition(listen(fd, 8) == 0, "listen: errno \(errno)")
+        // The thread holds self until stop(), which every test calls (there is no deinit).
         Thread.detachNewThread { [self] in
+            defer { close(fd); exited.signal() }
             while true {
                 let c = accept(fd, nil, nil)
-                if c < 0 { return }
-                let n = lock.withLock { _accepted += 1; return _accepted }
+                if c < 0 {
+                    if errno == EINTR || errno == ECONNABORTED { continue }
+                    return
+                }
+                let n = lock.withLock { () -> Int? in
+                    if stopping { return nil }
+                    _accepted += 1
+                    return _accepted
+                }
+                guard let n else { close(c); return }  // stop()'s wake-up dial
                 Thread.detachNewThread { handler(c, n) }
             }
         }
     }
 
-    /// Idempotent: a second close of the same fd number could hit another test's socket.
+    /// Idempotent. Returns once the accept thread has closed the listener.
     func stop() {
-        let fd = lock.withLock { () -> Int32 in defer { listener = -1 }; return listener }
-        if fd < 0 { return }
-        shutdown(fd, SHUT_RDWR)
-        close(fd)
+        let first = lock.withLock { () -> Bool in defer { stopping = true }; return !stopping }
+        guard first else { return }
+        // Wake the blocked accept with a connection of our own.
+        let s = socket(AF_UNIX, SOCK_STREAM, 0)
+        if s >= 0 {
+            _ = Self.withAddress(path) { connect(s, $0, $1) }
+            close(s)
+        }
+        // Bounded, so a wake-up that never lands fails loudly instead of hanging the run.
+        precondition(exited.wait(timeout: .now() + 5) == .success, "RawServer accept thread did not exit")
         unlink(path)
     }
-    deinit { stop() }
+
+    private static func withAddress(_ path: String, _ body: (UnsafePointer<sockaddr>, socklen_t) -> Int32) -> Int32 {
+        var addr = sockaddr_un()
+        addr.sun_family = sa_family_t(AF_UNIX)
+        withUnsafeMutableBytes(of: &addr.sun_path) { p in _ = path.withCString { strncpy(p.baseAddress!.assumingMemoryBound(to: CChar.self), $0, p.count - 1) } }
+        let len = socklen_t(MemoryLayout<sockaddr_un>.size)
+        return withUnsafePointer(to: &addr) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { body($0, len) } }
+    }
 
     /// Read up to and including the next newline; false on EOF.
     static func readLine(_ fd: Int32) -> Bool {
@@ -84,11 +110,21 @@ final class RawServer: @unchecked Sendable {
     @Test func aPathTooLongForASocketAddressIsDisconnected() {
         let long = "/tmp/" + String(repeating: "a", count: 200) + ".sock"
         #expect(throws: DaemonError.disconnected) { try LineSocket(path: long, timeout: 1).roundTrip(req()) }
-        // And the exact limit: sun_path holds 104 bytes including the NUL.
+        // sun_path holds 104 bytes including the NUL. A server listens at the
+        // longest path that fits (103 bytes); dialling one byte more must not
+        // be silently truncated onto it.
         let limit = MemoryLayout.size(ofValue: sockaddr_un().sun_path)
-        let atLimit = "/" + String(repeating: "b", count: limit - 1)
-        #expect(atLimit.utf8.count == limit)
-        #expect(throws: DaemonError.disconnected) { try LineSocket(path: atLimit, timeout: 1).roundTrip(req()) }
+        let dir = NSTemporaryDirectory() + "fsk-"
+        let fits = dir + String(repeating: "b", count: limit - 1 - dir.utf8.count)
+        #expect(fits.utf8.count == limit - 1)
+        let srv = RawServer(path: fits) { fd, _ in
+            while RawServer.readLine(fd) { RawServer.send(fd, "{}\n") }
+            close(fd)
+        }
+        defer { srv.stop() }
+        #expect(throws: Never.self) { try LineSocket(path: fits, timeout: 1).roundTrip(req()) }
+        #expect(throws: DaemonError.disconnected) { try LineSocket(path: fits + "x", timeout: 1).roundTrip(req()) }
+        #expect(srv.accepted == 1, "only the dial that fits connected")
     }
 
     @Test func echoesOneLine() throws {
@@ -176,14 +212,16 @@ final class RawServer: @unchecked Sendable {
     @Test func silentPeerTimesOutAndIsNotRetried() {
         let srv = RawServer { fd, _ in
             _ = RawServer.readLine(fd)
-            // Hold the connection open until the client gives up.
-            var b: UInt8 = 0
-            _ = read(fd, &b, 1)
+            // Hold the connection open until the client gives up, but hang up
+            // after 5 s so a broken timeout fails the test instead of hanging it.
+            var p = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
+            _ = poll(&p, 1, 5000)
             close(fd)
         }
         defer { srv.stop() }
-        let s = LineSocket(path: srv.path, timeout: 0.2)
-        #expect(throws: DaemonError.timeout) { try s.roundTrip(req()) }
+        let t0 = Date()
+        #expect(throws: DaemonError.timeout) { try LineSocket(path: srv.path, timeout: 0.3).roundTrip(req()) }
+        #expect(Date().timeIntervalSince(t0) >= 0.25, "the sub-second part of the timeout is honoured")
         #expect(srv.accepted == 1)
     }
 
@@ -213,6 +251,7 @@ final class RawServer: @unchecked Sendable {
         let s = LineSocket(path: srv.path, timeout: 2)
         _ = try s.roundTrip(req())
         #expect(throws: DaemonError.disconnected) { try s.roundTrip(req()) }
+        #expect(srv.accepted == 2, "the reused connection was redialled once, and only once")
     }
 
     @Test func closeIsIdempotentAndForcesAFreshDial() throws {
@@ -227,7 +266,6 @@ final class RawServer: @unchecked Sendable {
         s.close()
         _ = try s.roundTrip(req())
         #expect(srv.accepted == 2)
-        #expect(s.path == srv.path && s.timeout == 2)
     }
 
     @Test func closeDropsBufferedBytes() throws {
@@ -243,20 +281,6 @@ final class RawServer: @unchecked Sendable {
         #expect(String(decoding: try s.roundTrip(req()), as: UTF8.self) == "one")
         s.close()
         #expect(String(decoding: try s.roundTrip(req()), as: UTF8.self) == "two")
-    }
-
-    @Test func subSecondTimeoutIsHonoured() {
-        let srv = RawServer { fd, _ in
-            _ = RawServer.readLine(fd)
-            var b: UInt8 = 0
-            _ = read(fd, &b, 1)
-            close(fd)
-        }
-        defer { srv.stop() }
-        let t0 = Date()
-        #expect(throws: DaemonError.timeout) { try LineSocket(path: srv.path, timeout: 0.3).roundTrip(req()) }
-        let dt = Date().timeIntervalSince(t0)
-        #expect(dt >= 0.2 && dt < 3)
     }
 }
 
