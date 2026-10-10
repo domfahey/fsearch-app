@@ -77,8 +77,8 @@ private struct Exploding: Decodable {
 
     @Test func missingTopLevelKeyHasNoPathSuffix() {
         #expect(badReplyMessage(#"{"ok":true}"#, as: SearchReply.self) == #"reply has no "took_us""#)
-        let m = badReplyMessage(#"{"ok":true,"entries":1,"dirs":1,"overlay":1,"removed":1}"#, as: DaemonStatus.self)
-        #expect(m?.contains("eventId") == false && m?.hasPrefix(#"reply has no ""#) == true)
+        // Status needs only `entries` (older daemons lack the newer fields).
+        #expect(badReplyMessage(#"{"ok":true,"dirs":1}"#, as: DaemonStatus.self) == #"reply has no "entries""#)
     }
 
     @Test func unrelatedDecoderErrorsBecomeBadReply() {
