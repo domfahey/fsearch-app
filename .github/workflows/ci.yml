@@ -106,7 +106,9 @@ jobs:
           rm -f "$RUNNER_TEMP/cert.p12"
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
           # Add to the user search list (keeping the existing ones) and make it default.
-          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          EXISTING=()
+          while IFS= read -r kc; do [ -n "$kc" ] && EXISTING+=("$kc"); done < <(security list-keychains -d user | tr -d '"')
+          security list-keychains -d user -s "$KEYCHAIN" ${EXISTING[@]+"${EXISTING[@]}"}
           security default-keychain -d user -s "$KEYCHAIN"
       - name: Store notary credentials (App Store Connect API key)
         env:
