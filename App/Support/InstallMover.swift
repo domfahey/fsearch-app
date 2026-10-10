@@ -51,12 +51,21 @@ enum InstallMover {
             removeQuarantine(dest)
             let p = Process()
             p.executableURL = URL(fileURLWithPath: "/bin/sh")
-            p.arguments = ["-c", "sleep 1; /usr/bin/open \"$0\"", dest.path]
+            p.arguments = relaunchArguments(app: dest, waitingFor: ProcessInfo.processInfo.processIdentifier)
             try p.run()
         } catch {
             Log.daemon.error("move to Applications failed: \(error.localizedDescription, privacy: .private)")
             NSWorkspace.shared.activateFileViewerSelecting([source, URL(fileURLWithPath: "/Applications")])
         }
+    }
+
+    /// `/bin/sh` arguments that wait for `pid` to exit (polling every 0.1 s,
+    /// for at most 30 s), then open `app` with `open`.
+    nonisolated static func relaunchArguments(app: URL, waitingFor pid: Int32, open: String = "/usr/bin/open") -> [String] {
+        let script = """
+            i=0; while kill -0 "$1" 2>/dev/null && [ $i -lt 300 ]; do sleep 0.1; i=$((i + 1)); done; exec "$2" "$0"
+            """
+        return ["-c", script, app.path, String(pid), open]
     }
 
     private static func removeQuarantine(_ url: URL) {
