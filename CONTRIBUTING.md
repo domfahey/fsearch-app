@@ -39,7 +39,7 @@ xcodebuild -project FSearch.xcodeproj -scheme FSearch -configuration Debug \
 | Benchmarks | `make bench` | `scripts/bench.sh` |
 | Lint, type and test together | `make check` | |
 
-- Core tests need `Vendor/fsearch` from `make daemon`. Set `LINT_FORMAT=0` to skip the swift-format check in `make lint` if formatting is not applied yet.
+- Core tests need `Vendor/fsearch` from `make daemon`.
 - Markdown links: `scripts/check-links.sh` checks that every relative link and anchor resolves. CI runs it, so run it when you edit docs.
 - UI smoke test: `make ui` (`scripts/ui-smoke.sh`). It needs a logged-in GUI session and accessibility permission for the test runner. CI does not run it, so run it locally when you change the panel.
 

@@ -70,8 +70,6 @@ jobs:
       - run: actionlint
       - run: shellcheck -S warning scripts/*.sh
       - name: swift format lint
-        # Remove continue-on-error once the codebase has been formatted.
-        continue-on-error: true
         run: xcrun swift format lint --strict --configuration .swift-format -r App AppUITests Packages/FSearchKit/Sources Packages/FSearchKit/Tests
 
   release:
