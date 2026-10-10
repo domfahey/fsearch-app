@@ -51,6 +51,7 @@ All fixed; see the CHANGELOG.
   - agent ownership for the app's LaunchAgent;
   - a daemon-wide query log;
   - **check the connecting client's code signature** on the socket;
+    once the daemon checks peers, Debug and ad-hoc builds of this app will be refused; give developers a path (an `allowed-clients` entry written by `make daemon`, or the opt-out in test mode) and document it in CONTRIBUTING;
   - Unicode normalization and case folding for names and queries;
   - apply the query's `limit:` over the JSON limit;
   - a daemon.log path option for the bundled helper: let the daemon open its own `daemon.log` via a flag or env var (SMAppService plists can't set a per-user `StandardErrorPath`).
