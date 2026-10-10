@@ -28,16 +28,18 @@ enum ActionsMenu {
             let t = Target {
                 let errors = app.actionErrorCount
                 action()
-                if kind.recordsRecent { app.openedRecent(path) }
+                let errored = app.actionErrorCount != errors
+                // A file that turned out to be gone is not a recent.
+                if kind.recordsRecent && !errored { app.openedRecent(path) }
                 // Like ↵: the user went to another app, so the launcher goes away,
                 // unless the action already failed and its error line needs reading.
-                if kind.hidesPanel(errored: app.actionErrorCount != errors) { app.panel.hide(returnFocus: true) }
+                if kind.hidesPanel(errored: errored) { app.panel.hide(returnFocus: true) }
             }
             i.target = t
             i.representedObject = t  // the item keeps its target alive
             return i
         }
-        menu.addItem(entry("Open", .open) { FileActions.open(item, editor: app.editor) })
+        menu.addItem(entry("Open", .open) { FileActions.open(item, editor: app.editor, onError: app.showActionError) })
         let with = NSMenuItem(title: "Open With", action: nil, keyEquivalent: "")
         // Capped at 12 so the submenu stays short.
         let apps = FileActions.workspace.urlsForApplications(toOpen: FileActions.url(path)).prefix(12)
@@ -47,12 +49,14 @@ enum ActionsMenu {
             let sub = NSMenu()
             for appURL in apps {
                 sub.addItem(
-                    entry(FileManager.default.displayName(atPath: appURL.path), .openWith) { FileActions.openWith(path, app: appURL) })
+                    entry(FileManager.default.displayName(atPath: appURL.path), .openWith) {
+                        FileActions.openWith(path, app: appURL, onError: app.showActionError)
+                    })
             }
             with.submenu = sub
         }
         menu.addItem(with)
-        menu.addItem(entry("Reveal in Finder", .reveal) { FileActions.reveal(path) })
+        menu.addItem(entry("Reveal in Finder", .reveal) { FileActions.reveal(path, onError: app.showActionError) })
         menu.addItem(entry("Quick Look", .quickLook) { FileActions.quickLook(path) })
         menu.addItem(entry("Copy Path", .copyPath) { FileActions.copyPath(path) })
         menu.addItem(entry("Copy File", .copyFile) { FileActions.copyFile(path) })

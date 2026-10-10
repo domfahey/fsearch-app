@@ -9,12 +9,18 @@ final class IconCache {
     static let shared = IconCache()
     private var byType: [String: NSImage] = [:]
 
-    /// The icon for a file: per type for files, directly for folders and apps (whose icons are their own).
-    func icon(for path: String) -> NSImage {
-        let url = URL(fileURLWithPath: path)
-        let ext = url.pathExtension.lowercased()
-        // Folders and bundles (apps) have their own icons; ask for those directly.
-        if ext.isEmpty || ext == "app" { return NSWorkspace.shared.icon(forFile: path) }
+    /// Folders (a dotted one like v1.2 too), extensionless files and apps
+    /// have their own icons, asked for by path; anything else shares its
+    /// extension's cached icon.
+    static func usesFileIcon(path: String, isDirectory: Bool) -> Bool {
+        let ext = (path as NSString).pathExtension.lowercased()
+        return isDirectory || ext.isEmpty || ext == "app"
+    }
+
+    /// `isDirectory` comes from the search result (the daemon's kind), so no disk access.
+    func icon(for path: String, isDirectory: Bool = false) -> NSImage {
+        if Self.usesFileIcon(path: path, isDirectory: isDirectory) { return NSWorkspace.shared.icon(forFile: path) }
+        let ext = (path as NSString).pathExtension.lowercased()
         if let cached = byType[ext] { return cached }
         let img = NSWorkspace.shared.icon(for: UTType(filenameExtension: ext) ?? .data)
         byType[ext] = img

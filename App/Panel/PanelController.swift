@@ -94,12 +94,12 @@ final class PanelController: PanelHost {
         p.hasShadow = true
         p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         p.contentView = NSHostingView(rootView: view)
-        // 680 x 460 matches SearchView's frame; the origin below centres it horizontally and sits it a little above the screen's middle.
-        p.setContentSize(NSSize(width: 680, height: 460))
+        // 680 x 460 matches SearchView's frame; PanelFrame centres it horizontally, a little above the middle, inside the visible frame.
+        let size = NSSize(width: 680, height: 460)
+        p.setContentSize(size)
         let mouse = NSEvent.mouseLocation
         if let screen = NSScreen.screens.first(where: { $0.frame.contains(mouse) }) ?? NSScreen.main {
-            let f = screen.visibleFrame
-            p.setFrameOrigin(NSPoint(x: f.midX - 340, y: f.midY - 30 + f.height / 6))
+            p.setFrameOrigin(PanelFrame.origin(size: size, in: screen.visibleFrame))
         }
         panel = p
         let front = NSWorkspace.shared.frontmostApplication
@@ -200,18 +200,24 @@ final class PanelController: PanelHost {
             guard items.indices.contains(i) else { return }
         case .none, .hide: break
         }
+        let errors = app.actionErrorCount
         switch effect {
         case .none: break
         case .hide: hide()
         case let .open(i):
-            FileActions.open(items[i], editor: app.editor)
-            app.openedRecent(items[i].path)
-        case let .reveal(i): FileActions.reveal(items[i].path)
+            // ↵ on an app, script or installer reveals it; ⌘K → Open launches it.
+            if FileActions.revealsOnReturn(items[i], editor: app.editor) {
+                FileActions.reveal(items[i].path, onError: app.showActionError)
+            } else if FileActions.open(items[i], editor: app.editor, onError: app.showActionError) {
+                app.openedRecent(items[i].path)
+            }
+        case let .reveal(i): FileActions.reveal(items[i].path, onError: app.showActionError)
         case let .quickLook(i): FileActions.quickLook(items[i].path)
         case let .copyPath(i): FileActions.copyPath(items[i].path)
         case let .showActions(i): ActionsMenu.show(for: items[i], in: panel, app: app)
         }
-        // The same rule as the ⌘K menu: going to another app puts the launcher away.
-        if PanelInput.menuAction(for: effect)?.hidesPanel == true { hide() }
+        // The same rule as the ⌘K menu: going to another app puts the launcher
+        // away, unless the action failed at once and its error needs reading.
+        if PanelInput.menuAction(for: effect)?.hidesPanel(errored: app.actionErrorCount != errors) == true { hide() }
     }
 }

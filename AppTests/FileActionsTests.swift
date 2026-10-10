@@ -12,71 +12,97 @@ extension AppTests {
         private let line = ResultItem.line(path: "/p/main.swift", match: Match(line: 12, text: "func main()"))
         private let file = ResultItem.file(Wire.hit("/p/readme.md"))
 
-        @Test func editorCommandOnlyForInstalledEditorsAndLines() throws {
+        private let vscodeApp = URL(fileURLWithPath: "/Applications/Visual Studio Code.app")
+        private func noErrors(_ m: String) { Issue.record("unexpected action error: \(m)") }
+
+        @Test func editorTargetOnlyForInstalledEditorsAndLines() throws {
             let env = TestEnv()
             defer { env.tearDown() }
-            let editor = try #require(Editor.allCases.first)
-            #expect(FileActions.editorCommand(for: file, editor: editor) == nil)
-            #expect(FileActions.editorCommand(for: line, editor: nil) == nil)
-            #expect(FileActions.editorCommand(for: line, editor: editor) == nil)  // not installed
-            env.workspace.apps[editor.bundleId] = URL(fileURLWithPath: "/Applications/Ed.app")
-            let c = try #require(FileActions.editorCommand(for: line, editor: editor))
-            #expect(c == openAtLine(editor, appURL: URL(fileURLWithPath: "/Applications/Ed.app"), path: "/p/main.swift", line: 12))
+            #expect(FileActions.editorTarget(for: file, editor: .vscode) == nil)
+            #expect(FileActions.editorTarget(for: line, editor: nil) == nil)
+            #expect(FileActions.editorTarget(for: line, editor: .vscode) == nil)  // not installed
+            env.workspace.apps[Editor.vscode.bundleId] = vscodeApp
+            let t = try #require(FileActions.editorTarget(for: line, editor: .vscode))
+            #expect(t.url == editorURL(.vscode, path: "/p/main.swift", line: 12))
+            #expect(t.app == vscodeApp)
+            // Xcode has no open-at-line URL: the file, opened with Xcode.
+            let xcode = URL(fileURLWithPath: "/Applications/Xcode.app")
+            env.workspace.apps[Editor.xcode.bundleId] = xcode
+            let x = try #require(FileActions.editorTarget(for: line, editor: .xcode))
+            #expect(x.url == URL(fileURLWithPath: "/p/main.swift"))
+            #expect(x.app == xcode)
         }
 
         @Test func openUsesTheDefaultApp() {
             let env = TestEnv()
             defer { env.tearDown() }
-            FileActions.open(file, editor: nil)
+            #expect(FileActions.open(file, editor: nil, onError: noErrors))
             #expect(env.workspace.opened == [URL(fileURLWithPath: "/p/readme.md")])
-            #expect(env.workspace.runs.isEmpty)
+            #expect(env.workspace.openedWith.isEmpty)
         }
 
-        @Test func openLineInEditor() throws {
+        /// A-H1: the editor is opened by LaunchServices with its URL, so it
+        /// never runs as FSearch's child (with FSearch's Full Disk Access).
+        @Test func openLineInEditorThroughLaunchServices() throws {
             let env = TestEnv()
             defer { env.tearDown() }
-            let editor = try #require(Editor.allCases.first)
-            env.workspace.apps[editor.bundleId] = URL(fileURLWithPath: "/Applications/Ed.app")
-            FileActions.open(line, editor: editor)
-            let c = try #require(FileActions.editorCommand(for: line, editor: editor))
-            #expect(env.workspace.runs.count == 1)
-            #expect(env.workspace.runs.first?.exe == c.executable)
-            #expect(env.workspace.runs.first?.args == c.arguments)
+            env.workspace.apps[Editor.vscode.bundleId] = vscodeApp
+            #expect(FileActions.open(line, editor: .vscode, onError: noErrors))
+            #expect(env.workspace.openedWith.count == 1)
+            #expect(env.workspace.openedWith.first?.app == vscodeApp)
+            #expect(env.workspace.openedWith.first?.urls.map(\.absoluteString) == ["vscode://file/p/main.swift:12"])
             #expect(env.workspace.opened.isEmpty)
         }
 
-        @Test func editorThatWontStartFallsBack() throws {
+        @Test func editorThatFailsFallsBackToTheDefaultApp() async throws {
             let env = TestEnv()
             defer { env.tearDown() }
-            let editor = try #require(Editor.allCases.first)
-            env.workspace.apps[editor.bundleId] = URL(fileURLWithPath: "/Applications/Ed.app")
-            env.workspace.runStarts = false
-            FileActions.open(line, editor: editor)
-            #expect(env.workspace.opened == [URL(fileURLWithPath: "/p/main.swift")])
+            env.workspace.apps[Editor.vscode.bundleId] = vscodeApp
+            env.workspace.openWithError = TestError("no handler")
+            #expect(FileActions.open(line, editor: .vscode, onError: noErrors))
+            #expect(await eventually { env.workspace.opened == [URL(fileURLWithPath: "/p/main.swift")] })
         }
 
-        @Test func editorThatFailsFallsBack() async throws {
+        /// Item 9: a result that is gone says so, and opens nothing.
+        @Test func missingFileReportsAndOpensNothing() {
             let env = TestEnv()
             defer { env.tearDown() }
-            let editor = try #require(Editor.allCases.first)
-            env.workspace.apps[editor.bundleId] = URL(fileURLWithPath: "/Applications/Ed.app")
-            env.workspace.runExitStatus = 2
-            FileActions.open(line, editor: editor)
-            #expect(await eventually { env.workspace.opened == [URL(fileURLWithPath: "/p/main.swift")] })
+            env.workspace.missing = ["/p/readme.md", "/p/main.swift"]
+            env.workspace.apps[Editor.vscode.bundleId] = vscodeApp
+            var errors: [String] = []
+            #expect(!FileActions.open(file, editor: nil) { errors.append($0) })
+            #expect(!FileActions.open(line, editor: .vscode) { errors.append($0) })
+            #expect(!FileActions.reveal("/p/readme.md") { errors.append($0) })
+            FileActions.openWith("/p/readme.md", app: URL(fileURLWithPath: "/Applications/X.app")) { errors.append($0) }
+            let readme = "“readme.md” is gone: moved or deleted", main = "“main.swift” is gone: moved or deleted"
+            #expect(errors == [readme, main, readme, readme])
+            #expect(env.workspace.opened.isEmpty)
+            #expect(env.workspace.openedWith.isEmpty)
+            #expect(env.workspace.revealed.isEmpty)
         }
 
         @Test func revealCopyAndOpenWith() {
             let env = TestEnv()
             defer { env.tearDown() }
-            FileActions.reveal("/p/a b.txt")
+            #expect(FileActions.reveal("/p/a b.txt", onError: noErrors))
             #expect(env.workspace.revealed == [[URL(fileURLWithPath: "/p/a b.txt")]])
             FileActions.copyPath("/p/🏡 a b.txt")
             #expect(env.pasteboard.string(forType: .string) == "/p/🏡 a b.txt")
             FileActions.copyFile("/p/a.txt")
             #expect(env.pasteboard.readObjects(forClasses: [NSURL.self]) as? [URL] == [URL(fileURLWithPath: "/p/a.txt")])
-            FileActions.openWith("/p/a.txt", app: URL(fileURLWithPath: "/Applications/X.app"))
+            FileActions.openWith("/p/a.txt", app: URL(fileURLWithPath: "/Applications/X.app"), onError: noErrors)
             #expect(env.workspace.openedWith.first?.app == URL(fileURLWithPath: "/Applications/X.app"))
             #expect(env.workspace.openedWith.first?.urls == [URL(fileURLWithPath: "/p/a.txt")])
+        }
+
+        /// Item 10: Open With reports a launch error, as Terminal does.
+        @Test func openWithReportsErrors() async {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            env.workspace.openWithError = TestError("damaged")
+            var errors: [String] = []
+            FileActions.openWith("/p/a.txt", app: URL(fileURLWithPath: "/Applications/X.app")) { errors.append($0) }
+            #expect(await eventually { errors == ["Couldn't open with X: damaged"] })
         }
 
         @Test func terminalOpensTheFolder() {
@@ -85,6 +111,20 @@ extension AppTests {
             let f = env.file("sub/x.txt")
             #expect(FileActions.terminalFolder(for: f) == env.dir.appendingPathComponent("sub").path)
             #expect(FileActions.terminalFolder(for: env.dir.path) == env.dir.path)
+        }
+
+        /// Item 11: a package (an app, an .rtfd) is a file to Terminal: its folder, not its insides.
+        @Test func terminalTreatsAPackageAsAFile() throws {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            for name in ["Tool.app", "Notes.rtfd"] {
+                let pkg = env.dir.appendingPathComponent("sub/\(name)")
+                try FileManager.default.createDirectory(at: pkg, withIntermediateDirectories: true)
+                #expect(FileActions.terminalFolder(for: pkg.path) == env.dir.appendingPathComponent("sub").path, "\(name)")
+            }
+            let dotted = env.dir.appendingPathComponent("v1.2")
+            try FileManager.default.createDirectory(at: dotted, withIntermediateDirectories: true)
+            #expect(FileActions.terminalFolder(for: dotted.path) == dotted.path)
         }
 
         @Test func terminalErrors() async {
@@ -102,6 +142,26 @@ extension AppTests {
             env.workspace.openWithError = TestError("denied")
             FileActions.openTerminal(at: "/p/x.txt") { errors.append($0) }
             #expect(await eventually { errors.last == "Couldn't open Terminal: denied" })
+        }
+
+        /// A-M2: ↵ reveals what it would launch; documents open.
+        @Test func returnRevealsLaunchableFiles() throws {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            #expect(FileActions.revealsOnReturn(.file(Wire.hit("/p/Installer.pkg")), editor: nil))
+            #expect(FileActions.revealsOnReturn(.file(Wire.hit("/p/run.command")), editor: nil))
+            #expect(!FileActions.revealsOnReturn(file, editor: nil))
+            // An extensionless file reveals only if it is executable.
+            let tool = env.file("bin/tool", "#!/bin/sh\n")
+            #expect(!FileActions.revealsOnReturn(.file(Wire.hit(tool)), editor: nil))
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: tool)
+            #expect(FileActions.revealsOnReturn(.file(Wire.hit(tool)), editor: nil))
+            // A line in a script opens in the chosen editor, which runs nothing;
+            // without an installed editor the default app would run it.
+            let script = ResultItem.line(path: "/p/run.command", match: Match(line: 2, text: "echo"))
+            #expect(FileActions.revealsOnReturn(script, editor: .vscode))
+            env.workspace.apps[Editor.vscode.bundleId] = vscodeApp
+            #expect(!FileActions.revealsOnReturn(script, editor: .vscode))
         }
 
         @Test func trashGoesThroughTheWorkspace() throws {
@@ -124,17 +184,18 @@ extension AppTests {
             ws.open(URL(fileURLWithPath: f))
             ws.activateFileViewerSelecting([URL(fileURLWithPath: f)])
             ws.open([URL(fileURLWithPath: f)], withApplicationAt: URL(fileURLWithPath: "/Applications/X.app"), completion: nil)
-            let exited = Exited()
-            #expect(ws.run("/usr/bin/false", ["a"]) { _ in exited.set() })
             try ws.trash(URL(fileURLWithPath: f))
             ws.open(URL(string: "x-apple.systempreferences:x")!)
             let want = [
-                "open \(f)", "reveal \(f)", "openWith X.app \(f)", "run /usr/bin/false a", "trash \(f)", "open x-apple.systempreferences:x",
+                "open \(f)", "reveal \(f)", "openWith X.app \(f)", "trash \(f)", "open x-apple.systempreferences:x",
             ]
             #expect(ws.actions == want)
             #expect(try String(contentsOf: log, encoding: .utf8) == want.joined(separator: "\n") + "\n")
             #expect(FileManager.default.fileExists(atPath: f))  // not trashed
-            #expect(!exited.value)
+            // File checks are real and read-only.
+            #expect(ws.fileInfo(atPath: f) == FileInfo())
+            #expect(ws.fileInfo(atPath: env.dir.path)?.isDirectory == true)
+            #expect(ws.fileInfo(atPath: env.dir.path + "/nope") == nil)
         }
 
         /// In this host toggling only sets the item (no preview comes up); the
@@ -205,6 +266,33 @@ extension AppTests {
             #expect(env.pasteboard.readObjects(forClasses: [NSURL.self]) as? [URL] == [URL(fileURLWithPath: path)])
         }
 
+        /// Item 9: Open on a file that is gone reports it, records no recent and keeps the launcher up.
+        @Test func openOnAMissingFile() {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            env.workspace.missing = ["/p/gone.txt"]
+            let menu = ActionsMenu.build(for: .file(Wire.hit("/p/gone.txt")), app: env.app)
+            let g = env.app.recentsGeneration
+            run(menu.item(withTitle: "Open"))
+            #expect(env.app.actionError == "“gone.txt” is gone: moved or deleted")
+            #expect(env.app.recentsGeneration == g)  // nothing recorded
+            #expect(env.panel.hides == 0)
+            run(menu.item(withTitle: "Reveal in Finder"))
+            #expect(env.workspace.revealed.isEmpty)
+            #expect(env.panel.hides == 0)
+        }
+
+        /// Item 10: an Open With launch error reaches the footer.
+        @Test func openWithFailureShowsTheError() async {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            env.workspace.appsToOpen = [URL(fileURLWithPath: "/Applications/Preview.app")]
+            env.workspace.openWithError = TestError("damaged")
+            let menu = ActionsMenu.build(for: .file(Wire.hit("/p/x.txt")), app: env.app)
+            run(menu.item(withTitle: "Open With")?.submenu?.items.first)
+            #expect(await eventually { env.app.actionError == "Couldn't open with Preview: damaged" })
+        }
+
         @Test func terminalFailureShowsTheError() {
             let env = TestEnv()
             defer { env.tearDown() }
@@ -261,12 +349,4 @@ extension AppTests {
             #expect(env.panel.hides == 1)
         }
     }
-}
-
-/// A flag a @Sendable callback can set.
-final class Exited: @unchecked Sendable {
-    private let lock = NSLock()
-    private var _value = false
-    var value: Bool { lock.lock(); defer { lock.unlock() }; return _value }
-    func set() { lock.lock(); _value = true; lock.unlock() }
 }

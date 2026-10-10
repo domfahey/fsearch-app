@@ -16,6 +16,8 @@ struct SearchView: View {
     /// The keyboard state, reduced by ``reduce(_:_:)``.
     @State var state: PanelState
     @FocusState private var focused: Bool
+    /// A result key pressed before the rows answered the query, run once they do.
+    @State private var held = HeldKey()
     let onEffect: (PanelEffect, [ResultItem]) -> Void
     let onSelect: (Int) -> Void
     let onCommand: (AppCommand) -> Void
@@ -35,6 +37,11 @@ struct SearchView: View {
     private var highlightQuery: String {
         if model.mode != .names { return QuerySplit.split(model.query).pattern }
         return QuerySplit.contentSearch(model.query)?.pattern ?? model.query
+    }
+    /// ↵ on the selected row would reveal it (an app, a script: see Launchable).
+    private var selectedRevealsOnReturn: Bool {
+        guard shown.indices.contains(state.selection) else { return false }
+        return FileActions.revealsOnReturn(shown[state.selection], editor: app.editor)
     }
     private var showsLines: Bool { if case .line = shown.first { true } else { false } }
 
@@ -56,6 +63,7 @@ struct SearchView: View {
                     .accessibilityIdentifier("searchField")
                     .onChange(of: model.query) {
                         state.selection = 0
+                        held.cancel()  // a key held for the old query never runs on the new one
                         Task { await model.refresh() }
                     }
                 if app.debugMode { Circle().fill(.orange).frame(width: 6, height: 6).help("Debug mode") }
@@ -63,48 +71,58 @@ struct SearchView: View {
             .padding(14)
             DaemonMessageLine(model: model, daemon: app.daemon)
             Divider()
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    if case .failed(.daemon) = model.phase {
-                    } else if let msg = UserMessage.forPhase(model.phase) {
-                        Text(msg).foregroundStyle(.secondary).padding(16)
-                    }
-                    if QuerySyntax.isCheatSheet(model.query) {
-                        cheatSheet
-                    }
-                    if !shown.isEmpty {
-                        section(model.query.isEmpty ? "Recent" : (showsLines ? "Inside files" : "Files"))
-                        ForEach(Array(shown.enumerated()), id: \.element.id) { i, item in
-                            ResultRow(item: item, query: highlightQuery, selected: i == state.selection)
-                                .onTapGesture(count: 2) { onEffect(.open(i), shown) }
-                                .onTapGesture { state.selection = i }
-                                .draggable(URL(fileURLWithPath: item.path))
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        if case .failed(.daemon) = model.phase {
+                        } else if let msg = UserMessage.forPhase(model.phase) {
+                            Text(msg).foregroundStyle(.secondary).padding(16)
+                        }
+                        if QuerySyntax.isCheatSheet(model.query) {
+                            cheatSheet
+                        }
+                        if !shown.isEmpty {
+                            section(model.query.isEmpty ? "Recent" : (showsLines ? "Inside files" : "Files"))
+                            ForEach(Array(shown.enumerated()), id: \.element.id) { i, item in
+                                ResultRow(item: item, query: highlightQuery, selected: i == state.selection)
+                                    .id(item.id)
+                                    .onTapGesture(count: 2) { onEffect(.open(i), shown) }
+                                    .onTapGesture { state.selection = i }
+                                    .draggable(URL(fileURLWithPath: item.path))
+                            }
+                        }
+                        // Below the files, so ↵ after "set" still opens the top file.
+                        if !rows.commands.isEmpty {
+                            section("FSearch")
+                            ForEach(Array(rows.commands.enumerated()), id: \.offset) { i, c in
+                                fallback(c.title, c.symbol, selected: state.selection == commandsStart + i) { onCommand(c) }
+                                    .accessibilityIdentifier("command-\(c.title)")
+                                    .id("command-\(c.title)")
+                            }
+                        }
+                        if rows.hasFallbacks {
+                            // UI tests press ↵ on a fallback only once the search is done and the row is selected.
+                            section("Use “\(model.query)” with…")
+                                .accessibilityIdentifier("fallbacks")
+                                .accessibilityValue(model.phase == .loading ? "searching" : "done")
+                            fallback("Search inside files", "doc.text.magnifyingglass", selected: state.selection == fallbacksStart) {
+                                switchMode(.content)
+                            }
+                            .accessibilityIdentifier("fallback-content")
+                            .id("fallback-content")
+                            fallback("Find definitions", "function", selected: state.selection == fallbacksStart + 1) {
+                                switchMode(.symbols)
+                            }
+                            .accessibilityIdentifier("fallback-symbols")
+                            .id("fallback-symbols")
                         }
                     }
-                    // Below the files, so ↵ after "set" still opens the top file.
-                    if !rows.commands.isEmpty {
-                        section("FSearch")
-                        ForEach(Array(rows.commands.enumerated()), id: \.offset) { i, c in
-                            fallback(c.title, c.symbol, selected: state.selection == commandsStart + i) { onCommand(c) }
-                                .accessibilityIdentifier("command-\(c.title)")
-                        }
-                    }
-                    if rows.hasFallbacks {
-                        // UI tests press ↵ on a fallback only once the search is done and the row is selected.
-                        section("Use “\(model.query)” with…")
-                            .accessibilityIdentifier("fallbacks")
-                            .accessibilityValue(model.phase == .loading ? "searching" : "done")
-                        fallback("Search inside files", "doc.text.magnifyingglass", selected: state.selection == fallbacksStart) {
-                            switchMode(.content)
-                        }
-                        .accessibilityIdentifier("fallback-content")
-                        fallback("Find definitions", "function", selected: state.selection == fallbacksStart + 1) {
-                            switchMode(.symbols)
-                        }
-                        .accessibilityIdentifier("fallback-symbols")
-                    }
+                    .padding(.bottom, 6)
                 }
-                .padding(.bottom, 6)
+                // The keyboard selection stays in view (anchor nil: the least scrolling).
+                .onChange(of: state.selection) {
+                    if let id = PanelInput.rowID(at: state.selection, shown: shown, rows: self.rows) { proxy.scrollTo(id) }
+                }
             }
             Divider()
             HStack(spacing: 14) {
@@ -115,8 +133,13 @@ struct SearchView: View {
                     Text(err).foregroundStyle(.red).lineLimit(1).accessibilityIdentifier("actionError")
                 }
                 Spacer()
-                hint(showsLines ? "Open at line" : "Open", "↵")
-                hint("Reveal in Finder", "⌘↵")
+                if selectedRevealsOnReturn {
+                    hint("Reveal in Finder", "↵")
+                    Text("⌘K → Open to launch").foregroundStyle(.secondary).accessibilityIdentifier("launchHint")
+                } else {
+                    hint(showsLines ? "Open at line" : "Open", "↵")
+                    hint("Reveal in Finder", "⌘↵")
+                }
                 hint("Actions", "⌘K")
             }
             .font(.system(size: 12)).padding(.horizontal, 12).padding(.vertical, 8)
@@ -125,7 +148,13 @@ struct SearchView: View {
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
         .onAppear { focused = true }
         .onChange(of: state.selection) { onSelect(state.selection) }
-        .onKeyPress(phases: .down) { press in handle(press) }
+        .onChange(of: model.mode) { held.cancel() }
+        // The results for the query in the box arrived: run a key held for them.
+        .onChange(of: model.resultsAreCurrent) {
+            if let k = PanelInput.replay(held: &held, model: model) { act(k) }
+        }
+        // .repeat: holding ↓/↑ keeps moving (PanelInput ignores other repeats).
+        .onKeyPress(phases: [.down, .repeat]) { press in handle(press) }
     }
 
     /// "?" in the field: the query syntax instead of results.
@@ -175,9 +204,16 @@ struct SearchView: View {
 
     /// Routes a key press through ``PanelInput`` and ``reduce(_:_:)``, then performs the effect.
     private func handle(_ press: KeyPress) -> KeyPress.Result {
+        let p = PanelInput.Press(press, event: NSApp.currentEvent)
+        guard let key = PanelInput.key(for: p, queryIsEmpty: model.query.isEmpty) else { return .ignored }
+        // A result key waits for results that answer the query in the box.
+        if let now = PanelInput.gate(key, held: &held, model: model) { act(now) }
+        return .handled
+    }
+
+    private func act(_ key: PanelKey) {
         let rows = rows
         state.query = model.query; state.mode = model.mode; state.count = rows.count; state.files = shown.count
-        guard let key = PanelInput.key(for: PanelInput.Press(press), queryIsEmpty: model.query.isEmpty) else { return .ignored }
         let effect = reduce(&state, key)
         // A query change refreshes through .onChange; only a mode change alone needs it here.
         let modeChanged = model.mode != state.mode
@@ -190,6 +226,5 @@ struct SearchView: View {
         case let .runCommand(c): onCommand(c)
         case .ignore: break
         }
-        return .handled
     }
 }

@@ -75,6 +75,51 @@ extension AppTests {
             #expect(!pc.isVisible)
         }
 
+        /// Item 9: ↵ or ⌘↵ on a result that is gone: an error, the launcher stays, no recent.
+        @Test func missingFileKeepsTheLauncherUp() {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let pc = PanelController()
+            env.workspace.missing = ["/p/gone.txt"]
+            let items: [ResultItem] = [.file(Wire.hit("/p/gone.txt"))]
+            pc.show(app: env.app)
+            defer { pc.hide(returnFocus: false) }
+            let g = env.app.recentsGeneration
+            pc.perform(.open(0), items)
+            #expect(env.app.actionError == "“gone.txt” is gone: moved or deleted")
+            #expect(pc.isVisible)
+            #expect(env.app.recentsGeneration == g)  // nothing recorded
+            pc.perform(.reveal(0), items)
+            #expect(pc.isVisible)
+            #expect(env.workspace.opened.isEmpty && env.workspace.revealed.isEmpty)
+        }
+
+        /// A-M2: ↵ on an app reveals it in Finder instead of launching it.
+        @Test func returnOnALaunchableFileReveals() {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let pc = PanelController()
+            let items: [ResultItem] = [.file(Wire.hit("/p/Tool.app"))]
+            pc.show(app: env.app)
+            pc.perform(.open(0), items)
+            #expect(env.workspace.revealed == [[URL(fileURLWithPath: "/p/Tool.app")]])
+            #expect(env.workspace.opened.isEmpty)
+            #expect(!pc.isVisible)
+        }
+
+        /// Item 5: the panel lands inside the screen's visible frame.
+        @Test func panelFitsTheScreen() throws {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let pc = PanelController()
+            pc.show(app: env.app)
+            defer { pc.hide(returnFocus: false) }
+            let frame = try #require(pc.panel?.frame)
+            // A host with no screen (headless CI) places nothing to check.
+            guard let screen = NSScreen.screens.first(where: { $0.visibleFrame.intersects(frame) }) ?? NSScreen.main else { return }
+            #expect(screen.visibleFrame.contains(frame), "\(frame) outside \(screen.visibleFrame)")
+        }
+
         /// Render smoke test: the search view in every state the panel can
         /// show (for coverage); each query's model state is checked.
         @Test func searchViewStatesRenderSmoke() async {
