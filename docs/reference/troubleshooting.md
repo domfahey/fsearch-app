@@ -47,10 +47,11 @@ macOS asks you to approve background helpers. Open System Settings, General, Log
 The file opens in its default app, not at the line, when:
 
 - you left **Open content results in** on **Default app**;
-- the chosen editor is gone, or its command failed (the app then falls back to the default app);
+- the chosen editor is gone, or it couldn't open the file (the app then falls back to the default app);
+- the editor is Xcode, which opens the file without jumping to the line;
 - the result is a file name, not a matching line. Only matching lines open at a line.
 
-See [Open results in your editor](../how-to/open-results-in-your-editor.md). The Zed, Sublime Text and BBEdit paths are not tested on a real install yet.
+See [Open results in your editor](../how-to/open-results-in-your-editor.md). Zed, Sublime Text and BBEdit are not tested on a real install yet.
 
 ## A query shows a red error line
 

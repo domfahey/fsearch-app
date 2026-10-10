@@ -44,6 +44,8 @@ macOS hides some folders, such as Desktop, Documents, Downloads, Mail, Messages 
 
 FSearch asks for Full Disk Access so the search daemon can index those folders too. The index stays on your Mac. You can skip this step. Search still works, but it will not find files in those protected folders. The daemon is the process that reads your files, so the permission belongs to the daemon.
 
+FSearch opens files and editors through macOS (LaunchServices), never by starting them as its own child processes, so the apps you open from FSearch don't run with its Full Disk Access.
+
 You can remove the permission at any time in System Settings, under Privacy & Security, then Full Disk Access.
 
 ## Deleting your data

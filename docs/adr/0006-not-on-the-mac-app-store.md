@@ -23,3 +23,7 @@ Distribute the app outside the Mac App Store as a signed, notarized DMG. Sign wi
 - Each release needs signing and notarization, handled by `scripts/release.sh` and the [release runbook](../release-checklist.md).
 - People find the app through GitHub, not the store.
 - Updates depend on the Sparkle key being set up. Until then, the updater stays off and **Check for Updates…** is hidden.
+
+## Update (2026-10-10)
+
+The app no longer runs helper programs such as an editor's command. Editors now open through LaunchServices with their URL schemes (see [Open results in your editor](../how-to/open-results-in-your-editor.md)), so they don't inherit FSearch's Full Disk Access. The decision is unchanged: Full Disk Access and the background daemon still rule out the sandbox.
