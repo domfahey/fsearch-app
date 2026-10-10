@@ -50,6 +50,9 @@ public final class SearchModel {
     }
 
     public func refresh() async {
+        // A filter still being typed (`foo size:`) is not a query yet: keep
+        // what is showing, and let any search already under way finish.
+        if QuerySplit.endsInHalfTypedFilter(query) { return }
         generation += 1
         inflight?.cancel()
         inflight = nil
