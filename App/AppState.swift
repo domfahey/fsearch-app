@@ -75,5 +75,33 @@ final class AppState: ObservableObject {
             guard let self, self.debugMode else { return }
             self.log.append(e, at: Date())
         }
+        search.onSettled = { [weak self] phase in self?.searchSettled(phase) }
+    }
+
+    /// The restart budget and recovery check (shared by every panel open).
+    var status: MenuBarStatus = .shared
+
+    /// Every finished search: results refill the restart budget and re-check a
+    /// daemon marked down; a dropped connection restarts it, once per unit of
+    /// the outage's budget (each restart searches again, and may fail again).
+    func searchSettled(_ phase: SearchPhase) {
+        switch phase {
+        case .results:
+            status.restartBudget.reset()
+            // Searches work, so a "failed" or "needs approval" warning is
+            // stale (e.g. the daemon came back): re-check, at most every 5 s.
+            let unhealthy = switch daemon.state {
+            case .failed, .needsApproval: true
+            default: false
+            }
+            if status.recoveryCheck.shouldRefresh(daemonUnhealthy: unhealthy) {
+                Task { await daemon.refresh() }
+            }
+        case .failed(.disconnected):
+            // `restart()` re-registers only a daemon the app owns; a CLI daemon is just re-checked.
+            guard status.restartBudget.spend() else { return }
+            Task { await daemon.restart(); await search.refresh() }
+        default: break
+        }
     }
 }

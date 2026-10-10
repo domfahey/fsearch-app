@@ -36,6 +36,11 @@ public final class SearchModel {
     public private(set) var phase: SearchPhase = .idle
     public private(set) var lastTookUs: UInt64?
     @ObservationIgnored public var onSearched: ((LogEntry) -> Void)?
+    /// Called with the new phase every time a search finishes (results,
+    /// indexing or failed), even when the phase is the same as before: a
+    /// second dropped connection must be seen as one, which watching the
+    /// phase for changes can miss.
+    @ObservationIgnored public var onSettled: ((SearchPhase) -> Void)?
 
     @ObservationIgnored private let names: SearchBackend
     @ObservationIgnored private let content: SearchBackend
@@ -120,5 +125,6 @@ public final class SearchModel {
 
     private func report(_ q: String, _ mode: SearchMode, _ n: Int, _ took: UInt64?, _ started: Date, _ err: String?) {
         onSearched?(LogEntry(query: q, mode: mode, resultCount: n, tookUs: took, roundTripMs: Date().timeIntervalSince(started) * 1000, error: err))
+        onSettled?(phase)
     }
 }
