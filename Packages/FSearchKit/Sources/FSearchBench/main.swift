@@ -27,6 +27,18 @@ func machineKey() -> String {
     return "\(sysctlString("hw.model"))-\(String(chip))".replacingOccurrences(of: "--", with: "-")
 }
 
+/// The daemon client timeout in seconds: `$FSEARCH_BENCH_TIMEOUT` when it is a
+/// positive number (it replaces every default, it doesn't scale them), else
+/// `fallback`. CI sets it higher because hosted runners can stall.
+func benchTimeout(_ fallback: TimeInterval, env: [String: String] = ProcessInfo.processInfo.environment)
+    -> TimeInterval
+{
+    guard let raw = env["FSEARCH_BENCH_TIMEOUT"], let t = TimeInterval(raw), t.isFinite, t > 0 else {
+        return fallback
+    }
+    return t
+}
+
 struct Args {
     var command: String
     var opts: [String: String] = [:]

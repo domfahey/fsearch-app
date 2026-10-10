@@ -106,14 +106,14 @@ struct Inconclusive: Error, CustomStringConvertible {
     if c.wants("client.search50") || c.wants("client.grep50") {
         let s = try CannedServer(dir: work, reply: Fixtures.searchReplyLine(hits: 50))
         defer { s.stop() }
-        let client = DaemonClient(socketPath: s.path, timeout: 15)
+        let client = DaemonClient(socketPath: s.path, timeout: benchTimeout(15))
         try await b.measureAsync("client.search50", group: .inproc, warmup: 50, samples: 400) {
             blackHole(try await client.search("heron lattice", limit: 50))
         }
         let g = try CannedServer(
             dir: work.appendingPathComponent("g", isDirectory: true).creating(), reply: Fixtures.grepReplyLine(files: 50))
         defer { g.stop() }
-        let gclient = DaemonClient(socketPath: g.path, timeout: 15)
+        let gclient = DaemonClient(socketPath: g.path, timeout: benchTimeout(15))
         try await b.measureAsync("client.grep50", group: .inproc, warmup: 50, samples: 400) {
             blackHole(try await gclient.grep(q: "", pattern: "heron", mode: .literal))
         }

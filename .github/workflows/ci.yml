@@ -222,6 +222,8 @@ jobs:
     continue-on-error: true
     env:
       BENCH_MACHINE: ci-macos-26
+      # Seconds each daemon request may take (local default 15 or 30). Hosted runners stall.
+      FSEARCH_BENCH_TIMEOUT: '90'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
