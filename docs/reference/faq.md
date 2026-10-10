@@ -12,7 +12,7 @@ macOS 14 (Sonoma) and later, on Apple silicon and Intel.
 
 ## Does it send my files or searches anywhere?
 
-No. The index and logs stay on your Mac. The app makes no network requests of its own, except that the updater checks for new versions in builds that have updates configured. See [Privacy](../../PRIVACY.md).
+No. The index and logs stay on your Mac. The app makes no network requests of its own, except that the updater checks for new versions in builds that have updates configured. See [Privacy](../privacy.md).
 
 ## Does it replace Spotlight?
 
@@ -68,7 +68,7 @@ The daemon rejected your query, and the red text is its own message, for example
 
 ## Where do I report a bug or ask for a feature?
 
-See [Support](../../SUPPORT.md). For security problems, see [Security](../../SECURITY.md).
+See [Support](../../.github/SUPPORT.md). For security problems, see [Security](../../.github/SECURITY.md).
 
 ## See also
 

@@ -35,7 +35,7 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
 - A Makefile for common tasks (`make test`, `lint`, `type`, `bench`, `check`) and a `.swift-format` style config.
 - CI runs the FSearchKit tests on macOS 14 (Xcode 16.2) and macOS 26 (Xcode 26.6), builds the universal app, lints the scripts and workflows, and reports benchmarks.
 - Open-source project files: contributing guide, security policy, code of conduct, architecture overview, issue and pull request templates, CODEOWNERS, and Dependabot for GitHub Actions.
-- Documentation ([docs/README.md](docs/README.md)): a first-search tutorial, how-to guides, reference pages (keyboard shortcuts, query syntax, settings, files and locations, troubleshooting, FAQ), architecture decision records, install and uninstall guides, a privacy policy ([PRIVACY.md](PRIVACY.md)), support ([SUPPORT.md](SUPPORT.md)) and a roadmap ([ROADMAP.md](ROADMAP.md)).
+- Documentation ([docs/README.md](docs/README.md)): a first-search tutorial, how-to guides, reference pages (keyboard shortcuts, query syntax, settings, files and locations, troubleshooting, FAQ), architecture decision records, install and uninstall guides, a privacy policy ([Privacy](docs/privacy.md)), support ([Support](.github/SUPPORT.md)) and a roadmap ([Roadmap](docs/roadmap.md)).
 
 ### Changed
 

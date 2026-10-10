@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Use this page to match what FSearch for Mac shows you to a cause and a fix. If your symptom is not here, see [Support](../../SUPPORT.md).
+Use this page to match what FSearch for Mac shows you to a cause and a fix. If your symptom is not here, see [Support](../../.github/SUPPORT.md).
 
 For most problems, turn on [debug mode](../how-to/turn-on-debug-mode.md) first. Index Details shows what the daemon is doing.
 
@@ -66,7 +66,7 @@ These are the exact texts the panel shows when a search cannot return results.
 |---|---|---|
 | Starting search… | The app cannot reach the daemon yet, or it did not answer in time. | See [Starting search…](#starting-search-does-not-go-away). |
 | Indexing your disk… results will appear shortly | The first index is still being built. | Wait. See [Indexing](#indexing-your-disk-results-will-appear-shortly). |
-| Unexpected reply from the search daemon: *detail* | The daemon answered with something the app does not understand, for example `reply has no "hits"`. This usually means the app and the daemon are different versions. | Quit and reopen FSearch. If it persists, [report it](../../SUPPORT.md) with the detail text. |
+| Unexpected reply from the search daemon: *detail* | The daemon answered with something the app does not understand, for example `reply has no "hits"`. This usually means the app and the daemon are different versions. | Quit and reopen FSearch. If it persists, [report it](../../.github/SUPPORT.md) with the detail text. |
 | *The daemon's own message* (in red) | The daemon rejected the query. | Fix the query. |
 
 In the debug-mode Search Log, a failed search is recorded as "Can't reach the search daemon", "The search daemon didn't answer in time", "The search index is still being built", or "The search daemon reported an error" (when the daemon gave no text).
@@ -78,7 +78,7 @@ In the debug-mode Search Log, a failed search is recorded as "Can't reach the se
 
 ## Still stuck
 
-Quit FSearch from the menu and open it again. Then see [Support](../../SUPPORT.md).
+Quit FSearch from the menu and open it again. Then see [Support](../../.github/SUPPORT.md).
 
 ## See also
 

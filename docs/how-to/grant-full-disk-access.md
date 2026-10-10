@@ -41,4 +41,4 @@ Which binary macOS lists for the bundled helper (the app or the helper) is still
 ## See also
 
 - [Troubleshooting](../reference/troubleshooting.md)
-- [Privacy](../../PRIVACY.md)
+- [Privacy](../privacy.md)

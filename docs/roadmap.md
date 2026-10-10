@@ -4,7 +4,7 @@ This page lists what FSearch for Mac may do next. It is a plan, not a promise: i
 
 ## v1: launcher panel (unreleased, 0.1.0 is next)
 
-Nothing has been released yet. Version 0.1.0 will be the first release. See the [Changelog](CHANGELOG.md).
+Nothing has been released yet. Version 0.1.0 will be the first release. See the [Changelog](../CHANGELOG.md).
 
 The launcher panel, opened with a shortcut. It searches by name, inside files, and for definitions. It includes the query filters, recent files, the actions menu, and debug mode.
 
@@ -12,7 +12,7 @@ The launcher panel, opened with a shortcut. It searches by name, inside files, a
 
 - App commands in the panel, with a Settings screen.
 - Launch FSearch itself at login.
-- An in-app uninstall button. Until then, see [docs/uninstall.md](docs/uninstall.md).
+- An in-app uninstall button. Until then, see [docs/uninstall.md](uninstall.md).
 - Unified logging.
 - A Report an Issue action in the app.
 - Accessibility and localization.
@@ -46,6 +46,6 @@ FSearch for Mac depends on the [fsearch](https://github.com/noahdunnagan/fsearch
 
 ## See also
 
-- [Changelog](CHANGELOG.md)
-- [Contributing](CONTRIBUTING.md)
-- [Architecture](ARCHITECTURE.md)
+- [Changelog](../CHANGELOG.md)
+- [Contributing](../CONTRIBUTING.md)
+- [Architecture](architecture.md)

@@ -54,4 +54,4 @@ If you still use the CLI, skip the data folder in step 5. To remove the CLI's lo
 
 ## An in-app uninstall button
 
-A button in the app to do these steps is planned. See [ROADMAP.md](../ROADMAP.md).
+A button in the app to do these steps is planned. See [Roadmap](roadmap.md).
