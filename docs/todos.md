@@ -21,6 +21,18 @@ Follow-ups not done yet, grouped by priority. "You" items need the maintainer: a
 
 - [x] **Tidy the root folder:** community files (CODE_OF_CONDUCT, SECURITY, SUPPORT) live in `.github/`; architecture, privacy, roadmap and this file live in `docs/`. README, LICENSE, CHANGELOG, CONTRIBUTING and THIRD_PARTY_NOTICES stay at the root. Every link was updated and checked with scripts/check-links.sh.
 
+## P1: Sparkle (from Sparkle's setup guide)
+
+- [ ] **Gentle update reminders:** FSearch is a menu-bar (`LSUIElement`) app, so scheduled update alerts can open behind other windows. Implement `SPUStandardUserDriverDelegate.supportsGentleScheduledUpdateReminders`: a quiet menu-bar indicator plus an "Update Available…" menu item.
+- [ ] **Signed feeds:** set `SURequireSignedFeed` and `SUVerifyUpdateBeforeExtraction` to YES (Sparkle 2.9+; we pin 2.10). DMG updates keep EdDSA key rotation possible.
+- [ ] **Incrementing `CFBundleVersion`:** it's hard-coded to `1`. `release.sh` sets it from `git rev-list --count HEAD` and refuses to go backwards; `CFBundleShortVersionString` comes from the tag.
+- [ ] **Update settings:** "Automatically check for updates" (bound to `SPUUpdater.automaticallyChecksForUpdates`) and "Check Now" in Settings, shown only when the updater is configured.
+- [ ] **No system profiling:** set `SUEnableSystemProfiling` to NO explicitly in Info.plist, matching docs/privacy.md.
+- [ ] **Strip Sparkle's XPC services** (not needed when not sandboxed) at build time, so there's less to sign and notarize. Update `release.sh` to match.
+- [ ] **Archive and export with Developer ID:** replace the ad-hoc archive plus manual nested signing with `xcodebuild archive` + `-exportArchive` (an `ExportOptions.plist` with method `developer-id`). Keep the staple, codesign and spctl checks.
+- [ ] **Automate the appcast:** `release.sh` keeps a folder with every released DMG (for deltas), writes `<dmg>.md` release notes from the CHANGELOG section, and runs `generate_appcast` from the SwiftPM artifacts (`…/artifacts/sparkle/Sparkle/bin/`). Run locally only; the EdDSA private key never goes to CI or the web host.
+- [ ] **You:** back up the EdDSA private key with `generate_keys -x <file>` somewhere safe. Test the first update by lowering `CFBundleVersion` and running `defaults delete com.domfahey.fsearch SULastCheckTime`. Keep the dSYMs.
+
 ## P1: test safety
 
 - [ ] **App tests must never take focus:** some AppTests made the real launcher panel the key window, stealing keystrokes (fixed for the panel). Onboarding, Quick Look, the activate call, the UI-test guard, throwaway defaults for UI tests, and clipboard restore are in progress, along with the low-signal app tests. Until done: no AppTests or UI test runs while someone is using the Mac.
