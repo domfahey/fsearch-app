@@ -1,6 +1,15 @@
 #!/bin/bash
-# Blocks commits that stage key files or secret-looking content.
+# Blocks commits that stage key files or secret-looking content. It checks the
+# staged blob (`git show ":$f"`), not the working-tree file, so `git add -p` and
+# edits after staging cannot slip a secret past it.
+root=$(git rev-parse --show-toplevel)
 files=()
 while IFS= read -r -d '' f; do files+=("$f"); done < <(git diff --cached --name-only -z --diff-filter=ACMR)
 [ ${#files[@]} -eq 0 ] && exit 0
-exec "$(git rev-parse --show-toplevel)/scripts/hooks/check-secrets.sh" "${files[@]}"
+tmp=$(mktemp -d) || exit 1
+trap 'rm -rf "$tmp"' EXIT
+for f in "${files[@]}"; do
+  mkdir -p "$tmp/$(dirname "$f")"
+  git show ":$f" > "$tmp/$f" 2>/dev/null || true
+done
+cd "$tmp" && exec "$root/scripts/hooks/check-secrets.sh" "${files[@]}"
