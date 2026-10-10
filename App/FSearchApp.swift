@@ -24,7 +24,6 @@ struct FSearchApp: App {
         Settings { SettingsView().environmentObject(app) }
         Window("Index Details", id: "index") { IndexDetailsView().environmentObject(app) }
         Window("Search Log", id: "log") { SearchLogView().environmentObject(app) }
-        Window("Welcome to FSearch", id: "onboarding") { OnboardingView().environmentObject(app) }
     }
 }
 
