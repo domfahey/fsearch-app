@@ -26,15 +26,24 @@ enum FileActions {
     /// The file URL for a path.
     static func url(_ path: String) -> URL { URL(fileURLWithPath: path) }
 
+    /// The chosen editor's app, if it is installed and the item is a content hit it opens.
+    private static func editorApp(for item: ResultItem, editor: Editor?) -> URL? {
+        guard case .line = item, let e = editor else { return nil }
+        return workspace.urlForApplication(withBundleIdentifier: e.bundleId)
+    }
+
     /// What opens a content hit in the chosen editor, if it is installed: its
-    /// open-at-line URL (the file itself for Xcode), handed to that app by
-    /// LaunchServices. Never the editor's CLI as our child process, which
-    /// would inherit FSearch's Full Disk Access.
+    /// open-at-line URL, handed to that app by LaunchServices. Never the
+    /// editor's CLI as our child process, which would inherit FSearch's Full
+    /// Disk Access. The file itself, without the line, when the editor has no
+    /// such URL (Xcode) or doesn't register its scheme: LaunchServices would
+    /// drop the URL without an error, so the fallback below would never run.
     static func editorTarget(for item: ResultItem, editor: Editor?) -> (url: URL, app: URL)? {
-        guard case let .line(path, match) = item, let e = editor,
-            let appURL = workspace.urlForApplication(withBundleIdentifier: e.bundleId)
-        else { return nil }
-        return (editorURL(e, path: path, line: match.line) ?? url(path), appURL)
+        guard case let .line(path, match) = item, let e = editor, let appURL = editorApp(for: item, editor: e) else { return nil }
+        guard let lineURL = editorURL(e, path: path, line: match.line),
+            workspace.urlsForApplications(toOpen: lineURL).contains(where: { $0.path == appURL.path })
+        else { return (url(path), appURL) }
+        return (lineURL, appURL)
     }
 
     /// The footer line for a result that is no longer on disk.
@@ -74,7 +83,7 @@ enum FileActions {
     /// chosen editor opens runs nothing, so it opens. Only an extensionless
     /// path is looked up on disk.
     static func revealsOnReturn(_ item: ResultItem, editor: Editor?) -> Bool {
-        if editorTarget(for: item, editor: editor) != nil { return false }
+        if editorApp(for: item, editor: editor) != nil { return false }
         let info = Launchable.needsFileCheck(item.path) ? workspace.fileInfo(atPath: item.path) : nil
         return Launchable.revealsOnReturn(
             path: item.path, isDirectory: info?.isDirectory ?? false, isExecutable: info?.isExecutable ?? false)
@@ -218,3 +227,4 @@ final class QuickLookSource: NSObject, @preconcurrency QLPreviewPanelDataSource 
         keyMonitor = nil
     }
 }
+
