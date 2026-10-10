@@ -15,6 +15,8 @@ struct LaunchOptions: Equatable, Sendable {
     var unitTestHost: Bool
     /// `-UITestShowPanel`: open the panel at launch and keep it up without focus.
     var showPanel: Bool
+    /// Where the search log goes instead (unit tests point it at a temp folder).
+    var searchLogOverride: URL? = nil
 
     static let current = parse(arguments: CommandLine.arguments, environment: ProcessInfo.processInfo.environment)
 
@@ -39,7 +41,16 @@ struct LaunchOptions: Equatable, Sendable {
     /// Debug mode's search log. In test mode it lives in the test daemon's data
     /// folder (inside its temp HOME), never in the user's ~/Library/Logs.
     var searchLogFile: URL {
+        if let searchLogOverride { return searchLogOverride }
         if testMode { return DebugFormat.dataDir(socketPath: socketPath).appendingPathComponent("searches.jsonl") }
         return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/FSearch/searches.jsonl")
+    }
+
+    /// The unit-test host never reopens windows AppKit saved in an earlier run
+    /// (Xcode passes -ApplePersistenceIgnoreState too; this doesn't rely on it).
+    /// The registration domain only: nothing is written to disk.
+    func configureHost(defaults: UserDefaults = .standard) {
+        guard unitTestHost else { return }
+        defaults.register(defaults: ["ApplePersistenceIgnoreState": true])
     }
 }

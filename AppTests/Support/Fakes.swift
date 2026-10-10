@@ -235,9 +235,12 @@ final class FakePanel: PanelHost {
 }
 
 /// One app with fakes everywhere, a throwaway defaults suite and a temp folder.
+/// AppTests run serialized, so every TestEnv shares one fixed suite, emptied
+/// when each starts and ends: at most one plist exists, removed at exit.
 @MainActor
 final class TestEnv {
-    let suite = "com.domfahey.fsearch.apptests.\(UUID().uuidString)"
+    nonisolated static let unitSuite = "com.domfahey.fsearch.apptests.unit"
+    let suite = TestEnv.unitSuite
     let defaults: UserDefaults
     let dir: URL
     let daemon: StubDaemon
@@ -250,18 +253,21 @@ final class TestEnv {
 
     init(helper: FakeHelper? = nil, daemon: StubDaemon = StubDaemon()) {
         _ = TestEnv.sweptStaleSuites
-        defaults = UserDefaults(suiteName: suite)!
+        defaults = TestEnv.emptySuite(suite)
         dir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("fsa-unit-\(UUID().uuidString.prefix(8))")
         try! FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         self.daemon = daemon
         self.helper = helper
         let options = LaunchOptions(
             socketPath: dir.path + "/Library/Application Support/FSearch/fsearch.sock",
-            testMode: helper == nil, unitTestHost: false, showPanel: false)
+            testMode: helper == nil, unitTestHost: false, showPanel: false,
+            // With a helper this isn't test mode; keep the log out of ~/Library/Logs.
+            searchLogOverride: dir.appendingPathComponent("searches.jsonl"))
         app = AppState(
             options: options, defaults: defaults, helper: helper,
             names: daemon, content: daemon, control: daemon, clock: clock.clock,
             cliAgentInstalled: { false })  // never the real ~/Library/LaunchAgents
+        precondition(app.log.file.path.hasPrefix(dir.path), "TestEnv's search log escaped its temp folder")
         app.panel = panel
         app.actionErrorDuration = .milliseconds(20)
         FileActions.workspace = workspace
@@ -283,7 +289,7 @@ final class TestEnv {
         FileActions.workspace = FakeWorkspace()
         FileActions.pasteboard = NSPasteboard(name: NSPasteboard.Name("com.domfahey.fsearch.apptests.idle"))
         pasteboard.releaseGlobally()
-        TestEnv.removeSuite(suite)
+        _ = TestEnv.emptySuite(suite)
         try? FileManager.default.removeItem(at: dir)
     }
 
@@ -298,11 +304,21 @@ final class TestEnv {
         {
             try? FileManager.default.removeItem(at: prefs.appendingPathComponent(n))
         }
+        // At the end of the run, best effort, the shared suite's (now empty)
+        // plist goes too; cfprefsd may still write it back, and the sweep above
+        // (and scripts/coverage.sh, ui-smoke.sh) removes it next time.
+        atexit { TestEnv.deletePlist(TestEnv.unitSuite) }
     }()
 
-    /// Clears a throwaway suite and deletes the plist cfprefsd leaves behind.
-    static func removeSuite(_ name: String) {
-        UserDefaults(suiteName: name)?.removePersistentDomain(forName: name)
+    /// The suite, emptied and flushed, so cfprefsd holds no stale keys for it.
+    nonisolated static func emptySuite(_ name: String) -> UserDefaults {
+        let d = UserDefaults(suiteName: name)!
+        d.removePersistentDomain(forName: name)
+        d.synchronize()
+        return d
+    }
+
+    nonisolated static func deletePlist(_ name: String) {
         let plist = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Preferences/\(name).plist")
         try? FileManager.default.removeItem(at: plist)

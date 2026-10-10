@@ -16,9 +16,13 @@ enum Updater {
     /// nil until `start()` runs with a real key.
     private(set) static var controller: SPUStandardUpdaterController?
 
-    /// Called once at launch. Creates (and so starts) Sparkle only when configured.
+    /// Never under test: a UI-test launch would check the real feed, write
+    /// SULastCheckTime to the real defaults and could put up update windows.
+    static func shouldStart(configured: Bool, testMode: Bool) -> Bool { configured && !testMode }
+
+    /// Called once at launch. Creates (and so starts) Sparkle only when configured, outside test mode.
     static func start() {
-        guard isConfigured, controller == nil else { return }
+        guard shouldStart(configured: isConfigured, testMode: LaunchOptions.current.testMode), controller == nil else { return }
         controller = SPUStandardUpdaterController(
             startingUpdater: true, updaterDelegate: nil, userDriverDelegate: UpdateReminderDriver.shared)
     }

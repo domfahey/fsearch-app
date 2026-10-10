@@ -44,9 +44,14 @@ final class PanelController: PanelHost {
         }
     }
 
+    /// A test-mode app (UI tests) must not take the user's own global shortcut.
+    static func registersGlobalHotkey(_ options: LaunchOptions) -> Bool { !options.testMode }
+
     func install(app: AppState) {
         self.app = app
-        KeyboardShortcuts.onKeyUp(for: .togglePanel) { [weak self] in self?.toggle(app: app) }
+        if Self.registersGlobalHotkey(LaunchOptions.current) {
+            KeyboardShortcuts.onKeyUp(for: .togglePanel) { [weak self] in self?.toggle(app: app) }
+        }
         if LaunchOptions.current.showPanel { show(app: app) }
     }
 

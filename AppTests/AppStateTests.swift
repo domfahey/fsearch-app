@@ -65,8 +65,8 @@ extension AppTests {
             #expect(AppDefaults.make(testMode: false) === UserDefaults.standard)
             #expect(AppDefaults.store !== UserDefaults.standard)  // this host is test mode
             #expect(OnboardingLauncher.defaults !== UserDefaults.standard)
-            let name = "com.domfahey.fsearch.apptests.\(UUID().uuidString)"
-            defer { TestEnv.removeSuite(name) }
+            let name = TestEnv.unitSuite
+            defer { _ = TestEnv.emptySuite(name) }
             UserDefaults(suiteName: name)!.set(["/stale"], forKey: "recentPaths")
             let d = AppDefaults.make(testMode: true, suiteName: name)
             #expect(d !== UserDefaults.standard)
@@ -134,10 +134,10 @@ extension AppTests {
         }
 
         @Test func defaultPanelHostIsTheLauncher() {
-            defer { TestEnv.removeSuite("com.domfahey.fsearch.apptests.panel") }
+            defer { _ = TestEnv.emptySuite(TestEnv.unitSuite) }
             let app = AppState(
                 options: LaunchOptions(socketPath: "/nowhere.sock", testMode: true, unitTestHost: false, showPanel: false),
-                defaults: UserDefaults(suiteName: "com.domfahey.fsearch.apptests.panel")!, helper: nil,
+                defaults: TestEnv.emptySuite(TestEnv.unitSuite), helper: nil,
                 names: StubDaemon(), content: StubDaemon(), control: StubDaemon())
             #expect(app.panel === PanelController.shared)
         }

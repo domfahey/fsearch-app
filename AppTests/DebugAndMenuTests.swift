@@ -118,9 +118,9 @@ extension AppTests {
         }
 
         @Test func dontRemindMeStoresTheFlagThatHidesTheReminder() {
-            let name = "com.domfahey.fsearch.apptests.\(UUID().uuidString)"
-            let defaults = UserDefaults(suiteName: name)!
-            defer { TestEnv.removeSuite(name) }
+            let name = TestEnv.unitSuite
+            let defaults = TestEnv.emptySuite(name)
+            defer { _ = TestEnv.emptySuite(name) }
             #expect(!defaults.bool(forKey: "dismissedFullDiskAccessReminder"))
             let off = DaemonCondition.running(fullDiskAccess: false)
             #expect(
