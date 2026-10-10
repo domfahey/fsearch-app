@@ -14,7 +14,7 @@ struct FSearchApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra("FSearch", systemImage: "magnifyingglass") {
+        MenuBarExtra("FSearch", systemImage: MenuBarStatus.shared.icon(for: app)) { MenuBarFixItem(app: app)
             MenuContent(app: app)
         }
         Settings { SettingsView().environmentObject(app) }

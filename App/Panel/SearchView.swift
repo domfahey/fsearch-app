@@ -44,6 +44,7 @@ struct SearchView: View {
                 if app.debugMode { Circle().fill(.orange).frame(width: 6, height: 6).help("Debug mode") }
             }
             .padding(14)
+            DaemonMessageLine(model: model, daemon: app.daemon)
             Divider()
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
