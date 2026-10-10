@@ -62,9 +62,10 @@ final class AppState: ObservableObject {
 
     init(options: LaunchOptions, defaults: UserDefaults, helper: HelperService?,
          names: SearchBackend, content: SearchBackend, control: any DaemonControl,
-         clock: DaemonClock = .live) {
+         clock: DaemonClock = .live,
+         cliAgentInstalled: @escaping () -> Bool = { FileManager.default.fileExists(atPath: DaemonManager.cliAgentPlist.path) }) {
         self.options = options
-        daemon = DaemonManager(client: control, service: helper, clock: clock)
+        daemon = DaemonManager(client: control, service: helper, cliAgentInstalled: cliAgentInstalled, clock: clock)
         search = SearchModel(names: names, content: content)
         recents = Recents(defaults: defaults)
         log = SearchLog(file: options.searchLogFile)

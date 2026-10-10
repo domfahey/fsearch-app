@@ -124,11 +124,12 @@ final class PanelController: PanelHost {
         case let .open(i):
             FileActions.open(items[i], editor: app.editor)
             app.openedRecent(items[i].path)
-            hide()
-        case let .reveal(i): FileActions.reveal(items[i].path); hide()
+        case let .reveal(i): FileActions.reveal(items[i].path)
         case let .quickLook(i): FileActions.quickLook(items[i].path)
         case let .copyPath(i): FileActions.copyPath(items[i].path)
         case let .showActions(i): ActionsMenu.show(for: items[i], in: panel, app: app)
         }
+        // The same rule as the ⌘K menu: going to another app puts the launcher away.
+        if PanelInput.menuAction(for: effect)?.hidesPanel == true { hide() }
     }
 }

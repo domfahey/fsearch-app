@@ -137,34 +137,17 @@ struct SearchView: View {
 
     private func handle(_ press: KeyPress) -> KeyPress.Result {
         state.query = model.query; state.mode = model.mode; state.count = rowCount; state.files = shown.count
-        let cmd = press.modifiers.contains(.command), shift = press.modifiers.contains(.shift), ctrl = press.modifiers.contains(.control)
-        let key: PanelKey? = switch (press.key, cmd, shift, ctrl) {
-        case (.upArrow, _, _, _), (KeyEquivalent("p"), false, false, true): .up
-        case (.downArrow, _, _, _), (KeyEquivalent("n"), false, false, true): .down
-        case (.return, true, _, _): .cmdEnter
-        case (.return, false, _, _): .enter
-        case (.escape, _, _, _): .escape
-        // ⌘Y, ⌘K, ⌘⇧C ignoring case: Shift or Caps Lock change the character.
-        case (_, true, _, _) where PanelKey.commandLetter(String(press.key.character), shift: shift) != nil:
-            PanelKey.commandLetter(String(press.key.character), shift: shift)
-        case (.delete, false, _, _) where model.query.isEmpty: .backspaceOnEmpty
-        default: press.characters.first.flatMap { $0.wholeNumberValue }.flatMap { cmd ? PanelKey.cmdDigit($0) : nil }
-        }
-        guard let key else { return .ignored }
+        guard let key = PanelInput.key(for: PanelInput.Press(press), queryIsEmpty: model.query.isEmpty) else { return .ignored }
         let effect = reduce(&state, key)
         // A query change refreshes through .onChange; only a mode change alone needs it here.
         let modeChanged = model.mode != state.mode
         let queryChanged = model.query != state.query
         model.query = state.query; model.mode = state.mode
         if modeChanged && !queryChanged { Task { await model.refresh() } }
-        // Rows past the files are the "use with..." rows: Return switches mode, other actions don't apply.
-        switch effect {
-        case let .open(i) where i >= shown.count:
-            if let m = PanelRows.row(at: i, files: shown.count, query: model.query, mode: model.mode)?.mode { switchMode(m) }
-        case let .reveal(i), let .quickLook(i), let .copyPath(i), let .showActions(i):
-            if i < shown.count { onEffect(effect, shown) }
-        default:
-            onEffect(effect, shown)
+        switch PanelInput.route(effect, files: shown.count, query: model.query, mode: model.mode) {
+        case let .perform(e): onEffect(e, shown)
+        case let .switchMode(m): switchMode(m)
+        case .ignore: break
         }
         return .handled
     }
