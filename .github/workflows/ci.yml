@@ -15,10 +15,22 @@ permissions:
 # accessibility permission that hosted runners don't grant reliably. Run locally.
 jobs:
   kit:
-    runs-on: macos-26
+    # macos-14 is the deployment target (macOS 14): its newest Xcode with Swift 6 is
+    # 16.2 (Swift 6.0.3, satisfies swift-tools-version 6.0), per macos-14-arm64 Readme,
+    # image 20260831. That image is deprecated (unsupported 2026-11-02); then drop the leg.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-26
+            xcode: '26.6'
+          - os: macos-14
+            xcode: '16.2'
+    runs-on: ${{ matrix.os }}
+    continue-on-error: false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: sudo xcode-select -s /Applications/Xcode_26.6.app
+      - run: sudo xcode-select -s /Applications/Xcode_${{ matrix.xcode }}.app
       - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master, 2026-09-12 (merge of #185)
         with:
           toolchain: stable
