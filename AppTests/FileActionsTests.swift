@@ -75,6 +75,22 @@ extension AppTests {
             #expect(env.workspace.openedWith.first?.urls.first?.scheme == "vscode")
         }
 
+        /// The footer asks what ↵ does on every redraw; the answer (LaunchServices, maybe the disk) is worked out once
+        /// per selected row and editor.
+        @Test func returnsActionIsCachedPerRowAndEditor() {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let cache = RevealCache()
+            #expect(!cache.revealsOnReturn(line, editor: .vscode))
+            #expect(!cache.revealsOnReturn(line, editor: .vscode))
+            #expect(env.workspace.appLookups == 1)
+            #expect(!cache.revealsOnReturn(line, editor: .zed))
+            #expect(env.workspace.appLookups == 2)
+            #expect(cache.revealsOnReturn(.file(Wire.hit("/p/Tool.app")), editor: .zed))
+            #expect(cache.revealsOnReturn(.file(Wire.hit("/p/Tool.app")), editor: .zed))
+            #expect(!cache.revealsOnReturn(line, editor: nil))
+        }
+
         @Test func editorThatFailsFallsBackToTheDefaultApp() async throws {
             let env = TestEnv()
             defer { env.tearDown() }

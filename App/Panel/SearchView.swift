@@ -20,6 +20,8 @@ struct SearchView: View {
     let held: HeldKeyBox
     /// Whether the panel is on screen; a hidden panel never replays a held key.
     let isVisible: () -> Bool
+    /// What ↵ does on the selected row, remembered per row.
+    @State private var revealCache = RevealCache()
     let onEffect: (PanelEffect, [ResultItem]) -> Void
     let onSelect: (Int) -> Void
     let onCommand: (AppCommand) -> Void
@@ -43,7 +45,7 @@ struct SearchView: View {
     /// ↵ on the selected row would reveal it (an app, a script: see Launchable).
     private var selectedRevealsOnReturn: Bool {
         guard shown.indices.contains(state.selection) else { return false }
-        return FileActions.revealsOnReturn(shown[state.selection], editor: app.editor)
+        return revealCache.revealsOnReturn(shown[state.selection], editor: app.editor)
     }
     private var showsLines: Bool { if case .line = shown.first { true } else { false } }
 

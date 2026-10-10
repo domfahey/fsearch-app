@@ -228,3 +228,18 @@ final class QuickLookSource: NSObject, @preconcurrency QLPreviewPanelDataSource 
     }
 }
 
+/// What ↵ does on the selected row, worked out once per row and editor: the
+/// footer asks on every redraw, and the answer may need LaunchServices and the disk.
+@MainActor
+final class RevealCache {
+    private var key: (id: String, editor: Editor?)?
+    private var value = false
+
+    /// ``FileActions/revealsOnReturn(_:editor:)``, remembered for the last row and editor asked about.
+    func revealsOnReturn(_ item: ResultItem, editor: Editor?) -> Bool {
+        if let key, key.id == item.id, key.editor == editor { return value }
+        value = FileActions.revealsOnReturn(item, editor: editor)
+        key = (item.id, editor)
+        return value
+    }
+}

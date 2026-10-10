@@ -203,6 +203,8 @@ final class FakeWorkspace: Workspace {
     private(set) var openedWith: [(urls: [URL], app: URL)] = []
     private(set) var revealed: [[URL]] = []
     private(set) var trashed: [URL] = []
+    /// LaunchServices lookups by bundle id.
+    private(set) var appLookups = 0
 
     func open(_ url: URL) { opened.append(url) }
 
@@ -214,7 +216,10 @@ final class FakeWorkspace: Workspace {
     }
 
     func activateFileViewerSelecting(_ urls: [URL]) { revealed.append(urls) }
-    func urlForApplication(withBundleIdentifier id: String) -> URL? { apps[id] }
+    func urlForApplication(withBundleIdentifier id: String) -> URL? {
+        appLookups += 1
+        return apps[id]
+    }
     func urlsForApplications(toOpen url: URL) -> [URL] {
         url.isFileURL ? appsToOpen : schemeHandlers[url.scheme ?? ""] ?? []
     }
