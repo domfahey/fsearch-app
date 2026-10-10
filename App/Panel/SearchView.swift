@@ -119,9 +119,9 @@ struct SearchView: View {
         case (.return, true, _, _): .cmdEnter
         case (.return, false, _, _): .enter
         case (.escape, _, _, _): .escape
-        case (KeyEquivalent("y"), true, false, _): .cmdY
-        case (_, true, true, _) where press.key.character.lowercased() == "c": .cmdShiftC  // Shift makes it "C"
-        case (KeyEquivalent("k"), true, false, _): .cmdK
+        // ⌘Y, ⌘K, ⌘⇧C ignoring case: Shift or Caps Lock change the character.
+        case (_, true, _, _) where PanelKey.commandLetter(String(press.key.character), shift: shift) != nil:
+            PanelKey.commandLetter(String(press.key.character), shift: shift)
         case (.delete, false, _, _) where model.query.isEmpty: .backspaceOnEmpty
         default: press.characters.first.flatMap { $0.wholeNumberValue }.flatMap { cmd ? PanelKey.cmdDigit($0) : nil }
         }

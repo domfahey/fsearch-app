@@ -2,6 +2,32 @@ import Foundation
 
 public enum PanelKey: Equatable, Sendable {
     case up, down, enter, cmdEnter, cmdY, cmdShiftC, cmdDigit(Int), cmdK, escape, backspaceOnEmpty
+
+    /// The ⌘-letter bindings, matched ignoring case: Caps Lock or Shift change the character.
+    public static func commandLetter(_ character: String, shift: Bool) -> PanelKey? {
+        switch (character.lowercased(), shift) {
+        case ("y", false): .cmdY
+        case ("k", false): .cmdK
+        case ("c", true): .cmdShiftC
+        default: nil
+        }
+    }
+}
+
+/// The ⌘K menu's entries and what the panel does after each.
+public enum MenuAction: CaseIterable, Hashable, Sendable {
+    case open, openWith, reveal, quickLook, copyPath, copyFile, openTerminal, trash
+
+    /// Actions that take you to another app put the launcher away, as ↵ does.
+    public var hidesPanel: Bool {
+        switch self {
+        case .open, .openWith, .reveal, .openTerminal: true
+        case .quickLook, .copyPath, .copyFile, .trash: false
+        }
+    }
+
+    /// Opening a file, in any app, makes it a recent.
+    public var recordsRecent: Bool { self == .open || self == .openWith }
 }
 
 public enum PanelEffect: Equatable, Sendable {

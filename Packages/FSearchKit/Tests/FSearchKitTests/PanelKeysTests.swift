@@ -140,3 +140,22 @@ import Testing
         #expect(reduce(&s, .escape) == .hide)
     }
 }
+
+@Suite struct CommandLetterTests {
+    @Test func matchesIgnoringCase() {
+        // Caps Lock turns ⌘y into "Y"; Shift turns ⌘⇧c into "C".
+        #expect(PanelKey.commandLetter("y", shift: false) == .cmdY)
+        #expect(PanelKey.commandLetter("Y", shift: false) == .cmdY)
+        #expect(PanelKey.commandLetter("k", shift: false) == .cmdK)
+        #expect(PanelKey.commandLetter("K", shift: false) == .cmdK)
+        #expect(PanelKey.commandLetter("c", shift: true) == .cmdShiftC)
+        #expect(PanelKey.commandLetter("C", shift: true) == .cmdShiftC)
+    }
+
+    @Test func shiftMatters() {
+        #expect(PanelKey.commandLetter("Y", shift: true) == nil)
+        #expect(PanelKey.commandLetter("K", shift: true) == nil)
+        #expect(PanelKey.commandLetter("c", shift: false) == nil)
+        #expect(PanelKey.commandLetter("x", shift: false) == nil)
+    }
+}

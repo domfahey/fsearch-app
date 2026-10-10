@@ -12,19 +12,26 @@ import XCTest
 /// works where the runner is not sandboxed.
 @MainActor
 final class PanelSmokeTests: XCTestCase {
-    private var savedClipboard: String?
+    /// Every item on the general pasteboard, every type, as data.
+    private var savedClipboard: [[NSPasteboard.PasteboardType: Data]] = []
 
-    // ⌘⇧C overwrites the general pasteboard; put the user's text back afterwards.
+    // ⌘⇧C overwrites the general pasteboard; put back exactly what the user had.
     override func setUp() {
         super.setUp()
-        savedClipboard = NSPasteboard.general.string(forType: .string)
+        savedClipboard = (NSPasteboard.general.pasteboardItems ?? []).map { item in
+            Dictionary(item.types.compactMap { t in item.data(forType: t).map { (t, $0) } }, uniquingKeysWith: { a, _ in a })
+        }
     }
 
     override func tearDown() {
-        if let s = savedClipboard {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(s, forType: .string)
+        let pb = NSPasteboard.general
+        pb.clearContents()  // even if it was empty
+        let items = savedClipboard.map { saved in
+            let item = NSPasteboardItem()
+            for (t, d) in saved { item.setData(d, forType: t) }
+            return item
         }
+        if !items.isEmpty { pb.writeObjects(items) }
         super.tearDown()
     }
 
@@ -73,6 +80,19 @@ final class PanelSmokeTests: XCTestCase {
         XCTAssertTrue(row, row ? "" : "value=\(field.value as? String ?? "nil") " + app.debugDescription.components(separatedBy: "\n").filter { !$0.contains("MenuItem") && !$0.contains("Menu,") && !$0.contains("MenuBarItem") }.joined(separator: "\n"))
         field.typeKey("c", modifierFlags: [.command, .shift])
         XCTAssertEqual(NSPasteboard.general.string(forType: .string)?.hasSuffix("/proj/heronfile.txt"), true)
+
+        // ⌘Y opens Quick Look over the launcher; ⌘Y again closes it and the field gets the keyboard back.
+        let windows = app.windows.count
+        field.typeKey("y", modifierFlags: .command)
+        let previewUp = NSPredicate { _, _ in app.windows.count > windows }
+        let opened = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: previewUp, object: nil)], timeout: 10) == .completed
+        XCTAssertTrue(opened, "windows=\(app.windows.count) " + app.debugDescription)
+        app.typeKey("y", modifierFlags: .command)
+        let previewGone = NSPredicate { _, _ in app.windows.count == windows }
+        let closed = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: previewGone, object: nil)], timeout: 10) == .completed
+        XCTAssertTrue(closed, "windows=\(app.windows.count) " + app.debugDescription)
+        let refocused = NSPredicate { _, _ in field.value(forKey: "hasKeyboardFocus") as? Bool == true }
+        XCTAssertEqual(XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: refocused, object: nil)], timeout: 5), .completed)
 
         // A path with a space and an emoji copies intact.
         field.typeKey("a", modifierFlags: .command)

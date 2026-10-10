@@ -1,6 +1,7 @@
 import AppKit
 import FSearchKit
 import KeyboardShortcuts
+import Quartz
 import SwiftUI
 
 /// The floating launcher: a borderless panel over every Space, centred on
@@ -18,9 +19,24 @@ final class PanelController {
         override func resignKey() {
             super.resignKey()
             // UI tests keep the panel up even though the test runner holds focus.
+            if CommandLine.arguments.contains("-UITestShowPanel") { return }
+            // Quick Look takes key while it previews; the launcher stays up behind it.
+            if QuickLookSource.shared.isPreviewing { return }
             // The user moved to another app, so don't pull focus back.
-            if !CommandLine.arguments.contains("-UITestShowPanel") {
-                MainActor.assumeIsolated { PanelController.shared.hide(returnFocus: false) }
+            PanelController.shared.hide(returnFocus: false)
+        }
+
+        // Quick Look looks for a controller up the key window's responder chain.
+        override func acceptsPreviewPanelControl(_ panel: QLPreviewPanel!) -> Bool { true }
+        override func beginPreviewPanelControl(_ panel: QLPreviewPanel!) {
+            MainActor.assumeIsolated { QuickLookSource.shared.attach(panel) }
+        }
+        override func endPreviewPanelControl(_ panel: QLPreviewPanel!) {
+            MainActor.assumeIsolated { QuickLookSource.shared.detach(panel) }
+            // The preview closed: give the keyboard back to the launcher.
+            DispatchQueue.main.async {
+                guard self.isVisible else { return }
+                if NSApp.isActive { self.makeKey() } else { PanelController.shared.hide(returnFocus: false) }
             }
         }
     }
@@ -67,6 +83,7 @@ final class PanelController {
         guard let p = panel, p.isVisible, let app else { return }
         session.hidden(PanelState(query: app.search.query, mode: app.search.mode, selection: selection), at: Date())
         p.orderOut(nil)
+        QuickLookSource.shared.close()
         // Hiding the app hands focus back to whatever was in front before.
         if returnFocus && NSApp.isActive { NSApp.hide(nil) }
     }
