@@ -73,6 +73,9 @@ Follow-ups not done yet, grouped by priority. "You" items need the maintainer: a
 - [ ] Land the fsearch PR stack (#12 → #13 → #14; rebase #14 if PR #17 merges first), then move `scripts/build-daemon.sh` from the fork pin `d26cf78` to an upstream tag, and update THIRD_PARTY_NOTICES.md.
 - [ ] Until then, keep the fork's `tests-daemon` branch (or tag the commit) so the pinned SHA stays reachable.
 - [ ] Upstream daemon changes the app wants:
+  - check the connecting client's code signature on the socket (today any process running as the user can query a daemon that has Full Disk Access);
+  - Unicode normalization (NFC/NFD) and case folding for names and queries;
+  - apply `limit:` from the query over the JSON `limit`;
   - version in `status` (unlocks the "different fsearch running" banner);
   - agent ownership for the app's LaunchAgent;
   - the daemon-wide query log for debug mode's Search Log, with the client's pid (also unlocks the daemon pid in Index Details).
