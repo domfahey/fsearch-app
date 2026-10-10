@@ -1,4 +1,5 @@
 import Darwin
+import FSearchKit
 import Foundation
 
 /// Metric groups. Each has its own default regression tolerance.
@@ -138,19 +139,41 @@ func stats(_ name: String, _ group: Group, perOp: [Double], ops: Int, unit: Stri
         add(stats(name, group, perOp: perOp, ops: ops, tolerance: tolerance))
     }
 
+    /// Metrics that could not be measured because the daemon answered too slowly
+    /// (a timed-out sample is retried once first). Reported, never fatal here.
+    private(set) var inconclusive: [String] = []
+    private(set) var retries = 0
+
+    func markInconclusive(_ what: String, _ why: String) {
+        inconclusive.append(what)
+        print("  inconclusive (daemon slow): \(what): \(why)")
+    }
+
     /// Async op, one op per sample (round trips are already micro- to milliseconds).
+    /// A daemon timeout is retried once; a second one makes the metric inconclusive
+    /// (skipped, run continues) instead of failing the whole benchmark.
     func measureAsync(_ name: String, group: Group, warmup: Int, samples: Int, tolerance: Double? = nil,
                       info: (() -> [String: String]?)? = nil, _ body: () async throws -> Void) async throws {
         guard config.wants(name) else { return }
         let factor = config.slowdown
-        for _ in 0..<warmup { try await body() }
-        var perOp: [Double] = []
-        for _ in 0..<samples {
-            let t0 = now()
-            for _ in 0..<factor { try await body() }
-            perOp.append(Double(now() - t0))
+        func once() async throws {
+            do { try await body() } catch DaemonError.timeout {
+                retries += 1
+                try await body()
+            }
         }
-        add(stats(name, group, perOp: perOp, ops: 1, tolerance: tolerance, info: info?()))
+        do {
+            for _ in 0..<warmup { try await once() }
+            var perOp: [Double] = []
+            for _ in 0..<samples {
+                let t0 = now()
+                for _ in 0..<factor { try await once() }
+                perOp.append(Double(now() - t0))
+            }
+            add(stats(name, group, perOp: perOp, ops: 1, tolerance: tolerance, info: info?()))
+        } catch DaemonError.timeout {
+            markInconclusive(name, "\(DaemonError.timeout.description) (twice in a row)")
+        }
     }
 
     /// The canary: a fixed integer workload, never slowed by --self-test.

@@ -15,7 +15,7 @@
 # thin pass-throughs to SMAppService, NSWorkspace/Process/Trash, app
 # activation and Sparkle, which tests replace with fakes and never run for real.
 set -u -o pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 export DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}
 OUT=${COVERAGE_OUT:-build/coverage}
 mode=both

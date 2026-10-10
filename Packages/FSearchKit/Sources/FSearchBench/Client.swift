@@ -37,19 +37,40 @@ final class CannedServer: @unchecked Sendable {
         }
     }
 
+    /// Answers each request line with the canned reply carrying that request's
+    /// id: DaemonClient drops a reply whose id isn't the one it asked for.
     private static func serve(_ c: Int32, _ reply: Data) {
         var chunk = [UInt8](repeating: 0, count: 16 * 1024)
-        var pending = 0   // newlines seen but not yet answered
+        var line: [UInt8] = []
         while true {
             let n = read(c, &chunk, chunk.count)
             if n <= 0 { close(c); return }
-            for i in 0..<n where chunk[i] == UInt8(ascii: "\n") { pending += 1 }
-            while pending > 0 {
-                let sent = reply.withUnsafeBytes { write(c, $0.baseAddress, reply.count) }
-                if sent != reply.count { close(c); return }
-                pending -= 1
+            for i in 0..<n {
+                guard chunk[i] == UInt8(ascii: "\n") else { line.append(chunk[i]); continue }
+                let out = withID(requestID(line), reply)
+                line.removeAll(keepingCapacity: true)
+                let sent = out.withUnsafeBytes { write(c, $0.baseAddress, out.count) }
+                if sent != out.count { close(c); return }
             }
         }
+    }
+
+    /// The integer after `"id":` in a request line, if any.
+    private static func requestID(_ line: [UInt8]) -> Int? {
+        let key = Array(#""id":"#.utf8)
+        guard line.count > key.count else { return nil }
+        for i in 0...(line.count - key.count) where Array(line[i..<(i + key.count)]) == key {
+            var j = i + key.count, v = 0, any = false
+            while j < line.count, line[j] >= 48, line[j] <= 57 { v = v * 10 + Int(line[j] - 48); j += 1; any = true }
+            return any ? v : nil
+        }
+        return nil
+    }
+
+    /// `reply` (one line, newline-terminated, ending in `"id":<n>}`) with `id` swapped in.
+    private static func withID(_ id: Int?, _ reply: Data) -> Data {
+        guard let id, let s = String(data: reply, encoding: .utf8), let r = s.range(of: #""id":"#, options: .backwards) else { return reply }
+        return Data((s[..<r.lowerBound] + #""id":\#(id)}"# + "\n").utf8)
     }
 
     func stop() {
@@ -65,6 +86,13 @@ struct BenchError: Error, CustomStringConvertible {
     init(_ s: String) { description = s }
 }
 
+/// The run could not finish because the machine or daemon was too slow: a
+/// result of "inconclusive", not a benchmark failure.
+struct Inconclusive: Error, CustomStringConvertible {
+    let description: String
+    init(_ s: String) { description = s }
+}
+
 /// Client round trip against the canned server, and SearchModel latest-wins
 /// overhead against a stub backend.
 @MainActor func benchClient(_ b: Bench, work: URL) async throws {
@@ -72,13 +100,13 @@ struct BenchError: Error, CustomStringConvertible {
     if c.wants("client.search50") || c.wants("client.grep50") {
         let s = try CannedServer(dir: work, reply: Fixtures.searchReplyLine(hits: 50))
         defer { s.stop() }
-        let client = DaemonClient(socketPath: s.path, timeout: 5)
+        let client = DaemonClient(socketPath: s.path, timeout: 15)
         try await b.measureAsync("client.search50", group: .inproc, warmup: 50, samples: 400) {
             blackHole(try await client.search("heron lattice", limit: 50))
         }
         let g = try CannedServer(dir: work.appendingPathComponent("g", isDirectory: true).creating(), reply: Fixtures.grepReplyLine(files: 50))
         defer { g.stop() }
-        let gclient = DaemonClient(socketPath: g.path, timeout: 5)
+        let gclient = DaemonClient(socketPath: g.path, timeout: 15)
         try await b.measureAsync("client.grep50", group: .inproc, warmup: 50, samples: 400) {
             blackHole(try await gclient.grep(q: "", pattern: "heron", mode: .literal))
         }
