@@ -31,6 +31,32 @@ Ideas and follow-ups not done yet. Most important first within each section. "Yo
 - [ ] **Re-record the benchmark baseline on a quiet machine:** the committed one is provisional (recorded under load). Run `scripts/bench.sh --record` after deleting this machine's entry in `bench/baseline.json`.
 - [ ] **CI benchmark baseline:** add a `ci-macos-26` entry from a CI artifact so the CI bench job can gate, not just report.
 
+## Code quality follow-ups (from reviews)
+
+- [ ] **Formatting:** commit a `.swift-format` config (4-space indent, 140 columns) and apply it repo-wide (143 style-only issues today). Do it in one commit with no other changes.
+- [ ] **Warnings as errors for our targets only:** set `SWIFT_TREAT_WARNINGS_AS_ERRORS` in project.yml for FSearch and the test targets. A command-line flag breaks KeyboardShortcuts, which builds with `-suppress-warnings`.
+- [ ] **Readable errors:** `DaemonError` has no `LocalizedError`, so the search log stores raw enum text (`daemon("bad regex")`), and one decode message says `tookUs` (a Swift name) instead of `took_us`. Tests label both as current-but-wrong.
+- [ ] **Reply ids:** DaemonClient never checks the `id` in replies; LineSocket would hand leftover buffered lines to the next request if the daemon ever sent two. Neither can happen with today's daemon, but checking ids makes it robust.
+- [ ] **Half-typed filters:** a content query like `foo size:` briefly sends an incomplete filter, and the daemon's error flashes under the field until the value is typed.
+- [ ] **Small panel polish:**
+  - the ⌘K menu opens at a fixed point instead of next to the selected row;
+  - ⌘⌃Y also triggers Quick Look;
+  - letter shortcuts don't match on non-Latin keyboard layouts;
+  - Quick Look has no delegate, so no zoom animation and no arrow-key navigation.
+- [ ] **API hygiene:** namespace FSearchKit's module-level free functions (`reduce`, `canContinue`, `openAtLine`, `installedEditors`, …), e.g. `PanelState.reduce`.
+- [ ] **Review:** the privacy manifest's file-timestamp reason C617.1 is the closest fit for a non-sandboxed app; confirm before an App Store-style review matters.
+- [ ] **Verify:** dependabot.yml's `cooldown` field against GitHub's current schema (the first Dependabot run will reject it if unsupported).
+
+## Upstream (fsearch) and the daemon pin
+
+- [ ] Land the fsearch PR stack (#12 → #13 → #14; rebase #14 if PR #17 merges first), then move `scripts/build-daemon.sh` from the fork pin `d26cf78` to an upstream tag, and update THIRD_PARTY_NOTICES.md.
+- [ ] Until then, keep the fork's `tests-daemon` branch (or tag the commit) so the pinned SHA stays reachable.
+- [ ] Upstream daemon changes the app wants:
+  - version in `status` (unlocks the "different fsearch running" banner);
+  - agent ownership for the app's LaunchAgent;
+  - the daemon-wide query log for debug mode's Search Log, with the client's pid (also unlocks the daemon pid in Index Details).
+- [ ] Drop the `macos-14` CI leg before GitHub retires that image (fully unsupported Nov 2, 2026).
+
 ## GitHub settings (needs your go-ahead; repo-level changes)
 
 - [ ] Turn on private vulnerability reporting (SECURITY.md already points to it).
@@ -42,6 +68,7 @@ Ideas and follow-ups not done yet. Most important first within each section. "Yo
 
 ## Before going public (you)
 
+- [ ] Decide when to make github.com/domfahey/fsearch-app public (it's private now).
 - [ ] Open a friendly issue on noahdunnagan/fsearch about the app, the name "FSearch for Mac", and the plan to offer it upstream.
 - [ ] **App icon:** original, with light and dark variants. No Raycast or other third-party assets.
 - [ ] Screenshots and a short demo GIF for the README (light and dark).
