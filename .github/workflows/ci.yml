@@ -56,6 +56,22 @@ jobs:
           -derivedDataPath build -destination 'generic/platform=macOS'
           CODE_SIGN_IDENTITY=- build
 
+  lint:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: sudo xcode-select -s /Applications/Xcode_26.6.app
+      - run: scripts/gen-credits.sh --check
+      - name: Syntax-check shell scripts
+        run: for f in scripts/*.sh; do bash -n "$f"; done
+      - run: brew install actionlint shellcheck
+      - run: actionlint
+      - run: shellcheck -S warning scripts/*.sh
+      - name: swift format lint
+        # Remove continue-on-error once the codebase has been formatted.
+        continue-on-error: true
+        run: xcrun swift format lint --strict --configuration .swift-format -r App AppUITests Packages/FSearchKit/Sources Packages/FSearchKit/Tests
+
   release:
     # Only on version tags. Secrets are referenced by name; none live in the repo.
     if: startsWith(github.ref, 'refs/tags/v')
