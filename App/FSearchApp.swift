@@ -44,6 +44,13 @@ struct MenuContent: View {
         }
         DebugMenuItem(app: app)
         FinishSetupMenuItem(app: app)
+        Menu("Help") {
+            ForEach(HelpLinks.items, id: \.title) { item in
+                Button(item.title) { FileActions.workspace.open(item.url) }
+            }
+            Divider()
+            Button(HelpLinks.reportTitle) { HelpLinks.reportIssue(daemon: app.daemon, workspace: FileActions.workspace) }
+        }
         Button("About FSearch") { NSApp.activate(ignoringOtherApps: true); NSApp.orderFrontStandardAboutPanel(nil) }
         SettingsLink { Text("Settings…") }
         CheckForUpdatesItem()
