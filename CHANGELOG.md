@@ -39,7 +39,7 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
   - Release tooling: `scripts/release.sh <version>` sets an increasing build number from git, signs, notarizes and staples, verifies the app and DMG signatures, and writes a SHA-256 checksum next to the DMG. A release runbook is in [docs/release-checklist.md](docs/release-checklist.md).
   - FSearchKit Swift package with unit and daemon integration tests. A separate UI smoke test (`scripts/ui-smoke.sh`) runs locally, not in CI.
   - Benchmarks: `scripts/bench.sh` measures keystroke, client and real-daemon performance and fails when a result regresses against `bench/baseline.json`. See [bench/README.md](bench/README.md).
-  - A Makefile for common tasks (`make test`, `lint`, `type`, `bench`, `check`) and a `.swift-format` style config.
+  - A Makefile for common tasks (`make test`, `apptest`, `lint`, `type`, `bench`, `check`) and a `.swift-format` style config.
   - CI runs the FSearchKit tests on macOS 14 (Xcode 16.2) and macOS 26 (Xcode 26.6), builds the universal app, runs the app's unit tests (AppTests), gates coverage (FSearchKit at 90%, the app's unit tests at 80%), treats compiler warnings as errors, blocks on swift-format lint, checks Markdown links, lints the scripts and workflows, and reports benchmarks.
   - Open-source project files: contributing guide, security policy, code of conduct, architecture overview, issue and pull request templates, CODEOWNERS, and Dependabot for GitHub Actions.
 

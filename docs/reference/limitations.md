@@ -19,7 +19,7 @@ Name search ignores case for the letters A to Z only. It does not fold case for 
 
 It also does not normalize Unicode. macOS can store an accented letter in two forms: one character, or a letter plus a combining mark. A name stored in one form may not match the same text typed in the other form. If an accented name is not found, search for the part of the name without the accented letter.
 
-## The 50-result cap and `limit:`
+## The 50-result cap
 
 The panel asks for up to 50 results. In name search, `limit:` has no effect today, because the panel sends its own limit. In a search inside files, `limit:` limits how many files are returned. To see fewer, narrower results, add words or filters such as `ext:` and `in:`.
 

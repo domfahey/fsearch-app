@@ -56,7 +56,7 @@ Matching ignores case for the letters A to Z only, and FSearch does not normaliz
 
 ## Why do I only see 50 results?
 
-The panel asks for up to 50 results. Add words or filters such as `ext:` or `in:` to narrow the list. See [Known limitations](limitations.md#the-50-result-cap-and-limit).
+The panel asks for up to 50 results. Add words or filters such as `ext:` or `in:` to narrow the list. See [Known limitations](limitations.md#the-50-result-cap).
 
 ## Does it search external drives?
 

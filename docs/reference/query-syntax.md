@@ -22,7 +22,7 @@ Case folding covers the letters A to Z only, and FSearch does not normalize Unic
 
 A word with `/` in it is split at the slashes, so `src/main` is two words. The daemon tracks up to eight positive words; extra ones are ignored.
 
-The panel asks for up to 50 results. See [Known limitations](limitations.md#the-50-result-cap-and-limit).
+The panel asks for up to 50 results. See [Known limitations](limitations.md#the-50-result-cap).
 
 ## Filters
 

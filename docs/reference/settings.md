@@ -49,7 +49,7 @@ These are not settings:
 
 - The panel is 680 by 460 points and opens on the screen where the mouse is.
 - Reopening the panel within 60 seconds resumes your last query.
-- Name searches ask for 50 results. See [Known limitations](limitations.md#the-50-result-cap-and-limit).
+- Name searches ask for 50 results. See [Known limitations](limitations.md#the-50-result-cap).
 - The search log keeps 10,000 searches.
 
 ## See also
