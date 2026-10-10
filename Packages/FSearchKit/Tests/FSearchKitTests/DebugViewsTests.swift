@@ -30,7 +30,28 @@ import Testing
     }
 
     @Test func formatsBytes() {
-        #expect(DebugFormat.bytes(1_000_000).contains("MB"))
+        // Same formatter and style, so the result holds in any locale.
+        for n in [0, 1_000_000, Int.max] {
+            let want = ByteCountFormatter.string(fromByteCount: Int64(n), countStyle: .file)
+            #expect(DebugFormat.bytes(n) == want)
+            #expect(!want.isEmpty)
+        }
+    }
+
+    @Test func dataDirIsTheSocketsFolder() {
+        #expect(DebugFormat.dataDir(socketPath: "/tmp/fsk-x/fsearch.sock").path == "/tmp/fsk-x")
+    }
+
+    @Test func fileStampChangesWithTheFile() throws {
+        let f = FileManager.default.temporaryDirectory.appendingPathComponent("fsk-stamp-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: f) }
+        #expect(DebugFormat.FileStamp(of: f) == nil)
+        try Data("a\n".utf8).write(to: f)
+        let a = try #require(DebugFormat.FileStamp(of: f))
+        #expect(a.size == 2)
+        #expect(DebugFormat.FileStamp(of: f) == a)
+        try Data("a\nbb\n".utf8).write(to: f)
+        #expect(DebugFormat.FileStamp(of: f) != a)
     }
 
     @Test func tailReadsOnlyTheEndAndWholeLines() throws {

@@ -6,29 +6,13 @@ struct IndexDetailsView: View {
     @EnvironmentObject var app: AppState
     @State private var skipped: [String] = []
     @State private var logTail = ""
-    private let dataDir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/FSearch")
+    /// The running daemon's folder (a temp folder in test mode).
+    private let dataDir = DebugFormat.dataDir(socketPath: AppState.socketPath)
 
     var body: some View {
         Form {
-            if case let .running(s) = app.daemon.state {
-                Section("Index") {
-                    row("Entries", s.entries.formatted())
-                    row("Folders", s.dirs.formatted())
-                    row("Pending changes", "\(s.overlay.formatted()) added, \(s.removed.formatted()) removed")
-                    row("Last FSEvents id", "\(s.eventId)")
-                    row("Index size", DebugFormat.bytes(s.indexBytes))
-                    row("Full Disk Access", s.fullDiskAccess ? "On" : "Off")
-                    row("Role", s.owner ? "Owner (writes the index)" : "Follower")
-                }
-                Section("Content index") {
-                    row("Files", s.contentDocs.formatted())
-                    row("Segments", "\(s.contentSegments)")
-                    row("Size", DebugFormat.bytes(s.contentBytes))
-                    row("Waiting to be indexed", s.contentPending.formatted())
-                }
-            } else {
-                Text(String(describing: app.daemon.state)).foregroundStyle(.secondary)
-            }
+            // Observes DaemonManager directly: AppState doesn't forward its changes.
+            IndexStatsSections(daemon: app.daemon)
             Section("Folders the index lacks (skipped)") {
                 if skipped.isEmpty {
                     Text("None").foregroundStyle(.secondary)
@@ -57,20 +41,63 @@ struct IndexDetailsView: View {
         .task {
             while !Task.isCancelled {
                 await app.daemon.refresh()
-                load()
+                await load()
                 try? await Task.sleep(for: .seconds(1))
             }
         }
     }
 
-    private func row(_ k: String, _ v: String) -> some View { LabeledContent(k, value: v) }
-
-    private func load() {
-        skipped = DebugFormat.lines((try? String(contentsOf: dataDir.appendingPathComponent("skipped"), encoding: .utf8)) ?? "")
-        logTail = DebugFormat.tail(of: dataDir.appendingPathComponent("daemon.log"), lines: 30)
+    /// Reads the skipped list and the log tail off the main actor.
+    private func load() async {
+        let dir = dataDir
+        let (s, t) = await Task.detached {
+            (DebugFormat.lines((try? String(contentsOf: dir.appendingPathComponent("skipped"), encoding: .utf8)) ?? ""),
+             DebugFormat.tail(of: dir.appendingPathComponent("daemon.log"), lines: 30))
+        }.value
+        skipped = s
+        logTail = t
     }
 
     private func report() -> String {
         "state: \(app.daemon.state)\nskipped:\n\(skipped.joined(separator: "\n"))\nlog:\n\(logTail)"
     }
+}
+
+/// The daemon's stats; redraws on every DaemonManager change.
+private struct IndexStatsSections: View {
+    @ObservedObject var daemon: DaemonManager
+
+    var body: some View {
+        switch daemon.state {
+        case let .running(s):
+            Section("Index") {
+                row("Entries", s.entries.formatted())
+                row("Folders", s.dirs.formatted())
+                row("Pending changes", "\(s.overlay.formatted()) added, \(s.removed.formatted()) removed")
+                row("Last FSEvents id", "\(s.eventId)")
+                row("Index size", DebugFormat.bytes(s.indexBytes))
+                row("Full Disk Access", s.fullDiskAccess ? "On" : "Off")
+                row("Role", s.owner ? "Owner (writes the index)" : "Follower")
+            }
+            Section("Content index") {
+                row("Files", s.contentDocs.formatted())
+                row("Segments", "\(s.contentSegments)")
+                row("Size", DebugFormat.bytes(s.contentBytes))
+                row("Waiting to be indexed", s.contentPending.formatted())
+            }
+        case let .failed(msg):
+            Section("Daemon") {
+                Label("Not reachable: \(msg)", systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.red).textSelection(.enabled)
+            }
+        case .checking:
+            Section("Daemon") { Text("Checking…").foregroundStyle(.secondary) }
+        case .indexing:
+            Section("Daemon") { Text("Indexing…").foregroundStyle(.secondary) }
+        case .needsApproval:
+            Section("Daemon") { Text("Waiting for approval in Login Items.").foregroundStyle(.secondary) }
+        }
+    }
+
+    private func row(_ k: String, _ v: String) -> some View { LabeledContent(k, value: v) }
 }

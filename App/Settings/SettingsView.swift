@@ -7,6 +7,7 @@ struct SettingsView: View {
     @EnvironmentObject var app: AppState
     /// Editor.rawValue, "" = none. Task 11 reads the same key into AppState.editorChoice.
     @AppStorage("editor") private var editor = ""
+    @Environment(\.dismissWindow) private var dismissWindow
 
     var body: some View {
         Form {
@@ -24,14 +25,11 @@ struct SettingsView: View {
         .padding(20).frame(width: 440)
     }
 
-    /// Turning debug mode off also deletes the search log (privacy).
+    /// Turning debug mode off also deletes the search log and closes the debug windows.
     private var debugBinding: Binding<Bool> {
         Binding(
             get: { app.debugMode },
-            set: { on in
-                app.debugMode = on
-                if !on { app.log.clear() }
-            }
+            set: { on in DebugMode.set(on, app: app, dismiss: dismissWindow) }
         )
     }
 }

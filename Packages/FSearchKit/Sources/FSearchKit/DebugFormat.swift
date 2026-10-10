@@ -29,6 +29,24 @@ public enum DebugFormat {
         ByteCountFormatter.string(fromByteCount: Int64(n), countStyle: .file)
     }
 
+    /// The daemon's data folder: the directory holding its socket.
+    public static func dataDir(socketPath: String) -> URL {
+        URL(fileURLWithPath: socketPath).deletingLastPathComponent()
+    }
+
+    /// Size and modification date of a file, to skip re-reading an unchanged
+    /// one. nil when the file is missing.
+    public struct FileStamp: Equatable, Sendable {
+        public let size: UInt64
+        public let modified: Date?
+
+        public init?(of file: URL) {
+            guard let a = try? FileManager.default.attributesOfItem(atPath: file.path) else { return nil }
+            size = (a[.size] as? NSNumber)?.uint64Value ?? 0
+            modified = a[.modificationDate] as? Date
+        }
+    }
+
     /// Non-empty lines.
     public static func lines(_ s: String) -> [String] {
         s.split(separator: "\n").map(String.init)
