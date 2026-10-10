@@ -12,6 +12,29 @@ public enum PanelKey: Equatable, Sendable {
         default: nil
         }
     }
+
+    /// ANSI key codes (Carbon's kVK_ANSI_Y, _K, _C) for the bound letters.
+    static let letterKeyCodes: [UInt16: String] = [0x10: "y", 0x28: "k", 0x08: "c"]
+
+    /// The character decides when it is an ASCII letter (QWERTY, Dvorak, AZERTY
+    /// all type Latin letters with ⌘). On a non-Latin layout (Russian, Greek)
+    /// ⌘Y types "н" or "ν", so then the physical key decides, as macOS's own
+    /// menus do.
+    public static func commandLetter(_ character: String, shift: Bool, keyCode: UInt16?) -> PanelKey? {
+        let isLatinLetter = character.count == 1 && character.unicodeScalars.allSatisfy { $0.isASCII && $0.properties.isAlphabetic }
+        if isLatinLetter || character.isEmpty && keyCode == nil { return commandLetter(character, shift: shift) }
+        guard let code = keyCode, let letter = letterKeyCodes[code] else { return nil }
+        return commandLetter(letter, shift: shift)
+    }
+
+    /// Keys that act on a result row, so they must wait for results that
+    /// answer the current query (see `HeldKey`). Moving and Escape never wait.
+    public var actsOnResults: Bool {
+        switch self {
+        case .enter, .cmdEnter, .cmdY, .cmdShiftC, .cmdDigit, .cmdK: true
+        case .up, .down, .escape, .backspaceOnEmpty: false
+        }
+    }
 }
 
 /// The ⌘K menu's entries and what the panel does after each.
@@ -89,4 +112,34 @@ public struct PanelSession: Sendable {
         if let (s, at) = last, t.timeIntervalSince(at) <= Self.resumeWindow { return s }
         return PanelState()
     }
+}
+
+/// A result key (↵, ⌘↵, ⌘Y, ⌘K, ⌘⇧C, ⌘1–9) pressed while the rows still
+/// answer an older query or mode (paste + ↵, ↵ while a slow grep runs) is held,
+/// not run on the stale rows, and replayed once results for that same query and
+/// mode arrive. A newer result key replaces it; a different query or mode, or
+/// Escape, drops it.
+public struct HeldKey: Equatable, Sendable {
+    public private(set) var held: PanelKey?
+    private var query = ""
+    private var mode: SearchMode = .names
+
+    public init() {}
+
+    /// The key to act on now, or nil if it is held. `current` says whether the
+    /// rows answer `query` in `mode`.
+    public mutating func press(_ key: PanelKey, current: Bool, query: String, mode: SearchMode) -> PanelKey? {
+        if key == .escape { cancel() }
+        guard key.actsOnResults, !current else { return key }
+        (held, self.query, self.mode) = (key, query, mode)
+        return nil
+    }
+
+    /// Results arrived for `query` in `mode`: the held key to replay, if it was held for them.
+    public mutating func resultsArrived(query: String, mode: SearchMode) -> PanelKey? {
+        defer { cancel() }
+        return query == self.query && mode == self.mode ? held : nil
+    }
+
+    public mutating func cancel() { held = nil }
 }
