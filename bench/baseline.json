@@ -1,0 +1,263 @@
+{
+  "machines" : {
+    "Mac17,7-apple-m5-max" : {
+      "machine" : {
+        "chip" : "Apple M5 Max",
+        "cores" : 18,
+        "daemonRev" : "d26cf78",
+        "key" : "Mac17,7-apple-m5-max",
+        "loadAverage1m" : 8.2119140625,
+        "macOS" : "26.4.1",
+        "model" : "Mac17,7",
+        "swift" : "swift-driver version: 1.148.6 Apple Swift version 6.3.3 (swiftlang-6.3.3.1.3 clang-2100.1.1.101)",
+        "xcode" : "Xcode 26.6 Build version 17F113"
+      },
+      "metrics" : {
+        "canary.cpu" : {
+          "group" : "canary",
+          "median" : 288458.5,
+          "min" : 283458,
+          "p95" : 315958,
+          "tolerance" : 0.15,
+          "unit" : "ns"
+        },
+        "canary.parallel" : {
+          "group" : "canary",
+          "median" : 618458.5,
+          "min" : 593958,
+          "p95" : 686625,
+          "tolerance" : 0.25,
+          "unit" : "ns"
+        },
+        "client.grep50" : {
+          "group" : "inproc",
+          "median" : 335791.5,
+          "min" : 309292,
+          "p95" : 393708,
+          "tolerance" : 0.2,
+          "unit" : "ns"
+        },
+        "client.search50" : {
+          "group" : "inproc",
+          "median" : 147291.5,
+          "min" : 130708,
+          "p95" : 185333,
+          "tolerance" : 0.2,
+          "unit" : "ns"
+        },
+        "daemon.grep.literal" : {
+          "group" : "daemon",
+          "median" : 1053458.5,
+          "min" : 760125,
+          "p95" : 1245250,
+          "tolerance" : 0.5,
+          "unit" : "ns"
+        },
+        "daemon.grep.regex" : {
+          "group" : "daemon",
+          "median" : 825917,
+          "min" : 610166,
+          "p95" : 1178834,
+          "tolerance" : 0.5,
+          "unit" : "ns"
+        },
+        "daemon.grep.symbol" : {
+          "group" : "daemon",
+          "median" : 274625,
+          "min" : 218708,
+          "p95" : 358167,
+          "tolerance" : 0.5,
+          "unit" : "ns"
+        },
+        "daemon.search.ext" : {
+          "group" : "daemon",
+          "median" : 361562,
+          "min" : 252750,
+          "p95" : 466958,
+          "tolerance" : 0.35,
+          "unit" : "ns"
+        },
+        "daemon.search.long" : {
+          "group" : "daemon",
+          "median" : 65687,
+          "min" : 46125,
+          "p95" : 98041,
+          "tolerance" : 0.35,
+          "unit" : "ns"
+        },
+        "daemon.search.short" : {
+          "group" : "daemon",
+          "median" : 433291.5,
+          "min" : 330041,
+          "p95" : 518833,
+          "tolerance" : 0.35,
+          "unit" : "ns"
+        },
+        "daemon.search.typo" : {
+          "group" : "daemon",
+          "median" : 65750,
+          "min" : 44291,
+          "p95" : 111292,
+          "tolerance" : 0.35,
+          "unit" : "ns"
+        },
+        "daemon.status" : {
+          "group" : "daemon",
+          "median" : 43041.5,
+          "min" : 34667,
+          "p95" : 63875,
+          "tolerance" : 0.35,
+          "unit" : "ns"
+        },
+        "debugformat.row" : {
+          "group" : "inproc",
+          "median" : 2588.9482421875,
+          "min" : 2329.263671875,
+          "p95" : 2814.044921875,
+          "tolerance" : 0.2,
+          "unit" : "ns"
+        },
+        "debugformat.shown.10k" : {
+          "group" : "inproc",
+          "median" : 6495395.5,
+          "min" : 5869167,
+          "p95" : 6760500,
+          "tolerance" : 0.2,
+          "unit" : "ns"
+        },
+        "decode.grep50" : {
+          "group" : "inproc",
+          "median" : 220218.75,
+          "min" : 210750,
+          "p95" : 235354.25,
+          "tolerance" : 0.2,
+          "unit" : "ns"
+        },
+        "decode.search50" : {
+          "group" : "inproc",
+          "median" : 103531.28125,
+          "min" : 99039.0625,
+          "p95" : 120109.375,
+          "tolerance" : 0.2,
+          "unit" : "ns"
+        },
+        "index.build.content" : {
+          "group" : "tracked",
+          "median" : 2769086250,
+          "min" : 2769086250,
+          "p95" : 2769086250,
+          "tolerance" : 0.5,
+          "unit" : "ns"
+        },
+        "index.build.names" : {
+          "group" : "tracked",
+          "median" : 50093875,
+          "min" : 49600500,
+          "p95" : 51789792,
+          "tolerance" : 0.5,
+          "unit" : "ns"
+        },
+        "index.bytes.content" : {
+          "group" : "tracked",
+          "median" : 4438080,
+          "min" : 4438080,
+          "p95" : 4438080,
+          "tolerance" : 0.1,
+          "unit" : "bytes"
+        },
+        "index.bytes.names" : {
+          "group" : "tracked",
+          "median" : 3061248,
+          "min" : 3061248,
+          "p95" : 3061248,
+          "tolerance" : 0.1,
+          "unit" : "bytes"
+        },
+        "keystroke.contentSearch" : {
+          "group" : "inproc",
+          "median" : 1403.50341796875,
+          "min" : 1337.9716796875,
+          "p95" : 1470.0517578125,
+          "tolerance" : 0.2,
+          "unit" : "ns"
+        },
+        "keystroke.panelKeys.reduce10" : {
+          "group" : "inproc",
+          "median" : 14.8973388671875,
+          "min" : 14.341354370117188,
+          "p95" : 16.360610961914062,
+          "tolerance" : 0.2,
+          "unit" : "ns"
+        },
+        "keystroke.panelRows.50" : {
+          "group" : "inproc",
+          "median" : 76462.21875,
+          "min" : 72291.625,
+          "p95" : 91229.1875,
+          "tolerance" : 0.2,
+          "unit" : "ns"
+        },
+        "keystroke.split.filters" : {
+          "group" : "inproc",
+          "median" : 3089.314453125,
+          "min" : 2950.68359375,
+          "p95" : 3509.84765625,
+          "tolerance" : 0.2,
+          "unit" : "ns"
+        },
+        "keystroke.split.plain" : {
+          "group" : "inproc",
+          "median" : 1291.48388671875,
+          "min" : 1205.9736328125,
+          "p95" : 1693.3994140625,
+          "tolerance" : 0.2,
+          "unit" : "ns"
+        },
+        "keystroke.split.quoted" : {
+          "group" : "inproc",
+          "median" : 3020.7119140625,
+          "min" : 2831.298828125,
+          "p95" : 3295.8984375,
+          "tolerance" : 0.2,
+          "unit" : "ns"
+        },
+        "model.refresh.burst100" : {
+          "group" : "inproc",
+          "median" : 453437.5,
+          "min" : 427917,
+          "p95" : 548041,
+          "tolerance" : 0.2,
+          "unit" : "ns"
+        },
+        "model.refresh.single" : {
+          "group" : "inproc",
+          "median" : 17209,
+          "min" : 12333,
+          "p95" : 23333,
+          "tolerance" : 0.2,
+          "unit" : "ns"
+        },
+        "searchlog.append.10k" : {
+          "group" : "inproc",
+          "median" : 40309.58,
+          "min" : 34213.34,
+          "p95" : 50887.5,
+          "tolerance" : 0.5,
+          "unit" : "ns"
+        },
+        "searchlog.entries.10k" : {
+          "group" : "inproc",
+          "median" : 21523541.5,
+          "min" : 20588667,
+          "p95" : 22563583,
+          "tolerance" : 0.2,
+          "unit" : "ns"
+        }
+      },
+      "provisional" : true,
+      "recorded" : "2026-10-10T16:16:04Z"
+    }
+  },
+  "note" : "Machine-specific. Update with scripts\/bench.sh --record; tolerances may be tuned per metric by hand and survive re-recording.",
+  "schema" : 1
+}
