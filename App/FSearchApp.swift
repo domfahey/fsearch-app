@@ -9,7 +9,7 @@ struct FSearchApp: App {
         _app = StateObject(wrappedValue: state)
         DispatchQueue.main.async {
             PanelController.shared.install(app: state)
-            Task { await state.daemon.start() }
+            OnboardingLauncher.launch(app: state)
         }
     }
 
@@ -37,6 +37,7 @@ struct MenuContent: View {
             Button("Search Log…") { openWindow(id: "log") }
             Divider()
         }
+        FinishSetupMenuItem(app: app)
         SettingsLink { Text("Settings…") }
         Button("Quit FSearch") { NSApp.terminate(nil) }
     }
