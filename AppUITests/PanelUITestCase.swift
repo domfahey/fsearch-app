@@ -226,7 +226,7 @@ class PanelUITestCase: XCTestCase {
             .joined(separator: "\n")
     }
 
-    /// Presses ↵ on a fallback row (`fallback-content` or `fallback-symbols`)
+    /// Presses ↵ on a fallback row (`fallback-content`, `fallback-symbols` or a `command-…` row)
     /// only once the name search has finished (no late file row can take the
     /// selection) and that row is the selected one. Even if a file row were
     /// selected, the test-mode workspace would only record the open.
