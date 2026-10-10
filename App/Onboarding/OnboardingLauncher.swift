@@ -5,18 +5,28 @@ import SwiftUI
 /// launch on macOS 14, so the onboarding window is hosted directly.
 @MainActor
 enum OnboardingLauncher {
-    private static var window: NSWindow?
+    enum Decision: Equatable { case showOnboarding, startDaemon }
+
+    private(set) static var window: NSWindow?
     private static var closeObserver: NSObjectProtocol?
     /// Set once the helper has been started, by onboarding or on close.
-    private static var startedDaemon = false
+    private(set) static var startedDaemon = false
+    /// Where "onboarded" is read; a throwaway suite under test.
+    static var defaults: UserDefaults = .standard
 
-    private static var onboarded: Bool { UserDefaults.standard.bool(forKey: "onboarded") }
+    private static var onboarded: Bool { defaults.bool(forKey: "onboarded") }
+
+    /// Test mode (UI tests) never shows onboarding: it would take focus from the panel.
+    static func decision(onboarded: Bool, testMode: Bool) -> Decision {
+        onboarded || testMode ? .startDaemon : .showOnboarding
+    }
 
     /// Opens onboarding the first time; afterwards just starts the helper.
     static func launch(app: AppState) {
-        // Test mode (UI tests) never shows onboarding: it would take focus from the panel.
-        guard !onboarded, !AppState.testMode else { startDaemon(app: app); return }
-        show(app: app)
+        switch decision(onboarded: onboarded, testMode: app.options.testMode) {
+        case .startDaemon: startDaemon(app: app)
+        case .showOnboarding: show(app: app)
+        }
     }
 
     /// "Finish Setup…" in the menu: bring the window back while not onboarded.
@@ -26,9 +36,10 @@ enum OnboardingLauncher {
     }
 
     /// Starts the helper outside any view, so closing a window doesn't cancel it.
-    static func startDaemon(app: AppState) {
+    @discardableResult
+    static func startDaemon(app: AppState) -> Task<Void, Never> {
         startedDaemon = true
-        Task { await app.daemon.start() }
+        return Task { await app.daemon.start() }
     }
 
     /// Onboarding's own step 2 started the helper.
@@ -36,13 +47,20 @@ enum OnboardingLauncher {
 
     static func close() { window?.close() }
 
+    /// Forgets a closed window's run, so a test can start over.
+    static func reset() {
+        close()
+        startedDaemon = false
+    }
+
     private static func show(app: AppState) {
         if let window {
-            NSApp.activate(ignoringOtherApps: true)
+            AppActivation.activate()
             window.makeKeyAndOrderFront(nil)
             return
         }
-        let w = NSWindow(contentViewController: NSHostingController(rootView: OnboardingView().environmentObject(app)))
+        let flow = OnboardingFlow(app: app, defaults: defaults)
+        let w = NSWindow(contentViewController: NSHostingController(rootView: OnboardingView(flow: flow).environmentObject(app)))
         w.title = "Welcome to FSearch"
         w.styleMask = [.titled, .closable]
         w.isReleasedWhenClosed = false
@@ -51,7 +69,7 @@ enum OnboardingLauncher {
             MainActor.assumeIsolated { didClose(app: app) }
         }
         window = w
-        NSApp.activate(ignoringOtherApps: true)
+        AppActivation.activate()
         w.makeKeyAndOrderFront(nil)
     }
 

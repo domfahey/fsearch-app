@@ -14,7 +14,7 @@ struct SettingsView: View {
             KeyboardShortcuts.Recorder("Shortcut:", name: .togglePanel)
             Picker("Open content results in:", selection: $editor) {
                 Text("Default app").tag("")
-                ForEach(installedEditors { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) }, id: \.0) { e, _ in
+                ForEach(installedEditors { FileActions.workspace.urlForApplication(withBundleIdentifier: $0) }, id: \.0) { e, _ in
                     Text(e.displayName).tag(e.rawValue)
                 }
             }

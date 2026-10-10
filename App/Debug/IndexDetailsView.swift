@@ -7,7 +7,7 @@ struct IndexDetailsView: View {
     @State private var skipped: [String] = []
     @State private var logTail = ""
     /// The running daemon's folder (a temp folder in test mode).
-    private let dataDir = DebugFormat.dataDir(socketPath: AppState.socketPath)
+    private var dataDir: URL { DebugFormat.dataDir(socketPath: app.options.socketPath) }
 
     var body: some View {
         Form {
@@ -27,7 +27,7 @@ struct IndexDetailsView: View {
                 }.frame(height: 160)
             }
             HStack {
-                Button("Reveal Data Folder") { NSWorkspace.shared.activateFileViewerSelecting([dataDir]) }
+                Button("Reveal Data Folder") { FileActions.workspace.activateFileViewerSelecting([dataDir]) }
                 Button("Save Now") { Task { await app.daemon.saveNow() } }
                 Button("Restart Daemon") { Task { await app.daemon.restart() } }
                 Button("Copy All") {

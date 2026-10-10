@@ -4,6 +4,13 @@ import FSearchKit
 @MainActor
 enum ActionsMenu {
     static func show(for item: ResultItem, in panel: NSPanel?, app: AppState) {
+        let menu = build(for: item, app: app)
+        guard let view = panel?.contentView else { return }
+        menu.popUp(positioning: nil, at: NSPoint(x: view.bounds.maxX - 220, y: 40), in: view)
+    }
+
+    /// ⌘K's menu for one result. Each item runs its action through `Target`.
+    static func build(for item: ResultItem, app: AppState) -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
         let path = item.path
@@ -23,7 +30,7 @@ enum ActionsMenu {
         }
         menu.addItem(entry("Open", .open) { FileActions.open(item, editor: app.editor) })
         let with = NSMenuItem(title: "Open With", action: nil, keyEquivalent: "")
-        let apps = NSWorkspace.shared.urlsForApplications(toOpen: FileActions.url(path)).prefix(12)
+        let apps = FileActions.workspace.urlsForApplications(toOpen: FileActions.url(path)).prefix(12)
         if apps.isEmpty {
             with.isEnabled = false
         } else {
@@ -51,8 +58,7 @@ enum ActionsMenu {
                 app.showActionError("Couldn't move to Trash: \(error.localizedDescription)")
             }
         })
-        guard let view = panel?.contentView else { return }
-        menu.popUp(positioning: nil, at: NSPoint(x: view.bounds.maxX - 220, y: 40), in: view)
+        return menu
     }
 
     final class Target: NSObject {
