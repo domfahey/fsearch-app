@@ -21,7 +21,7 @@ trap cleanup EXIT
 for _ in $(seq 50); do [ -S "$SOCK" ] && break; sleep 0.2; done
 [ -S "$SOCK" ] || { echo "ui-smoke: daemon socket never appeared at $SOCK" >&2; exit 1; }
 TEST_RUNNER_FSEARCH_SOCKET="$SOCK" \
-  xcodebuild test -project FSearch.xcodeproj -scheme FSearch -derivedDataPath build -only-testing:AppUITests > "$LOG" 2>&1
+  xcodebuild test -project FSearch.xcodeproj -scheme FSearch -derivedDataPath build -only-testing:AppUITests "$@" > "$LOG" 2>&1
 rc=$?
 grep -E 'error:|\*\* TEST' "$LOG" | cut -c1-400
 exit $rc
