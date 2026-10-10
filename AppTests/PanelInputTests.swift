@@ -274,6 +274,27 @@ extension AppTests {
             #expect(PanelInput.gate(.enter, held: &held, model: model) == nil)
         }
 
+        /// A pasted tail ("food ext:" over rows for "foo") only starts with the answered query: ↵ waits.
+        @Test func aPastedHalfTypedTailHoldsAKey() async {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let model = env.app.search
+            env.daemon.onSearch = { q in SearchReply(tookUs: 1, hits: [Wire.hit("/p/\(q).txt")]) }
+            model.query = "foo"
+            await model.refresh()
+            model.query = "food ext:"
+            #expect(!PanelInput.rowsAreCurrent(model))
+            var held = HeldKey()
+            #expect(PanelInput.gate(.enter, held: &held, model: model) == nil)
+            await model.refresh()
+            #expect(model.items.isEmpty && PanelInput.rowsAreCurrent(model), "the cleared list answers it")
+            // Typing the filter word one key at a time keeps the rows of its last finished prefix.
+            model.query = "foo ext"
+            await model.refresh()
+            model.query = "foo ext:"
+            #expect(PanelInput.rowsAreCurrent(model) && model.items.map(\.path) == ["/p/foo ext.txt"])
+        }
+
         /// New rows make a selection made on the old ones meaningless: it goes back to the top before a held key replays.
         @Test func newRowsResetTheSelection() async {
             let env = TestEnv()

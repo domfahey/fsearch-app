@@ -132,12 +132,13 @@ public final class SearchModel {
     /// newer refresh, is dropped. At most ``shownLimit`` rows are published.
     public func refresh() async {
         // A filter still being typed (`foo size:`) is not a query yet. While
-        // it extends the last query in the same mode, keep what is showing and
-        // let any search already under way finish. Otherwise (the query was
-        // replaced, or the mode changed) those rows answer something else:
-        // clear them, still sending nothing.
+        // it extends the last query in the same mode (see
+        // QuerySplit.halfTypedExtends), keep what is showing and let any
+        // search already under way finish. Otherwise (the query was replaced,
+        // a tail was pasted, or the mode changed) those rows answer something
+        // else: clear them, still sending nothing.
         let halfTyped = QuerySplit.endsInHalfTypedFilter(query, mode: mode)
-        if halfTyped && mode == requested.mode && query.hasPrefix(requested.query) { return }
+        if halfTyped && mode == requested.mode && QuerySplit.halfTypedExtends(query, answered: requested.query, mode: mode) { return }
         generation += 1
         inflight?.cancel()
         inflight = nil

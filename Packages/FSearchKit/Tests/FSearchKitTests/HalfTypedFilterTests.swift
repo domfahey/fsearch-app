@@ -108,6 +108,35 @@ import Testing
     }
 }
 
+/// Which earlier query a half-typed one extends: the words before the filter, or those words with less of it typed.
+@Suite struct HalfTypedExtendsTests {
+    @Test func theQueryBeforeTheFilterOrWithLessOfItTyped() {
+        for (q, answered) in [
+            ("foo ext:", "foo"), ("foo ext:", "foo "), (" foo  ext:", "foo"), ("foo ext:", "foo e"), ("foo ext:", "foo ext"),
+            ("foo size:>", "foo siz"), ("foo size:>", "foo size:"), ("ext:", ""), ("ext:", "ex"), ("foo bar type:c", "foo bar"),
+        ] {
+            #expect(QuerySplit.halfTypedExtends(q, answered: answered), "\(q) ← \(answered)")
+        }
+    }
+
+    @Test func aQueryThatOnlyStartsWithTheAnswerDoesnt() {
+        for (q, answered) in [
+            ("food ext:", "foo"),  // pasted: the tail isn't what was searched
+            ("foo bar ext:", "foo"), ("foo ext:", "fo"), ("foo ext:", "foo x"), ("foo ext:", "foo ext:rs"),
+            ("foo ext:", "bar"), ("ext:", "foo"), ("foo exe ext:", "foo ex"),
+        ] {
+            #expect(!QuerySplit.halfTypedExtends(q, answered: answered), "\(q) ← \(answered)")
+        }
+    }
+
+    @Test func onlyAHalfTypedFilterExtends() {
+        #expect(!QuerySplit.halfTypedExtends("foo", answered: "foo"))
+        #expect(!QuerySplit.halfTypedExtends("foo ext:rs", answered: "foo"))
+        #expect(!QuerySplit.halfTypedExtends("foo \"ext:", answered: "foo", mode: .content), "a quoted word is text")
+        #expect(QuerySplit.halfTypedExtends("foo \"ext:", answered: "foo", mode: .names))
+    }
+}
+
 /// Item 28: the wait keeps older rows only while they're for the query being extended.
 @MainActor @Suite struct HalfTypedWaitScopeTests {
     @Test func replacedQueryClearsInsteadOfWaiting() async {
@@ -120,6 +149,17 @@ import Testing
         #expect(names.calls == ["search foo"], "still nothing sent for a half-typed filter")
         #expect(m.items.isEmpty && m.phase == .idle)
         #expect(m.resultsAreCurrent, "the empty list answers it")
+    }
+
+    @Test func aPastedTailClearsInsteadOfWaiting() async {
+        let names = RecordingBackend()
+        let m = SearchModel(names: names, content: RecordingBackend())
+        m.query = "foo"
+        await m.refresh()
+        m.query = "food ext:"  // pasted after "foo": starts with it, but "food" was never searched
+        await m.refresh()
+        #expect(names.calls == ["search foo"], "still nothing sent for a half-typed filter")
+        #expect(m.items.isEmpty && m.phase == .idle && m.resultsAreCurrent)
     }
 
     @Test func modeChangeClearsInsteadOfWaiting() async {

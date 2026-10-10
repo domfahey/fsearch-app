@@ -131,12 +131,13 @@ enum PanelInput {
     /// Whether the rows answer what is in the box. Recents (an empty names
     /// query) wait on no search. A filter still being typed (`foo ext:`) keeps
     /// the results of the query it extends in the same mode, and no search runs
-    /// until it is finished, so those rows count too.
+    /// until it is finished, so those rows count too. A pasted tail that only
+    /// starts with the answered query (`food ext:` over `foo`) doesn't.
     @MainActor
     static func rowsAreCurrent(_ model: SearchModel) -> Bool {
         if model.resultsAreCurrent || (model.query.isEmpty && model.mode == .names) { return true }
-        return model.phase == .results && model.mode == model.answered.mode && model.query.hasPrefix(model.answered.query)
-            && QuerySplit.endsInHalfTypedFilter(model.query, mode: model.mode)
+        return model.phase == .results && model.mode == model.answered.mode
+            && QuerySplit.halfTypedExtends(model.query, answered: model.answered.query, mode: model.mode)
     }
 
     /// The key to act on now, or nil while a result key waits for the results
