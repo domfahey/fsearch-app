@@ -60,15 +60,20 @@ APP="$OUT/FSearch.xcarchive/Products/Applications/FSearch.app"
 sign() { codesign --force --options runtime --timestamp --sign "$DEVELOPER_ID" "$@"; }
 
 # Inside-out, as Sparkle's docs prescribe: Autoupdate and Updater.app, then the
-# framework, then our helper, then the app. The XPC services are stripped at build
-# time (project.yml); the app isn't sandboxed, so they must not be present.
+# framework, then our helper, then the app.
 SPARKLE="$APP/Contents/Frameworks/Sparkle.framework"
 SV="$SPARKLE/Versions/B"
 [ -d "$SV" ] || fail "Sparkle.framework/Versions/B not found in $APP"
 for c in "$SV/Autoupdate" "$SV/Updater.app"; do
   [ -e "$c" ] || fail "expected Sparkle component missing: $c"
 done
-[ ! -e "$SV/XPCServices" ] || fail "Sparkle's XPCServices reappeared in $APP (see the 'Strip Sparkle XPC services' phase in project.yml)"
+# The app isn't sandboxed, so Sparkle's XPC services are unused and must not
+# ship. Strip them here, not in a build phase: Xcode embeds the framework after
+# post-build scripts, so an incremental build would put them back. Debug builds
+# keep them, which is harmless. Removing them breaks the framework's seal; the
+# signing below re-seals it.
+rm -rf "$SV/XPCServices" "$SPARKLE/XPCServices"
+if [ -e "$SV/XPCServices" ] || [ -e "$SPARKLE/XPCServices" ]; then fail "could not strip Sparkle's XPCServices from $APP"; fi
 BUILT_VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" "$APP/Contents/Info.plist")
 [ "$BUILT_VERSION" = "$BUILD" ] || fail "built CFBundleVersion is '$BUILT_VERSION', expected '$BUILD'"
 sign "$SV/Autoupdate"
