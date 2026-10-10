@@ -32,6 +32,8 @@ Releases are not published yet. When they are, download the DMG from the [Releas
 
 Until then, build from source. See [Development](#development).
 
+For step-by-step setup, see [docs/install.md](docs/install.md). To remove the app, see [docs/uninstall.md](docs/uninstall.md).
+
 ## Usage
 
 Press ⌥Space to open the panel and start typing. Below the results, choose **Search inside files** or **Find definitions** to change what the query searches. Type `?` alone to see the query syntax.
@@ -98,7 +100,11 @@ The design spec is in `docs/superpowers/specs/` and the implementation plan is i
 
 Your index and logs stay on your Mac. The app has no telemetry and makes no network requests of its own. The only network code is the Sparkle updater, which checks for updates once it is configured. The debug Search Log records only this app's searches and stays local.
 
+For the details, see [PRIVACY.md](PRIVACY.md).
+
 ## Contributing
+
+For questions and bug reports, see [SUPPORT.md](SUPPORT.md). For what is planned, see [ROADMAP.md](ROADMAP.md).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). To report a vulnerability, see [SECURITY.md](SECURITY.md). Changes are listed in the [Changelog](CHANGELOG.md).
 
