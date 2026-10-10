@@ -79,7 +79,8 @@ final class AppState: ObservableObject {
             socketHolder: {
                 SocketHolder.read(dataDir: DebugFormat.dataDir(socketPath: options.socketPath), bundlePath: Bundle.main.bundlePath)
             },
-            helperIdentity: { DaemonManager.bundledHelperIdentity() })
+            helperIdentity: { DaemonManager.bundledHelperIdentity() },
+            fullDiskAccessGranted: { DaemonManager.appHasFullDiskAccess() })
     }
 
     /// Creates the state from its parts.
@@ -95,18 +96,21 @@ final class AppState: ObservableObject {
     ///   - cliAgentInstalled: Whether the CLI's login agent exists.
     ///   - socketHolder: Who holds the daemon's socket (decides ``DaemonManager/ownsDaemon``).
     ///   - helperIdentity: The bundled helper binary's identity, to spot an app update.
+    ///   - fullDiskAccessGranted: Whether FSearch has Full Disk Access now.
     init(
         options: LaunchOptions, defaults: UserDefaults, helper: HelperService?,
         names: SearchBackend, content: SearchBackend, control: any DaemonControl,
         clock: DaemonClock = .live,
         cliAgentInstalled: @escaping () -> Bool = { FileManager.default.fileExists(atPath: DaemonManager.cliAgentPlist.path) },
         socketHolder: @escaping () -> SocketHolder = { .none },
-        helperIdentity: @escaping () -> String? = { nil }
+        helperIdentity: @escaping () -> String? = { nil },
+        fullDiskAccessGranted: @escaping () -> Bool = { false }
     ) {
         self.options = options
         daemon = DaemonManager(
             client: control, service: helper, cliAgentInstalled: cliAgentInstalled, clock: clock,
-            socketHolder: socketHolder, defaults: defaults, helperIdentity: helperIdentity)
+            socketHolder: socketHolder, defaults: defaults, helperIdentity: helperIdentity,
+            fullDiskAccessGranted: fullDiskAccessGranted)
         search = SearchModel(names: names, content: content)
         recents = Recents(defaults: defaults)
         log = SearchLog(file: options.searchLogFile)

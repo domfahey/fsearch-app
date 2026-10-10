@@ -15,11 +15,11 @@ extension AppTests {
         private func manager(
             _ helper: FakeHelper?, _ daemon: StubDaemon = StubDaemon(), cli: Bool = false, clock: FakeClock = FakeClock(),
             holder: @escaping () -> SocketHolder = { .none }, defaults: UserDefaults = TestEnv.emptySuite(TestEnv.unitSuite),
-            identity: @escaping () -> String? = { nil }
+            identity: @escaping () -> String? = { nil }, granted: @escaping () -> Bool = { false }
         ) -> DaemonManager {
             DaemonManager(
                 client: daemon, service: helper, cliAgentInstalled: { cli }, clock: clock.clock, socketHolder: holder,
-                defaults: defaults, helperIdentity: identity)
+                defaults: defaults, helperIdentity: identity, fullDiskAccessGranted: granted)
         }
 
         @Test func testModeOnlyRefreshesAndNeverOwns() async {
@@ -419,6 +419,51 @@ extension AppTests {
             #expect(!m.fullDiskAccessRestartArmed)
             await m.appBecameActive()
             #expect(h.unregistered == 1, "once")
+        }
+
+        /// A menu-bar app isn't activated on return from System Settings, so the grant is looked for every 2 s while
+        /// armed; seeing it restarts our helper then, not later in the middle of a search.
+        @Test func aMenuGrantIsSeenWithoutActivation() async {
+            let h = FakeHelper(.enabled)
+            let d = StubDaemon()
+            d.onStatus = { _ in Wire.status(fullDiskAccess: false) }
+            d.onPing = { _ in false }
+            let clock = FakeClock()
+            var checks = 0
+            let m = manager(
+                h, d, clock: clock, holder: { .ours },
+                granted: {
+                    checks += 1; return checks >= 3
+                })
+            await m.refresh()
+            m.armFullDiskAccessRestart()
+            #expect(await eventually { h.unregistered == 1 })
+            #expect(checks == 3 && !m.fullDiskAccessRestartArmed)
+            #expect(clock.slept.filter { $0 == .seconds(2) }.count == 3)
+            await m.appBecameActive()
+            #expect(h.unregistered == 1, "once")
+        }
+
+        /// No grant in 2 minutes: the poll stops, and activation still restarts as before.
+        @Test func theGrantPollGivesUpAfterTwoMinutes() async {
+            let h = FakeHelper(.enabled)
+            let d = StubDaemon()
+            d.onStatus = { _ in Wire.status(fullDiskAccess: false) }
+            d.onPing = { _ in false }
+            var checks = 0
+            let m = manager(
+                h, d, holder: { .ours },
+                granted: {
+                    checks += 1; return false
+                })
+            await m.refresh()
+            m.armFullDiskAccessRestart()
+            #expect(await eventually { checks == 60 })
+            try? await Task.sleep(for: .milliseconds(50))
+            #expect(checks == 60 && h.unregistered == 0 && m.fullDiskAccessRestartArmed)
+            await m.appBecameActive()
+            #expect(h.unregistered == 1)
+            _ = DaemonManager.appHasFullDiskAccess()  // read-only; whatever this host is granted
         }
 
         @Test func aMenuGrantNeverRestartsAnotherDaemonOrAWorkingOne() async {

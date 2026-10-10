@@ -59,6 +59,10 @@ final class DaemonManager: ObservableObject {
     private var restartTask: Task<Void, Never>?
     /// Set when the menu sent the user to turn on Full Disk Access for our helper.
     private(set) var fullDiskAccessRestartArmed = false
+    /// Whether FSearch has Full Disk Access now (injected for tests).
+    private let fullDiskAccessGranted: () -> Bool
+    /// Looks for the grant while armed (see ``armFullDiskAccessRestart()``).
+    private var fullDiskAccessPoll: Task<Void, Never>?
 
     /// Creates a manager.
     ///
@@ -70,14 +74,17 @@ final class DaemonManager: ObservableObject {
     ///   - socketHolder: Who holds the daemon's socket (see `SocketHolder`).
     ///   - defaults: Where the helper's identity is stored.
     ///   - helperIdentity: The bundled helper binary's identity, to spot an app update.
+    ///   - fullDiskAccessGranted: Whether FSearch has Full Disk Access now (see ``appHasFullDiskAccess()``).
     init(
         client: any DaemonControl, service: HelperService?,
         cliAgentInstalled: @escaping () -> Bool = { FileManager.default.fileExists(atPath: DaemonManager.cliAgentPlist.path) },
         clock: DaemonClock = .live,
         socketHolder: @escaping () -> SocketHolder = { .none },
         defaults: UserDefaults = AppDefaults.store,
-        helperIdentity: @escaping () -> String? = { nil }
+        helperIdentity: @escaping () -> String? = { nil },
+        fullDiskAccessGranted: @escaping () -> Bool = { false }
     ) {
+        self.fullDiskAccessGranted = fullDiskAccessGranted
         self.client = client
         self.service = service
         self.cliAgentInstalled = cliAgentInstalled
@@ -278,18 +285,51 @@ final class DaemonManager: ObservableObject {
 
     /// The menu's Full Disk Access item sent the user to System Settings for
     /// our helper; the daemon fixes its skip list when it starts.
-    func armFullDiskAccessRestart() { fullDiskAccessRestartArmed = true }
+    ///
+    /// A menu-bar app isn't activated on return from System Settings, so
+    /// waiting for activation alone would restart the helper whenever the
+    /// panel next opens, in the middle of a search. Instead look for the grant
+    /// every 2 s for up to 2 minutes; activation still restarts it after that.
+    func armFullDiskAccessRestart() {
+        fullDiskAccessRestartArmed = true
+        fullDiskAccessPoll?.cancel()
+        fullDiskAccessPoll = Task { [weak self] in await self?.pollForFullDiskAccess() }
+    }
+
+    private func pollForFullDiskAccess() async {
+        for _ in 0..<60 {
+            do { try await clock.sleep(.seconds(2)) } catch { return }
+            guard fullDiskAccessRestartArmed else { return }
+            if fullDiskAccessGranted() {
+                await restartForFullDiskAccess()
+                return
+            }
+        }
+    }
 
     /// The app is active again: if armed, and our helper still runs without
     /// Full Disk Access, restart it once so a grant takes effect.
     func appBecameActive() async {
+        fullDiskAccessPoll?.cancel()
+        await restartForFullDiskAccess()
+    }
+
+    private func restartForFullDiskAccess() async {
         guard fullDiskAccessRestartArmed else { return }
         fullDiskAccessRestartArmed = false
         let fullDiskAccess: Bool
         if case let .running(s) = state { fullDiskAccess = s.fullDiskAccess } else { return }
         guard restartAfterSettings(pressedTurnOn: true, owns: ownsDaemon, fullDiskAccess: fullDiskAccess) else { return }
-        Log.daemon.info("back from System Settings: restarting the helper to pick up Full Disk Access")
+        Log.daemon.info("restarting the helper to pick up Full Disk Access")
         await restart()
+    }
+
+    /// Whether FSearch has Full Disk Access: the system TCC database opens
+    /// only with it, and trying without fails at once, with no prompt (the
+    /// daemon checks the same way). The helper runs as part of FSearch.app, so
+    /// the grant is the same one.
+    nonisolated static func appHasFullDiskAccess() -> Bool {
+        FileHandle(forReadingAtPath: "/Library/Application Support/com.apple.TCC/TCC.db") != nil
     }
 
     /// Asks the daemon to compact and save its index now; a failure is only logged.
