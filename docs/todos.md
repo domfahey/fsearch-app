@@ -10,6 +10,12 @@ Detail for the bug-audit items is in `.superpowers/audit-round2.md`, and for the
 - [ ] **Security best-practices audits** (app/platform, supply chain/CI/repo): triage the findings. *(results pending)*
 - [ ] **Docs and developer-docs audits:** apply the findings. *(results pending)*
 
+## After the pull request merges
+
+- [ ] Stricter `main`: enforce for admins, require up-to-date branches, linear history, conversation resolution; squash-only merges; delete merged branches.
+- [ ] Remove `dtolnay/rust-toolchain` from the Actions allow list once CI uses the preinstalled rustup.
+- [ ] CodeQL: add Swift analysis (needs an advanced setup with a build step; default setup covers the workflows only).
+
 ## P1: bugs from audit round 2
 
 - [ ] **The panel opens partly off-screen** on displays shorter than about 1290pt (the built-in 1512×982 included). Clamp `y` in `PanelController`.
@@ -52,7 +58,8 @@ Detail for the bug-audit items is in `.superpowers/audit-round2.md`, and for the
 ## Upstream (fsearch)
 
 - [ ] Land the PR stack #12 → #13 → #14 (rebase #14 if #17 merges first). Then move `scripts/build-daemon.sh` from the fork pin `d26cf78` to an upstream tag and update THIRD_PARTY_NOTICES.md. Until then, keep the fork's `tests-daemon` branch.
-- [ ] Daemon changes the app wants:
+- [x] The pinned daemon commit has a protected tag on the fork: `app-pin-2026-10-10`.
+- [ ] Daemon changes the app wants (the socket peer check is a security issue: report it privately, through a security advisory on noahdunnagan/fsearch, not a public issue):
   - version in `status`;
   - agent ownership for the app's LaunchAgent;
   - a daemon-wide query log;
