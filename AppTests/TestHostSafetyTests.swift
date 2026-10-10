@@ -4,6 +4,7 @@ import Foundation
 import Quartz
 import SwiftUI
 import Testing
+
 @testable import FSearch
 
 extension AppTests {

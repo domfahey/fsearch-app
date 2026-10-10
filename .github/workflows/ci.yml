@@ -81,7 +81,7 @@ jobs:
       - run: actionlint
       - run: shellcheck -S warning scripts/*.sh
       - name: swift format lint
-        run: xcrun swift format lint --strict --configuration .swift-format -r App AppUITests Packages/FSearchKit/Sources Packages/FSearchKit/Tests
+        run: xcrun swift format lint --strict --configuration .swift-format -r App AppTests AppUITests Packages/FSearchKit/Sources Packages/FSearchKit/Tests
 
   release:
     # Only on version tags. Secrets are referenced by name; none live in the repo.

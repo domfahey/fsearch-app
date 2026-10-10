@@ -1,9 +1,10 @@
 # Developer tasks for FSearch. Run `make help`.
-export DEVELOPER_DIR ?= /Applications/Xcode.app/Contents/Developer
+# The selected Xcode (xcode-select -s), unless DEVELOPER_DIR is already set.
+export DEVELOPER_DIR ?= $(shell xcode-select -p)
 
 # Set LINT_FORMAT=0 to skip the swift-format check in `make lint`.
 LINT_FORMAT ?= 1
-SWIFT_DIRS := App AppUITests Packages/FSearchKit/Sources Packages/FSearchKit/Tests
+SWIFT_DIRS := App AppTests AppUITests Packages/FSearchKit/Sources Packages/FSearchKit/Tests
 FORMAT_CFG := --configuration .swift-format
 XCODEBUILD := xcodebuild -project FSearch.xcodeproj -scheme FSearch -configuration Debug \
 	-derivedDataPath build -destination 'generic/platform=macOS' CODE_SIGN_IDENTITY=-
@@ -15,8 +16,7 @@ help: ## List targets
 	@echo "FSearch developer tasks:"
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/^([a-z-]+):.*## (.*)/  make \1\t\2/'
 	@echo ""
-	@echo "Note: 'make lint' fails on formatting until formatting is applied;"
-	@echo "use LINT_FORMAT=0 make lint to skip the swift-format check."
+	@echo "LINT_FORMAT=0 make lint skips the swift-format check."
 
 daemon: ## Build the universal fsearch daemon into Vendor/
 	scripts/build-daemon.sh
@@ -33,7 +33,7 @@ test: ## Run FSearchKit tests (needs Vendor/fsearch)
 ui: ## Run the panel UI smoke test (needs a GUI session)
 	scripts/ui-smoke.sh
 
-coverage: ## FSearchKit coverage report (llvm-cov)
+coverage: ## App coverage: AppTests + UI tests merged, plus FSearchKit (needs a GUI session)
 	@if [ -x scripts/coverage.sh ]; then scripts/coverage.sh; else \
 	cd Packages/FSearchKit && swift test --enable-code-coverage && \
 	xcrun llvm-cov report "$$(find .build -name FSearchKitPackageTests.xctest -path '*debug*' | head -1)/Contents/MacOS/FSearchKitPackageTests" \

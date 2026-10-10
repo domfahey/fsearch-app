@@ -3,6 +3,7 @@ import FSearchKit
 import Foundation
 import SwiftUI
 import Testing
+
 @testable import FSearch
 
 extension AppTests {
@@ -201,7 +202,9 @@ extension AppTests {
             let flow = OnboardingFlow(app: env.app, defaults: env.defaults, step: .helper)
             // Each answer carries its call number: the last call is start()'s, and
             // a stale poll publishing after it would show an earlier number.
-            env.daemon.onStatus = { n in if n == 1 { throw DaemonError.timeout }; return Wire.status(entries: n) }
+            env.daemon.onStatus = { n in
+                if n == 1 { throw DaemonError.timeout }; return Wire.status(entries: n)
+            }
             let poll = Task { await flow.poll() }
             await Task.yield()
             await flow.startDaemon().value
@@ -224,7 +227,8 @@ extension AppTests {
                 case .helper:
                     if helperStepMode(owns: owns, running: f.daemonRunning) == .existingDaemon { return "existing daemon" }
                     return f.facts.helperEnabled ? "allowed" : "ask"
-                case .fullDiskAccess: return "\(fullDiskAccessStepMode(owns: owns, running: f.daemonRunning, fullDiskAccess: f.facts.fullDiskAccess))"
+                case .fullDiskAccess:
+                    return "\(fullDiskAccessStepMode(owns: owns, running: f.daemonRunning, fullDiskAccess: f.facts.fullDiskAccess))"
                 case .indexing: return "indexing \(f.entries)"
                 }
             }

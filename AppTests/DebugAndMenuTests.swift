@@ -3,6 +3,7 @@ import FSearchKit
 import Foundation
 import SwiftUI
 import Testing
+
 @testable import FSearch
 
 extension AppTests {
@@ -111,8 +112,9 @@ extension AppTests {
             let env = TestEnv()
             defer { env.tearDown() }
             FullDiskAccessReminder.openSettings()
-            #expect(env.workspace.opened.map(\.absoluteString)
-                == ["x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"])
+            #expect(
+                env.workspace.opened.map(\.absoluteString)
+                    == ["x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"])
         }
 
         @Test func dontRemindMeStoresTheFlagThatHidesTheReminder() {
@@ -121,12 +123,16 @@ extension AppTests {
             defer { TestEnv.removeSuite(name) }
             #expect(!defaults.bool(forKey: "dismissedFullDiskAccessReminder"))
             let off = DaemonCondition.running(fullDiskAccess: false)
-            #expect(MenuBarWarning.evaluate(off, skippedFullDiskAccess: true,
-                                            dismissedReminder: defaults.bool(forKey: FullDiskAccessReminder.dismissedKey)) != nil)
+            #expect(
+                MenuBarWarning.evaluate(
+                    off, skippedFullDiskAccess: true,
+                    dismissedReminder: defaults.bool(forKey: FullDiskAccessReminder.dismissedKey)) != nil)
             FullDiskAccessReminder.dismiss(defaults: defaults)
             #expect(defaults.bool(forKey: "dismissedFullDiskAccessReminder"))
-            #expect(MenuBarWarning.evaluate(off, skippedFullDiskAccess: true,
-                                            dismissedReminder: defaults.bool(forKey: FullDiskAccessReminder.dismissedKey)) == nil)
+            #expect(
+                MenuBarWarning.evaluate(
+                    off, skippedFullDiskAccess: true,
+                    dismissedReminder: defaults.bool(forKey: FullDiskAccessReminder.dismissedKey)) == nil)
         }
     }
 
@@ -153,11 +159,13 @@ extension AppTests {
 
         /// Render smoke test (coverage only): SwiftUI's text isn't readable in-process.
         @Test func resultRowsRenderSmoke() async {
-            let w = await render(VStack {
-                ResultRow(item: .file(Wire.hit("/p/heron.txt")), query: "her", selected: true)
-                ResultRow(item: .line(path: "/p/main.swift", match: Match(line: 3, text: "  func main()")), query: "main x", selected: false)
-                ResultRow(item: .file(Wire.hit("/p/x.txt")), query: "", selected: false)
-            })
+            let w = await render(
+                VStack {
+                    ResultRow(item: .file(Wire.hit("/p/heron.txt")), query: "her", selected: true)
+                    ResultRow(
+                        item: .line(path: "/p/main.swift", match: Match(line: 3, text: "  func main()")), query: "main x", selected: false)
+                    ResultRow(item: .file(Wire.hit("/p/x.txt")), query: "", selected: false)
+                })
             w.close()
         }
 
@@ -168,11 +176,12 @@ extension AppTests {
                 let env = TestEnv()
                 defer { env.tearDown() }
                 env.app.debugMode = debug
-                let w = await render(VStack {
-                    MenuBarFixItem(app: env.app)
-                    MenuContent(app: env.app)
-                    MenuBarLabel(app: env.app)
-                })
+                let w = await render(
+                    VStack {
+                        MenuBarFixItem(app: env.app)
+                        MenuContent(app: env.app)
+                        MenuBarLabel(app: env.app)
+                    })
                 w.close()
             }
         }
@@ -181,7 +190,8 @@ extension AppTests {
         @Test func settingsRenderSmoke() async {
             let env = TestEnv()
             defer { env.tearDown() }
-            env.workspace.apps = Dictionary(uniqueKeysWithValues: Editor.allCases.map { ($0.bundleId, URL(fileURLWithPath: "/Applications/\($0.rawValue).app")) })
+            env.workspace.apps = Dictionary(
+                uniqueKeysWithValues: Editor.allCases.map { ($0.bundleId, URL(fileURLWithPath: "/Applications/\($0.rawValue).app")) })
             let w = await render(SettingsView().environmentObject(env.app), size: NSSize(width: 440, height: 200))
             w.close()
         }
@@ -193,7 +203,8 @@ extension AppTests {
             try? FileManager.default.createDirectory(at: dataDir, withIntermediateDirectories: true)
             try? "/Users/x/Library/Mail\n".write(to: dataDir.appendingPathComponent("skipped"), atomically: true, encoding: .utf8)
             try? "started\nindexed 42\n".write(to: dataDir.appendingPathComponent("daemon.log"), atomically: true, encoding: .utf8)
-            let w = await render(IndexDetailsView().environmentObject(env.app), size: NSSize(width: 520, height: 600), settle: .milliseconds(300))
+            let w = await render(
+                IndexDetailsView().environmentObject(env.app), size: NSSize(width: 520, height: 600), settle: .milliseconds(300))
             #expect(env.app.daemon.state == .running(Wire.status()))
             // The view polls every second: each daemon state is picked up.
             env.daemon.onStatus = { _ in throw DaemonError.indexing("indexing") }
@@ -211,7 +222,11 @@ extension AppTests {
                 e.daemon.onStatus = { _ in throw CancellationError() }  // stays as it is
                 let w2 = await render(IndexDetailsView().environmentObject(e.app), size: NSSize(width: 520, height: 600))
                 defer { w2.close() }
-                if s == .checking { #expect(e.app.daemon.state == .checking) } else { #expect(e.app.daemon.state == .failed("The search helper isn't answering.")) }
+                if s == .checking {
+                    #expect(e.app.daemon.state == .checking)
+                } else {
+                    #expect(e.app.daemon.state == .failed("The search helper isn't answering."))
+                }
             }
         }
 
@@ -225,7 +240,8 @@ extension AppTests {
                 env.app.search.query = q
                 await env.app.search.refresh()
             }
-            let w = await render(SearchLogView().environmentObject(env.app), size: NSSize(width: 760, height: 420), settle: .milliseconds(400))
+            let w = await render(
+                SearchLogView().environmentObject(env.app), size: NSSize(width: 760, height: 420), settle: .milliseconds(400))
             defer { w.close() }
             #expect(env.app.log.entries().count == 2)
             // What the view filters (on a copy, off the main actor), as it does it.

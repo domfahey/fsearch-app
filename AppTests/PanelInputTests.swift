@@ -1,7 +1,8 @@
-import FSearchKit
 import AppKit
+import FSearchKit
 import SwiftUI
 import Testing
+
 @testable import FSearch
 
 extension AppTests {

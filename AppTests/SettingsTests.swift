@@ -1,6 +1,7 @@
 import FSearchKit
 import Foundation
 import Testing
+
 @testable import FSearch
 
 extension AppTests {
@@ -53,11 +54,14 @@ extension AppTests {
         let data = URL(fileURLWithPath: "/fake/Application Support/FSearch")
         let logs = URL(fileURLWithPath: "/fake/Logs/FSearch")
 
-        func make(_ env: TestEnv, helper: FakeHelper?, login: FakeLoginItem?, exists: @escaping (URL) -> Bool = { _ in true },
-                  cliAgent: Bool = false, shortcutResets: Box = Box()) -> Uninstaller {
-            Uninstaller(helper: helper, loginItem: login, workspace: env.workspace, defaults: env.defaults,
-                        dataFolder: data, logFolder: logs, exists: exists, cliAgentInstalled: { cliAgent },
-                        resetShortcut: { shortcutResets.n += 1 })
+        func make(
+            _ env: TestEnv, helper: FakeHelper?, login: FakeLoginItem?, exists: @escaping (URL) -> Bool = { _ in true },
+            cliAgent: Bool = false, shortcutResets: Box = Box()
+        ) -> Uninstaller {
+            Uninstaller(
+                helper: helper, loginItem: login, workspace: env.workspace, defaults: env.defaults,
+                dataFolder: data, logFolder: logs, exists: exists, cliAgentInstalled: { cliAgent },
+                resetShortcut: { shortcutResets.n += 1 })
         }
 
         final class Box { var n = 0 }
@@ -135,9 +139,10 @@ extension AppTests {
             let env = TestEnv()
             defer { env.tearDown() }
             let helper = FailingHelper()
-            let u = Uninstaller(helper: helper, loginItem: nil, workspace: env.workspace, defaults: env.defaults,
-                                dataFolder: data, logFolder: logs, exists: { _ in true }, cliAgentInstalled: { false },
-                                resetShortcut: {})
+            let u = Uninstaller(
+                helper: helper, loginItem: nil, workspace: env.workspace, defaults: env.defaults,
+                dataFolder: data, logFolder: logs, exists: { _ in true }, cliAgentInstalled: { false },
+                resetShortcut: {})
             await u.run(ownsDaemon: true)
             #expect(!env.workspace.trashed.contains(data))
             guard case let .done(r) = u.phase else { Issue.record("not done"); return }
