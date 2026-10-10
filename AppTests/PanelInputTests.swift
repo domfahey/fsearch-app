@@ -20,6 +20,12 @@ extension AppTests {
             #expect(key(P(key: "p", shift: true, control: true)) == nil)
             #expect(key(P(key: "n", command: true, control: true)) == nil)
             #expect(key(P(key: "p", characters: "p")) == nil)
+            // ⌃P/⌃N as control characters, as AppKit may deliver them.
+            #expect(key(P(key: KeyEquivalent("\u{10}"), characters: "\u{10}", control: true)) == .up)
+            #expect(key(P(key: KeyEquivalent("\u{0e}"), characters: "\u{0e}", control: true)) == .down)
+            #expect(key(P(key: "P", control: true)) == .up)
+            #expect(PanelInput.letter("\u{0e}") == "n")
+            #expect(PanelInput.letter("Q") == "q")
         }
 
         @Test func returnAndEscape() {

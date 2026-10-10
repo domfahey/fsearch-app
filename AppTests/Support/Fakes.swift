@@ -210,6 +210,8 @@ final class TestEnv {
         FileActions.workspace = workspace
         FileActions.pasteboard = pasteboard
         OnboardingLauncher.defaults = defaults
+        // Never take focus from whatever the user is doing.
+        AppActivation.activate = {}
     }
 
     /// A real file in the temp folder (Recents only keeps files that exist).

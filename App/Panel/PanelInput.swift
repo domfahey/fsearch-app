@@ -21,9 +21,13 @@ enum PanelInput {
 
     /// Which panel key a press is, if any. Delete is a key only on an empty query.
     static func key(for p: Press, queryIsEmpty: Bool) -> PanelKey? {
+        // ⌃ letters can arrive as control characters (⌃N is U+000E).
+        let ctrlLetter = p.control && !p.command && !p.shift ? letter(p.key.character) : nil
+        if ctrlLetter == "p" { return .up }
+        if ctrlLetter == "n" { return .down }
         switch (p.key, p.command, p.shift, p.control) {
-        case (.upArrow, _, _, _), (KeyEquivalent("p"), false, false, true): return .up
-        case (.downArrow, _, _, _), (KeyEquivalent("n"), false, false, true): return .down
+        case (.upArrow, _, _, _): return .up
+        case (.downArrow, _, _, _): return .down
         case (.return, true, _, _): return .cmdEnter
         case (.return, false, _, _): return .enter
         case (.escape, _, _, _): return .escape
@@ -36,6 +40,13 @@ enum PanelInput {
             guard p.command, let n = p.characters.first?.wholeNumberValue else { return nil }
             return .cmdDigit(n)
         }
+    }
+
+    /// The letter a key is, lowercased, turning a control character back into its letter.
+    static func letter(_ c: Character) -> Character? {
+        guard let v = c.unicodeScalars.first?.value, c.unicodeScalars.count == 1 else { return nil }
+        if (1...26).contains(v) { return Character(UnicodeScalar(v + 0x60)!) }
+        return Character(String(c).lowercased())
     }
 
     enum Route: Equatable {

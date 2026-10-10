@@ -55,7 +55,7 @@ enum OnboardingLauncher {
 
     private static func show(app: AppState) {
         if let window {
-            NSApp.activate(ignoringOtherApps: true)
+            AppActivation.activate()
             window.makeKeyAndOrderFront(nil)
             return
         }
@@ -69,7 +69,7 @@ enum OnboardingLauncher {
             MainActor.assumeIsolated { didClose(app: app) }
         }
         window = w
-        NSApp.activate(ignoringOtherApps: true)
+        AppActivation.activate()
         w.makeKeyAndOrderFront(nil)
     }
 

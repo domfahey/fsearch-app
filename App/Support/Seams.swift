@@ -48,3 +48,10 @@ protocol PanelHost: AnyObject {
     var isVisible: Bool { get }
     func show(app: AppState)
 }
+
+/// Bringing FSearch to the front. Hosted unit tests replace it with a no-op so
+/// showing the panel or onboarding never takes focus from the user's apps.
+@MainActor
+enum AppActivation {
+    static var activate: @MainActor () -> Void = { NSApp.activate(ignoringOtherApps: true) }
+}

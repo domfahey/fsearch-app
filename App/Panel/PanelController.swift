@@ -79,7 +79,7 @@ final class PanelController: PanelHost {
         panel = p
         let front = NSWorkspace.shared.frontmostApplication
         previousApp = front == NSRunningApplication.current ? nil : front
-        NSApp.activate(ignoringOtherApps: true)
+        AppActivation.activate()
         p.makeKeyAndOrderFront(nil)
         Task { await app.search.refresh() }
     }
