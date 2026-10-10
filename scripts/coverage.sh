@@ -6,6 +6,10 @@
 #   scripts/coverage.sh                 run both suites, merge, report
 #   scripts/coverage.sh --unit-only     run AppTests only
 #   scripts/coverage.sh --reuse U [UI]  report on existing .xcresult bundles (no tests run)
+#   scripts/coverage.sh --kit-only      FSearchKit package coverage only (swift test, no app host)
+#   --min PERCENT (or COVERAGE_MIN)     exit non-zero if FSearchKit line coverage, or FSearch.app
+#                                       coverage excluding system adapters, is below PERCENT.
+#                                       Combines with any mode; the FSearchKit gate runs unless --reuse.
 #
 # Both suites need a logged-in GUI session and nobody using the Mac: the UI
 # tests synthesize keystrokes, and the unit-test host opens (unfocused) windows.
@@ -20,11 +24,24 @@ export DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer
 OUT=${COVERAGE_OUT:-build/coverage}
 mode=both
 UNIT="$OUT/unit.xcresult" UI="$OUT/ui.xcresult"
+MIN=${COVERAGE_MIN:-}
+args=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --min) MIN=${2:?--min needs a percentage}; shift 2 ;;
+    --min=*) MIN=${1#--min=}; shift ;;
+    *) args+=("$1"); shift ;;
+  esac
+done
+case "$MIN" in "" | *[!0-9.]* | *.*.*) [ -z "$MIN" ] || { echo "coverage: --min must be a number, got '$MIN'" >&2; exit 2; } ;; esac
+set -- ${args[@]+"${args[@]}"}
+usage() { echo "usage: $0 [--unit-only | --kit-only | --reuse UNIT.xcresult [UI.xcresult]] [--min PERCENT]" >&2; exit 2; }
 case "${1:-}" in
   --unit-only) mode=unit ;;
+  --kit-only) mode=kit ;;
   --reuse) mode=reuse; UNIT=${2:?--reuse needs a unit .xcresult}; UI=${3:-} ;;
   "") ;;
-  *) echo "usage: $0 [--unit-only | --reuse UNIT.xcresult [UI.xcresult]]" >&2; exit 2 ;;
+  *) usage ;;
 esac
 mkdir -p "$OUT"
 rc=0
@@ -32,6 +49,30 @@ rc=0
 # never the real com.domfahey.fsearch.plist.
 sweep_test_defaults() { rm -f "$HOME"/Library/Preferences/com.domfahey.fsearch.apptests.*.plist; }
 trap sweep_test_defaults EXIT
+
+# FSearchKit line coverage from SwiftPM (llvm-cov), gated by --min.
+kit_coverage() {
+  echo "== FSearchKit (swift test --enable-code-coverage)"
+  ( cd Packages/FSearchKit && swift test --enable-code-coverage > "../../$OUT/kit.log" 2>&1 ) || { tail -20 "$OUT/kit.log"; echo "coverage: FSearchKit tests failed" >&2; return 1; }
+  local pkg=Packages/FSearchKit bin prof
+  bin=$(find "$pkg/.build" -name FSearchKitPackageTests.xctest -path '*debug*' | head -1)
+  prof=$pkg/.build/debug/codecov/default.profdata
+  [ -n "$bin" ] && [ -f "$prof" ] || { echo "coverage: FSearchKit coverage data not found" >&2; return 1; }
+  xcrun llvm-cov export -summary-only "$bin/Contents/MacOS/FSearchKitPackageTests" -instr-profile="$prof" \
+    -ignore-filename-regex='Tests/|\.build/' > "$OUT/kit.json" || return 1
+  python3 -I - "$OUT/kit.json" "$MIN" <<'PY'
+import json, sys
+t = json.load(open(sys.argv[1]))["data"][0]["totals"]["lines"]
+pct = t["percent"]
+print(f"FSearchKit lines: {pct:.2f}% ({t['covered']}/{t['count']})")
+if sys.argv[2] and pct < float(sys.argv[2]):
+    print(f"coverage: FSearchKit {pct:.2f}% is below the minimum {sys.argv[2]}%", file=sys.stderr)
+    sys.exit(1)
+PY
+}
+
+if [ "$mode" = kit ]; then kit_coverage; exit $?; fi
+if [ "$mode" != reuse ] && [ -n "$MIN" ]; then kit_coverage || rc=1; fi
 
 if [ "$mode" != reuse ]; then
   rm -rf "$UNIT"
@@ -67,7 +108,7 @@ echo "== combined ($(basename "$REPORT"))"
 xcrun xccov view --report --only-targets "$REPORT"
 
 xcrun xccov view --report --json "$REPORT" > "$OUT/report.json"
-python3 -I - "$OUT/report.json" <<'PY' || rc=1
+python3 -I - "$OUT/report.json" "$MIN" <<'PY' || rc=1
 import json, re, sys
 # file name -> the functions (exact xccov names) of system adapters left out
 # of the second number. Listed one by one, so a new function in these files is
@@ -123,6 +164,10 @@ for fname, fn, c, e in excluded:
 print(f"\nFSearch.app raw:                        {100 * cov / exe:.2f}% ({cov}/{exe})")
 print(f"FSearch.app excluding system adapters:  {100 * xcov / xexe:.2f}% ({xcov}/{xexe})")
 for p in problems: print(f"coverage: {p}", file=sys.stderr)
-sys.exit(1 if problems else 0)
+bad = bool(problems)
+if len(sys.argv) > 2 and sys.argv[2] and 100 * xcov / xexe < float(sys.argv[2]):
+    print(f"coverage: FSearch.app excluding system adapters {100 * xcov / xexe:.2f}% is below the minimum {sys.argv[2]}%", file=sys.stderr)
+    bad = True
+sys.exit(1 if bad else 0)
 PY
 exit $rc

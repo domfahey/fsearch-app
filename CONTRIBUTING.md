@@ -62,6 +62,7 @@ xcodebuild -project FSearch.xcodeproj -scheme FSearch -configuration Debug \
 ## Tests
 
 - New behaviour needs a test that fails without it.
+- Coverage: CI fails if FSearchKit line coverage drops below 90% (`scripts/coverage.sh --kit-only --min 90`) or if AppTests-only app coverage (excluding documented system adapters) drops below 80%. The full app number, combining AppTests with the UI tests, needs a GUI session: run `make coverage` locally (`--min 90` gates it).
 - Tests must never touch the real index, `~/Library/LaunchAgents`, `~/.local/bin` or `~/Library/Application Support/FSearch`.
 - Use a temporary `HOME` and `FSEARCH_ROOT` for anything that starts a daemon. In the core tests, use `RealDaemon`: it runs the daemon under a watchdog that stops it and deletes its temporary directory when the test process exits or crashes, and it sweeps orphans from earlier hard-killed runs. See [ADR 0005](docs/adr/0005-tests-never-touch-the-real-index.md).
 

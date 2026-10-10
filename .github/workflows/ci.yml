@@ -13,6 +13,7 @@ permissions:
 # per actions/runner-images macos-26-arm64 Readme, image 20260907. Bump both together.
 # UI tests (AppUITests) are not run here: they need a logged-in GUI session and
 # accessibility permission that hosted runners don't grant reliably. Run locally.
+# Coverage: the kit job gates FSearchKit at 90%; the app job gates AppTests-only coverage at 80%.
 jobs:
   kit:
     # macos-14 is the deployment target (macOS 14): its newest Xcode with Swift 6 is
@@ -40,6 +41,9 @@ jobs:
         working-directory: Packages/FSearchKit
       - run: swift test
         working-directory: Packages/FSearchKit
+      - name: FSearchKit coverage gate (90%)
+        if: matrix.os == 'macos-26'
+        run: scripts/coverage.sh --kit-only --min 90
 
   app:
     runs-on: macos-26
@@ -57,6 +61,11 @@ jobs:
           xcodebuild -project FSearch.xcodeproj -scheme FSearch -configuration Debug
           -derivedDataPath build -destination 'generic/platform=macOS'
           CODE_SIGN_IDENTITY=- build
+      - name: App unit tests and coverage gate
+        # Hosted unit tests (AppTests) run headless on the runner; the UI tests do not.
+        # The floor is below 90 because AppTests alone reach about 84%; the remainder is
+        # covered by the local end-to-end run (`make coverage`, which combines both suites).
+        run: scripts/coverage.sh --unit-only --min 80
 
   lint:
     runs-on: macos-26
