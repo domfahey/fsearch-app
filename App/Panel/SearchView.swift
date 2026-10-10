@@ -29,7 +29,7 @@ struct SearchView: View {
         // Reading the generation makes a trash or open re-read the recents.
         _ = app.recentsGeneration
         return model.query.isEmpty && model.mode == .names
-            ? app.recents.paths.map { .file(Hit(path: $0, kind: "file", size: 0, mtime: 0, score: 0)) }
+            ? app.recents.entries.map { .file(Hit(path: $0.path, kind: $0.isDirectory ? "dir" : "file", size: 0, mtime: 0, score: 0)) }
             : model.items
     }
 
