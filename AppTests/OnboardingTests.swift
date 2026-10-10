@@ -41,13 +41,18 @@ extension AppTests {
             #expect(await eventually { env.app.daemon.state == .running(Wire.status()) })
         }
 
-        @Test func closingAfterStep2DoesNotStartAgain() {
+        @Test func closingAfterStep2DoesNotStartAgain() async {
             let env = TestEnv(helper: FakeHelper(.enabled))
             defer { env.tearDown() }
             OnboardingLauncher.reopen(app: env.app)
             OnboardingLauncher.noteDaemonStarted()
             OnboardingLauncher.close()
+            #expect(OnboardingLauncher.window == nil)
+            // A start would be a Task: give one time to run before checking none did.
+            try? await Task.sleep(for: .milliseconds(100))
             #expect(env.daemon.pings == 0)
+            #expect(env.daemon.statuses == 0)
+            #expect(env.app.daemon.state == .checking)
         }
 
         @Test func onboardedNeverReopens() {
@@ -194,24 +199,43 @@ extension AppTests {
             let env = TestEnv()
             defer { env.tearDown() }
             let flow = OnboardingFlow(app: env.app, defaults: env.defaults, step: .helper)
-            env.daemon.onStatus = { n in if n == 1 { throw DaemonError.timeout }; return Wire.status() }
+            // Each answer carries its call number: the last call is start()'s, and
+            // a stale poll publishing after it would show an earlier number.
+            env.daemon.onStatus = { n in if n == 1 { throw DaemonError.timeout }; return Wire.status(entries: n) }
             let poll = Task { await flow.poll() }
             await Task.yield()
             await flow.startDaemon().value
             await poll.value
-            #expect(env.app.daemon.state == .running(Wire.status()))
+            let last = env.daemon.statuses
+            #expect(last >= 2)
+            #expect(env.app.daemon.state == .running(Wire.status(entries: last)))
+            #expect(flow.entries == last)
             #expect(!flow.busy)
         }
 
+        /// Render smoke test of every step and branch; asserts which branch each
+        /// case renders (SwiftUI's text isn't readable in-process).
         @Test func viewRendersEveryStep() async {
-            for (step, helper, status) in [
-                (OnboardingStep.welcome, FakeHelper?.none, Wire.status()),
-                (.helper, FakeHelper(.enabled), Wire.status()),
-                (.helper, FakeHelper?.none, Wire.status()),
-                (.fullDiskAccess, FakeHelper(.enabled), Wire.status(fullDiskAccess: false)),
-                (.fullDiskAccess, FakeHelper?.none, Wire.status(fullDiskAccess: false)),
-                (.fullDiskAccess, FakeHelper?.none, Wire.status()),
-                (.indexing, FakeHelper?.none, Wire.status()),
+            // The branch each step's view shows, from the same inputs the view reads.
+            func branch(_ f: OnboardingFlow) -> String {
+                let owns = f.app.daemon.ownsDaemon
+                switch f.step {
+                case .welcome: return "welcome"
+                case .helper:
+                    if helperStepMode(owns: owns, running: f.daemonRunning) == .existingDaemon { return "existing daemon" }
+                    return f.facts.helperEnabled ? "allowed" : "ask"
+                case .fullDiskAccess: return "\(fullDiskAccessStepMode(owns: owns, running: f.daemonRunning, fullDiskAccess: f.facts.fullDiskAccess))"
+                case .indexing: return "indexing \(f.entries)"
+                }
+            }
+            for (step, helper, status, want) in [
+                (OnboardingStep.welcome, FakeHelper?.none, Wire.status(), "welcome"),
+                (.helper, FakeHelper(.enabled), Wire.status(), "allowed"),
+                (.helper, FakeHelper?.none, Wire.status(), "existing daemon"),
+                (.fullDiskAccess, FakeHelper(.enabled), Wire.status(fullDiskAccess: false), "bundledHelper"),
+                (.fullDiskAccess, FakeHelper?.none, Wire.status(fullDiskAccess: false), "existingDaemon"),
+                (.fullDiskAccess, FakeHelper?.none, Wire.status(), "granted"),
+                (.indexing, FakeHelper?.none, Wire.status(), "indexing 42"),
             ] {
                 let env = TestEnv(helper: helper)
                 defer { env.tearDown() }
@@ -220,7 +244,7 @@ extension AppTests {
                 let flow = OnboardingFlow(app: env.app, defaults: env.defaults, step: step)
                 flow.apply()
                 let w = await render(OnboardingView(flow: flow).environmentObject(env.app), size: NSSize(width: 440, height: 300))
-                #expect(w.contentView != nil)
+                #expect(branch(flow) == want, "\(step)")
                 w.close()
             }
         }
@@ -231,9 +255,15 @@ extension AppTests {
                 defer { env.tearDown() }
                 env.daemon.onStatus = { _ in throw DaemonError.disconnected }
                 if fail { await env.app.daemon.refresh() }
+                // Otherwise the view's own poll must leave it checking.
+                if !fail { env.daemon.onStatus = { _ in throw CancellationError() } }
                 let flow = OnboardingFlow(app: env.app, defaults: env.defaults, step: .helper)
                 let w = await render(OnboardingView(flow: flow).environmentObject(env.app), size: NSSize(width: 440, height: 300))
-                w.close()
+                defer { w.close() }
+                // The inputs that pick "failed: Try Again" vs "Open Login Items Settings".
+                #expect(helperStepMode(owns: env.app.daemon.ownsDaemon, running: flow.daemonRunning) == .bundledHelper)
+                #expect(!flow.facts.helperEnabled && !flow.busy)
+                #expect(env.app.daemon.state == (fail ? .failed("The search helper isn't answering.") : .checking))
             }
         }
     }

@@ -1,6 +1,7 @@
 import AppKit
 import FSearchKit
 import Foundation
+import Quartz
 import Testing
 @testable import FSearch
 
@@ -36,7 +37,10 @@ extension AppTests {
             let editor = try #require(Editor.allCases.first)
             env.workspace.apps[editor.bundleId] = URL(fileURLWithPath: "/Applications/Ed.app")
             FileActions.open(line, editor: editor)
+            let c = try #require(FileActions.editorCommand(for: line, editor: editor))
             #expect(env.workspace.runs.count == 1)
+            #expect(env.workspace.runs.first?.exe == c.executable)
+            #expect(env.workspace.runs.first?.args == c.arguments)
             #expect(env.workspace.opened.isEmpty)
         }
 
@@ -71,6 +75,7 @@ extension AppTests {
             #expect(env.pasteboard.readObjects(forClasses: [NSURL.self]) as? [URL] == [URL(fileURLWithPath: "/p/a.txt")])
             FileActions.openWith("/p/a.txt", app: URL(fileURLWithPath: "/Applications/X.app"))
             #expect(env.workspace.openedWith.first?.app == URL(fileURLWithPath: "/Applications/X.app"))
+            #expect(env.workspace.openedWith.first?.urls == [URL(fileURLWithPath: "/p/a.txt")])
         }
 
         @Test func terminalOpensTheFolder() {
@@ -129,9 +134,17 @@ extension AppTests {
             #expect(!exited.value)
         }
 
+        /// In this host toggling only sets the item (no preview comes up); the
+        /// data source then serves it.
         @Test func quickLookDataSource() {
             let q = QuickLookSource.shared
+            let u = URL(fileURLWithPath: "/p/a b.txt")
+            FileActions.quickLook(u.path)
+            #expect(q.item == u)
             #expect(!q.isPreviewing)
+            #expect(!QLPreviewPanel.sharedPreviewPanelExists() || !QLPreviewPanel.shared().isVisible)
+            #expect(q.numberOfPreviewItems(in: nil) == 1)
+            #expect((q.previewPanel(nil, previewItemAt: 0) as? URL) == u)
             q.close()  // nothing up: no-op
         }
     }
@@ -208,10 +221,36 @@ extension AppTests {
             #expect(env.app.actionError == "Couldn't move to Trash: locked")
         }
 
-        @Test func showWithoutAPanelDoesNothing() {
+        @Test func showPopsUpOnlyOverAPanel() {
             let env = TestEnv()
             defer { env.tearDown() }
+            var shown: [[String]] = []
+            let saved = ActionsMenu.popUp
+            ActionsMenu.popUp = { menu, _, _ in shown.append(menu.items.map(\.title)) }
+            defer { ActionsMenu.popUp = saved }
             ActionsMenu.show(for: .file(Wire.hit("/p/x.txt")), in: nil, app: env.app)
+            #expect(shown.isEmpty)
+            let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 300, height: 200), styleMask: [.borderless], backing: .buffered, defer: true)
+            panel.contentView = NSView()
+            ActionsMenu.show(for: .file(Wire.hit("/p/x.txt")), in: panel, app: env.app)
+            #expect(shown.first?.first == "Open")
+            #expect(shown.first?.last == "Move to Trash")
+        }
+
+        /// Like ↵, an action that sends you to another app puts the launcher
+        /// away, unless it failed at once and its error line needs reading.
+        @Test func erroredActionKeepsTheLauncherUp() {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let path = env.file("x.txt")
+            let menu = ActionsMenu.build(for: .file(Wire.hit(path)), app: env.app)
+            run(menu.item(withTitle: "Copy Path"))
+            #expect(env.panel.hides == 0)  // copying stays in the launcher
+            run(menu.item(withTitle: "Open"))
+            #expect(env.panel.hides == 1)
+            run(menu.item(withTitle: "Open Folder in Terminal"))  // no Terminal: errors
+            #expect(env.app.actionError == "Couldn't find Terminal")
+            #expect(env.panel.hides == 1)
         }
     }
 }

@@ -29,7 +29,7 @@ enum ActionsMenu {
                 if kind.recordsRecent { app.openedRecent(path) }
                 // Like ↵: the user went to another app, so the launcher goes away,
                 // unless the action already failed and its error line needs reading.
-                if kind.hidesPanel(errored: app.actionErrorCount != errors) { PanelController.shared.hide() }
+                if kind.hidesPanel(errored: app.actionErrorCount != errors) { app.panel.hide(returnFocus: true) }
             }
             i.target = t
             i.representedObject = t  // the item keeps its target alive

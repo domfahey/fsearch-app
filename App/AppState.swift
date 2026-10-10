@@ -30,7 +30,7 @@ final class AppState: ObservableObject {
     private var errorClear: Task<Void, Never>?
     /// How long an action error stays up.
     var actionErrorDuration: Duration = .seconds(5)
-    /// Brought back when an action fails while it is hidden.
+    /// Brought back when an action fails while it is hidden; put away after an action.
     var panel: PanelHost = PanelController.shared
 
     /// Bumped by every error, so a caller can tell whether its action reported one.

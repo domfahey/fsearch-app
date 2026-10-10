@@ -57,6 +57,7 @@ struct DaemonClock: Sendable {
 protocol PanelHost: AnyObject {
     var isVisible: Bool { get }
     func show(app: AppState)
+    func hide(returnFocus: Bool)
 }
 
 /// Bringing FSearch to the front. In the unit-test host the real closure does

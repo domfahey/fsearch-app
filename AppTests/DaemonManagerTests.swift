@@ -262,8 +262,6 @@ extension AppTests {
         @Test func cliAgentPlistIsOnlyAPath() {
             #expect(DaemonManager.cliAgentPlist.path.hasSuffix("Library/LaunchAgents/mt.nd.fsearch.plist"))
             #expect(DaemonManager.agentPlistName == "com.domfahey.fsearch.daemon.plist")
-            // The default existence check only reads the file system.
-            _ = DaemonManager(client: StubDaemon(), service: nil)
         }
     }
 }

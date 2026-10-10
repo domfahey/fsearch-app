@@ -176,9 +176,11 @@ final class FakeWorkspace: Workspace {
 
     func open(_ url: URL) { opened.append(url) }
 
+    /// Like NSWorkspace, the completion runs off the main thread.
     func open(_ urls: [URL], withApplicationAt app: URL, completion: (@Sendable (Error?) -> Void)?) {
         openedWith.append((urls, app))
-        completion?(openWithError)
+        let error = openWithError.map { $0 as NSError }
+        DispatchQueue.global().async { completion?(error) }
     }
 
     func activateFileViewerSelecting(_ urls: [URL]) { revealed.append(urls) }
@@ -188,7 +190,8 @@ final class FakeWorkspace: Workspace {
     func run(_ executable: String, _ arguments: [String], onExit: @escaping @Sendable (Int32) -> Void) -> Bool {
         runs.append((executable, arguments))
         guard runStarts else { return false }
-        if let s = runExitStatus { onExit(s) }
+        // Like Process.terminationHandler, off the main thread.
+        if let s = runExitStatus { DispatchQueue.global().async { onExit(s) } }
         return true
     }
 
@@ -201,8 +204,9 @@ final class FakeWorkspace: Workspace {
 @MainActor
 final class FakePanel: PanelHost {
     var isVisible = false
-    private(set) var shows = 0
+    private(set) var shows = 0, hides = 0
     func show(app: AppState) { shows += 1; isVisible = true }
+    func hide(returnFocus: Bool) { hides += 1; isVisible = false }
 }
 
 /// One app with fakes everywhere, a throwaway defaults suite and a temp folder.

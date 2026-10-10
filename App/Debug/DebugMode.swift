@@ -8,13 +8,16 @@ enum DebugMode {
     static let windowIDs = ["index", "log"]
 
     @MainActor static func set(_ on: Bool, app: AppState, dismiss: DismissWindowAction?) {
+        set(on, app: app) { id in dismiss?(id: id) }
+    }
+
+    /// `dismissWindow` closes one window by id (tests record the ids).
+    @MainActor static func set(_ on: Bool, app: AppState, dismissWindow: (String) -> Void) {
         app.debugMode = on
         Log.debug.info("debug mode \(on ? "on" : "off", privacy: .public)")
         guard !on else { return }
         app.log.clear()
-        if let dismiss {
-            for id in windowIDs { dismiss(id: id) }
-        }
+        for id in windowIDs { dismissWindow(id) }
     }
 }
 
