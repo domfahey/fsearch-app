@@ -6,7 +6,7 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject var app: AppState
     /// Editor.rawValue, "" = none: the same key as AppState.editorRaw (read as AppState.editor).
-    @AppStorage("editor") private var editor = ""
+    @AppStorage("editor", store: AppDefaults.store) private var editor = ""
     @Environment(\.dismissWindow) private var dismissWindow
     @StateObject private var loginItem = LoginItemModel(
         service: LaunchOptions.current.testMode ? nil : SMAppLoginItemService())

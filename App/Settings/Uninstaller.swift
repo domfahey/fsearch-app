@@ -48,7 +48,7 @@ final class Uninstaller: ObservableObject {
     static func live(options: LaunchOptions) -> Uninstaller {
         Uninstaller(helper: options.testMode ? nil : SMAppHelperService(),
                     loginItem: options.testMode ? nil : SMAppLoginItemService(),
-                    workspace: FileActions.workspace, defaults: .standard,
+                    workspace: FileActions.workspace, defaults: AppDefaults.store,
                     dataFolder: DebugFormat.dataDir(socketPath: options.socketPath),
                     logFolder: options.searchLogFile.deletingLastPathComponent(),
                     resetShortcut: { KeyboardShortcuts.reset(.togglePanel) })

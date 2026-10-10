@@ -52,7 +52,7 @@ final class AppState: ObservableObject {
 
     /// The running app: real daemon connections, real login item (none in test mode).
     static func live(options: LaunchOptions = .current) -> AppState {
-        AppState(options: options, defaults: .standard,
+        AppState(options: options, defaults: options.testMode ? AppDefaults.store : .standard,
                  helper: options.testMode ? nil : SMAppHelperService(),
                  // Two connections: names and content never wait on each other.
                  names: DaemonClient(socketPath: options.socketPath),

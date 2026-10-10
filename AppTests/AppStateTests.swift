@@ -50,9 +50,23 @@ extension AppTests {
         @Test func liveTestModeHasNoHelper() {
             let dir = NSTemporaryDirectory() + "fsa-live-\(UUID().uuidString.prefix(6))"
             let app = AppState.live(options: LaunchOptions(socketPath: dir + "/s.sock", testMode: true, unitTestHost: false, showPanel: false))
+            #expect(app.daemon.service == nil)  // SMAppService is never touched
             #expect(!app.daemon.ownsDaemon)
             #expect(app.log.file.path == dir + "/searches.jsonl")
             #expect(app.options.testMode)
+        }
+
+        /// Test mode never touches the user's real com.domfahey.fsearch defaults.
+        @Test func testModeUsesAThrowawayDefaultsSuite() {
+            #expect(AppDefaults.make(testMode: false) === UserDefaults.standard)
+            #expect(AppDefaults.store !== UserDefaults.standard)  // this host is test mode
+            #expect(OnboardingLauncher.defaults !== UserDefaults.standard)
+            let name = "com.domfahey.fsearch.apptests.\(UUID().uuidString)"
+            defer { TestEnv.removeSuite(name) }
+            UserDefaults(suiteName: name)!.set(["/stale"], forKey: "recentPaths")
+            let d = AppDefaults.make(testMode: true, suiteName: name)
+            #expect(d !== UserDefaults.standard)
+            #expect(d.object(forKey: "recentPaths") == nil)  // emptied at launch
         }
 
         @Test func debugModeGatesTheSearchLog() async {

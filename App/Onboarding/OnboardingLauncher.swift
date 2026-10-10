@@ -13,7 +13,7 @@ enum OnboardingLauncher {
     /// Set once the helper has been started, by onboarding or on close.
     private(set) static var startedDaemon = false
     /// Where "onboarded" is read; a throwaway suite under test.
-    static var defaults: UserDefaults = .standard
+    static var defaults: UserDefaults = AppDefaults.store
 
     private static var onboarded: Bool { defaults.bool(forKey: "onboarded") }
 
@@ -91,7 +91,7 @@ enum OnboardingLauncher {
 /// The menu's "Finish Setup…" item, shown until onboarding is done.
 struct FinishSetupMenuItem: View {
     let app: AppState
-    @AppStorage("onboarded") private var onboarded = false
+    @AppStorage("onboarded", store: AppDefaults.store) private var onboarded = false
 
     var body: some View {
         if !onboarded { Button("Finish Setup…") { OnboardingLauncher.reopen(app: app) } }
