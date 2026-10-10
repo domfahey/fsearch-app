@@ -24,6 +24,7 @@ The app keeps its settings in its standard preferences file, `~/Library/Preferen
 | `debugMode` | Bool | Whether debug mode is on. |
 | `onboarded` | Bool | Whether the welcome window is finished. While false, the menu shows **Finish Setup…**. |
 | `skippedFullDiskAccess` | Bool | Whether you pressed **Skip for now** on the Full Disk Access step. |
+| `dismissedFullDiskAccessReminder` | Bool | Whether you chose **Don't Remind Me** on the menu-bar Full Disk Access reminder shown after skipping. |
 | `recentPaths` | List of strings | The files you opened from the panel, newest first. Up to 16 are kept. The empty panel shows up to 8 that still exist. |
 
 The shortcut is stored by the [KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts) library under its own key.

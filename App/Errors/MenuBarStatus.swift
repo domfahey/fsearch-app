@@ -43,11 +43,24 @@ final class MenuBarStatus {
                 case .needsApproval: .needsApproval
                 case .failed: .failed
                 }
-                let next = MenuBarWarning.evaluate(condition, skippedFullDiskAccess: UserDefaults.standard.bool(forKey: "skippedFullDiskAccess"))
+                let next = MenuBarWarning.evaluate(condition, skippedFullDiskAccess: UserDefaults.standard.bool(forKey: "skippedFullDiskAccess"),
+                                                 dismissedReminder: UserDefaults.standard.bool(forKey: "dismissedFullDiskAccessReminder"))
                 if next != self?.warning { self?.warning = next }
             }
             .store(in: &cancellables)
     }
+}
+
+/// The reminder's actions, apart from the view so tests can run them.
+@MainActor
+enum FullDiskAccessReminder {
+    static let settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!
+    static let dismissedKey = "dismissedFullDiskAccessReminder"
+
+    static func openSettings() { FileActions.workspace.open(settingsURL) }
+
+    /// Stores the flag; the defaults-change notification re-evaluates the menu bar.
+    static func dismiss(defaults: UserDefaults = .standard) { defaults.set(true, forKey: dismissedKey) }
 }
 
 /// The menu-bar icon. A View, so Observation tracks `warning` reliably.
@@ -70,6 +83,12 @@ struct MenuBarFixItem: View {
             Text(w.message)
             if w.offersFix {
                 Button("Fix…") { NSApp.activate(); openWindow(id: "index") }
+            }
+            if w.offersFullDiskAccess {
+                Button(MenuBarWarning.fullDiskAccessItemTitle(ownsDaemon: app.daemon.ownsDaemon)) {
+                    FullDiskAccessReminder.openSettings()
+                }
+                Button("Don't Remind Me") { FullDiskAccessReminder.dismiss() }
             }
             Divider()
         }

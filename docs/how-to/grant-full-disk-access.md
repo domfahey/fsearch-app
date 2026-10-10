@@ -28,7 +28,7 @@ Full Disk Access belongs to whichever daemon is running. If the app is using you
 
 ## Skip it
 
-You can press **Skip for now**. Search works, but the protected folders are missing. Once you skip, the app shows no menu-bar reminder, so grant access later when you want those folders.
+You can press **Skip for now**. Search works, but the protected folders are missing. After you skip, the menu bar shows a quiet reminder (a magnifying glass in a circle) for as long as access is off. Its menu has **Turn On Full Disk Access…**, which opens Privacy & Security, Full Disk Access (**Grant Full Disk Access to fsearch…** if the app is using your CLI daemon), and **Don't Remind Me**, which hides the reminder for good. The reminder goes away by itself once access is on.
 
 If you close the welcome window without granting or skipping, the menu bar shows "Full Disk Access is off, so some files won't be found" (with no Fix… button) until you do one or the other.
 
