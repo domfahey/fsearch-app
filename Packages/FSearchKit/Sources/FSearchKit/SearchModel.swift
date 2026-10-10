@@ -60,6 +60,8 @@ public final class SearchModel {
     @ObservationIgnored private let names: SearchBackend
     @ObservationIgnored private let content: SearchBackend
     @ObservationIgnored private var generation = 0
+    /// The query and mode of the newest refresh that searched or cleared.
+    @ObservationIgnored private var requested: (query: String, mode: SearchMode) = ("", .names)
     /// The backend call of the newest refresh; a newer refresh cancels it, so a
     /// hung daemon costs one timeout, not one per keystroke.
     @ObservationIgnored private var inflight: Task<([ResultItem], UInt64), Error>?
@@ -74,13 +76,22 @@ public final class SearchModel {
     }
 
     public func refresh() async {
-        // A filter still being typed (`foo size:`) is not a query yet: keep
-        // what is showing, and let any search already under way finish.
-        if QuerySplit.endsInHalfTypedFilter(query) { return }
+        // A filter still being typed (`foo size:`) is not a query yet. While
+        // it extends the last query in the same mode, keep what is showing and
+        // let any search already under way finish. Otherwise (the query was
+        // replaced, or the mode changed) those rows answer something else:
+        // clear them, still sending nothing.
+        let halfTyped = QuerySplit.endsInHalfTypedFilter(query)
+        if halfTyped && mode == requested.mode && query.hasPrefix(requested.query) { return }
         generation += 1
         inflight?.cancel()
         inflight = nil
         let gen = generation, q = query, mode = self.mode
+        requested = (q, mode)
+        if halfTyped {
+            (items, phase, lastTookUs, answered) = ([], .idle, nil, (q, mode))
+            return
+        }
         // Nothing to send: a blank query, the "?" cheat sheet, or a content
         // query made only of filters, or a name query whose grep:/sym: has no
         // value yet (an empty pattern matches every line).

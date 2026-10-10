@@ -71,14 +71,34 @@ public enum QuerySplit {
     /// True if the query has a content key, so a name search would get lines back.
     public static func hasContentKey(_ query: String) -> Bool { contentSearch(query) != nil }
 
-    /// True while the last word is a filter key with nothing after the colon
-    /// and no space typed since (`foo size:`): the user is still typing the
-    /// value, and the daemon would answer with an error (or match nothing).
+    /// The daemon's `type:` values (query.rs `TYPES`, plus `app`).
+    static let typeValues: Set<String> = ["code", "doc", "image", "video", "audio", "archive", "font", "app"]
+    /// The daemon's `kind:` values.
+    static let kindValues: Set<String> = ["file", "f", "dir", "folder", "d", "link", "symlink", "l"]
+
+    /// True while the last word, with no space typed since, is a filter whose
+    /// value is still being typed: nothing after the colon (`foo size:`), a
+    /// strict prefix of a `type:`/`kind:` value (`type:c`, `kind:fi`, or after
+    /// a comma: `type:code,`), or a range cut short (`size:1mb..`, `size:>`,
+    /// `mtime:<`). The daemon would answer with an error, or match nothing.
     public static func endsInHalfTypedFilter(_ query: String) -> Bool {
         guard let last = words(query).last, query.last != " " else { return false }
         let plain = unquoted(last)
-        guard let colon = plain.firstIndex(of: ":"), plain.index(after: colon) == plain.endIndex else { return false }
-        return keys.contains(String(plain[..<colon]))
+        guard let colon = plain.firstIndex(of: ":") else { return false }
+        let key = String(plain[..<colon]), value = String(plain[plain.index(after: colon)...])
+        guard keys.contains(key) else { return false }
+        if value.isEmpty { return true }
+        switch key {
+        case "type": return isStrictPrefix(String(value.split(separator: ",", omittingEmptySubsequences: false).last ?? ""), of: typeValues)
+        case "kind": return isStrictPrefix(value, of: kindValues)
+        case "size", "mtime", "modified": return [".", "<", ">", "="].contains { value.hasSuffix($0) }
+        default: return false
+        }
+    }
+
+    /// `s` starts some value but isn't one yet.
+    private static func isStrictPrefix(_ s: String, of values: Set<String>) -> Bool {
+        !values.contains(s) && values.contains { $0.hasPrefix(s) }
     }
 
     /// Each word with the spaces typed before it.
