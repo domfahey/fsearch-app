@@ -28,6 +28,8 @@ Follow-ups not done yet, grouped by priority. "You" items need the maintainer: a
 
 ## P2: code quality and polish
 
+- [ ] **Test-only API in shipped code:** wrap `OnboardingLauncher.reset()` and the `private(set)` widenings added for AppTests in `#if DEBUG`.
+- [ ] **One source for launch options:** `PanelController` reads `LaunchOptions.current.showPanel`; use `app.options` like everything else.
 - [x] **Docs best-practice pass:** README points to the docs index; troubleshooting shows the new error texts; query syntax explains that half-typed filters wait; ARCHITECTURE mentions reply ids; a Markdown link check in CI.
 - [ ] **Small panel polish:**
   - the ⌘K menu opens at a fixed point instead of next to the selected row;
