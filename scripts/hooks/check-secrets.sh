@@ -8,19 +8,21 @@ fail=0
 for f in "$@"; do
   [ -f "$f" ] || continue
   [ "$f" = scripts/hooks/check-secrets.sh ] && continue  # holds the patterns themselves
-  case "$f" in
-    *.p12|*.p8|*.pem|*.key|*.cer|*.certSigningRequest|*.mobileprovision|*.provisionprofile|*AuthKey_*|*sparkle*private*|*private-key*|.env|.env.*)
+  # File names are matched case-insensitively (macOS volumes usually are too).
+  lower=$(printf '%s' "$f" | tr '[:upper:]' '[:lower:]')
+  case "$lower" in
+    *.p12|*.p8|*.pem|*.key|*.cer|*.certsigningrequest|*.mobileprovision|*.provisionprofile|*authkey_*|*sparkle*private*|*private-key*|.env|.env.*)
       echo "secret check: refusing key or secret file: $f" >&2; fail=1; continue ;;
   esac
   # An EdDSA (Sparkle) private key is 32 bytes: a lone 44-character base64 line.
-  lower=$(printf '%s' "$f" | tr '[:upper:]' '[:lower:]')
+  # (A *.key file was already refused above.)
   case "$lower" in
-    *.key|*eddsa*)
+    *eddsa*)
       if grep -Eq '^[[:space:]]*[A-Za-z0-9+/]{43}=[[:space:]]*$' "$f"; then
         echo "secret check: $f holds a 44-character base64 line that looks like an EdDSA private key" >&2; fail=1; continue
       fi ;;
   esac
-  if grep -IqE -- '-----BEGIN ([A-Z]+ )?PRIVATE KEY-----|gh[opsu]_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{40,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,}|-----BEGIN OPENSSH PRIVATE KEY-----' "$f"; then
+  if grep -IqE -- '-----BEGIN ([A-Z]+ )?PRIVATE KEY-----|gh[oprsu]_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{40,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,}|-----BEGIN OPENSSH PRIVATE KEY-----' "$f"; then
     echo "secret check: $f contains something that looks like a private key or token" >&2; fail=1
   fi
 done

@@ -21,7 +21,7 @@ Follow the sections in order. Do the setup once, then repeat "Cut a release" for
 - [ ] Update `MARKETING_VERSION` in `project.yml` to the new version. Release builds take their version from the tag, but Debug builds show this value.
 - [ ] In [CHANGELOG.md](../CHANGELOG.md), rename the Unreleased section to `## [X.Y.Z] - YYYY-MM-DD`. Add a new empty `## [Unreleased]` above it. Update the compare links at the bottom: `[Unreleased]` compares `vX.Y.Z...main`, and `[X.Y.Z]` compares the previous tag to `vX.Y.Z` (for the first release, link to the tag itself).
 - [ ] Commit these changes on `main`.
-- [ ] Check the build number. `scripts/release.sh` sets `CFBundleShortVersionString` from the version and `CFBundleVersion` from `git rev-list --count HEAD`, so it needs a full clone. The number must be greater than the `sparkle:version` of the last appcast entry, or Sparkle will not offer the update. Tag releases only on commits of `main`, whose commit count only grows.
+- [ ] Check the build number. `scripts/release.sh` sets `CFBundleShortVersionString` from the version and `CFBundleVersion` from `git rev-list --count HEAD`, so it needs a full clone. The number must be greater than the `sparkle:version` of the last appcast entry, or Sparkle will not offer the update. Tag releases only on commits of `main`, whose commit count only grows. The script refuses a build number that is not greater than the last release's: the highest `git rev-list --count` among the other `v*` tags, and `release/last-build` if that file exists. CI's checkout fetches the full history and the tags for this, and the job fails if it finds no `v*` tag.
 
 ### 2. Tag
 
@@ -30,12 +30,11 @@ Follow the sections in order. Do the setup once, then repeat "Cut a release" for
 
 ### 3. Build the release
 
-CI's tag build is the release of record. Pushing a `v*` tag runs the `release` job, which waits for the `kit` and `app` jobs, then runs `scripts/release.sh`. That script builds, signs, notarizes and staples the app and DMG, verifies both, and writes the SHA-256 checksum. If the repository protects the job with an environment that needs approval, approve the run.
+CI's tag build is the release of record. Pushing a `v*` tag runs the `release` job, which waits for the `kit`, `app` and `lint` jobs, then runs `scripts/release.sh` in two phases (see [CI release job](#ci-release-job-environment-approval-provenance)). That script builds, signs, notarizes and staples the app and DMG, verifies both, and writes the SHA-256 checksum. If the repository protects the job with an environment that needs approval, approve the run.
 
-- [ ] Watch the run finish. Download the `FSearch-dmg` artifact from the run. It holds the DMG only.
-- [ ] Write the checksum next to it: `shasum -a 256 FSearch-X.Y.Z.dmg > FSearch-X.Y.Z.dmg.sha256`.
+- [ ] Watch the run finish. Download the `FSearch-dmg` artifact from the run. It holds the DMG, its `.sha256` checksum and the `.intoto.jsonl` provenance attestation.
 
-If CI cannot run, use the fallback: on a Mac with the setup above, check out the tag and run `scripts/release.sh X.Y.Z`. The output lands in `build/release/`, including `FSearch-X.Y.Z.dmg` and `FSearch-X.Y.Z.dmg.sha256`. The script also writes `release/last-build`, which is git-ignored. Keep it with your release records, or copy the last appcast's build number into it on a new Mac. CI starts from a fresh checkout and skips that check.
+If CI cannot run, use the fallback: on a Mac with the setup above, check out the tag and run `scripts/release.sh X.Y.Z` (both phases in one go). The output lands in `build/release/`, including `FSearch-X.Y.Z.dmg` and `FSearch-X.Y.Z.dmg.sha256`. The script also writes `release/last-build`, which is git-ignored. Keep it with your release records, or copy the last appcast's build number into it on a new Mac. The tags cover the same check when the file is missing, as in CI's fresh checkout, provided every release was tagged.
 
 ### 4. Verify the DMG
 
@@ -89,11 +88,11 @@ Sparkle never downgrades an install, so the fix for a bad release is a newer one
 
 A Homebrew cask is planned for after the first release. It will point at the release DMG and its SHA-256, and include a `zap` stanza for the data and log folders. See [To do](todos.md).
 
+## CI release job (environment approval, provenance)
+
+CI release flow. Push a tag only on a commit of `main` (the job refuses any other tag). The `release` job waits for approval of the `release` environment, then builds everything before it touches a secret: the daemon with `cargo build --locked` on the pinned Rust toolchain (`RUST_TOOLCHAIN` in `ci.yml`), the Xcode project, the Swift packages (resolved from `Package.resolved` only) and the unsigned archive (`scripts/release.sh --prepare`). Only then does it unlock the signing keychain and run `scripts/release.sh --sign`, which signs, notarizes and packages that archive and builds or fetches nothing. It then writes a build provenance attestation and creates a draft GitHub release with the DMG, `.sha256` and `.intoto.jsonl` attestation bundle. XcodeGen is installed by `scripts/install-xcodegen.sh` from a pinned, checksum-verified release, and Swift packages resolve from the committed `Package.resolved`; when you bump a dependency or the toolchain, update those pins (and `Package.resolved`) in their own reviewed commit. Check on the downloaded DMG that `shasum -a 256 -c FSearch-<version>.dmg.sha256` and `gh attestation verify FSearch-<version>.dmg -R domfahey/fsearch-app` pass, then publish the draft.
+
 ## See also
 
 - [Changelog](../CHANGELOG.md)
 - [Contributing](../CONTRIBUTING.md)
-
-## CI release job (environment approval, provenance)
-
-CI release flow. Push a tag only on a commit of `main` (the job refuses any other tag). The `release` job waits for approval of the `release` environment, builds the daemon first with `cargo build --locked` on the pinned Rust toolchain (`RUST_TOOLCHAIN` in `ci.yml`), then unlocks the signing keychain, signs and notarizes, writes a build provenance attestation, and creates a draft GitHub release with the DMG, `.sha256` and `.intoto.jsonl` attestation bundle. XcodeGen is installed by `scripts/install-xcodegen.sh` from a pinned, checksum-verified release, and Swift packages resolve from the committed `Package.resolved`; when you bump a dependency or the toolchain, update those pins (and `Package.resolved`) in their own reviewed commit. Check on the downloaded DMG that `shasum -a 256 -c FSearch-<version>.dmg.sha256` and `gh attestation verify FSearch-<version>.dmg -R domfahey/fsearch-app` pass, then publish the draft.

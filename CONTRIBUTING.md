@@ -6,7 +6,7 @@ By taking part you agree to follow the [Code of Conduct](.github/CODE_OF_CONDUCT
 
 ## Secrets
 
-Never commit keys, certificates, provisioning profiles, notary API keys or the Sparkle private key. Run `make hooks` once after cloning: it installs git hooks that refuse commits and pushes containing key files or secret-looking content. `.gitignore` also excludes the usual key file types. Only Sparkle's *public* key (`SUPublicEDKey`) belongs in the repo. If a hook refuses your commit, remove the secret. There is no bypass.
+Never commit keys, certificates, provisioning profiles, notary API keys or the Sparkle private key. Run `make hooks` once after cloning: it installs git hooks that refuse commits and pushes containing key files or secret-looking content. `.gitignore` also excludes the usual key file types. Only Sparkle's *public* key (`SUPublicEDKey`) belongs in the repo. If a hook refuses your commit, remove the secret. Don't skip the hooks with `--no-verify`: git allows it, but this project doesn't, and a false positive is a reason to fix the pattern in `scripts/hooks/check-secrets.sh` instead.
 
 ## Set up
 
@@ -14,7 +14,7 @@ Never commit keys, certificates, provisioning profiles, notary API keys or the S
 
 - **Xcode 16 or later** (Swift 6). The app is tested with Xcode 26.6. FSearchKit is tested with Xcode 16.2 and later. The Makefile and scripts use `DEVELOPER_DIR` if it is set, otherwise the Xcode that `xcode-select -p` reports. Select one with `sudo xcode-select -s /Applications/Xcode.app`, or `export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
 - **Rust** through [rustup](https://rustup.rs), with both macOS targets: `rustup target add aarch64-apple-darwin x86_64-apple-darwin`.
-- **XcodeGen**: `brew install xcodegen`.
+- **XcodeGen**: `scripts/install-xcodegen.sh ~/.local/share/xcodegen` installs the pinned, checksum-verified release that CI uses (it empties that folder first) and prints its `bin` folder; add that folder to your `PATH`. `brew install xcodegen` (what `make install` runs) also works, but its version floats.
 - **python3**, which `scripts/check-links.sh` uses. macOS and Xcode's command-line tools provide it.
 - **Network access** the first time you build the daemon. `scripts/build-daemon.sh` clones the pinned fsearch commit from GitHub.
 - Optional: `shellcheck` and `actionlint`. `make lint` skips them with a message when they are missing. CI runs both.
@@ -129,10 +129,10 @@ Use the issue templates. For a bug, include the Index Details output from debug 
 | You see | What to do |
 |---|---|
 | A Rust error about a missing target when you build the daemon | Run `rustup target add aarch64-apple-darwin x86_64-apple-darwin`, or `make install`. |
-| `xcodegen: command not found` | Run `brew install xcodegen`. |
+| `xcodegen: command not found` | Run `scripts/install-xcodegen.sh ~/.local/share/xcodegen` and add the `bin` folder it prints to your `PATH`, or `brew install xcodegen`. |
 | The Xcode build fails in the embed phase and tells you to run `scripts/build-daemon.sh` | `Vendor/fsearch` is missing. Run `make daemon`. |
 | Swift 6 strict-concurrency errors | Fix the isolation: mark the type `@MainActor` or `Sendable`, or move the work off the main actor. Do not turn the checks down. |
-| A git hook refuses your commit with "secret check" | Remove the key or token from the change. There is no bypass. |
+| A git hook refuses your commit with "secret check" | Remove the key or token from the change. Don't use `--no-verify`; if it's a false positive, fix the pattern in `scripts/hooks/check-secrets.sh`. |
 | Your build lost Full Disk Access after a rebuild | An ad-hoc build is a new app to macOS each time. Turn the entry off and on, or remove and re-add it. See [Running your own build](#running-your-own-build). |
 | `make lint` seems to print nothing | On success it ends with `lint: ok`. A skipped check says so, for example "shellcheck not installed; skipped". |
 | `make doctor` reports a failed check | Follow the `fix:` line under it. |

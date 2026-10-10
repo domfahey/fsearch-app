@@ -56,7 +56,7 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
 - ↵ on an app, script, installer or internet location reveals it in Finder instead of launching it. ⌘K → Open still launches.
 - The panel shows at most 1000 results.
 - `limit:` now works in name searches, because the app no longer sends its own limit over it.
-- The debug search log folder is private (0700) and its file 0600, both excluded from backups. The privacy manifest uses reason DDA9.1 for file timestamps.
+- The debug search log folder is private (0700) and its file 0600, both excluded from backups. The privacy manifest uses reasons DDA9.1 and C617.1 (the app's own files) for file timestamps.
 
 ### Fixed
 
@@ -92,7 +92,8 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
 - The Rust toolchain (1.94.0) and XcodeGen (2.46.0, sha256-checked) are pinned. `dtolnay/rust-toolchain` is no longer used in CI.
 - The daemon builds with `cargo build --locked` from the exact pinned commit (a protected tag on the fork), before the signing keychain is imported in CI.
 - `Package.resolved` is committed, and CI and release builds use only it.
-- CI actions are pinned to full commit SHAs, and workflows run with read-only permissions.
+- CI actions are pinned to full commit SHAs. Workflows are read-only by default; the release job gets write for the draft release and attestation.
+- The CI release job builds the project, resolves the Swift packages and archives the app before it imports the signing keychain; after that it only signs, notarizes and packages. The build-number check also compares against earlier `v*` tags, so it runs in CI too. The secret-check hooks check every pushed commit in its own scratch folder, block on a file they can't check, match key file names case-insensitively and catch `ghr_` tokens; CI shellchecks them.
 - An OpenSSF Scorecard workflow checks the repository's supply-chain security practices.
 
 [Unreleased]: https://github.com/domfahey/fsearch-app/commits/main

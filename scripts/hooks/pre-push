@@ -2,25 +2,31 @@
 # Blocks pushes whose new commits add key files or secret-looking content.
 # Every commit that is not already on a remote is scanned (`git rev-list "$local_sha"
 # --not --remotes`), blob by blob, so a secret added in one commit and removed in a
-# later one is still caught.
+# later one is still caught. Each commit is checked out into its own scratch directory
+# (a path can be a file in one commit and a folder in another). A blob that can't be
+# written out blocks the push rather than going unchecked.
 root=$(git rev-parse --show-toplevel)
 fail=0
+tmp=""
+trap 'rm -rf "$tmp"' EXIT
 while read -r _ local_sha _ _; do
   [ "$local_sha" = 0000000000000000000000000000000000000000 ] && continue
-  tmp=$(mktemp -d) || exit 1
   seen=$'\n'
   while IFS= read -r c; do
     [ -n "$c" ] || continue
+    rm -rf "$tmp"
+    tmp=$(mktemp -d) || { echo "secret check: cannot create a scratch directory" >&2; exit 1; }
     # Added, copied or modified files in this commit (merges and the root commit included).
-    while IFS=' ' read -r _ _ _ blob _ path; do
+    while IFS=' ' read -r _ mode _ blob _ path; do
       [ -n "$path" ] || continue
+      [ "$mode" = 160000 ] && continue  # a submodule commit, not a file
       case "$seen" in *$'\n'"$blob:$path"$'\n'*) continue ;; esac
       seen+="$blob:$path"$'\n'
-      mkdir -p "$tmp/$(dirname "$path")"
-      git cat-file blob "$blob" > "$tmp/$path" 2>/dev/null || continue
+      if ! { mkdir -p "$tmp/$(dirname "$path")" && git cat-file blob "$blob" > "$tmp/$path"; }; then
+        echo "secret check: could not write $path (commit ${c:0:10}) to check it" >&2; fail=1; continue
+      fi
       (cd "$tmp" && "$root/scripts/hooks/check-secrets.sh" "$path") || { fail=1; echo "  (in commit ${c:0:10})" >&2; }
     done < <(git -c core.quotepath=off diff-tree -r -m --root --no-commit-id --diff-filter=ACMR "$c" | sed -E 's/^:([0-9]+) ([0-9]+) ([0-9a-f]+) ([0-9a-f]+) ([A-Z])[0-9]*\t/:\1 \2 \3 \4 \5 /')
   done < <(git rev-list "$local_sha" --not --remotes)
-  rm -rf "$tmp"
 done
 exit $fail
