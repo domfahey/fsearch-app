@@ -15,12 +15,20 @@ The launcher panel, opened with a shortcut. It searches by name, inside files, a
 - A Report an Issue action in the app.
 - Accessibility and localization.
 
-## v2: search window
+## v2: an Everything-style search window
 
-- A search window alongside the panel, on the same engine.
-- Clickable filter chips.
-- Sorting.
-- File previews.
+A full window for when the panel isn't enough, modelled on [Everything](https://www.voidtools.com) by voidtools. It sits alongside the panel and uses the same engine.
+
+- One search field over a dense results table that updates as you type, across the whole disk.
+- Columns for name, folder, size, kind and date modified. Sort by any column; resize and reorder columns.
+- A status bar with the result count and search time.
+- Toggles for match case, whole word, regex and search-in-path, plus the existing `ext:`, `in:`, `size:` and `mtime:` filters as clickable chips.
+- Saved searches and filters you can switch between.
+- Keyboard first: the same shortcuts and actions as the panel, multi-select, and drag out.
+- A preview pane (Quick Look) and inside-file results with the matching line.
+- More than one window open at a time.
+
+This needs the daemon to return more than 50 results quickly, with paging. Scrolling through very large result sets may need upstream fsearch changes.
 
 ## Later
 

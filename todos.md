@@ -19,7 +19,7 @@ Follow-ups not done yet, grouped by priority. "You" items need the maintainer: a
 
 ## P1: tests and benchmarks
 
-- [ ] **Leaked test daemon:** if `swift test` is killed (SIGKILL, CI timeout), RealDaemon's `fsearch serve` stays running under launchd with its temp HOME. *(In progress.)*
+- [x] **Leaked test daemon:** if `swift test` is killed (SIGKILL, CI timeout), RealDaemon's `fsearch serve` stays running under launchd with its temp HOME. Fixed: a watchdog pipe kills it when the test process dies, and orphans are swept at start.
 - [ ] **Re-record the benchmark baseline on a quiet machine:** the committed one is provisional (recorded under load). Delete this machine's entry in `bench/baseline.json`, then `scripts/bench.sh --record`.
 - [ ] **CI benchmark baseline:** add a `ci-macos-26` entry from a CI artifact so the CI bench job can gate, not just report.
 
@@ -39,6 +39,7 @@ Follow-ups not done yet, grouped by priority. "You" items need the maintainer: a
 
 ## P2: later features
 
+- [ ] **Everything-style search window (v2):** a full window with a sortable results table (name, folder, size, kind, date modified), a status bar, match-case/regex/path toggles, filter chips, saved searches and a preview pane. See ROADMAP.md. Needs a design pass, and daemon paging for large result sets.
 - [ ] **App Intents:** a "Search files" action for Shortcuts.
 - [ ] **URL scheme:** `fsearch://search?q=…` opens the panel with a query.
 
