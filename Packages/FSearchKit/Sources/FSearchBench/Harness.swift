@@ -19,7 +19,7 @@ enum Group: String, Codable, Sendable {
 struct Metric: Codable, Sendable {
     var name: String
     var group: Group
-    var unit: String          // "ns" or "bytes"
+    var unit: String  // "ns" or "bytes"
     var median: Double
     var p95: Double
     var min: Double
@@ -86,14 +86,17 @@ struct BenchConfig: Sendable {
     }
 }
 
-func stats(_ name: String, _ group: Group, perOp: [Double], ops: Int, unit: String = "ns", tolerance: Double? = nil, info: [String: String]? = nil) -> Metric {
+func stats(
+    _ name: String, _ group: Group, perOp: [Double], ops: Int, unit: String = "ns", tolerance: Double? = nil, info: [String: String]? = nil
+) -> Metric {
     let s = perOp.sorted()
     let n = s.count
     func q(_ p: Double) -> Double { s[Swift.min(n - 1, Swift.max(0, Int((p * Double(n)).rounded(.up)) - 1))] }
     let median = n % 2 == 1 ? s[n / 2] : (s[n / 2 - 1] + s[n / 2]) / 2
-    return Metric(name: name, group: group, unit: unit, median: median, p95: q(0.95), min: s.first ?? 0,
-                  mean: s.reduce(0, +) / Double(Swift.max(1, n)), samples: n, opsPerSample: ops,
-                  tolerance: tolerance ?? Tolerance.default(group), info: info)
+    return Metric(
+        name: name, group: group, unit: unit, median: median, p95: q(0.95), min: s.first ?? 0,
+        mean: s.reduce(0, +) / Double(Swift.max(1, n)), samples: n, opsPerSample: ops,
+        tolerance: tolerance ?? Tolerance.default(group), info: info)
 }
 
 @MainActor final class Bench {
@@ -109,8 +112,10 @@ func stats(_ name: String, _ group: Group, perOp: [Double], ops: Int, unit: Stri
     }
 
     /// Synchronous op. `setup` runs before each sample, untimed.
-    func measure(_ name: String, group: Group = .inproc, ops fixedOps: Int? = nil, tolerance: Double? = nil,
-                 setup: (() -> Void)? = nil, _ body: () -> Void) {
+    func measure(
+        _ name: String, group: Group = .inproc, ops fixedOps: Int? = nil, tolerance: Double? = nil,
+        setup: (() -> Void)? = nil, _ body: () -> Void
+    ) {
         guard config.wants(name) else { return }
         let factor = config.slowdown
         func run(_ k: Int) -> UInt64 {
@@ -152,8 +157,10 @@ func stats(_ name: String, _ group: Group, perOp: [Double], ops: Int, unit: Stri
     /// Async op, one op per sample (round trips are already micro- to milliseconds).
     /// A daemon timeout is retried once; a second one makes the metric inconclusive
     /// (skipped, run continues) instead of failing the whole benchmark.
-    func measureAsync(_ name: String, group: Group, warmup: Int, samples: Int, tolerance: Double? = nil,
-                      info: (() -> [String: String]?)? = nil, _ body: () async throws -> Void) async throws {
+    func measureAsync(
+        _ name: String, group: Group, warmup: Int, samples: Int, tolerance: Double? = nil,
+        info: (() -> [String: String]?)? = nil, _ body: () async throws -> Void
+    ) async throws {
         guard config.wants(name) else { return }
         let factor = config.slowdown
         func once() async throws {
@@ -201,18 +208,22 @@ func stats(_ name: String, _ group: Group, perOp: [Double], ops: Int, unit: Stri
         }
         if final {
             add(stats("canary.cpu", .canary, perOp: canarySamples, ops: 1))
-            add(stats("canary.parallel", .canary, perOp: parallelSamples, ops: 1, tolerance: 0.25,
-                      info: ["threads": "\(cores)"]))
+            add(
+                stats(
+                    "canary.parallel", .canary, perOp: parallelSamples, ops: 1, tolerance: 0.25,
+                    info: ["threads": "\(cores)"]))
         }
     }
 
     /// A single tracked number (index build time or size).
     func track(_ name: String, value: Double, unit: String, info: [String: String]? = nil) {
         guard config.wants(name) else { return }
-        add(Metric(name: name, group: .tracked, unit: unit, median: value, p95: value, min: value, mean: value,
-                   samples: 1, opsPerSample: 1,
-                   // Index size is deterministic for a fixed tree and daemon; build time is one noisy sample.
-                   tolerance: unit == "bytes" ? 0.10 : Tolerance.default(.tracked), info: info))
+        add(
+            Metric(
+                name: name, group: .tracked, unit: unit, median: value, p95: value, min: value, mean: value,
+                samples: 1, opsPerSample: 1,
+                // Index size is deterministic for a fixed tree and daemon; build time is one noisy sample.
+                tolerance: unit == "bytes" ? 0.10 : Tolerance.default(.tracked), info: info))
     }
 }
 
@@ -260,4 +271,3 @@ struct SplitMix64 {
     mutating func below(_ n: Int) -> Int { Int(next() % UInt64(n)) }
     mutating func pick<T>(_ a: [T]) -> T { a[below(a.count)] }
 }
-

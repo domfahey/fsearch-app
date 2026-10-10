@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import FSearchKit
 
 @Suite struct SearchLogTests {
@@ -13,7 +14,9 @@ import Testing
     /// One valid JSON line for `query`, encoded the way the log encodes it.
     func validLine(_ query: String) throws -> String {
         let enc = JSONEncoder(); enc.dateEncodingStrategy = .secondsSince1970
-        let r = SearchLog.Record(time: Date(timeIntervalSince1970: 1_800_000_000), query: query, mode: "names", results: 1, tookUs: nil, roundTripMs: 0, error: nil)
+        let r = SearchLog.Record(
+            time: Date(timeIntervalSince1970: 1_800_000_000), query: query, mode: "names", results: 1, tookUs: nil, roundTripMs: 0,
+            error: nil)
         return String(decoding: try enc.encode(r), as: UTF8.self)
     }
 
@@ -21,12 +24,20 @@ import Testing
         let s = sandbox(); defer { try? FileManager.default.removeItem(at: s.dir) }
         let log = SearchLog(file: s.file)
         log.append(e, at: Date(timeIntervalSince1970: 1_800_000_000))
-        #expect(log.entries() == [SearchLog.Record(time: Date(timeIntervalSince1970: 1_800_000_000), query: "main", mode: "names", results: 3, tookUs: 120, roundTripMs: 1.5, error: nil)])
+        #expect(
+            log.entries() == [
+                SearchLog.Record(
+                    time: Date(timeIntervalSince1970: 1_800_000_000), query: "main", mode: "names", results: 3, tookUs: 120,
+                    roundTripMs: 1.5, error: nil)
+            ])
     }
     @Test func keepsOnlyTheNewestCap() {
         let s = sandbox(); defer { try? FileManager.default.removeItem(at: s.dir) }
         let log = SearchLog(file: s.file, cap: 5)
-        for i in 0..<12 { log.append(SearchModel.LogEntry(query: "q\(i)", mode: .names, resultCount: 0, tookUs: nil, roundTripMs: 0, error: nil), at: Date()) }
+        for i in 0..<12 {
+            log.append(
+                SearchModel.LogEntry(query: "q\(i)", mode: .names, resultCount: 0, tookUs: nil, roundTripMs: 0, error: nil), at: Date())
+        }
         #expect(log.entries().map(\.query) == ["q7", "q8", "q9", "q10", "q11"])
     }
     @Test func clearEmptiesIt() {
@@ -49,7 +60,10 @@ import Testing
         let s = sandbox(); defer { try? FileManager.default.removeItem(at: s.dir) }
         let log = SearchLog(file: s.file, cap: 3)
         let lines = { try String(contentsOf: s.file, encoding: .utf8).split(separator: "\n").count }
-        for i in 0..<6 { log.append(SearchModel.LogEntry(query: "q\(i)", mode: .names, resultCount: 0, tookUs: nil, roundTripMs: 0, error: nil), at: Date()) }
+        for i in 0..<6 {
+            log.append(
+                SearchModel.LogEntry(query: "q\(i)", mode: .names, resultCount: 0, tookUs: nil, roundTripMs: 0, error: nil), at: Date())
+        }
         #expect(try lines() == 6, "2x cap lines is not yet over the limit")
         log.append(SearchModel.LogEntry(query: "q6", mode: .names, resultCount: 0, tookUs: nil, roundTripMs: 0, error: nil), at: Date())
         #expect(try lines() == 3, "the 7th line triggers one rewrite down to cap")
@@ -71,7 +85,10 @@ import Testing
     @Test func appendsDoNotAddBlankLines() throws {
         let s = sandbox(); defer { try? FileManager.default.removeItem(at: s.dir) }
         let log = SearchLog(file: s.file, cap: 100)
-        for i in 0..<3 { log.append(SearchModel.LogEntry(query: "q\(i)", mode: .names, resultCount: 0, tookUs: nil, roundTripMs: 0, error: nil), at: Date()) }
+        for i in 0..<3 {
+            log.append(
+                SearchModel.LogEntry(query: "q\(i)", mode: .names, resultCount: 0, tookUs: nil, roundTripMs: 0, error: nil), at: Date())
+        }
         let raw = try String(contentsOf: s.file, encoding: .utf8)
         #expect(!raw.contains("\n\n"))
         #expect(raw.split(separator: "\n", omittingEmptySubsequences: false).count == 4)

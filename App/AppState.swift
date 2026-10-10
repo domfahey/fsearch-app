@@ -52,18 +52,21 @@ final class AppState: ObservableObject {
 
     /// The running app: real daemon connections, real login item (none in test mode).
     static func live(options: LaunchOptions = .current) -> AppState {
-        AppState(options: options, defaults: options.testMode ? AppDefaults.store : .standard,
-                 helper: options.testMode ? nil : SMAppHelperService(),
-                 // Two connections: names and content never wait on each other.
-                 names: DaemonClient(socketPath: options.socketPath),
-                 content: DaemonClient(socketPath: options.socketPath),
-                 control: DaemonClient(socketPath: options.socketPath))
+        AppState(
+            options: options, defaults: options.testMode ? AppDefaults.store : .standard,
+            helper: options.testMode ? nil : SMAppHelperService(),
+            // Two connections: names and content never wait on each other.
+            names: DaemonClient(socketPath: options.socketPath),
+            content: DaemonClient(socketPath: options.socketPath),
+            control: DaemonClient(socketPath: options.socketPath))
     }
 
-    init(options: LaunchOptions, defaults: UserDefaults, helper: HelperService?,
-         names: SearchBackend, content: SearchBackend, control: any DaemonControl,
-         clock: DaemonClock = .live,
-         cliAgentInstalled: @escaping () -> Bool = { FileManager.default.fileExists(atPath: DaemonManager.cliAgentPlist.path) }) {
+    init(
+        options: LaunchOptions, defaults: UserDefaults, helper: HelperService?,
+        names: SearchBackend, content: SearchBackend, control: any DaemonControl,
+        clock: DaemonClock = .live,
+        cliAgentInstalled: @escaping () -> Bool = { FileManager.default.fileExists(atPath: DaemonManager.cliAgentPlist.path) }
+    ) {
         self.options = options
         daemon = DaemonManager(client: control, service: helper, cliAgentInstalled: cliAgentInstalled, clock: clock)
         search = SearchModel(names: names, content: content)
@@ -90,17 +93,20 @@ final class AppState: ObservableObject {
             status.restartBudget.reset()
             // Searches work, so a "failed" or "needs approval" warning is
             // stale (e.g. the daemon came back): re-check, at most every 5 s.
-            let unhealthy = switch daemon.state {
-            case .failed, .needsApproval: true
-            default: false
-            }
+            let unhealthy =
+                switch daemon.state {
+                case .failed, .needsApproval: true
+                default: false
+                }
             if status.recoveryCheck.shouldRefresh(daemonUnhealthy: unhealthy) {
                 Task { await daemon.refresh() }
             }
         case .failed(.disconnected):
             // `restart()` re-registers only a daemon the app owns; a CLI daemon is just re-checked.
             guard status.restartBudget.spend() else { return }
-            Task { await daemon.restart(); await search.refresh() }
+            Task {
+                await daemon.restart(); await search.refresh()
+            }
         default: break
         }
     }

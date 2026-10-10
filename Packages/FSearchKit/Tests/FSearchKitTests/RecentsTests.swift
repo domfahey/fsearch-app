@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import FSearchKit
 
 /// All tests share one defaults suite, which is cleared at the start of each

@@ -26,7 +26,9 @@ final class LineSocket {
         addr.sun_family = sa_family_t(AF_UNIX)
         let fits = path.utf8.count < MemoryLayout.size(ofValue: addr.sun_path)
         guard fits else { Darwin.close(s); throw DaemonError.disconnected }
-        withUnsafeMutableBytes(of: &addr.sun_path) { p in _ = path.withCString { strncpy(p.baseAddress!.assumingMemoryBound(to: CChar.self), $0, p.count - 1) } }
+        withUnsafeMutableBytes(of: &addr.sun_path) { p in
+            _ = path.withCString { strncpy(p.baseAddress!.assumingMemoryBound(to: CChar.self), $0, p.count - 1) }
+        }
         var tv = timeval(tv_sec: Int(timeout), tv_usec: Int32((timeout - Double(Int(timeout))) * 1_000_000))
         setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
         setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))

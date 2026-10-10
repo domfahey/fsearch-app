@@ -11,7 +11,9 @@
 public enum QuerySplit {
     static let keys: Set<String> = ["ext", "type", "kind", "in", "size", "mtime", "modified", "re", "path", "limit"]
     /// Keys that make the daemon answer a search with matching lines (query.rs `filter`).
-    static let contentKeys: [String: GrepMode] = ["grep": .literal, "content": .literal, "regex": .regex, "sym": .symbol, "symbol": .symbol]
+    static let contentKeys: [String: GrepMode] = [
+        "grep": .literal, "content": .literal, "regex": .regex, "sym": .symbol, "symbol": .symbol,
+    ]
 
     /// The pattern keeps the typed spacing (only leading and trailing spaces
     /// are dropped); filters are returned joined by single spaces.
@@ -19,7 +21,7 @@ public enum QuerySplit {
         var pattern = "", filters: [String] = []
         for (space, word) in spacedWords(query) {
             if isFilter(word) {
-                filters.append(word)   // its surrounding spacing is dropped
+                filters.append(word)  // its surrounding spacing is dropped
             } else {
                 if !pattern.isEmpty { pattern += space }
                 pattern += word

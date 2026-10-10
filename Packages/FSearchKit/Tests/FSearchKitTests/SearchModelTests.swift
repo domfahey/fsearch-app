@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import FSearchKit
 
 /// A backend whose answers can be delayed per query, to stage out-of-order replies.
@@ -13,7 +14,8 @@ final class ScriptedBackend: SearchBackend, @unchecked Sendable {
     }
     func grep(q: String, pattern: String, mode: GrepMode) async throws -> GrepReply {
         if let fail { throw fail }
-        let json = #"{"ok":true,"took_us":50,"source":"index","candidates":1,"read":1,"complete":true,"files":[{"path":"/r/f.txt","matches":[{"line":3,"text":"\#(pattern)|\#(q)|\#(mode.rawValue)"}]}]}"#
+        let json =
+            #"{"ok":true,"took_us":50,"source":"index","candidates":1,"read":1,"complete":true,"files":[{"path":"/r/f.txt","matches":[{"line":3,"text":"\#(pattern)|\#(q)|\#(mode.rawValue)"}]}]}"#
         return try decodeReply(Data(json.utf8), as: GrepReply.self)
     }
     func status() async throws -> DaemonStatus { throw DaemonError.disconnected }
@@ -35,8 +37,7 @@ final class HangingBackend: SearchBackend, @unchecked Sendable {
             return SearchReply(tookUs: 9, hits: [Hit(path: "/r/\(q)", kind: "file", size: 0, mtime: 0, score: 0)])
         }
         lock.withLock { _started = true }
-        do { try await Task.sleep(for: .seconds(10)) }
-        catch {
+        do { try await Task.sleep(for: .seconds(10)) } catch {
             lock.withLock { _cancelled = true }
             throw error
         }
@@ -212,7 +213,8 @@ final class RecordingBackend: SearchBackend, @unchecked Sendable {
     }
     func grep(q: String, pattern: String, mode: GrepMode) async throws -> GrepReply {
         lock.withLock { _calls.append("grep \(q)|\(pattern)|\(mode.rawValue)") }
-        let json = #"{"ok":true,"took_us":5,"source":"index","candidates":1,"read":1,"complete":true,"files":[{"path":"/r/g.txt","matches":[{"line":1,"text":"x"}]}]}"#
+        let json =
+            #"{"ok":true,"took_us":5,"source":"index","candidates":1,"read":1,"complete":true,"files":[{"path":"/r/g.txt","matches":[{"line":1,"text":"x"}]}]}"#
         return try decodeReply(Data(json.utf8), as: GrepReply.self)
     }
     func status() async throws -> DaemonStatus { throw DaemonError.disconnected }

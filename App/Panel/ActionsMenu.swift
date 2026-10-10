@@ -43,7 +43,8 @@ enum ActionsMenu {
         } else {
             let sub = NSMenu()
             for appURL in apps {
-                sub.addItem(entry(FileManager.default.displayName(atPath: appURL.path), .openWith) { FileActions.openWith(path, app: appURL) })
+                sub.addItem(
+                    entry(FileManager.default.displayName(atPath: appURL.path), .openWith) { FileActions.openWith(path, app: appURL) })
             }
             with.submenu = sub
         }
@@ -52,19 +53,21 @@ enum ActionsMenu {
         menu.addItem(entry("Quick Look", .quickLook) { FileActions.quickLook(path) })
         menu.addItem(entry("Copy Path", .copyPath) { FileActions.copyPath(path) })
         menu.addItem(entry("Copy File", .copyFile) { FileActions.copyFile(path) })
-        menu.addItem(entry("Open Folder in Terminal", .openTerminal) {
-            FileActions.openTerminal(at: path) { app.showActionError($0) }
-        })
+        menu.addItem(
+            entry("Open Folder in Terminal", .openTerminal) {
+                FileActions.openTerminal(at: path) { app.showActionError($0) }
+            })
         menu.addItem(.separator())
-        menu.addItem(entry("Move to Trash", .trash) {
-            do {
-                try FileActions.trash(path)
-                app.recentsChanged()   // an empty query shows Recents: drop the trashed row
-                Task { await app.search.refresh() }
-            } catch {
-                app.showActionError("Couldn't move to Trash: \(error.localizedDescription)")
-            }
-        })
+        menu.addItem(
+            entry("Move to Trash", .trash) {
+                do {
+                    try FileActions.trash(path)
+                    app.recentsChanged()  // an empty query shows Recents: drop the trashed row
+                    Task { await app.search.refresh() }
+                } catch {
+                    app.showActionError("Couldn't move to Trash: \(error.localizedDescription)")
+                }
+            })
         return menu
     }
 

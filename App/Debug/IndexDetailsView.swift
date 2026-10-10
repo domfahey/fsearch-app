@@ -1,7 +1,7 @@
 import AppKit
 import FSearchKit
-import os
 import SwiftUI
+import os
 
 struct IndexDetailsView: View {
     @EnvironmentObject var app: AppState
@@ -29,8 +29,12 @@ struct IndexDetailsView: View {
             }
             HStack {
                 Button("Reveal Data Folder") { FileActions.workspace.activateFileViewerSelecting([dataDir]) }
-                Button("Save Now") { Log.debug.info("Save Now pressed"); Task { await app.daemon.saveNow() } }
-                Button("Restart Daemon") { Log.debug.info("Restart Daemon pressed"); Task { await app.daemon.restart() } }
+                Button("Save Now") {
+                    Log.debug.info("Save Now pressed"); Task { await app.daemon.saveNow() }
+                }
+                Button("Restart Daemon") {
+                    Log.debug.info("Restart Daemon pressed"); Task { await app.daemon.restart() }
+                }
                 Button("Copy All") {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(report(), forType: .string)
@@ -52,8 +56,10 @@ struct IndexDetailsView: View {
     private func load() async {
         let dir = dataDir
         let (s, t) = await Task.detached {
-            (DebugFormat.lines((try? String(contentsOf: dir.appendingPathComponent("skipped"), encoding: .utf8)) ?? ""),
-             DebugFormat.tail(of: dir.appendingPathComponent("daemon.log"), lines: 30))
+            (
+                DebugFormat.lines((try? String(contentsOf: dir.appendingPathComponent("skipped"), encoding: .utf8)) ?? ""),
+                DebugFormat.tail(of: dir.appendingPathComponent("daemon.log"), lines: 30)
+            )
         }.value
         skipped = s
         logTail = t

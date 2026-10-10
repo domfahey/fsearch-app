@@ -24,18 +24,27 @@ public final class SearchLog: @unchecked Sendable {
     /// Physical lines in the file, seeded by one read on first use.
     private var lineCount: Int?
 
-    public init(file: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/FSearch/searches.jsonl"), cap: Int = 10_000) {
+    public init(
+        file: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/FSearch/searches.jsonl"),
+        cap: Int = 10_000
+    ) {
         self.file = file
         self.cap = cap
     }
 
     private static func mode(_ m: SearchMode) -> String {
-        switch m { case .names: "names"; case .content: "content"; case .symbols: "symbols" }
+        switch m {
+        case .names: "names";
+        case .content: "content";
+        case .symbols: "symbols"
+        }
     }
 
     public func append(_ e: SearchModel.LogEntry, at t: Date) {
         lock.lock(); defer { lock.unlock() }
-        let r = Record(time: t, query: e.query, mode: Self.mode(e.mode), results: e.resultCount, tookUs: e.tookUs, roundTripMs: e.roundTripMs, error: e.error)
+        let r = Record(
+            time: t, query: e.query, mode: Self.mode(e.mode), results: e.resultCount, tookUs: e.tookUs, roundTripMs: e.roundTripMs,
+            error: e.error)
         let enc = JSONEncoder(); enc.dateEncodingStrategy = .secondsSince1970
         guard var line = try? enc.encode(r) else { return }
         line.append(UInt8(ascii: "\n"))
@@ -80,7 +89,8 @@ public final class SearchLog: @unchecked Sendable {
     private func compact() {
         let enc = JSONEncoder(); enc.dateEncodingStrategy = .secondsSince1970
         let kept = readRecords().suffix(cap)
-        let body = kept.compactMap { try? enc.encode($0) }
+        let body =
+            kept.compactMap { try? enc.encode($0) }
             .map { String(decoding: $0, as: UTF8.self) }
             .joined(separator: "\n") + (kept.isEmpty ? "" : "\n")
         try? body.write(to: file, atomically: true, encoding: .utf8)

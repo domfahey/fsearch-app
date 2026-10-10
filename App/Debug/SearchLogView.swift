@@ -1,8 +1,8 @@
 import AppKit
 import FSearchKit
-import os
 import SwiftUI
 import UniformTypeIdentifiers
+import os
 
 struct SearchLogView: View {
     @EnvironmentObject var app: AppState
@@ -20,7 +20,9 @@ struct SearchLogView: View {
             HStack {
                 TextField("Filter", text: $filter)
                 Button("Export…", action: export)
-                Button("Clear Log") { app.log.clear(); setRows([]) }
+                Button("Clear Log") {
+                    app.log.clear(); setRows([])
+                }
             }.padding([.horizontal, .top])
             if let exportError {
                 Text(exportError).font(.caption).foregroundStyle(.red)

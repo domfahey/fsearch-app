@@ -16,7 +16,9 @@ final class Uninstaller: ObservableObject {
     enum Phase: Equatable { case idle, running, done(Report) }
 
     /// The app's UserDefaults keys; the shortcut is reset separately.
-    static let defaultsKeys = ["editor", "debugMode", "onboarded", "skippedFullDiskAccess", "dismissedFullDiskAccessReminder", "recentPaths"]
+    static let defaultsKeys = [
+        "editor", "debugMode", "onboarded", "skippedFullDiskAccess", "dismissedFullDiskAccessReminder", "recentPaths",
+    ]
     static let fullDiskAccessURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!
 
     @Published private(set) var phase: Phase = .idle
@@ -30,10 +32,12 @@ final class Uninstaller: ObservableObject {
     private let exists: (URL) -> Bool
     private let resetShortcut: () -> Void
 
-    init(helper: HelperService?, loginItem: LoginItemService?, workspace: Workspace, defaults: UserDefaults,
-         dataFolder: URL, logFolder: URL,
-         exists: @escaping (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) },
-         resetShortcut: @escaping () -> Void) {
+    init(
+        helper: HelperService?, loginItem: LoginItemService?, workspace: Workspace, defaults: UserDefaults,
+        dataFolder: URL, logFolder: URL,
+        exists: @escaping (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) },
+        resetShortcut: @escaping () -> Void
+    ) {
         self.helper = helper
         self.loginItem = loginItem
         self.workspace = workspace
@@ -46,12 +50,13 @@ final class Uninstaller: ObservableObject {
 
     /// The running app's: the real helper, login item, Trash and defaults (none of the first two in test mode).
     static func live(options: LaunchOptions) -> Uninstaller {
-        Uninstaller(helper: options.testMode ? nil : SMAppHelperService(),
-                    loginItem: options.testMode ? nil : SMAppLoginItemService(),
-                    workspace: FileActions.workspace, defaults: AppDefaults.store,
-                    dataFolder: DebugFormat.dataDir(socketPath: options.socketPath),
-                    logFolder: options.searchLogFile.deletingLastPathComponent(),
-                    resetShortcut: { KeyboardShortcuts.reset(.togglePanel) })
+        Uninstaller(
+            helper: options.testMode ? nil : SMAppHelperService(),
+            loginItem: options.testMode ? nil : SMAppLoginItemService(),
+            workspace: FileActions.workspace, defaults: AppDefaults.store,
+            dataFolder: DebugFormat.dataDir(socketPath: options.socketPath),
+            logFolder: options.searchLogFile.deletingLastPathComponent(),
+            resetShortcut: { KeyboardShortcuts.reset(.togglePanel) })
     }
 
     /// `ownsDaemon`: DaemonManager.ownsDaemon, read before anything is unregistered.
@@ -83,7 +88,9 @@ final class Uninstaller: ObservableObject {
         if ownsDaemon && helperGone {
             trash(dataFolder, "The index and data folder", into: &r)
         } else if !ownsDaemon {
-            r.kept.append("The data folder (\(dataFolder.path)) was left alone: its search daemon wasn't started by this app, so it may be in use by the fsearch command-line tool.")
+            r.kept.append(
+                "The data folder (\(dataFolder.path)) was left alone: its search daemon wasn't started by this app, so it may be in use by the fsearch command-line tool."
+            )
         } else {
             r.kept.append("The data folder was left in place because the helper is still registered.")
         }

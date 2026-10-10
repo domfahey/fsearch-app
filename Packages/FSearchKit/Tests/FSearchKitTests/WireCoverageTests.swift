@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import FSearchKit
 
 /// A Decodable whose decoding fails with an error that is neither a
@@ -10,9 +11,9 @@ private struct Exploding: Decodable {
 
 @Suite struct WireCoverageTests {
     func badReplyMessage<T: Decodable>(_ json: String, as: T.Type) -> String? {
-        do { _ = try decodeReply(Data(json.utf8), as: T.self); return nil }
-        catch let DaemonError.badReply(m) { return m }
-        catch { return "other: \(error)" }
+        do { _ = try decodeReply(Data(json.utf8), as: T.self); return nil } catch let DaemonError.badReply(m) { return m } catch {
+            return "other: \(error)"
+        }
     }
 
     @Test func notOkWithoutAMessageIsAGenericDaemonError() {

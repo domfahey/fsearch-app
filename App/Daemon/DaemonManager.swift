@@ -21,9 +21,11 @@ final class DaemonManager: ObservableObject {
     private let cliAgentInstalled: () -> Bool
     private let clock: DaemonClock
 
-    init(client: any DaemonControl, service: HelperService?,
-         cliAgentInstalled: @escaping () -> Bool = { FileManager.default.fileExists(atPath: DaemonManager.cliAgentPlist.path) },
-         clock: DaemonClock = .live) {
+    init(
+        client: any DaemonControl, service: HelperService?,
+        cliAgentInstalled: @escaping () -> Bool = { FileManager.default.fileExists(atPath: DaemonManager.cliAgentPlist.path) },
+        clock: DaemonClock = .live
+    ) {
         self.client = client
         self.service = service
         self.cliAgentInstalled = cliAgentInstalled
@@ -40,7 +42,9 @@ final class DaemonManager: ObservableObject {
         let existing = await answers()
         let cli = cliAgentInstalled()
         var plan = DaemonPlan.decide(existingAnswers: existing, ownStatus: service.status, cliAgentInstalled: cli)
-        Log.daemon.info("start: plan \(String(describing: plan), privacy: .public) (answers \(existing, privacy: .public), own \(String(describing: service.status), privacy: .public), cli agent \(cli, privacy: .public))")
+        Log.daemon.info(
+            "start: plan \(String(describing: plan), privacy: .public) (answers \(existing, privacy: .public), own \(String(describing: service.status), privacy: .public), cli agent \(cli, privacy: .public))"
+        )
         if plan == .recheckThenRegister {
             // A daemon that is only restarting answers again within a few seconds.
             let deadline = clock.now().advanced(by: DaemonPlan.recheckWindow)
@@ -56,7 +60,7 @@ final class DaemonManager: ObservableObject {
         switch plan {
         case .needsApproval: setState(.needsApproval)
         case .useExisting, .refreshOwn: await refresh()
-        case .recheckThenRegister, .registerBundled: break // `register()` returned a failure state
+        case .recheckThenRegister, .registerBundled: break  // `register()` returned a failure state
         }
     }
 
@@ -66,7 +70,9 @@ final class DaemonManager: ObservableObject {
             try service.register()
             Log.daemon.info("register ok, status \(String(describing: service.status), privacy: .public)")
         } catch {
-            Log.daemon.error("register failed: \(error.localizedDescription, privacy: .public), status \(String(describing: service.status), privacy: .public)")
+            Log.daemon.error(
+                "register failed: \(error.localizedDescription, privacy: .public), status \(String(describing: service.status), privacy: .public)"
+            )
             // Already waiting for approval is not an error worth showing as one.
             if service.status == .requiresApproval { return .needsApproval }
             setState(.failed("Couldn't start the search helper: \(error.localizedDescription)"))
@@ -79,10 +85,9 @@ final class DaemonManager: ObservableObject {
     func refresh() async {
         for _ in 0..<50 {
             if Task.isCancelled { return }
-            do { setState(.running(try await client.status())); return }
-            catch DaemonError.indexing { setState(.indexing); return }
-            catch is CancellationError { return }
-            catch {
+            do { setState(.running(try await client.status())); return } catch DaemonError.indexing {
+                setState(.indexing); return
+            } catch is CancellationError { return } catch {
                 do { try await clock.sleep(.milliseconds(200)) } catch { return }
             }
         }
@@ -125,7 +130,7 @@ final class DaemonManager: ObservableObject {
         }
         switch register(service) {
         case .needsApproval: setState(.needsApproval)
-        case .registerBundled: break // failed; state already says why
+        case .registerBundled: break  // failed; state already says why
         default: await refresh()
         }
     }

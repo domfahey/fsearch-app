@@ -18,16 +18,22 @@ struct LaunchOptions: Equatable, Sendable {
 
     static let current = parse(arguments: CommandLine.arguments, environment: ProcessInfo.processInfo.environment)
 
-    static func parse(arguments a: [String], environment env: [String: String], defaultSocket: String = DaemonClient.defaultSocketPath) -> LaunchOptions {
+    static func parse(arguments a: [String], environment env: [String: String], defaultSocket: String = DaemonClient.defaultSocketPath)
+        -> LaunchOptions
+    {
         var socket: String?
         if let i = a.firstIndex(of: "-FSEARCH_SOCKET"), i + 1 < a.count { socket = a[i + 1] }
         let explicitTest = a.contains("-FSEARCH_SOCKET")
         // XCTest sets these in the host app's environment when it injects a test bundle.
-        let hosting = !explicitTest && (env["XCTestConfigurationFilePath"] != nil || env["XCTestBundlePath"] != nil || env["XCTestSessionIdentifier"] != nil)
+        let hosting =
+            !explicitTest
+            && (env["XCTestConfigurationFilePath"] != nil || env["XCTestBundlePath"] != nil || env["XCTestSessionIdentifier"] != nil)
         if hosting && socket == nil {
             socket = NSTemporaryDirectory() + "fsearch-unit-host-\(getpid())/no-daemon.sock"
         }
-        return LaunchOptions(socketPath: socket ?? defaultSocket, testMode: explicitTest || hosting, unitTestHost: hosting, showPanel: a.contains("-UITestShowPanel"))
+        return LaunchOptions(
+            socketPath: socket ?? defaultSocket, testMode: explicitTest || hosting, unitTestHost: hosting,
+            showPanel: a.contains("-UITestShowPanel"))
     }
 
     /// Debug mode's search log. In test mode it lives in the test daemon's data

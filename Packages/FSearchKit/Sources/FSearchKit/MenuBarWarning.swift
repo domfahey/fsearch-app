@@ -25,8 +25,10 @@ public struct MenuBarWarning: Equatable, Sendable {
         ownsDaemon ? "Turn On Full Disk Access…" : "Grant Full Disk Access to fsearch…"
     }
 
-    public static func evaluate(_ c: DaemonCondition, skippedFullDiskAccess: Bool,
-                                dismissedReminder: Bool = false) -> MenuBarWarning? {
+    public static func evaluate(
+        _ c: DaemonCondition, skippedFullDiskAccess: Bool,
+        dismissedReminder: Bool = false
+    ) -> MenuBarWarning? {
         switch c {
         case .failed: MenuBarWarning(message: "The search helper isn't running", offersFix: true)
         case .needsApproval: MenuBarWarning(message: "The search helper needs your approval", offersFix: true)

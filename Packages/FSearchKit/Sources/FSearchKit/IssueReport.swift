@@ -21,8 +21,10 @@ public struct IssueReport: Equatable, Sendable {
     public var daemonInstall: DaemonInstall
     public var daemonState: DaemonSummary
 
-    public init(appVersion: String, build: String, macOS: String, chip: Chip?,
-                daemonInstall: DaemonInstall, daemonState: DaemonSummary) {
+    public init(
+        appVersion: String, build: String, macOS: String, chip: Chip?,
+        daemonInstall: DaemonInstall, daemonState: DaemonSummary
+    ) {
         self.appVersion = appVersion
         self.build = build
         self.macOS = macOS

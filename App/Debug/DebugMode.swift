@@ -1,5 +1,5 @@
-import os
 import SwiftUI
+import os
 
 /// The one place debug mode is switched, so every path (Settings, the menu)
 /// does the same thing: turning it off deletes the search log (privacy) and

@@ -115,10 +115,9 @@ public func decodeReply<T: Decodable>(_ line: Data, as: T.Type) throws -> T {
         let msg = env.error ?? "error"
         throw msg.hasPrefix("indexing") ? DaemonError.indexing(msg) : DaemonError.daemon(msg)
     }
-    do { return try dec.decode(T.self, from: line) }
-    catch let e as DaemonError { throw e }
-    catch let e as DecodingError { throw DaemonError.badReply(describe(e)) }
-    catch { throw DaemonError.badReply(String(describing: error)) }
+    do { return try dec.decode(T.self, from: line) } catch let e as DaemonError { throw e } catch let e as DecodingError {
+        throw DaemonError.badReply(describe(e))
+    } catch { throw DaemonError.badReply(String(describing: error)) }
 }
 
 /// One short line for a reply that didn't have the expected shape.

@@ -1,10 +1,13 @@
 import Foundation
 import Testing
+
 @testable import FSearchKit
 
 @Suite struct DaemonClientTests {
     @Test func searchRoundTrip() async throws {
-        let d = FakeDaemon { req in ["ok": true, "took_us": 5, "hits": [["path": "/x/\(req["q"]!)", "kind": "file", "size": 1, "mtime": 2, "score": 3]]] }
+        let d = FakeDaemon { req in
+            ["ok": true, "took_us": 5, "hits": [["path": "/x/\(req["q"]!)", "kind": "file", "size": 1, "mtime": 2, "score": 3]]]
+        }
         let c = DaemonClient(socketPath: d.path)
         let r = try await c.search("main.rs", limit: 50)
         #expect(r.hits.first?.path == "/x/main.rs")
@@ -12,7 +15,9 @@ import Testing
     }
 
     @Test func requestsAreAnsweredInOrderOnOneConnection() async throws {
-        let d = FakeDaemon { req in ["ok": true, "took_us": 1, "hits": [["path": "\(req["q"]!)", "kind": "file", "size": 0, "mtime": 0, "score": 0]]] }
+        let d = FakeDaemon { req in
+            ["ok": true, "took_us": 1, "hits": [["path": "\(req["q"]!)", "kind": "file", "size": 0, "mtime": 0, "score": 0]]]
+        }
         let c = DaemonClient(socketPath: d.path)
         let results = try await withThrowingTaskGroup(of: (String, String).self) { g in
             for q in ["a", "b", "c", "d", "e"] { g.addTask { (q, try await c.search(q, limit: 1).hits[0].path) } }
@@ -133,10 +138,13 @@ import Testing
             while RawServer.readLine(fd) {
                 n += 1
                 if n == 1 {
-                    RawServer.send(fd, #"{"ok":true,"took_us":1,"hits":[{"path":"/one","kind":"file","size":0,"mtime":0,"score":0}],"id":1}"# + "\n")
-                    RawServer.send(fd, #"{"ok":true,"took_us":1,"hits":[{"path":"/extra","kind":"file","size":0,"mtime":0,"score":0}],"id":1}"# + "\n")
+                    RawServer.send(
+                        fd, #"{"ok":true,"took_us":1,"hits":[{"path":"/one","kind":"file","size":0,"mtime":0,"score":0}],"id":1}"# + "\n")
+                    RawServer.send(
+                        fd, #"{"ok":true,"took_us":1,"hits":[{"path":"/extra","kind":"file","size":0,"mtime":0,"score":0}],"id":1}"# + "\n")
                 } else {
-                    RawServer.send(fd, #"{"ok":true,"took_us":1,"hits":[{"path":"/two","kind":"file","size":0,"mtime":0,"score":0}],"id":2}"# + "\n")
+                    RawServer.send(
+                        fd, #"{"ok":true,"took_us":1,"hits":[{"path":"/two","kind":"file","size":0,"mtime":0,"score":0}],"id":2}"# + "\n")
                 }
             }
             close(fd)
@@ -153,8 +161,12 @@ import Testing
             var id = 0
             while RawServer.readLine(fd) {
                 id += 1
-                RawServer.send(fd, #"{"ok":true,"took_us":1,"hits":[{"path":"/stale","kind":"file","size":0,"mtime":0,"score":0}],"id":0}"# + "\n")
-                RawServer.send(fd, #"{"ok":true,"took_us":1,"hits":[{"path":"/real\#(id)","kind":"file","size":0,"mtime":0,"score":0}],"id":\#(id)}"# + "\n")
+                RawServer.send(
+                    fd, #"{"ok":true,"took_us":1,"hits":[{"path":"/stale","kind":"file","size":0,"mtime":0,"score":0}],"id":0}"# + "\n")
+                RawServer.send(
+                    fd,
+                    #"{"ok":true,"took_us":1,"hits":[{"path":"/real\#(id)","kind":"file","size":0,"mtime":0,"score":0}],"id":\#(id)}"#
+                        + "\n")
             }
             close(fd)
         }

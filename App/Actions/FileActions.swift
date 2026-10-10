@@ -1,13 +1,14 @@
 import AppKit
 import FSearchKit
-import os
 import Quartz
+import os
 
 @MainActor
 enum FileActions {
     /// Where actions go: the real workspace; in test mode one that only records
     /// (UI tests can press ↵ safely); a fake in unit tests.
-    static var workspace: Workspace = LaunchOptions.current.testMode
+    static var workspace: Workspace =
+        LaunchOptions.current.testMode
         ? TestModeWorkspace(log: TestModeWorkspace.logFile(socketPath: LaunchOptions.current.socketPath))
         : SystemWorkspace()
     /// ⌘⇧C and "Copy File" write here: the general pasteboard, or a private one under test.
@@ -18,7 +19,8 @@ enum FileActions {
     /// The editor command for a content hit, if an editor is chosen and installed.
     static func editorCommand(for item: ResultItem, editor: Editor?) -> EditorCommand? {
         guard case let .line(path, match) = item, let e = editor,
-              let appURL = workspace.urlForApplication(withBundleIdentifier: e.bundleId) else { return nil }
+            let appURL = workspace.urlForApplication(withBundleIdentifier: e.bundleId)
+        else { return nil }
         return openAtLine(e, appURL: appURL, path: path, line: match.line)
     }
 
@@ -129,13 +131,16 @@ final class QuickLookSource: NSObject, @preconcurrency QLPreviewPanelDataSource 
     func attach(_ panel: QLPreviewPanel) {
         panel.dataSource = self
         // The preview is key while it is up, so ⌘Y lands on it: close it, as ⌘Y toggles.
-        keyMonitor = keyMonitor ?? NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            let cmdY = event.modifierFlags.contains(.command)
-                && PanelKey.commandLetter(event.charactersIgnoringModifiers ?? "", shift: event.modifierFlags.contains(.shift)) == .cmdY
-            guard cmdY, event.window is QLPreviewPanel else { return event }
-            MainActor.assumeIsolated { QuickLookSource.shared.close() }
-            return nil
-        }
+        keyMonitor =
+            keyMonitor
+            ?? NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+                let cmdY =
+                    event.modifierFlags.contains(.command)
+                    && PanelKey.commandLetter(event.charactersIgnoringModifiers ?? "", shift: event.modifierFlags.contains(.shift)) == .cmdY
+                guard cmdY, event.window is QLPreviewPanel else { return event }
+                MainActor.assumeIsolated { QuickLookSource.shared.close() }
+                return nil
+            }
     }
 
     func detach(_ panel: QLPreviewPanel) {

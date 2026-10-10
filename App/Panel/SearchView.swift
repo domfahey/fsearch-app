@@ -58,7 +58,8 @@ struct SearchView: View {
             Divider()
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
-                    if case .failed(.daemon) = model.phase {} else if let msg = UserMessage.forPhase(model.phase) {
+                    if case .failed(.daemon) = model.phase {
+                    } else if let msg = UserMessage.forPhase(model.phase) {
                         Text(msg).foregroundStyle(.secondary).padding(16)
                     }
                     if QuerySyntax.isCheatSheet(model.query) {
@@ -85,10 +86,14 @@ struct SearchView: View {
                         section("Use “\(model.query)” with…")
                             .accessibilityIdentifier("fallbacks")
                             .accessibilityValue(model.phase == .loading ? "searching" : "done")
-                        fallback("Search inside files", "doc.text.magnifyingglass", selected: state.selection == commands + shown.count) { switchMode(.content) }
-                            .accessibilityIdentifier("fallback-content")
-                        fallback("Find definitions", "function", selected: state.selection == commands + shown.count + 1) { switchMode(.symbols) }
-                            .accessibilityIdentifier("fallback-symbols")
+                        fallback("Search inside files", "doc.text.magnifyingglass", selected: state.selection == commands + shown.count) {
+                            switchMode(.content)
+                        }
+                        .accessibilityIdentifier("fallback-content")
+                        fallback("Find definitions", "function", selected: state.selection == commands + shown.count + 1) {
+                            switchMode(.symbols)
+                        }
+                        .accessibilityIdentifier("fallback-symbols")
                     }
                 }
                 .padding(.bottom, 6)
@@ -135,18 +140,22 @@ struct SearchView: View {
     }
 
     private func fallback(_ t: String, _ icon: String, selected: Bool, action: @escaping () -> Void) -> some View {
-        HStack(spacing: 10) { Image(systemName: icon).frame(width: 22); Text(t) }
-            .padding(.horizontal, 12).padding(.vertical, 6)
-            .background(selected ? Color.primary.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 8))
-            .contentShape(Rectangle()).onTapGesture(perform: action)
-            // A container (its Text stays findable) whose value says whether ↵ would run it.
-            .accessibilityElement(children: .contain)
-            .accessibilityValue(selected ? "selected" : "")
-            .accessibilityAddTraits(selected ? .isSelected : [])
+        HStack(spacing: 10) {
+            Image(systemName: icon).frame(width: 22); Text(t)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 6)
+        .background(selected ? Color.primary.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 8))
+        .contentShape(Rectangle()).onTapGesture(perform: action)
+        // A container (its Text stays findable) whose value says whether ↵ would run it.
+        .accessibilityElement(children: .contain)
+        .accessibilityValue(selected ? "selected" : "")
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private func hint(_ t: String, _ k: String) -> some View {
-        HStack(spacing: 4) { Text(t); Text(k).padding(.horizontal, 5).overlay(RoundedRectangle(cornerRadius: 4).stroke(.secondary.opacity(0.5))) }
+        HStack(spacing: 4) {
+            Text(t); Text(k).padding(.horizontal, 5).overlay(RoundedRectangle(cornerRadius: 4).stroke(.secondary.opacity(0.5)))
+        }
     }
 
     private func switchMode(_ m: SearchMode) {

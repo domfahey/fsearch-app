@@ -1,8 +1,8 @@
 import AppKit
 import FSearchKit
 import KeyboardShortcuts
-import os
 import SwiftUI
+import os
 
 /// Wording for the Full Disk Access step. Task 0 (docs/notes/fda-attribution.md)
 /// decides which variant is right; change it here only.
@@ -12,7 +12,8 @@ enum FDACopy {
     static let buttonLabel = "Turn on FSearch"
     static let help = "In Privacy Settings, find FSearch in the list and turn it on."
     /// A daemon started from the CLI is a different binary with its own grant.
-    static let existingDaemonHelp = "Full Disk Access belongs to the fsearch daemon that's already running. Grant it to your fsearch binary in Privacy Settings and restart that daemon, or skip for now."
+    static let existingDaemonHelp =
+        "Full Disk Access belongs to the fsearch daemon that's already running. Grant it to your fsearch binary in Privacy Settings and restart that daemon, or skip for now."
     static let settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!
 }
 
@@ -101,7 +102,11 @@ final class OnboardingFlow: ObservableObject {
             let t = Task { await app.daemon.refresh() }
             pollRefresh = t
             // Closing the window cancels the poll loop; pass that on.
-            await withTaskCancellationHandler { await t.value } onCancel: { t.cancel() }
+            await withTaskCancellationHandler {
+                await t.value
+            } onCancel: {
+                t.cancel()
+            }
             pollRefresh = nil
         }
         apply()
@@ -138,7 +143,8 @@ final class OnboardingFlow: ObservableObject {
         Log.onboarding.info("returned from System Settings at step \(String(describing: self.step), privacy: .public)")
         if app.daemon.state == .needsApproval { await startDaemon().value; return }
         if step == .fullDiskAccess,
-           restartAfterSettings(pressedTurnOn: pressedTurnOn, owns: app.daemon.ownsDaemon, fullDiskAccess: facts.fullDiskAccess) {
+            restartAfterSettings(pressedTurnOn: pressedTurnOn, owns: app.daemon.ownsDaemon, fullDiskAccess: facts.fullDiskAccess)
+        {
             Log.onboarding.info("restarting the helper to pick up Full Disk Access")
             pressedTurnOn = false
             busy = true
@@ -200,10 +206,13 @@ struct OnboardingView: View {
     @ViewBuilder private var welcome: some View {
         Text("Find anything on your Mac").font(.title3.bold())
         Text("Press your shortcut from anywhere, type a few letters, and every file on your disk shows up as you type. Even inside files.")
-        HStack { Text("Your shortcut:"); KeyboardShortcuts.Recorder(for: .togglePanel) { shortcut = $0 } }
+        HStack {
+            Text("Your shortcut:"); KeyboardShortcuts.Recorder(for: .togglePanel) { shortcut = $0 }
+        }
         if let w = hotkeyWarning(
             defaultIsOptionSpace: shortcut == .init(.space, modifiers: [.option]),
-            runningBundleIds: Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))) {
+            runningBundleIds: Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier)))
+        {
             Text("⚠ " + w).foregroundStyle(.orange).font(.callout)
         }
     }
@@ -227,7 +236,9 @@ struct OnboardingView: View {
 
     @ViewBuilder private var fullDiskAccess: some View {
         Text("Let FSearch see all your files").font(.title3.bold())
-        Text("Without Full Disk Access, macOS hides Desktop, Documents, Downloads, Mail, Messages and iCloud Drive from every app. Nothing leaves your Mac: the index stays on this computer.")
+        Text(
+            "Without Full Disk Access, macOS hides Desktop, Documents, Downloads, Mail, Messages and iCloud Drive from every app. Nothing leaves your Mac: the index stays on this computer."
+        )
         switch fullDiskAccessStepMode(owns: daemon.ownsDaemon, running: flow.daemonRunning, fullDiskAccess: flow.facts.fullDiskAccess) {
         case .granted:
             Label("Full Disk Access is on", systemImage: "checkmark.circle.fill").foregroundStyle(.green)

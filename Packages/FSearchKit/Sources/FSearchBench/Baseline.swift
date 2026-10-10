@@ -4,7 +4,8 @@ import Foundation
 /// comparable on the machine (or CI image) that recorded them.
 struct BaselineFile: Codable {
     var schema = 1
-    var note = "Machine-specific. Update with scripts/bench.sh --record; tolerances may be tuned per metric by hand and survive re-recording."
+    var note =
+        "Machine-specific. Update with scripts/bench.sh --record; tolerances may be tuned per metric by hand and survive re-recording."
     var machines: [String: BaselineEntry] = [:]
 }
 
@@ -48,8 +49,9 @@ enum Baseline {
         let old = file.machines[key]?.metrics ?? [:]
         var metrics: [String: BaselineMetric] = [:]
         for m in run.metrics {
-            metrics[m.name] = BaselineMetric(group: m.group, unit: m.unit, median: m.median, p95: m.p95, min: m.min,
-                                             tolerance: old[m.name]?.tolerance ?? m.tolerance)
+            metrics[m.name] = BaselineMetric(
+                group: m.group, unit: m.unit, median: m.median, p95: m.p95, min: m.min,
+                tolerance: old[m.name]?.tolerance ?? m.tolerance)
         }
         file.machines[key] = BaselineEntry(provisional: provisional, recorded: run.date, machine: run.machine, metrics: metrics)
         try write(file, to: url)
@@ -67,13 +69,16 @@ enum Baseline {
             return (.noBaseline, [], false)
         }
         print("baseline: \(key), recorded \(entry.recorded)\(entry.provisional ? " (PROVISIONAL)" : "")")
-        print(Table.pad("metric", 34) + Table.pad("baseline", 12, right: true) + Table.pad("now", 12, right: true)
-              + Table.pad("delta", 9, right: true) + Table.pad("tol", 7, right: true) + "  status")
+        print(
+            Table.pad("metric", 34) + Table.pad("baseline", 12, right: true) + Table.pad("now", 12, right: true)
+                + Table.pad("delta", 9, right: true) + Table.pad("tol", 7, right: true) + "  status")
         var regressed: [String] = []
         var busy = false
         for m in run.metrics {
             guard let b = entry.metrics[m.name] else {
-                print(Table.pad(m.name, 34) + Table.pad("–", 12, right: true) + Table.pad(Table.fmt(m.median, m.unit), 12, right: true) + "                  new")
+                print(
+                    Table.pad(m.name, 34) + Table.pad("–", 12, right: true) + Table.pad(Table.fmt(m.median, m.unit), 12, right: true)
+                        + "                  new")
                 continue
             }
             let delta = b.median > 0 ? m.median / b.median - 1 : 0
@@ -81,12 +86,15 @@ enum Baseline {
             let canary = m.group == .canary
             if over && canary { busy = true }
             if over && !canary { regressed.append(m.name) }
-            let status = over ? (canary ? "BUSY (machine slower than at baseline)" : "REGRESSED")
+            let status =
+                over
+                ? (canary ? "BUSY (machine slower than at baseline)" : "REGRESSED")
                 : (delta < -b.tolerance ? "faster" : "ok")
-            print(Table.pad(m.name, 34) + Table.pad(Table.fmt(b.median, b.unit), 12, right: true)
-                  + Table.pad(Table.fmt(m.median, m.unit), 12, right: true)
-                  + Table.pad(String(format: "%+.1f%%", delta * 100), 9, right: true)
-                  + Table.pad(String(format: "%.0f%%", b.tolerance * 100), 7, right: true) + "  " + status)
+            print(
+                Table.pad(m.name, 34) + Table.pad(Table.fmt(b.median, b.unit), 12, right: true)
+                    + Table.pad(Table.fmt(m.median, m.unit), 12, right: true)
+                    + Table.pad(String(format: "%+.1f%%", delta * 100), 9, right: true)
+                    + Table.pad(String(format: "%.0f%%", b.tolerance * 100), 7, right: true) + "  " + status)
         }
         let missing = Set(entry.metrics.keys).subtracting(run.metrics.map(\.name))
         if !missing.isEmpty && run.config["filter"] == "" {

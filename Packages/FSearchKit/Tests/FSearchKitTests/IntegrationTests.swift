@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import FSearchKit
 
 @Suite(.enabled(if: RealDaemon.binary != nil, "run scripts/build-daemon.sh first"))

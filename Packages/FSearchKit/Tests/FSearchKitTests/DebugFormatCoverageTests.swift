@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import FSearchKit
 
 @Suite struct DebugFormatCoverageTests {
@@ -9,7 +10,8 @@ import Testing
         return dir
     }
     func rec(_ q: String, ms: Double = 1) -> SearchLog.Record {
-        SearchLog.Record(time: Date(timeIntervalSince1970: 1_800_000_000), query: q, mode: "names", results: 0, tookUs: nil, roundTripMs: ms, error: nil)
+        SearchLog.Record(
+            time: Date(timeIntervalSince1970: 1_800_000_000), query: q, mode: "names", results: 0, tookUs: nil, roundTripMs: ms, error: nil)
     }
 
     @Test func timingEdgeValues() {

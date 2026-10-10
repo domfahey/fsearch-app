@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import FSearchKit
 
 @Suite struct SearchLogCoverageTests {
@@ -31,8 +32,12 @@ import Testing
         let s = sandbox(); defer { try? FileManager.default.removeItem(at: s.dir) }
         let log = SearchLog(file: s.file)
         let t = Date(timeIntervalSince1970: 1_700_000_123)
-        log.append(SearchModel.LogEntry(query: "🏡 \"q\"", mode: .content, resultCount: 7, tookUs: 42, roundTripMs: 3.5, error: "boom"), at: t)
-        #expect(log.entries() == [SearchLog.Record(time: t, query: "🏡 \"q\"", mode: "content", results: 7, tookUs: 42, roundTripMs: 3.5, error: "boom")])
+        log.append(
+            SearchModel.LogEntry(query: "🏡 \"q\"", mode: .content, resultCount: 7, tookUs: 42, roundTripMs: 3.5, error: "boom"), at: t)
+        #expect(
+            log.entries() == [
+                SearchLog.Record(time: t, query: "🏡 \"q\"", mode: "content", results: 7, tookUs: 42, roundTripMs: 3.5, error: "boom")
+            ])
     }
 
     @Test func unencodableRecordIsDroppedQuietly() {

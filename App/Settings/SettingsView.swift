@@ -36,10 +36,13 @@ struct SettingsView: View {
     }
 
     @ViewBuilder private var loginSection: some View {
-        Toggle("Open FSearch at login", isOn: Binding(
-            get: { loginItem.isOn },
-            set: { on in Task { await loginItem.set(on) } }
-        ))
+        Toggle(
+            "Open FSearch at login",
+            isOn: Binding(
+                get: { loginItem.isOn },
+                set: { on in Task { await loginItem.set(on) } }
+            )
+        )
         .disabled(loginItem.display == .unavailable)
         Text(loginItem.statusText).font(.caption).foregroundStyle(.secondary)
         if loginItem.display == .needsApproval {
@@ -62,7 +65,9 @@ struct SettingsView: View {
                     }
                     Button("Cancel", role: .cancel) {}
                 } message: {
-                    Text("This turns off the helper FSearch started and moves its index, logs and settings to the Trash. A separately installed fsearch command-line tool is left alone. You can undo it from the Trash.")
+                    Text(
+                        "This turns off the helper FSearch started and moves its index, logs and settings to the Trash. A separately installed fsearch command-line tool is left alone. You can undo it from the Trash."
+                    )
                 }
         case .running:
             ProgressView("Removing…").controlSize(.small)

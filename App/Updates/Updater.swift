@@ -1,8 +1,8 @@
 import Combine
 import FSearchKit
 import Observation
-import SwiftUI
 import Sparkle
+import SwiftUI
 
 /// Sparkle updater. Not started while Info.plist still carries the placeholder
 /// public key (see docs/release-checklist.md), so dev builds never prompt.
@@ -85,7 +85,9 @@ struct UpdateAvailableItem: View {
 /// Mirrors `SPUUpdater.automaticallyChecksForUpdates` (KVO) and writes changes back.
 @MainActor
 final class AutoCheckState: ObservableObject {
-    @Published var automatic: Bool { didSet { if automatic != updater.automaticallyChecksForUpdates { updater.automaticallyChecksForUpdates = automatic } } }
+    @Published var automatic: Bool {
+        didSet { if automatic != updater.automaticallyChecksForUpdates { updater.automaticallyChecksForUpdates = automatic } }
+    }
     @Published private(set) var canCheck = false
     private let updater: SPUUpdater
     private var cancellables: Set<AnyCancellable> = []

@@ -60,10 +60,13 @@ final class PanelController: PanelHost {
         app.search.query = resumed.query
         app.search.mode = resumed.mode
         selection = resumed.selection
-        let view = SearchView(model: app.search, state: resumed, onEffect: { [weak self] effect, items in
-            self?.perform(effect, items)
-        }, onSelect: { [weak self] in self?.selection = $0 },
-        onCommand: { [weak self] in self?.run($0) }).environmentObject(app)
+        let view = SearchView(
+            model: app.search, state: resumed,
+            onEffect: { [weak self] effect, items in
+                self?.perform(effect, items)
+            }, onSelect: { [weak self] in self?.selection = $0 },
+            onCommand: { [weak self] in self?.run($0) }
+        ).environmentObject(app)
         let p = panel ?? Panel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         p.isFloatingPanel = true
         p.level = .floating

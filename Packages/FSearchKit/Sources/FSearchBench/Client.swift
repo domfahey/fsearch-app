@@ -19,8 +19,12 @@ final class CannedServer: @unchecked Sendable {
         guard fd >= 0 else { throw BenchError("socket() failed") }
         var addr = sockaddr_un()
         addr.sun_family = sa_family_t(AF_UNIX)
-        guard path.utf8.count < MemoryLayout.size(ofValue: addr.sun_path) else { close(fd); throw BenchError("socket path too long: \(path)") }
-        withUnsafeMutableBytes(of: &addr.sun_path) { p in _ = path.withCString { strncpy(p.baseAddress!.assumingMemoryBound(to: CChar.self), $0, p.count - 1) } }
+        guard path.utf8.count < MemoryLayout.size(ofValue: addr.sun_path) else {
+            close(fd); throw BenchError("socket path too long: \(path)")
+        }
+        withUnsafeMutableBytes(of: &addr.sun_path) { p in
+            _ = path.withCString { strncpy(p.baseAddress!.assumingMemoryBound(to: CChar.self), $0, p.count - 1) }
+        }
         let len = socklen_t(MemoryLayout<sockaddr_un>.size)
         let ok = withUnsafePointer(to: &addr) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(fd, $0, len) } }
         guard ok == 0, listen(fd, 8) == 0 else { close(fd); throw BenchError("bind/listen failed on \(path)") }
@@ -69,7 +73,9 @@ final class CannedServer: @unchecked Sendable {
 
     /// `reply` (one line, newline-terminated, ending in `"id":<n>}`) with `id` swapped in.
     private static func withID(_ id: Int?, _ reply: Data) -> Data {
-        guard let id, let s = String(data: reply, encoding: .utf8), let r = s.range(of: #""id":"#, options: .backwards) else { return reply }
+        guard let id, let s = String(data: reply, encoding: .utf8), let r = s.range(of: #""id":"#, options: .backwards) else {
+            return reply
+        }
         return Data((s[..<r.lowerBound] + #""id":\#(id)}"# + "\n").utf8)
     }
 
@@ -104,7 +110,8 @@ struct Inconclusive: Error, CustomStringConvertible {
         try await b.measureAsync("client.search50", group: .inproc, warmup: 50, samples: 400) {
             blackHole(try await client.search("heron lattice", limit: 50))
         }
-        let g = try CannedServer(dir: work.appendingPathComponent("g", isDirectory: true).creating(), reply: Fixtures.grepReplyLine(files: 50))
+        let g = try CannedServer(
+            dir: work.appendingPathComponent("g", isDirectory: true).creating(), reply: Fixtures.grepReplyLine(files: 50))
         defer { g.stop() }
         let gclient = DaemonClient(socketPath: g.path, timeout: 15)
         try await b.measureAsync("client.grep50", group: .inproc, warmup: 50, samples: 400) {
@@ -119,8 +126,10 @@ struct Inconclusive: Error, CustomStringConvertible {
     var published = 0
     model.onSearched = { _ in published += 1 }
     let queries = (0..<100).map { "heron lattice \($0)" }
-    try await b.measureAsync("model.refresh.burst100", group: .inproc, warmup: 5, samples: 60,
-                             info: { ["published_last_run": "\(published)"] }) {
+    try await b.measureAsync(
+        "model.refresh.burst100", group: .inproc, warmup: 5, samples: 60,
+        info: { ["published_last_run": "\(published)"] }
+    ) {
         published = 0
         var tasks: [Task<Void, Never>] = []
         tasks.reserveCapacity(queries.count)

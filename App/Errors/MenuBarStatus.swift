@@ -42,15 +42,17 @@ final class MenuBarStatus {
         Publishers.CombineLatest(daemon.$state, skipped)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] state, _ in
-                let condition: DaemonCondition = switch state {
-                case .checking: .checking
-                case let .running(s): .running(fullDiskAccess: s.fullDiskAccess)
-                case .indexing: .indexing
-                case .needsApproval: .needsApproval
-                case .failed: .failed
-                }
-                let next = MenuBarWarning.evaluate(condition, skippedFullDiskAccess: defaults.bool(forKey: "skippedFullDiskAccess"),
-                                                 dismissedReminder: defaults.bool(forKey: FullDiskAccessReminder.dismissedKey))
+                let condition: DaemonCondition =
+                    switch state {
+                    case .checking: .checking
+                    case let .running(s): .running(fullDiskAccess: s.fullDiskAccess)
+                    case .indexing: .indexing
+                    case .needsApproval: .needsApproval
+                    case .failed: .failed
+                    }
+                let next = MenuBarWarning.evaluate(
+                    condition, skippedFullDiskAccess: defaults.bool(forKey: "skippedFullDiskAccess"),
+                    dismissedReminder: defaults.bool(forKey: FullDiskAccessReminder.dismissedKey))
                 if next != self?.warning { self?.warning = next }
             }
             .store(in: &cancellables)
@@ -89,7 +91,9 @@ struct MenuBarFixItem: View {
         if let w = MenuBarStatus.shared.warning {
             Text(w.message)
             if w.offersFix {
-                Button("Fix…") { AppActivation.activate(); openWindow(id: "index") }
+                Button("Fix…") {
+                    AppActivation.activate(); openWindow(id: "index")
+                }
             }
             if w.offersFullDiskAccess {
                 Button(MenuBarWarning.fullDiskAccessItemTitle(ownsDaemon: app.daemon.ownsDaemon)) {

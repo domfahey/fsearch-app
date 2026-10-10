@@ -33,8 +33,10 @@ public final class DaemonClient: SearchBackend, @unchecked Sendable {
                     if cancelled.isSet { cont.resume(throwing: CancellationError()); return }
                     nextId += 1
                     let id = nextId
-                    do { cont.resume(returning: try decodeReply(try socket.roundTrip(req.json(id: id), accepts: { replyIsFor(id, $0) }), as: T.self)) }
-                    catch { cont.resume(throwing: error) }
+                    do {
+                        cont.resume(
+                            returning: try decodeReply(try socket.roundTrip(req.json(id: id), accepts: { replyIsFor(id, $0) }), as: T.self))
+                    } catch { cont.resume(throwing: error) }
                 }
             }
         } onCancel: {

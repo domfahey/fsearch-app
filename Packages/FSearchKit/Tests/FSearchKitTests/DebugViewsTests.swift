@@ -1,10 +1,13 @@
 import Foundation
 import Testing
+
 @testable import FSearchKit
 
 @Suite struct DebugViewsTests {
     func rec(_ q: String, _ err: String? = nil) -> SearchLog.Record {
-        SearchLog.Record(time: Date(timeIntervalSince1970: 1_800_000_000), query: q, mode: "names", results: 2, tookUs: 1500, roundTripMs: 2.25, error: err)
+        SearchLog.Record(
+            time: Date(timeIntervalSince1970: 1_800_000_000), query: q, mode: "names", results: 2, tookUs: 1500, roundTripMs: 2.25,
+            error: err)
     }
 
     @Test func filterIsNewestFirstAndCaseInsensitive() {

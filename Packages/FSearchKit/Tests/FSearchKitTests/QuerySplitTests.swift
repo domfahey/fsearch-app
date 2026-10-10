@@ -1,4 +1,5 @@
 import Testing
+
 @testable import FSearchKit
 
 @Suite struct QuerySplitTests {
@@ -23,7 +24,9 @@ import Testing
 /// are copied from the daemon's match arms, not from QuerySplit.keys.
 @Suite struct QuerySplitDaemonParityTests {
     static let daemonFilterKeys = ["ext", "type", "kind", "in", "size", "mtime", "modified", "re", "path", "limit"]
-    static let daemonContentKeys: [(String, GrepMode)] = [("grep", .literal), ("content", .literal), ("regex", .regex), ("sym", .symbol), ("symbol", .symbol)]
+    static let daemonContentKeys: [(String, GrepMode)] = [
+        ("grep", .literal), ("content", .literal), ("regex", .regex), ("sym", .symbol), ("symbol", .symbol),
+    ]
 
     @Test(arguments: daemonFilterKeys)
     func everyDaemonFilterKeyIsSplitOff(_ key: String) {

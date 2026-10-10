@@ -14,8 +14,9 @@ enum PanelInput {
         }
 
         init(_ p: KeyPress) {
-            self.init(key: p.key, characters: p.characters, command: p.modifiers.contains(.command),
-                      shift: p.modifiers.contains(.shift), control: p.modifiers.contains(.control))
+            self.init(
+                key: p.key, characters: p.characters, command: p.modifiers.contains(.command),
+                shift: p.modifiers.contains(.shift), control: p.modifiers.contains(.control))
         }
     }
 

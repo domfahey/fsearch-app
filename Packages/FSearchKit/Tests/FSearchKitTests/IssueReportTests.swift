@@ -1,10 +1,12 @@
 import Foundation
 import Testing
+
 @testable import FSearchKit
 
 @Suite struct IssueReportTests {
-    let facts = IssueReport(appVersion: "0.3.1", build: "42", macOS: "Version 15.1 (Build 24B83)", chip: .appleSilicon,
-                            daemonInstall: .cli, daemonState: .needsApproval)
+    let facts = IssueReport(
+        appVersion: "0.3.1", build: "42", macOS: "Version 15.1 (Build 24B83)", chip: .appleSilicon,
+        daemonInstall: .cli, daemonState: .needsApproval)
 
     func items(_ url: URL) -> [String: String] {
         let c = URLComponents(url: url, resolvingAgainstBaseURL: false)!
@@ -24,7 +26,8 @@ import Testing
     }
 
     @Test func encodesReservedCharacters() {
-        let odd = IssueReport(appVersion: "1&2=3+4 #x", build: "", macOS: "a b", chip: .intel, daemonInstall: .bundled, daemonState: .running)
+        let odd = IssueReport(
+            appVersion: "1&2=3+4 #x", build: "", macOS: "a b", chip: .intel, daemonInstall: .bundled, daemonState: .running)
         let url = IssueReport.url(for: odd)
         #expect(!url.absoluteString.dropFirst(IssueReport.newIssueBase.count + 1).contains(" "))
         #expect(items(url)["app-version"] == "1&2=3+4 #x")
@@ -44,7 +47,9 @@ import Testing
         #expect(!s.contains("%2F" + "Users"))
         #expect(!s.contains("/Users"))
         #expect(s.utf8.count < 8 * 1024)
-        let long = IssueReport(appVersion: String(repeating: "9", count: 200), build: "1", macOS: String(repeating: "m", count: 200), chip: .intel, daemonInstall: .unsure, daemonState: .failed)
+        let long = IssueReport(
+            appVersion: String(repeating: "9", count: 200), build: "1", macOS: String(repeating: "m", count: 200), chip: .intel,
+            daemonInstall: .unsure, daemonState: .failed)
         #expect(IssueReport.url(for: long).absoluteString.utf8.count < 8 * 1024)
     }
 }

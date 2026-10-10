@@ -106,7 +106,9 @@ class PanelUITestCase: XCTestCase {
         let others = NSRunningApplication.runningApplications(withBundleIdentifier: "com.domfahey.fsearch")
             .filter { !$0.isTerminated && !($0.bundleURL?.standardizedFileURL.path.hasPrefix(ours) ?? false) }
         if !others.isEmpty {
-            throw UITestRefusal("FSearch is running from \(others.compactMap { $0.bundleURL?.path }): quit it first; launching the test app would quit it", file: file, line: line)
+            throw UITestRefusal(
+                "FSearch is running from \(others.compactMap { $0.bundleURL?.path }): quit it first; launching the test app would quit it",
+                file: file, line: line)
         }
     }
 
@@ -129,7 +131,8 @@ class PanelUITestCase: XCTestCase {
     private var fieldHasKeyboard: Bool { field.exists && field.value(forKey: "hasKeyboardFocus") as? Bool == true }
 
     /// A key into the search field.
-    func press(_ key: XCUIKeyboardKey, _ mods: XCUIElement.KeyModifierFlags = [], file: StaticString = #filePath, line: UInt = #line) throws {
+    func press(_ key: XCUIKeyboardKey, _ mods: XCUIElement.KeyModifierFlags = [], file: StaticString = #filePath, line: UInt = #line) throws
+    {
         try requireFocus(field: true, file: file, line: line)
         field.typeKey(key, modifierFlags: mods)
     }
@@ -140,7 +143,9 @@ class PanelUITestCase: XCTestCase {
     }
 
     /// A key to the app while something else of ours (a menu, Quick Look) has the keyboard.
-    func pressInApp(_ key: XCUIKeyboardKey, _ mods: XCUIElement.KeyModifierFlags = [], file: StaticString = #filePath, line: UInt = #line) throws {
+    func pressInApp(_ key: XCUIKeyboardKey, _ mods: XCUIElement.KeyModifierFlags = [], file: StaticString = #filePath, line: UInt = #line)
+        throws
+    {
         try requireFocus(field: false, file: file, line: line)
         app.typeKey(key, modifierFlags: mods)
     }
@@ -201,7 +206,9 @@ class PanelUITestCase: XCTestCase {
         XCTAssertTrue(ok, "never appeared: \(e)\n" + tree(), file: file, line: line)
     }
 
-    func waitUntil(_ timeout: TimeInterval = 10, _ what: String, _ cond: @escaping () -> Bool, file: StaticString = #filePath, line: UInt = #line) {
+    func waitUntil(
+        _ timeout: TimeInterval = 10, _ what: String, _ cond: @escaping () -> Bool, file: StaticString = #filePath, line: UInt = #line
+    ) {
         let p = NSPredicate { _, _ in MainActor.assumeIsolated { cond() } }
         let r = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: p, object: nil)], timeout: timeout)
         XCTAssertEqual(r, .completed, what + "\n" + tree(), file: file, line: line)

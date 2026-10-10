@@ -8,10 +8,16 @@ public enum ResultItem: Equatable, Identifiable, Sendable {
     case line(path: String, match: Match)
 
     public var path: String {
-        switch self { case let .file(h): h.path; case let .line(p, _): p }
+        switch self {
+        case let .file(h): h.path;
+        case let .line(p, _): p
+        }
     }
     public var id: String {
-        switch self { case let .file(h): h.path; case let .line(p, m): "\(p):\(m.line)" }
+        switch self {
+        case let .file(h): h.path;
+        case let .line(p, m): "\(p):\(m.line)"
+        }
     }
 }
 
@@ -124,7 +130,8 @@ public final class SearchModel {
     }
 
     private func report(_ q: String, _ mode: SearchMode, _ n: Int, _ took: UInt64?, _ started: Date, _ err: String?) {
-        onSearched?(LogEntry(query: q, mode: mode, resultCount: n, tookUs: took, roundTripMs: Date().timeIntervalSince(started) * 1000, error: err))
+        onSearched?(
+            LogEntry(query: q, mode: mode, resultCount: n, tookUs: took, roundTripMs: Date().timeIntervalSince(started) * 1000, error: err))
         onSettled?(phase)
     }
 }

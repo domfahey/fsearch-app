@@ -117,7 +117,9 @@ final class PanelUITests: PanelUITestCase {
         try search("heronfile")
         waitFor(text("heronfile.txt"))
         try press("k", .command)
-        let items = ["Open", "Open With", "Reveal in Finder", "Quick Look", "Copy Path", "Copy File", "Open Folder in Terminal", "Move to Trash"]
+        let items = [
+            "Open", "Open With", "Reveal in Finder", "Quick Look", "Copy Path", "Copy File", "Open Folder in Terminal", "Move to Trash",
+        ]
         // The ⌘K pop-up itself, not the app's main menu or the menu-bar item's.
         let menu = app.menus.containing(.menuItem, identifier: "Copy Path").firstMatch
         waitFor(menu.menuItems["Copy Path"], 10)
@@ -181,7 +183,8 @@ final class PanelUITests: PanelUITestCase {
         try launch()
         try search("heronfile")
         waitFor(text("heronfile.txt"))
-        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "value CONTAINS ' ms · ' OR label CONTAINS ' ms · '")).firstMatch.exists)
+        XCTAssertFalse(
+            app.staticTexts.matching(NSPredicate(format: "value CONTAINS ' ms · ' OR label CONTAINS ' ms · '")).firstMatch.exists)
     }
 
     func testSettingsWindowOpens() throws {

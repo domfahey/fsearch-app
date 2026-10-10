@@ -68,8 +68,10 @@ enum AppActivation {
     static var activate: @MainActor () -> Void = live()
 
     /// `inert` is read on every call: the unit-test host never activates.
-    static func live(inert: @escaping @MainActor () -> Bool = { Presentation.inert },
-                     activate real: @escaping @MainActor () -> Void = { NSApp.activate(ignoringOtherApps: true) }) -> @MainActor () -> Void {
+    static func live(
+        inert: @escaping @MainActor () -> Bool = { Presentation.inert },
+        activate real: @escaping @MainActor () -> Void = { NSApp.activate(ignoringOtherApps: true) }
+    ) -> @MainActor () -> Void {
         { if !inert() { real() } }
     }
 }

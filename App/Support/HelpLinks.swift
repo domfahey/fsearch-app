@@ -22,13 +22,14 @@ enum HelpLinks {
     @MainActor
     static func issueFacts(daemon: DaemonManager) -> IssueReport {
         let info = Bundle.main.infoDictionary
-        let state: IssueReport.DaemonSummary = switch daemon.state {
-        case .checking: .checking
-        case .running: .running
-        case .indexing: .indexing
-        case .needsApproval: .needsApproval
-        case .failed: .failed
-        }
+        let state: IssueReport.DaemonSummary =
+            switch daemon.state {
+            case .checking: .checking
+            case .running: .running
+            case .indexing: .indexing
+            case .needsApproval: .needsApproval
+            case .failed: .failed
+            }
         return IssueReport(
             appVersion: info?["CFBundleShortVersionString"] as? String ?? "unknown",
             build: info?["CFBundleVersion"] as? String ?? "",

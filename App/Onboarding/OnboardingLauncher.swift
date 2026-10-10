@@ -1,6 +1,6 @@
 import AppKit
-import os
 import SwiftUI
+import os
 
 /// First-launch entry point. A SwiftUI `Window` scene can't open itself at
 /// launch on macOS 14, so the onboarding window is hosted directly.

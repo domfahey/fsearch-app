@@ -1,6 +1,7 @@
 import Darwin
 import Foundation
 import Testing
+
 @testable import FSearchKit
 
 /// A raw Unix-socket server on a temp path. `handler` runs on its own thread
@@ -48,7 +49,9 @@ final class RawServer: @unchecked Sendable {
 
     /// Idempotent. Returns once the accept thread has closed the listener.
     func stop() {
-        let first = lock.withLock { () -> Bool in defer { stopping = true }; return !stopping }
+        let first = lock.withLock { () -> Bool in
+            defer { stopping = true }; return !stopping
+        }
         guard first else { return }
         // Wake the blocked accept with a connection of our own.
         let s = socket(AF_UNIX, SOCK_STREAM, 0)
@@ -64,7 +67,9 @@ final class RawServer: @unchecked Sendable {
     private static func withAddress(_ path: String, _ body: (UnsafePointer<sockaddr>, socklen_t) -> Int32) -> Int32 {
         var addr = sockaddr_un()
         addr.sun_family = sa_family_t(AF_UNIX)
-        withUnsafeMutableBytes(of: &addr.sun_path) { p in _ = path.withCString { strncpy(p.baseAddress!.assumingMemoryBound(to: CChar.self), $0, p.count - 1) } }
+        withUnsafeMutableBytes(of: &addr.sun_path) { p in
+            _ = path.withCString { strncpy(p.baseAddress!.assumingMemoryBound(to: CChar.self), $0, p.count - 1) }
+        }
         let len = socklen_t(MemoryLayout<sockaddr_un>.size)
         return withUnsafePointer(to: &addr) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { body($0, len) } }
     }
@@ -154,7 +159,9 @@ final class RawServer: @unchecked Sendable {
     }
 
     @Test func peerClosingWithoutAnyReplyIsDisconnected() {
-        let srv = RawServer { fd, _ in _ = RawServer.readLine(fd); close(fd) }
+        let srv = RawServer { fd, _ in
+            _ = RawServer.readLine(fd); close(fd)
+        }
         defer { srv.stop() }
         #expect(throws: DaemonError.disconnected) { try LineSocket(path: srv.path, timeout: 2).roundTrip(req()) }
     }
@@ -206,7 +213,9 @@ final class RawServer: @unchecked Sendable {
     }
 
     @Test func emptyReplyLineIsAnEmptyData() throws {
-        let srv = RawServer { fd, _ in _ = RawServer.readLine(fd); RawServer.send(fd, "\n"); close(fd) }
+        let srv = RawServer { fd, _ in
+            _ = RawServer.readLine(fd); RawServer.send(fd, "\n"); close(fd)
+        }
         defer { srv.stop() }
         #expect(try LineSocket(path: srv.path, timeout: 2).roundTrip(req()).isEmpty)
     }

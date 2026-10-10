@@ -23,6 +23,8 @@ public func canContinue(_ step: OnboardingStep, _ f: OnboardingFacts) -> Bool {
 public func hotkeyWarning(defaultIsOptionSpace: Bool, runningBundleIds: Set<String>) -> String? {
     guard defaultIsOptionSpace else { return nil }
     if runningBundleIds.contains("com.raycast.macos") { return "Raycast uses ⌥ Space. Pick another shortcut, or turn Raycast's off." }
-    if runningBundleIds.contains("com.runningwithcrayons.Alfred") { return "Alfred may use ⌥ Space. Pick another shortcut, or change Alfred's." }
+    if runningBundleIds.contains("com.runningwithcrayons.Alfred") {
+        return "Alfred may use ⌥ Space. Pick another shortcut, or change Alfred's."
+    }
     return nil
 }
