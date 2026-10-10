@@ -8,7 +8,6 @@ Detail for the bug-audit items is in `.superpowers/audit-round2.md`, and for the
 
 - [ ] **Makefile audit:** stricter shell, phony targets, `clean`, plus new `doctor`, `install` (developer prerequisites only), `setup` and `ci` targets. *(in progress)*
 - [ ] **Security best-practices audits** (app/platform, supply chain/CI/repo): triage the findings. *(results pending)*
-- [ ] **Docs and developer-docs audits:** apply the findings. *(results pending)*
 
 ## After the pull request merges
 
@@ -47,6 +46,13 @@ Detail for the bug-audit items is in `.superpowers/audit-round2.md`, and for the
 - [ ] Accessibility: VoiceOver labels, keyboard navigation in Settings and onboarding, Reduce Motion and Transparency, Increase Contrast.
 - [ ] Localization readiness: a String Catalog, English only for now.
 - [ ] Query docs depth: ranking, typo tolerance, how words combine, `limit:`. Check each against the daemon first.
+
+## Docs follow-ups
+
+- [ ] Switch the Help menu links (`HelpLinks.base`, `blob/main`) to tag-pinned links after 0.1.0.
+- [ ] ADR 0003 says taking over from a stray daemon is future work, but fsearch ba100f4 does it for the CLI's agent. Add a superseding note or a new ADR (don't edit an accepted ADR).
+- [ ] Confirm the GitHub Pages location for the appcast (the runbook assumes a `gh-pages` branch with `appcast.xml` at its root).
+- [ ] Check external drives (`/Volumes`); the docs currently say "untested, probably not indexed".
 
 ## P2: features
 
