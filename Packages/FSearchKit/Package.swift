@@ -8,5 +8,7 @@ let package = Package(
     targets: [
         .target(name: "FSearchKit"),
         .testTarget(name: "FSearchKitTests", dependencies: ["FSearchKit"]),
+        // Performance benchmarks; run through scripts/bench.sh (release build).
+        .executableTarget(name: "FSearchBench", dependencies: ["FSearchKit"]),
     ]
 )

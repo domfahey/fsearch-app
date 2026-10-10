@@ -111,3 +111,27 @@ jobs:
       - name: Delete signing keychain
         if: always()
         run: security delete-keychain "$KEYCHAIN" || true
+
+  bench:
+    # Non-blocking performance report (bench/README.md). Compares against a
+    # "ci-macos-26" baseline entry if one exists, never fails the workflow, and
+    # uploads the results JSON. Hosted-runner timings are noisy; read trends, not single runs.
+    runs-on: macos-26
+    continue-on-error: true
+    env:
+      BENCH_MACHINE: ci-macos-26
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: sudo xcode-select -s /Applications/Xcode_26.6.app
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master, 2026-09-12 (merge of #185)
+        with:
+          toolchain: stable
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - run: scripts/build-daemon.sh
+      - run: scripts/bench.sh --report-only
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: bench-results
+          path: bench/results/*.json
+          if-no-files-found: warn
