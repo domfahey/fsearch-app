@@ -40,6 +40,7 @@ struct MenuContent: View {
             Button("Search Log…") { openWindow(id: "log") }
             Divider()
         }
+        DebugMenuItem(app: app)
         FinishSetupMenuItem(app: app)
         SettingsLink { Text("Settings…") }
         CheckForUpdatesItem()
