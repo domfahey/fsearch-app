@@ -1,14 +1,34 @@
-public enum OnboardingStep: Int, CaseIterable, Sendable { case welcome, helper, fullDiskAccess, indexing }
+/// The onboarding pages, in order.
+public enum OnboardingStep: Int, CaseIterable, Sendable {
+    /// Introduction.
+    case welcome
+    /// Enable the background helper.
+    case helper
+    /// Grant Full Disk Access (or skip it).
+    case fullDiskAccess
+    /// Wait for the first index.
+    case indexing
+}
 
+/// What onboarding has learned so far; each step reads its own flag.
 public struct OnboardingFacts: Equatable, Sendable {
+    /// The helper is registered and enabled.
     public var helperEnabled = false
+    /// The daemon has Full Disk Access.
     public var fullDiskAccess = false
+    /// The user chose to continue without it.
     public var skippedFullDiskAccess = false
+    /// The first index is built.
     public var indexReady = false
+    /// Creates facts with nothing done yet.
     public init() {}
 }
 
 /// Each step checks its own result before moving on.
+///
+/// - Parameters:
+///   - step: The page being shown.
+///   - f: What onboarding knows.
 public func canContinue(_ step: OnboardingStep, _ f: OnboardingFacts) -> Bool {
     switch step {
     case .welcome: true
@@ -20,6 +40,11 @@ public func canContinue(_ step: OnboardingStep, _ f: OnboardingFacts) -> Bool {
 
 /// macOS gives no way to ask who owns a hotkey, so warn when a launcher
 /// known to use ⌥ Space is running.
+///
+/// - Parameters:
+///   - defaultIsOptionSpace: Whether the chosen shortcut is the default ⌥ Space.
+///   - runningBundleIds: Bundle ids of the running apps.
+/// - Returns: A warning, or nil when there is no known clash.
 public func hotkeyWarning(defaultIsOptionSpace: Bool, runningBundleIds: Set<String>) -> String? {
     guard defaultIsOptionSpace else { return nil }
     if runningBundleIds.contains("com.raycast.macos") { return "Raycast uses ⌥ Space. Pick another shortcut, or turn Raycast's off." }

@@ -8,7 +8,11 @@
 /// Words split like the daemon's `split_words` (query.rs): on spaces, with a
 /// "double quoted" run kept in one word. Unlike the daemon, a word keeps its
 /// quotes here, so filters sent back to the daemon split the same way again.
+///
+/// The key lists and word rules must stay in step with the daemon's `query.rs`; a mismatch
+/// would send a filter as a pattern or the reverse.
 public enum QuerySplit {
+    /// The filter keys the daemon understands (query.rs `Query::filter`).
     static let keys: Set<String> = ["ext", "type", "kind", "in", "size", "mtime", "modified", "re", "path", "limit"]
     /// Keys that make the daemon answer a search with matching lines (query.rs `filter`).
     static let contentKeys: [String: GrepMode] = [
@@ -17,6 +21,9 @@ public enum QuerySplit {
 
     /// The pattern keeps the typed spacing (only leading and trailing spaces
     /// are dropped); filters are returned joined by single spaces.
+    ///
+    /// - Parameter query: The typed text.
+    /// - Returns: The pattern to search for and the filters that narrow the files.
     public static func split(_ query: String) -> (pattern: String, filters: String) {
         var pattern = "", filters: [String] = []
         for (space, word) in spacedWords(query) {
@@ -31,14 +38,21 @@ public enum QuerySplit {
     }
 
     /// The words of a query, quotes kept.
+    ///
+    /// - Parameter s: The typed text.
     public static func words(_ s: String) -> [String] { spacedWords(s).map(\.word) }
 
     /// A word as the daemon reads it: quotes removed.
+    ///
+    /// - Parameter word: A word from ``words(_:)``.
     public static func unquoted(_ word: String) -> String { word.replacingOccurrences(of: "\"", with: "") }
 
     /// A name query holding `grep:`/`content:`/`regex:`/`sym:`/`symbol:` is a
     /// content search: that word's value is the pattern (possibly empty; the last one wins,
     /// as in the daemon) and the other words pick the files.
+    ///
+    /// - Parameter query: The typed text.
+    /// - Returns: The filters, the pattern and the mode, or nil when the query has no content key.
     public static func contentSearch(_ query: String) -> (q: String, pattern: String, mode: GrepMode)? {
         var rest: [String] = [], found: (String, GrepMode)?
         for word in words(query) {
@@ -54,11 +68,17 @@ public enum QuerySplit {
     }
 
     /// True if the query has a content key, so a name search would get lines back.
+    ///
+    /// - Parameter query: The typed text.
     public static func hasContentKey(_ query: String) -> Bool { contentSearch(query) != nil }
 
     /// True while the last word is a filter key with nothing after the colon
     /// and no space typed since (`foo size:`): the user is still typing the
     /// value, and the daemon would answer with an error (or match nothing).
+    ///
+    /// The half-typed rule keeps the previous results on screen instead of flashing an error.
+    ///
+    /// - Parameter query: The typed text.
     public static func endsInHalfTypedFilter(_ query: String) -> Bool {
         guard let last = words(query).last, query.last != " " else { return false }
         let plain = unquoted(last)
@@ -81,6 +101,7 @@ public enum QuerySplit {
         return out
     }
 
+    /// Whether a word is `key:value` with a known filter key (an empty value still counts).
     private static func isFilter(_ word: String) -> Bool {
         let plain = unquoted(word)
         guard let colon = plain.firstIndex(of: ":") else { return false }
