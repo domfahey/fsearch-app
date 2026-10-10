@@ -78,24 +78,24 @@ extension AppTests {
         private func commandRows() -> PanelRows { PanelRows(files: 2, query: "set", mode: .names) }
 
         @Test func returnOnTheCommandRowRunsIt() {
-            #expect(PanelInput.route(.open(0), rows: commandRows()) == .runCommand(.settings))
-            #expect(PanelInput.route(.open(1), rows: commandRows()) == .perform(.open(0)))
-            #expect(PanelInput.route(.open(2), rows: commandRows()) == .perform(.open(1)))
+            #expect(PanelInput.route(.open(0), rows: commandRows()) == .perform(.open(0)))
+            #expect(PanelInput.route(.open(1), rows: commandRows()) == .perform(.open(1)))
+            #expect(PanelInput.route(.open(2), rows: commandRows()) == .runCommand(.settings))
             #expect(PanelInput.route(.open(3), rows: commandRows()) == .switchMode(.content))
             #expect(PanelInput.route(.open(4), rows: commandRows()) == .switchMode(.symbols))
             #expect(PanelInput.route(.open(5), rows: commandRows()) == .ignore)
         }
 
-        @Test func fileActionsIgnoreTheCommandRowAndShiftToFileIndexes() {
-            for e in [PanelEffect.reveal(0), .quickLook(0), .copyPath(0), .showActions(0), .reveal(3)] {
+        @Test func fileActionsIgnoreTheCommandRowAndKeepFileIndexes() {
+            for e in [PanelEffect.reveal(2), .quickLook(2), .copyPath(2), .showActions(2), .reveal(3)] {
                 #expect(PanelInput.route(e, rows: commandRows()) == .ignore)
             }
-            #expect(PanelInput.route(.reveal(2), rows: commandRows()) == .perform(.reveal(1)))
-            #expect(PanelInput.route(.showActions(1), rows: commandRows()) == .perform(.showActions(0)))
+            #expect(PanelInput.route(.reveal(0), rows: commandRows()) == .perform(.reveal(0)))
+            #expect(PanelInput.route(.showActions(1), rows: commandRows()) == .perform(.showActions(1)))
         }
 
         @Test func commandNKeysStillOpenFilesOnly() {
-            var s = PanelState(query: "set", selection: 0, count: 5, files: 2, commands: 1)
+            var s = PanelState(query: "set", selection: 0, count: 5, files: 2)
             let effect = reduce(&s, .cmdDigit(1))
             #expect(PanelInput.route(effect, rows: commandRows()) == .perform(.open(0)))
             let past = reduce(&s, .cmdDigit(3))

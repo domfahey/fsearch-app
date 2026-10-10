@@ -21,7 +21,7 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
 - Four-step onboarding: choose the hotkey (with a warning when another launcher holds it), turn on the background helper login item, grant Full Disk Access (you can skip it), and watch the first index progress.
 - A universal (arm64 and x86_64) fsearch daemon bundled in the app and registered with SMAppService.
 - Coexistence with the fsearch CLI: the app reuses a daemon that is already running and never takes over, stops or replaces a daemon it didn't start.
-- App commands in the search panel: typing "settings", "preferences" or "prefs" shows an FSearch Settings row above the results; ↵ opens Settings.
+- App commands in the search panel: typing "settings", "preferences" or "prefs" shows an FSearch Settings row below the files, just above the "Use … with" rows, so ↵ still opens the top file; select the row and press ↵ to open Settings. With no matching files the row is first.
 - Settings: "Open FSearch at login", with the real login-item status, and "Remove Background Helper and Data…" to uninstall from inside the app. It removes the helper only if FSearch owns it, and moves the data and logs to the Trash.
 - After you skip Full Disk Access during setup, a quiet menu-bar reminder offers "Turn On Full Disk Access…" and "Don't Remind Me". It clears itself once access is granted.
 - Help menu (FSearch Help, Keyboard Shortcuts, Query Syntax, Changelog, Privacy) and "Report an Issue…", which opens a pre-filled GitHub bug form with versions, chip and daemon state. It never includes paths or queries.
