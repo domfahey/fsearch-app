@@ -7,3 +7,4 @@ build/
 Vendor/fsearch.rev
 .worktrees*/
 Packages/FSearchKit/.swiftpm/
+release/

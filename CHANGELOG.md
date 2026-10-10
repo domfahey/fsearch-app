@@ -29,12 +29,12 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
 - Debug mode (⌥⌘D or Settings): Index Details, a Search Log, and timings in the footer. The Search Log records only this app's own searches, keeps at most 10,000, and stays on this Mac.
 - Errors show inline in the panel and in the menu bar.
 - Settings for the hotkey, the editor and debug mode.
-- Sparkle updater. It stays inactive until the signing keys are configured.
+- Sparkle updater. It stays inactive until the signing keys are configured. Scheduled updates show as a quiet menu-bar reminder ("Update Available…"), Settings has an Updates section (automatic checks, Check Now), feeds must be signed, system profiling is off, and Sparkle's unused XPC services are removed.
 - About FSearch window crediting fsearch by Noah Dunnagan, with the full third-party licenses. It also credits Raycast and Everything as inspiration.
 - Third-party notices for fsearch, KeyboardShortcuts and Sparkle ([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
 - Privacy manifest declaring no tracking, no data collection and the required-reason APIs the app uses (UserDefaults, file timestamps).
 - App category set to Productivity (`LSApplicationCategoryType`).
-- Release tooling: `scripts/release.sh` signs, notarizes and staples, verifies the app and DMG signatures, and writes a SHA-256 checksum next to the DMG. A release checklist is in [docs/release-checklist.md](docs/release-checklist.md).
+- Release tooling: `scripts/release.sh <version>` sets an increasing build number from git, signs, notarizes and staples, verifies the app and DMG signatures, and writes a SHA-256 checksum next to the DMG. A release checklist is in [docs/release-checklist.md](docs/release-checklist.md).
 - FSearchKit Swift package with unit and daemon integration tests. A separate UI smoke test (`scripts/ui-smoke.sh`) runs locally, not in CI.
 - Benchmarks: `scripts/bench.sh` measures keystroke, client and real-daemon performance and fails when a result regresses against `bench/baseline.json`. See [bench/README.md](bench/README.md).
 - A Makefile for common tasks (`make test`, `lint`, `type`, `bench`, `check`) and a `.swift-format` style config.
