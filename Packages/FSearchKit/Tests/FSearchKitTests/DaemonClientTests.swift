@@ -23,7 +23,9 @@ import Testing
 
     @Test func noDaemonIsDisconnected() async {
         let c = DaemonClient(socketPath: NSTemporaryDirectory() + "nothing-here.sock")
+        let t0 = Date()
         await #expect(throws: DaemonError.disconnected) { try await c.ping() }
+        #expect(Date().timeIntervalSince(t0) < 1.0)
     }
 
     @Test func hungDaemonTimesOut() async {
@@ -39,11 +41,49 @@ import Testing
         let c = DaemonClient(socketPath: first.path)
         try await c.ping()
         first.stop()
-        await #expect(throws: DaemonError.self) { try await c.ping() }
-        // A new daemon on the same path.
+        // A new daemon on the same path. The very next ping retries once on a fresh connection.
         let second = FakeDaemon(path: first.path) { _ in ["ok": true] }
         try await c.ping()
         _ = second
+    }
+
+    @Test func stoppingAnOldDaemonLeavesTheNewOneAlone() async throws {
+        let first = FakeDaemon { _ in ["ok": true] }
+        first.stop()
+        let second = FakeDaemon(path: first.path) { _ in ["ok": true] }
+        first.stop()  // a second stop on a stopped daemon is a no-op
+        try await DaemonClient(socketPath: second.path).ping()
+        _ = second
+    }
+
+    @Test func timeoutIsNotRetried() async {
+        // Reply to the first request only; the second hangs.
+        let d = FakeDaemon { req in (req["id"] as? Int) == 1 ? ["ok": true] : nil }
+        let c = DaemonClient(socketPath: d.path, timeout: 0.3)
+        try? await c.ping()
+        await #expect(throws: DaemonError.timeout) { try await c.ping() }
+        #expect(d.requests.count == 2, "a timed-out request is not resent")
+    }
+
+    @Test func cancelledQueuedCallsNeverHitTheSocket() async {
+        let d = FakeDaemon { _ in nil }
+        let c = DaemonClient(socketPath: d.path, timeout: 0.3)
+        let t0 = Date()
+        let tasks = (0..<5).map { _ in Task { try await c.ping() } }
+        for t in tasks.prefix(4) { t.cancel() }
+        await #expect(throws: DaemonError.timeout) { try await tasks[4].value }
+        #expect(Date().timeIntervalSince(t0) < 1.0, "five queued hung calls would take 1.5 s")
+        #expect(d.requests.count <= 2, "the cancelled calls were skipped, not sent")
+    }
+
+    @Test func cancelledCallThrowsCancellationError() async {
+        let d = FakeDaemon { _ in nil }
+        let c = DaemonClient(socketPath: d.path, timeout: 0.3)
+        let blocker = Task { try? await c.ping() }
+        let victim = Task { try await c.ping() }
+        victim.cancel()
+        await #expect(throws: CancellationError.self) { try await victim.value }
+        _ = await blocker.value
     }
 
     @Test func saveSendsTheSaveOp() async throws {

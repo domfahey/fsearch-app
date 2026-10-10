@@ -25,12 +25,19 @@ public final class DaemonClient: SearchBackend, @unchecked Sendable {
     }
 
     private func call<T: Decodable & Sendable>(_ req: Request, as: T.Type) async throws -> T {
-        try await withCheckedThrowingContinuation { cont in
-            queue.async { [self] in
-                nextId += 1
-                do { cont.resume(returning: try decodeReply(try socket.roundTrip(req.json(id: nextId)), as: T.self)) }
-                catch { cont.resume(throwing: error) }
+        let cancelled = CancelFlag()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (cont: CheckedContinuation<T, Error>) in
+                queue.async { [self] in
+                    // A call cancelled while queued is skipped without touching the socket.
+                    if cancelled.isSet { cont.resume(throwing: CancellationError()); return }
+                    nextId += 1
+                    do { cont.resume(returning: try decodeReply(try socket.roundTrip(req.json(id: nextId)), as: T.self)) }
+                    catch { cont.resume(throwing: error) }
+                }
             }
+        } onCancel: {
+            cancelled.set()
         }
     }
 
@@ -51,4 +58,12 @@ public final class DaemonClient: SearchBackend, @unchecked Sendable {
 
     /// Ask the daemon to compact and save its index (debug mode's "Save Now").
     public func save() async throws { _ = try await call(.save, as: Pong.self) }
+}
+
+/// A thread-safe one-way flag, set by the cancellation handler and read on the queue.
+private final class CancelFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = false
+    func set() { lock.lock(); value = true; lock.unlock() }
+    var isSet: Bool { lock.lock(); defer { lock.unlock() }; return value }
 }
