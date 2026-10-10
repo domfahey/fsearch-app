@@ -103,7 +103,7 @@ daemon: ## Rebuild the universal fsearch daemon into Vendor/ (pinned revision)
 	scripts/build-daemon.sh
 
 project: ## Generate FSearch.xcodeproj with XcodeGen
-	$(Q)xcodegen generate
+	$(Q)scripts/generate-project.sh
 
 build: project ## Build the universal Debug app (same as CI)
 	$(Q)$(XCODEBUILD) build

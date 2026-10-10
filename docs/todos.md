@@ -7,12 +7,12 @@ Detail for the bug-audit items is in `.superpowers/audit-round2.md`, and for the
 ## In flight
 
 - [ ] **Makefile audit:** stricter shell, phony targets, `clean`, plus new `doctor`, `install` (developer prerequisites only), `setup` and `ci` targets. *(in progress)*
-- [ ] **Security best-practices audits** (app/platform, supply chain/CI/repo): triage the findings. *(results pending)*
 
 ## After the pull request merges
 
 - [ ] Stricter `main`: enforce for admins, require up-to-date branches, linear history, conversation resolution; squash-only merges; delete merged branches.
-- [ ] Remove `dtolnay/rust-toolchain` from the Actions allow list once CI uses the preinstalled rustup.
+- [ ] Remove `dtolnay/rust-toolchain` from the Actions allow list once this branch is on `main` (the branch no longer uses it).
+- [ ] Pin `actionlint` and `shellcheck` in the CI lint job (it uses an unpinned `brew install`).
 - [ ] CodeQL: add Swift analysis (needs an advanced setup with a build step; default setup covers the workflows only).
 
 ## P1: bugs from audit round 2

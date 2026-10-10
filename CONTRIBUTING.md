@@ -29,14 +29,14 @@ From the repository root, build the pinned fsearch daemon once, then build the a
 
 ```sh
 make daemon   # scripts/build-daemon.sh
-make build    # xcodegen generate, then the Debug build (the same as CI)
+make build    # generate the project (pinned packages), then the Debug build (the same as CI)
 ```
 
 Or run the raw commands:
 
 ```sh
 scripts/build-daemon.sh
-xcodegen generate
+scripts/generate-project.sh   # xcodegen generate + the committed Package.resolved
 xcodebuild -project FSearch.xcodeproj -scheme FSearch -configuration Debug \
   -derivedDataPath build -destination 'generic/platform=macOS' \
   CODE_SIGN_IDENTITY=- build
