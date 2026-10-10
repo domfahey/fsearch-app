@@ -47,6 +47,35 @@ final class HangingBackend: SearchBackend, @unchecked Sendable {
     func ping() async throws {}
 }
 
+/// A name search for `slowQuery` that ignores cancellation: it sleeps in a
+/// detached task, so the reply still arrives after the caller has moved on.
+final class IgnoringCancelBackend: SearchBackend, @unchecked Sendable {
+    private let lock = NSLock()
+    private var _started = false
+    var started: Bool { lock.withLock { _started } }
+
+    func search(_ q: String, limit: Int) async throws -> SearchReply {
+        if q == "old" {
+            lock.withLock { _started = true }
+            await Task.detached { try? await Task.sleep(for: .milliseconds(300)) }.value
+        }
+        return SearchReply(tookUs: 9, hits: [Hit(path: "/r/\(q)", kind: "file", size: 0, mtime: 0, score: 0)])
+    }
+    func grep(q: String, pattern: String, mode: GrepMode) async throws -> GrepReply { throw DaemonError.disconnected }
+    func status() async throws -> DaemonStatus { throw DaemonError.disconnected }
+    func ping() async throws {}
+}
+
+/// A backend that reports when its slow query has begun.
+protocol StartSignal: Sendable { var started: Bool { get } }
+extension HangingBackend: StartSignal {}
+extension IgnoringCancelBackend: StartSignal {}
+
+/// Waits (bounded) until a backend has begun answering its slow query.
+private func waitUntilStarted(_ b: some StartSignal) async throws {
+    for _ in 0..<400 where !b.started { try await Task.sleep(for: .milliseconds(5)) }
+}
+
 @MainActor @Suite struct SearchModelTests {
     @Test func namesSearch() async {
         let m = SearchModel(names: ScriptedBackend(), content: ScriptedBackend())
@@ -126,10 +155,12 @@ final class HangingBackend: SearchBackend, @unchecked Sendable {
     @Test func supersededSearchIsCancelled() async throws {
         let b = HangingBackend(hangingQuery: "slow")
         let m = SearchModel(names: b, content: ScriptedBackend())
+        var log: [SearchModel.LogEntry] = []
+        m.onSearched = { log.append($0) }
         let t0 = Date()
         m.query = "slow"
         let first = Task { await m.refresh() }
-        for _ in 0..<400 where !b.started { try await Task.sleep(for: .milliseconds(5)) }
+        try await waitUntilStarted(b)
         #expect(b.started, "the hanging search reached the backend")
         m.query = "fast"
         await m.refresh()
@@ -137,5 +168,34 @@ final class HangingBackend: SearchBackend, @unchecked Sendable {
         #expect(b.cancelled, "the superseded call was cancelled")
         #expect(Date().timeIntervalSince(t0) < 2, "a hung daemon costs no timeout")
         #expect(m.items.map(\.path) == ["/r/fast"] && m.phase == .results)
+        #expect(log.map(\.query) == ["fast"], "only the newest search is reported")
+    }
+
+    @Test func emptyQueryCancelsInFlight() async throws {
+        let b = HangingBackend(hangingQuery: "slow")
+        let m = SearchModel(names: b, content: ScriptedBackend())
+        m.query = "slow"
+        let first = Task { await m.refresh() }
+        try await waitUntilStarted(b)
+        m.query = ""
+        await m.refresh()
+        await first.value
+        #expect(b.cancelled, "clearing the query cancels the search in flight")
+        #expect(m.phase == .idle && m.items.isEmpty)
+    }
+
+    @Test func staleReplyIsDropped() async throws {
+        let b = IgnoringCancelBackend()
+        let m = SearchModel(names: b, content: ScriptedBackend())
+        var log: [SearchModel.LogEntry] = []
+        m.onSearched = { log.append($0) }
+        m.query = "old"
+        let first = Task { await m.refresh() }
+        try await waitUntilStarted(b)
+        m.query = "new"
+        await m.refresh()
+        await first.value
+        #expect(m.items.map(\.path) == ["/r/new"] && m.phase == .results)
+        #expect(log.map(\.query) == ["new"], "the late reply to the old query is not reported")
     }
 }
