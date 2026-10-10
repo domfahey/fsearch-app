@@ -136,7 +136,7 @@ public final class SearchModel {
         // let any search already under way finish. Otherwise (the query was
         // replaced, or the mode changed) those rows answer something else:
         // clear them, still sending nothing.
-        let halfTyped = QuerySplit.endsInHalfTypedFilter(query)
+        let halfTyped = QuerySplit.endsInHalfTypedFilter(query, mode: mode)
         if halfTyped && mode == requested.mode && query.hasPrefix(requested.query) { return }
         generation += 1
         inflight?.cancel()

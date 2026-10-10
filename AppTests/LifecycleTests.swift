@@ -25,6 +25,20 @@ extension AppTests {
             #expect(await eventually { !app.daemon.isUnresponsive })
         }
 
+        /// "Isn't answering" never outlives the next results: the recovery check's throttle doesn't apply to it.
+        @Test func resultsClearUnresponsiveAtOnce() async {
+            let env = TestEnv(helper: FakeHelper(.enabled))
+            defer { env.tearDown() }
+            let app = env.app
+            app.status = MenuBarStatus(defaults: env.defaults)
+            let checked = app.status.recoveryCheck.shouldRefresh(daemonUnhealthy: true)
+            #expect(checked, "a check just ran")
+            app.searchSettled(.failed(.timeout))
+            #expect(app.daemon.isUnresponsive)
+            app.searchSettled(.results)
+            #expect(await eventually { !app.daemon.isUnresponsive })
+        }
+
         @Test func aTimeoutIsUnresponsive() {
             let env = TestEnv()
             defer { env.tearDown() }
@@ -131,6 +145,29 @@ extension AppTests {
         }
 
         // MARK: item 24 and A-M3
+
+        /// The copy in /Applications opens only once this process has quit (it would see this one and quit), however
+        /// long quitting takes; no fixed delay.
+        @Test func theMovedCopyOpensOnceThisProcessHasQuit() async throws {
+            let dir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("fsa-mover-\(UUID().uuidString.prefix(8))")
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: dir) }
+            let marker = dir.appendingPathComponent("opened")
+            let quitting = Process()  // stands in for this app while it quits
+            quitting.executableURL = URL(fileURLWithPath: "/bin/sleep")
+            quitting.arguments = ["1.5"]
+            try quitting.run()
+            let relaunch = Process()
+            relaunch.executableURL = URL(fileURLWithPath: "/bin/sh")
+            relaunch.arguments = InstallMover.relaunchArguments(
+                app: marker, waitingFor: quitting.processIdentifier, open: "/usr/bin/touch")
+            try relaunch.run()
+            try await Task.sleep(for: .milliseconds(1100))  // longer than the old fixed second
+            #expect(!FileManager.default.fileExists(atPath: marker.path), "opened while the app was still running")
+            quitting.waitUntilExit()
+            #expect(await eventually { FileManager.default.fileExists(atPath: marker.path) })
+            relaunch.waitUntilExit()
+        }
 
         @Test func launchGuardsStandDownInTestMode() {
             let test = LaunchOptions(socketPath: "/x.sock", testMode: true, unitTestHost: true, showPanel: false)

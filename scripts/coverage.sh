@@ -139,7 +139,6 @@ EXCLUDE = {
         "SystemWorkspace.activateFileViewerSelecting(_:)",
         "SystemWorkspace.urlForApplication(withBundleIdentifier:)",
         "SystemWorkspace.urlsForApplications(toOpen:)",
-        "SystemWorkspace.run(_:_:onExit:)", "closure #1 in SystemWorkspace.run(_:_:onExit:)",
         "SystemWorkspace.trash(_:)",
     ],
     "Updater.swift": [                                            # Sparkle

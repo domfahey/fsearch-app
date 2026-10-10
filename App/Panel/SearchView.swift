@@ -17,7 +17,11 @@ struct SearchView: View {
     @State var state: PanelState
     @FocusState private var focused: Bool
     /// A result key pressed before the rows answered the query, run once they do.
-    @State private var held = HeldKey()
+    let held: HeldKeyBox
+    /// Whether the panel is on screen; a hidden panel never replays a held key.
+    let isVisible: () -> Bool
+    /// What ↵ does on the selected row, remembered per row.
+    @State private var revealCache = RevealCache()
     let onEffect: (PanelEffect, [ResultItem]) -> Void
     let onSelect: (Int) -> Void
     let onCommand: (AppCommand) -> Void
@@ -27,7 +31,7 @@ struct SearchView: View {
         // Reading the generation makes a trash or open re-read the recents.
         _ = app.recentsGeneration
         return model.query.isEmpty && model.mode == .names
-            ? app.recents.paths.map { .file(Hit(path: $0, kind: "file", size: 0, mtime: 0, score: 0)) }
+            ? app.recents.entries.map { .file(Hit(path: $0.path, kind: $0.isDirectory ? "dir" : "file", size: 0, mtime: 0, score: 0)) }
             : model.items
     }
 
@@ -41,7 +45,7 @@ struct SearchView: View {
     /// ↵ on the selected row would reveal it (an app, a script: see Launchable).
     private var selectedRevealsOnReturn: Bool {
         guard shown.indices.contains(state.selection) else { return false }
-        return FileActions.revealsOnReturn(shown[state.selection], editor: app.editor)
+        return revealCache.revealsOnReturn(shown[state.selection], editor: app.editor)
     }
     private var showsLines: Bool { if case .line = shown.first { true } else { false } }
 
@@ -63,7 +67,7 @@ struct SearchView: View {
                     .accessibilityIdentifier("searchField")
                     .onChange(of: model.query) {
                         state.selection = 0
-                        held.cancel()  // a key held for the old query never runs on the new one
+                        held.key.cancel()  // a key held for the old query never runs on the new one
                         Task { await model.refresh() }
                     }
                 if app.debugMode { Circle().fill(.orange).frame(width: 6, height: 6).help("Debug mode") }
@@ -148,10 +152,12 @@ struct SearchView: View {
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
         .onAppear { focused = true }
         .onChange(of: state.selection) { onSelect(state.selection) }
-        .onChange(of: model.mode) { held.cancel() }
+        .onChange(of: model.mode) { held.key.cancel() }
         // The results for the query in the box arrived: run a key held for them.
-        .onChange(of: model.resultsAreCurrent) {
-            if let k = PanelInput.replay(held: &held, model: model) { act(k) }
+        .onChange(of: PanelInput.answer(model)) { old, new in
+            let k = PanelInput.rowsChanged(
+                from: old, to: new, selection: &state.selection, held: &held.key, model: model, visible: isVisible())
+            if let k { act(k) }
         }
         // .repeat: holding ↓/↑ keeps moving (PanelInput ignores other repeats).
         .onKeyPress(phases: [.down, .repeat]) { press in handle(press) }
@@ -207,7 +213,7 @@ struct SearchView: View {
         let p = PanelInput.Press(press, event: NSApp.currentEvent)
         guard let key = PanelInput.key(for: p, queryIsEmpty: model.query.isEmpty) else { return .ignored }
         // A result key waits for results that answer the query in the box.
-        if let now = PanelInput.gate(key, held: &held, model: model) { act(now) }
+        if let now = PanelInput.gate(key, held: &held.key, model: model) { act(now) }
         return .handled
     }
 

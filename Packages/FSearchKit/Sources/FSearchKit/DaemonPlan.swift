@@ -114,6 +114,23 @@ public extension DaemonPlan {
         helperEnabled && holder != .other
     }
 
+    /// Whether the data folder (shared with any other fsearch daemon) is the
+    /// app's to remove, and if not, why. Only a positive answer counts: our
+    /// helper is enabled and holds the socket. With no named holder (no pid in
+    /// socket.lock: an older daemon, or nothing running) it may be anyone's.
+    ///
+    /// - Parameters:
+    ///   - helperEnabled: Whether our helper's login item is enabled.
+    ///   - holder: Who holds the daemon's socket.
+    static func dataOwnership(helperEnabled: Bool, holder: SocketHolder) -> DataOwnership {
+        guard helperEnabled else { return .helperOff }
+        switch holder {
+        case .ours: return .ours
+        case .other: return .otherDaemon
+        case .none: return .unconfirmed
+        }
+    }
+
     /// What to do after launch about a helper that may run an older binary.
     enum HelperUpdate: Equatable, Sendable {
         /// Leave it alone.
@@ -184,4 +201,16 @@ public struct RecoveryCheck: Equatable, Sendable {
         last = now
         return true
     }
+}
+
+/// Whose index the data folder holds, as far as removing it goes (see ``DaemonPlan/dataOwnership(helperEnabled:holder:)``).
+public enum DataOwnership: Equatable, Sendable {
+    /// Our helper is enabled and holds the socket.
+    case ours
+    /// Our helper isn't enabled.
+    case helperOff
+    /// Another daemon holds the socket (our helper yielded to it).
+    case otherDaemon
+    /// Our helper is enabled, but no running daemon can be named as it.
+    case unconfirmed
 }

@@ -45,6 +45,18 @@ extension AppTests {
             #expect(!pc.isVisible)
         }
 
+        @Test func hidingThePanelDropsAHeldKey() {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let pc = PanelController()
+            pc.show(app: env.app)
+            env.app.search.query = "slow"  // its search hasn't answered
+            #expect(PanelInput.gate(.enter, held: &pc.held.key, model: env.app.search) == nil)
+            #expect(pc.held.key.held == .enter)
+            pc.hide(returnFocus: false)
+            #expect(pc.held.key.held == nil)
+        }
+
         @Test func effectsRunTheirActions() async {
             let env = TestEnv()
             defer { env.tearDown() }

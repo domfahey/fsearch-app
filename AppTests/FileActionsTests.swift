@@ -22,6 +22,7 @@ extension AppTests {
             #expect(FileActions.editorTarget(for: line, editor: nil) == nil)
             #expect(FileActions.editorTarget(for: line, editor: .vscode) == nil)  // not installed
             env.workspace.apps[Editor.vscode.bundleId] = vscodeApp
+            env.workspace.schemeHandlers["vscode"] = [vscodeApp]
             let t = try #require(FileActions.editorTarget(for: line, editor: .vscode))
             #expect(t.url == editorURL(.vscode, path: "/p/main.swift", line: 12))
             #expect(t.app == vscodeApp)
@@ -47,11 +48,47 @@ extension AppTests {
             let env = TestEnv()
             defer { env.tearDown() }
             env.workspace.apps[Editor.vscode.bundleId] = vscodeApp
+            env.workspace.schemeHandlers["vscode"] = [vscodeApp]
             #expect(FileActions.open(line, editor: .vscode, onError: noErrors))
             #expect(env.workspace.openedWith.count == 1)
             #expect(env.workspace.openedWith.first?.app == vscodeApp)
             #expect(env.workspace.openedWith.first?.urls.map(\.absoluteString) == ["vscode://file/p/main.swift:12"])
             #expect(env.workspace.opened.isEmpty)
+        }
+
+        /// An editor that doesn't register its open-at-line scheme would never get the URL (and no error says so):
+        /// it gets the file instead, without the line.
+        @Test func anEditorWithoutItsSchemeGetsTheFile() throws {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            env.workspace.apps[Editor.vscode.bundleId] = vscodeApp
+            let fileURL = URL(fileURLWithPath: "/p/main.swift")
+            for handlers in [[], [URL(fileURLWithPath: "/Applications/Other.app")]] {
+                env.workspace.schemeHandlers["vscode"] = handlers
+                let t = try #require(FileActions.editorTarget(for: line, editor: .vscode))
+                #expect(t.url == fileURL && t.app == vscodeApp, "\(handlers)")
+            }
+            // The same app, spelled with a trailing slash, still counts.
+            env.workspace.schemeHandlers["vscode"] = [URL(fileURLWithPath: vscodeApp.path + "/", isDirectory: true)]
+            #expect(try #require(FileActions.editorTarget(for: line, editor: .vscode)).url.scheme == "vscode")
+            #expect(FileActions.open(line, editor: .vscode, onError: noErrors))
+            #expect(env.workspace.openedWith.first?.urls.first?.scheme == "vscode")
+        }
+
+        /// The footer asks what ↵ does on every redraw; the answer (LaunchServices, maybe the disk) is worked out once
+        /// per selected row and editor.
+        @Test func returnsActionIsCachedPerRowAndEditor() {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let cache = RevealCache()
+            #expect(!cache.revealsOnReturn(line, editor: .vscode))
+            #expect(!cache.revealsOnReturn(line, editor: .vscode))
+            #expect(env.workspace.appLookups == 1)
+            #expect(!cache.revealsOnReturn(line, editor: .zed))
+            #expect(env.workspace.appLookups == 2)
+            #expect(cache.revealsOnReturn(.file(Wire.hit("/p/Tool.app")), editor: .zed))
+            #expect(cache.revealsOnReturn(.file(Wire.hit("/p/Tool.app")), editor: .zed))
+            #expect(!cache.revealsOnReturn(line, editor: nil))
         }
 
         @Test func editorThatFailsFallsBackToTheDefaultApp() async throws {

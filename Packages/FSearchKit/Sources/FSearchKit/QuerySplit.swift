@@ -104,9 +104,13 @@ public enum QuerySplit {
     ///
     /// The half-typed rule keeps the previous results on screen instead of flashing an error.
     ///
-    /// - Parameter query: The typed text.
-    public static func endsInHalfTypedFilter(_ query: String) -> Bool {
+    /// - Parameters:
+    ///   - query: The typed text.
+    ///   - mode: The search mode. Outside names mode a word starting with a quote is text (see ``split(_:)``), never a
+    ///     filter; the daemon drops a name query's quotes, so there it can still be one.
+    public static func endsInHalfTypedFilter(_ query: String, mode: SearchMode = .names) -> Bool {
         guard let last = words(query).last, query.last != " " else { return false }
+        if mode != .names && last.hasPrefix("\"") { return false }
         let plain = unquoted(last)
         guard let colon = plain.firstIndex(of: ":") else { return false }
         let key = String(plain[..<colon]), value = String(plain[plain.index(after: colon)...])

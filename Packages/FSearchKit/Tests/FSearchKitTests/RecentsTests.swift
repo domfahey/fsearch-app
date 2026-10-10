@@ -30,6 +30,15 @@ import Testing
         #expect(r.paths == (1...8).reversed().map { "/f\($0)" })
     }
 
+    /// The panel draws a recent folder with a folder icon, a dotted one (v1.2) too, so the check that it still exists
+    /// also says whether it is a folder.
+    @Test func entriesSayWhichAreFolders() {
+        let r = Recents(defaults: fresh(), probe: { ["/d/v1.2": true, "/f.txt": false][$0] })
+        for p in ["/gone", "/f.txt", "/d/v1.2"] { r.opened(p) }
+        #expect(r.entries == [Recents.Entry(path: "/d/v1.2", isDirectory: true), Recents.Entry(path: "/f.txt", isDirectory: false)])
+        #expect(r.paths == ["/d/v1.2", "/f.txt"])
+    }
+
     @Test func persists() {
         let d = fresh()
         Recents(defaults: d, exists: { _ in true }).opened("/a")

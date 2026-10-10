@@ -61,13 +61,13 @@ struct SettingsView: View {
                 .disabled(app.options.testMode)
                 .confirmationDialog("Remove FSearch's background helper and data?", isPresented: $confirming) {
                     Button("Remove", role: .destructive) {
-                        let owns = app.daemon.ownsDaemon
-                        Task { await uninstaller.run(ownsDaemon: owns) }
+                        let ownership = app.daemon.dataOwnership
+                        Task { await uninstaller.run(ownership: ownership) }
                     }
                     Button("Cancel", role: .cancel) {}
                 } message: {
                     Text(
-                        "This turns off FSearch's background helper and moves its logs and settings to the Trash, and its index too unless the fsearch command-line tool shares it. A separately installed fsearch command-line tool is left alone. You can undo it from the Trash."
+                        "This turns off FSearch's background helper and moves its logs and settings to the Trash, and its index too when only this app's helper uses it. A separately installed fsearch command-line tool is left alone. You can undo it from the Trash."
                     )
                 }
         case .running:
