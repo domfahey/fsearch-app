@@ -75,8 +75,9 @@ private struct Exploding: Decodable {
     }
 
     @Test func missingTopLevelKeyHasNoPathSuffix() {
-        // current behaviour, arguably wrong: the user-facing message names the Swift property "tookUs", not the wire key took_us.
-        #expect(badReplyMessage(#"{"ok":true}"#, as: SearchReply.self) == #"reply has no "tookUs""#)
+        #expect(badReplyMessage(#"{"ok":true}"#, as: SearchReply.self) == #"reply has no "took_us""#)
+        let m = badReplyMessage(#"{"ok":true,"entries":1,"dirs":1,"overlay":1,"removed":1}"#, as: DaemonStatus.self)
+        #expect(m?.contains("eventId") == false && m?.hasPrefix(#"reply has no ""#) == true)
     }
 
     @Test func unrelatedDecoderErrorsBecomeBadReply() {
@@ -95,5 +96,22 @@ private struct Exploding: Decodable {
         let want = #"{"budget_ms":1,"id":9,"mode":"symbol","op":"grep","pattern":"x\ny","q":"a\"b"}"#
         #expect(String(decoding: line, as: UTF8.self) == want)
         #expect(Request.search(q: "a", limit: 2).json(id: 3) == Data(#"{"id":3,"limit":2,"q":"a"}"#.utf8))
+    }
+}
+
+@Suite struct DaemonErrorTextTests {
+    @Test func everyCaseReadsAsShortUserText() {
+        #expect(DaemonError.daemon("bad regex").description == "bad regex")
+        #expect(DaemonError.daemon("bad regex").errorDescription == "bad regex")
+        #expect(DaemonError.daemon("").description == "The search daemon reported an error")
+        #expect(DaemonError.indexing("indexing 40%").description == "The search index is still being built")
+        #expect(DaemonError.disconnected.description == "Can't reach the search daemon")
+        #expect(DaemonError.timeout.description == "The search daemon didn't answer in time")
+        #expect(DaemonError.badReply("not json").description == "Unexpected reply from the search daemon: not json")
+    }
+
+    @Test func swiftErrorTextUsesIt() {
+        #expect(String(describing: DaemonError.daemon("bad regex")) == "bad regex")
+        #expect((DaemonError.timeout as Error).localizedDescription == "The search daemon didn't answer in time")
     }
 }
