@@ -9,13 +9,16 @@ permissions:
   contents: read
 
 # Actions are pinned to full commit SHAs; the comment names the version.
+# Xcode is pinned to 26.6 on the macos-26 image (the same Xcode used locally),
+# per actions/runner-images macos-26-arm64 Readme, image 20260907. Bump both together.
 # UI tests (AppUITests) are not run here: they need a logged-in GUI session and
 # accessibility permission that hosted runners don't grant reliably. Run locally.
 jobs:
   kit:
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: sudo xcode-select -s /Applications/Xcode_26.6.app
       - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master, 2026-09-12 (merge of #185)
         with:
           toolchain: stable
@@ -25,9 +28,10 @@ jobs:
         working-directory: Packages/FSearchKit
 
   app:
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: sudo xcode-select -s /Applications/Xcode_26.6.app
       - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master, 2026-09-12 (merge of #185)
         with:
           toolchain: stable
@@ -37,17 +41,19 @@ jobs:
       - run: xcodegen generate
       - run: >
           xcodebuild -project FSearch.xcodeproj -scheme FSearch -configuration Debug
-          -derivedDataPath build CODE_SIGN_IDENTITY=- build
+          -derivedDataPath build -destination 'generic/platform=macOS'
+          CODE_SIGN_IDENTITY=- build
 
   release:
     # Only on version tags. Secrets are referenced by name; none live in the repo.
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [kit, app]
-    runs-on: macos-15
+    runs-on: macos-26
     env:
       DEVELOPER_ID: ${{ secrets.DEVELOPER_ID }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: sudo xcode-select -s /Applications/Xcode_26.6.app
       - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master, 2026-09-12 (merge of #185)
         with:
           toolchain: stable

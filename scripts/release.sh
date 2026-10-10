@@ -6,6 +6,9 @@ cd "$(dirname "$0")/.."
 
 PROFILE=${NOTARY_PROFILE:-fsearch-notary}
 ENTITLEMENTS=App/Resources/FSearch.entitlements
+# CI stores the notary profile in a temporary keychain and exports KEYCHAIN.
+NOTARY_KC=()
+[ -n "${KEYCHAIN:-}" ] && NOTARY_KC=(--keychain "$KEYCHAIN")
 fail() { echo "release.sh: $*" >&2; exit 1; }
 
 [ -n "${DEVELOPER_ID:-}" ] || fail "DEVELOPER_ID is not set (e.g. 'Developer ID Application: Your Name (TEAMID)')"
@@ -13,7 +16,7 @@ fail() { echo "release.sh: $*" >&2; exit 1; }
 IDENTITIES=$(security find-identity -v -p codesigning)
 grep -qF "$DEVELOPER_ID" <<<"$IDENTITIES" \
   || fail "no codesigning identity matching '$DEVELOPER_ID' in the keychain"
-xcrun notarytool history --keychain-profile "$PROFILE" >/dev/null 2>&1 \
+xcrun notarytool history --keychain-profile "$PROFILE" ${NOTARY_KC[@]+"${NOTARY_KC[@]}"} >/dev/null 2>&1 \
   || fail "notarytool profile '$PROFILE' not found (xcrun notarytool store-credentials $PROFILE)"
 KEY=$(/usr/libexec/PlistBuddy -c "Print SUPublicEDKey" App/Resources/Info.plist)
 { [ -n "$KEY" ] && [ "$KEY" != "REPLACE_WITH_SPARKLE_PUBLIC_KEY" ]; } \
@@ -60,7 +63,7 @@ ditto "$APP" "$STAGE/FSearch.app"
 ln -s /Applications "$STAGE/Applications"
 hdiutil create -volname FSearch -srcfolder "$STAGE" -ov -format UDZO "$DMG"
 codesign --force --timestamp --sign "$DEVELOPER_ID" "$DMG"
-xcrun notarytool submit "$DMG" --keychain-profile "$PROFILE" --wait
+xcrun notarytool submit "$DMG" --keychain-profile "$PROFILE" ${NOTARY_KC[@]+"${NOTARY_KC[@]}"} --wait
 xcrun stapler staple "$DMG"
 spctl -a -t open --context context:primary-signature -v "$DMG"
 spctl -a -t exec -vv "$APP"
