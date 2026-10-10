@@ -4,6 +4,10 @@ This guide tells you how to set up, build, test and submit a change to FSearch f
 
 By taking part you agree to follow the [Code of Conduct](.github/CODE_OF_CONDUCT.md).
 
+## Secrets
+
+Never commit keys, certificates, provisioning profiles, notary API keys or the Sparkle private key. Run `make hooks` once after cloning: it installs git hooks that refuse commits and pushes containing key files or secret-looking content. `.gitignore` also excludes the usual key file types. Only Sparkle's *public* key (`SUPublicEDKey`) belongs in the repo.
+
 ## Set up
 
 You need Xcode 16 or later (Swift 6), Rust with both macOS targets, and XcodeGen. The README lists the exact steps in [Prerequisites](README.md#prerequisites).

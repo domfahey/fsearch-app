@@ -1,0 +1,17 @@
+#!/bin/bash
+# Blocks pushes whose new commits add key files or secret-looking content.
+root=$(git rev-parse --show-toplevel)
+fail=0
+while read -r _ local_sha _ remote_sha; do
+  [ "$local_sha" = 0000000000000000000000000000000000000000 ] && continue
+  if [ "$remote_sha" = 0000000000000000000000000000000000000000 ]; then range="$local_sha"; else range="$remote_sha..$local_sha"; fi
+  tmp=$(mktemp -d) || exit 1
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    mkdir -p "$tmp/$(dirname "$f")"
+    git show "$local_sha:$f" > "$tmp/$f" 2>/dev/null || true
+    (cd "$tmp" && "$root/scripts/hooks/check-secrets.sh" "$f") || fail=1
+  done < <(git diff --name-only --diff-filter=ACMR "$range" 2>/dev/null || git ls-tree -r --name-only "$local_sha")
+  rm -rf "$tmp"
+done
+exit $fail

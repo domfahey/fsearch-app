@@ -1,0 +1,6 @@
+#!/bin/bash
+# Blocks commits that stage key files or secret-looking content.
+files=()
+while IFS= read -r -d '' f; do files+=("$f"); done < <(git diff --cached --name-only -z --diff-filter=ACMR)
+[ ${#files[@]} -eq 0 ] && exit 0
+exec "$(git rev-parse --show-toplevel)/scripts/hooks/check-secrets.sh" "${files[@]}"

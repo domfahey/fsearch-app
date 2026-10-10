@@ -8,3 +8,18 @@ Vendor/fsearch.rev
 .worktrees*/
 Packages/FSearchKit/.swiftpm/
 release/
+
+# Keys and secrets: never commit these.
+*.p12
+*.p8
+*.pem
+*.key
+*.cer
+*.certSigningRequest
+*.mobileprovision
+*.provisionprofile
+AuthKey_*
+*sparkle*private*
+*private-key*
+.env
+.env.*

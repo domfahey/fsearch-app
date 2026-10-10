@@ -63,3 +63,7 @@ type: project ## Warnings-as-errors package build, plus app warnings check
 	@echo "type: ok"
 
 check: lint type test ## lint, type, test
+
+.PHONY: hooks
+hooks: ## Install the repo git hooks (secret checks)
+	git config core.hooksPath scripts/hooks
