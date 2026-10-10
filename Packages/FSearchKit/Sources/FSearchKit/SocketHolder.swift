@@ -9,7 +9,7 @@ import Security
 public enum SocketHolder: Equatable, Sendable {
     /// No lock file, no pid, or the pid isn't running: nobody we can name.
     case none
-    /// Our bundled helper: inside our app bundle, or signed by our team as our helper.
+    /// Our bundled helper: our bundle's helper, or a moved helper signed by our team.
     case ours
     /// Some other process, e.g. a CLI install's daemon.
     case other
@@ -23,35 +23,51 @@ public enum SocketHolder: Equatable, Sendable {
     /// The code-signing identifier release.sh gives the bundled helper.
     public static let helperIdentifier = "com.domfahey.fsearch.daemon"
 
-    /// What a holder's signature must satisfy to count as our helper wherever it
-    /// runs from: our identifier on a Developer ID (or other Apple-issued)
-    /// certificate of our team. An identifier alone isn't enough, since an
-    /// ad-hoc signature can claim any identifier.
-    public static let helperRequirement =
-        #"identifier "\#(helperIdentifier)" and anchor apple generic and certificate leaf[subject.OU] = "MR3WJZ83MR""#
+    /// A Developer ID (or other Apple-issued) certificate of our team. The app
+    /// satisfies it only in a release build.
+    public static let teamRequirement = #"anchor apple generic and certificate leaf[subject.OU] = "MR3WJZ83MR""#
 
-    /// Where any copy of our helper sits inside its app. After an update
+    /// What a moved helper's signature must satisfy to count as ours: our
+    /// identifier on our team's certificate. An identifier alone isn't enough,
+    /// since an ad-hoc signature can claim any identifier.
+    public static let helperRequirement = #"identifier "\#(helperIdentifier)" and "# + teamRequirement
+
+    /// Where a helper sits inside its app.
+    static let helperPlace = "/Contents/Helpers/fsearch"
+
+    /// Where an unsigned copy of our helper sits inside its app. After an update
     /// (Sparkle, or Finder replacing the app) the old helper keeps running
     /// from wherever its bundle went: the Trash or a temp folder.
-    static let helperSuffix = "/FSearch.app/Contents/Helpers/fsearch"
+    static let helperSuffix = "/FSearch.app" + helperPlace
+
+    /// Whether the running app is signed by our team, checked once.
+    public static let appIsTeamSigned = isAppTeamSigned()
 
     /// Classifies a live holder.
     ///
-    /// Only a signature that satisfies ``helperRequirement``, a path inside `bundlePath`, or a
-    /// path that is an FSearch.app's helper makes it ``ours``; anything else is ``other``, never
-    /// taken over.
+    /// It is ``ours`` only if it is:
+    /// - our bundle's helper, `<bundlePath>/Contents/Helpers/fsearch`, and nothing else in the bundle;
+    /// - a helper outside the bundle (or one whose file is gone) that satisfies ``helperRequirement``;
+    /// - from an app not signed by our team (a dev or ad-hoc build), an FSearch.app's helper.
+    ///
+    /// Anything else is ``other``, never taken over.
     ///
     /// - Parameters:
     ///   - pid: The pid in socket.lock.
     ///   - path: The pid's executable, nil when it isn't running (or its file is gone).
     ///   - signedAsHelper: Whether the pid's signature satisfies ``helperRequirement``.
+    ///   - appTeamSigned: Whether the app itself satisfies ``teamRequirement``.
     ///   - bundlePath: The app's bundle.
-    public static func classify(pid: Int32?, path: String?, signedAsHelper: Bool = false, bundlePath: String) -> SocketHolder {
+    public static func classify(
+        pid: Int32?, path: String?, signedAsHelper: Bool = false, appTeamSigned: Bool = true, bundlePath: String
+    ) -> SocketHolder {
         guard pid != nil else { return .none }
-        if signedAsHelper { return .ours }
-        guard let path else { return .none }
-        let bundle = bundlePath.hasSuffix("/") ? bundlePath : bundlePath + "/"
-        return path.hasPrefix(bundle) || path.hasSuffix(helperSuffix) ? .ours : .other
+        guard let path else { return signedAsHelper ? .ours : .none }
+        let bundle = bundlePath.hasSuffix("/") ? String(bundlePath.dropLast()) : bundlePath
+        if path.hasPrefix(bundle + "/") { return path == bundle + helperPlace ? .ours : .other }
+        if signedAsHelper && path.hasSuffix(helperPlace) { return .ours }
+        if !appTeamSigned && path.hasSuffix(helperSuffix) { return .ours }
+        return .other
     }
 
     /// The running process's executable, or nil if there is no such process.
@@ -78,6 +94,18 @@ public enum SocketHolder: Equatable, Sendable {
         return SecCodeCheckValidity(code, [], req) == errSecSuccess
     }
 
+    /// Whether the running app's code signature is valid and satisfies
+    /// `requirement`. False if it isn't signed or the requirement doesn't parse.
+    ///
+    /// - Parameter requirement: A code-signing requirement in text form (tests pass their own).
+    public static func isAppTeamSigned(requirement: String = teamRequirement) -> Bool {
+        var req: SecRequirement?
+        guard SecRequirementCreateWithString(requirement as CFString, [], &req) == errSecSuccess, let req else { return false }
+        var code: SecCode?
+        guard SecCodeCopySelf([], &code) == errSecSuccess, let code else { return false }
+        return SecCodeCheckValidity(code, [], req) == errSecSuccess
+    }
+
     /// The live holder of the socket in `dataDir`, judged against `bundlePath`
     /// (the app's bundle). A few cheap syscalls, fine on the main thread.
     ///
@@ -86,13 +114,16 @@ public enum SocketHolder: Equatable, Sendable {
     ///   - bundlePath: The app's bundle.
     ///   - path: A pid's executable (tests inject one).
     ///   - signedAsHelper: Whether a pid is signed as our helper (tests inject one).
+    ///   - appTeamSigned: Whether the app is signed by our team (tests inject one).
     public static func read(
         dataDir: URL, bundlePath: String,
         path: (Int32) -> String? = executablePath(pid:),
-        signedAsHelper: (Int32) -> Bool = { isSignedAsHelper(pid: $0) }
+        signedAsHelper: (Int32) -> Bool = { isSignedAsHelper(pid: $0) },
+        appTeamSigned: () -> Bool = { appIsTeamSigned }
     ) -> SocketHolder {
         let text = try? String(contentsOf: dataDir.appendingPathComponent("socket.lock"), encoding: .utf8)
         guard let pid = text.flatMap(pid(fromLock:)) else { return .none }
-        return classify(pid: pid, path: path(pid), signedAsHelper: signedAsHelper(pid), bundlePath: bundlePath)
+        return classify(
+            pid: pid, path: path(pid), signedAsHelper: signedAsHelper(pid), appTeamSigned: appTeamSigned(), bundlePath: bundlePath)
     }
 }

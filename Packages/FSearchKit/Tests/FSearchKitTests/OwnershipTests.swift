@@ -22,19 +22,74 @@ import Testing
         #expect(SocketHolder.classify(pid: 99, path: bundle + "/Contents/Helpers/fsearch", bundlePath: bundle + "/") == .ours)
     }
 
-    @Test func anUpdatedAppsOldHelperIsStillOurs() {
+    @Test func inOurBundleOnlyTheHelperIsOurs() {
         let bundle = "/Applications/FSearch.app"
-        // Sparkle or Finder swapped the bundle: the running helper now lives in the Trash or a temp dir.
+        // The app's own executable, or anything else in the bundle, isn't the daemon we started.
+        for path in [
+            bundle + "/Contents/MacOS/FSearch", bundle + "/Contents/Helpers/other", bundle + "/Contents/Helpers/fsearch2",
+            bundle + "/Contents/Resources/fsearch",
+        ] {
+            for signed in [false, true] {
+                for appSigned in [false, true] {
+                    #expect(
+                        SocketHolder.classify(
+                            pid: 99, path: path, signedAsHelper: signed, appTeamSigned: appSigned, bundlePath: bundle) == .other,
+                        "\(path) signed: \(signed) app signed: \(appSigned)")
+                }
+            }
+        }
+    }
+
+    @Test func outsideOurBundleOnlyOurSignedHelperIsOurs() {
+        let bundle = "/Applications/FSearch.app"
+        for appSigned in [false, true] {
+            // Signed by our team as our helper, but not in a helper's place: a copy someone put on their PATH.
+            for bare in ["/private/tmp/x/fsearch", "/Users/me/.local/bin/fsearch", "/opt/homebrew/bin/fsearch"] {
+                #expect(
+                    SocketHolder.classify(pid: 99, path: bare, signedAsHelper: true, appTeamSigned: appSigned, bundlePath: bundle)
+                        == .other, "\(bare)")
+            }
+            // Sparkle or Finder swapped the bundle: the signed helper now lives in the Trash or a temp dir.
+            for moved in [
+                "/Users/me/.Trash/FSearch.app/Contents/Helpers/fsearch",
+                "/private/var/folders/x/T/org.sparkle-project/FSearch 2.app/Contents/Helpers/fsearch",
+            ] {
+                #expect(
+                    SocketHolder.classify(pid: 99, path: moved, signedAsHelper: true, appTeamSigned: appSigned, bundlePath: bundle)
+                        == .ours, "\(moved)")
+            }
+            // Its file was deleted after an update: no path left to read.
+            #expect(
+                SocketHolder.classify(pid: 99, path: nil, signedAsHelper: true, appTeamSigned: appSigned, bundlePath: bundle) == .ours)
+            #expect(
+                SocketHolder.classify(pid: nil, path: nil, signedAsHelper: true, appTeamSigned: appSigned, bundlePath: bundle)
+                    == SocketHolder.none)
+        }
+    }
+
+    @Test func anUnsignedMovedHelperIsOursOnlyFromAnUnsignedApp() {
+        let bundle = "/Applications/FSearch.app"
         for moved in [
             "/Users/me/.Trash/FSearch.app/Contents/Helpers/fsearch",
             "/private/var/folders/x/T/org.sparkle-project/FSearch.app/Contents/Helpers/fsearch",
         ] {
-            #expect(SocketHolder.classify(pid: 99, path: moved, signedAsHelper: false, bundlePath: bundle) == .ours, "\(moved)")
+            // A dev or ad-hoc build: its old helper was never team-signed either.
+            #expect(
+                SocketHolder.classify(pid: 99, path: moved, signedAsHelper: false, appTeamSigned: false, bundlePath: bundle) == .ours,
+                "\(moved)")
+            // A release build: an unsigned FSearch.app helper is someone else's.
+            #expect(
+                SocketHolder.classify(pid: 99, path: moved, signedAsHelper: false, appTeamSigned: true, bundlePath: bundle) == .other,
+                "\(moved)")
         }
-        // Signed as our helper by our team, wherever it runs from (or with no path left to read).
-        #expect(SocketHolder.classify(pid: 99, path: "/private/tmp/x/fsearch", signedAsHelper: true, bundlePath: bundle) == .ours)
-        #expect(SocketHolder.classify(pid: 99, path: nil, signedAsHelper: true, bundlePath: bundle) == .ours)
-        #expect(SocketHolder.classify(pid: nil, path: nil, signedAsHelper: true, bundlePath: bundle) == SocketHolder.none)
+        // Only an FSearch.app's helper, signed or not.
+        #expect(
+            SocketHolder.classify(
+                pid: 99, path: "/x/Other.app/Contents/Helpers/fsearch", signedAsHelper: false, appTeamSigned: false, bundlePath: bundle)
+                == .other)
+        #expect(
+            SocketHolder.classify(pid: 99, path: nil, signedAsHelper: false, appTeamSigned: false, bundlePath: bundle)
+                == SocketHolder.none)
     }
 
     @Test func anythingElseIsNeverOurs() {
@@ -45,7 +100,8 @@ import Testing
             "/Applications/FSearch.app/Contents/MacOS/fsearch", "/x/FSearch.app/Contents/Helpers/fsearch/../../../evil",
         ] {
             #expect(
-                SocketHolder.classify(pid: 99, path: path, signedAsHelper: false, bundlePath: "/Applications/Mine.app") == .other,
+                SocketHolder.classify(
+                    pid: 99, path: path, signedAsHelper: false, appTeamSigned: false, bundlePath: "/Applications/Mine.app") == .other,
                 "\(path)")
         }
         #expect(SocketHolder.classify(pid: 99, path: "/opt/homebrew/bin/fsearch", signedAsHelper: false, bundlePath: bundle) == .other)
@@ -56,8 +112,19 @@ import Testing
         #expect(r.contains("identifier \"\(SocketHolder.helperIdentifier)\""))
         #expect(r.contains("anchor apple generic"))
         #expect(r.contains("certificate leaf[subject.OU] = \"MR3WJZ83MR\""))
-        var req: SecRequirement?
-        #expect(SecRequirementCreateWithString(r as CFString, [], &req) == errSecSuccess, "it parses")
+        #expect(r.hasSuffix(SocketHolder.teamRequirement))
+        #expect(!SocketHolder.teamRequirement.contains("identifier"), "the app has its own identifier")
+        for text in [r, SocketHolder.teamRequirement] {
+            var req: SecRequirement?
+            #expect(SecRequirementCreateWithString(text as CFString, [], &req) == errSecSuccess, "it parses")
+        }
+    }
+
+    @Test func checksTheRunningAppAgainstARequirement() {
+        // The test runner is signed ad hoc at most, never by our team.
+        #expect(!SocketHolder.isAppTeamSigned())
+        #expect(SocketHolder.isAppTeamSigned(requirement: "anchor apple generic or !anchor apple generic"))
+        #expect(!SocketHolder.isAppTeamSigned(requirement: "not a requirement ("), "a bad requirement")
     }
 
     @Test func readsThroughInjectedResolvers() throws {
@@ -65,10 +132,17 @@ import Testing
         defer { try? FileManager.default.removeItem(at: dir) }
         try "4242".write(to: dir.appendingPathComponent("socket.lock"), atomically: true, encoding: .utf8)
         let bundle = "/Applications/FSearch.app"
+        let moved = "/Users/me/.Trash/FSearch.app/Contents/Helpers/fsearch"
         let ours = SocketHolder.read(
-            dataDir: dir, bundlePath: bundle, path: { $0 == 4242 ? "/tmp/gone/fsearch" : nil },
-            signedAsHelper: { $0 == 4242 })
+            dataDir: dir, bundlePath: bundle, path: { $0 == 4242 ? moved : nil },
+            signedAsHelper: { $0 == 4242 }, appTeamSigned: { true })
         #expect(ours == .ours)
+        let unsigned = SocketHolder.read(
+            dataDir: dir, bundlePath: bundle, path: { _ in moved }, signedAsHelper: { _ in false }, appTeamSigned: { true })
+        #expect(unsigned == .other, "a release build doesn't trust an unsigned helper by its path")
+        let devBuild = SocketHolder.read(
+            dataDir: dir, bundlePath: bundle, path: { _ in moved }, signedAsHelper: { _ in false }, appTeamSigned: { false })
+        #expect(devBuild == .ours, "a dev build's old helper was never signed")
         let other = SocketHolder.read(
             dataDir: dir, bundlePath: bundle, path: { _ in "/opt/homebrew/bin/fsearch" }, signedAsHelper: { _ in false })
         #expect(other == .other)
@@ -109,6 +183,29 @@ import Testing
         #expect(SocketHolder.read(dataDir: dir, bundlePath: "/Applications/FSearch.app") == .other)
     }
 
+    @Test func aLiveHelperInOurBundleIsOurs() throws {
+        let app = tempDir()
+        defer { try? FileManager.default.removeItem(at: app) }
+        let helpers = app.appendingPathComponent("Contents/Helpers")
+        try FileManager.default.createDirectory(at: helpers, withIntermediateDirectories: true)
+        let src = app.appendingPathComponent("main.c")
+        let bin = helpers.appendingPathComponent("fsearch")
+        try "#include <unistd.h>\nint main(void) { sleep(30); return 0; }\n".write(to: src, atomically: true, encoding: .utf8)
+        try run("/usr/bin/xcrun", ["clang", "-o", bin.path, src.path])
+        let p = Process()
+        p.executableURL = bin
+        try p.run()
+        defer { p.terminate(); p.waitUntilExit() }
+        try "\(p.processIdentifier)".write(to: app.appendingPathComponent("socket.lock"), atomically: true, encoding: .utf8)
+        // proc_pidpath reports the real path (/private/var, not /var): take the bundle from it.
+        let real = try #require(SocketHolder.executablePath(pid: p.processIdentifier))
+        try #require(real.hasSuffix("/Contents/Helpers/fsearch"))
+        let bundle = String(real.dropLast("/Contents/Helpers/fsearch".count))
+        #expect(SocketHolder.read(dataDir: app, bundlePath: bundle) == .ours)
+        #expect(SocketHolder.read(dataDir: app, bundlePath: bundle + "/") == .ours)
+        #expect(SocketHolder.read(dataDir: app, bundlePath: "/Applications/FSearch.app") == .other)
+    }
+
     private func run(_ tool: String, _ args: [String]) throws {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: tool)
@@ -133,7 +230,8 @@ import Testing
         try "\(getpid())".write(to: dir.appendingPathComponent("socket.lock"), atomically: true, encoding: .utf8)
         let me = try #require(SocketHolder.executablePath(pid: getpid()))
         let myDir = (me as NSString).deletingLastPathComponent
-        #expect(SocketHolder.read(dataDir: dir, bundlePath: myDir) == .ours)
+        // Like the app's own executable: in the bundle, but not its helper.
+        #expect(SocketHolder.read(dataDir: dir, bundlePath: myDir) == .other)
         #expect(SocketHolder.read(dataDir: dir, bundlePath: "/nonexistent/FSearch.app") == .other)
     }
 
