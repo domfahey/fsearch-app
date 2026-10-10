@@ -13,6 +13,7 @@ struct SearchView: View {
     @FocusState private var focused: Bool
     let onEffect: (PanelEffect, [ResultItem]) -> Void
     let onSelect: (Int) -> Void
+    let onCommand: (AppCommand) -> Void
 
     private var shown: [ResultItem] {
         // Reading the generation makes a trash or open re-read the recents.
@@ -22,7 +23,8 @@ struct SearchView: View {
             : model.items
     }
 
-    private var rowCount: Int { PanelRows.count(files: shown.count, query: model.query, mode: model.mode) }
+    /// Built once per body evaluation and shared by the lookups below.
+    private var rows: PanelRows { PanelRows(files: shown.count, query: model.query, mode: model.mode) }
     /// Content and symbol rows highlight the pattern, not the filters.
     private var highlightQuery: String {
         if model.mode != .names { return QuerySplit.split(model.query).pattern }
@@ -31,7 +33,9 @@ struct SearchView: View {
     private var showsLines: Bool { if case .line = shown.first { true } else { false } }
 
     var body: some View {
-        VStack(spacing: 0) {
+        let rows = rows
+        let commands = rows.commands.count
+        return VStack(spacing: 0) {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                 if model.mode != .names {
@@ -60,19 +64,26 @@ struct SearchView: View {
                     if QuerySyntax.isCheatSheet(model.query) {
                         cheatSheet
                     }
+                    if !rows.commands.isEmpty {
+                        section("FSearch")
+                        ForEach(Array(rows.commands.enumerated()), id: \.offset) { i, c in
+                            fallback(c.title, c.symbol, selected: state.selection == i) { onCommand(c) }
+                                .accessibilityIdentifier("command-\(c.title)")
+                        }
+                    }
                     if !shown.isEmpty {
                         section(model.query.isEmpty ? "Recent" : (showsLines ? "Inside files" : "Files"))
                         ForEach(Array(shown.enumerated()), id: \.element.id) { i, item in
-                            ResultRow(item: item, query: highlightQuery, selected: i == state.selection)
+                            ResultRow(item: item, query: highlightQuery, selected: commands + i == state.selection)
                                 .onTapGesture(count: 2) { onEffect(.open(i), shown) }
-                                .onTapGesture { state.selection = i }
+                                .onTapGesture { state.selection = commands + i }
                                 .draggable(URL(fileURLWithPath: item.path))
                         }
                     }
-                    if PanelRows.hasFallbacks(query: model.query, mode: model.mode) {
+                    if rows.hasFallbacks {
                         section("Use “\(model.query)” with…")
-                        fallback("Search inside files", "doc.text.magnifyingglass", selected: state.selection == shown.count) { switchMode(.content) }
-                        fallback("Find definitions", "function", selected: state.selection == shown.count + 1) { switchMode(.symbols) }
+                        fallback("Search inside files", "doc.text.magnifyingglass", selected: state.selection == commands + shown.count) { switchMode(.content) }
+                        fallback("Find definitions", "function", selected: state.selection == commands + shown.count + 1) { switchMode(.symbols) }
                     }
                 }
                 .padding(.bottom, 6)
@@ -136,7 +147,9 @@ struct SearchView: View {
     }
 
     private func handle(_ press: KeyPress) -> KeyPress.Result {
-        state.query = model.query; state.mode = model.mode; state.count = rowCount; state.files = shown.count
+        let rows = rows
+        state.query = model.query; state.mode = model.mode; state.count = rows.count; state.files = shown.count
+        state.commands = rows.commands.count
         guard let key = PanelInput.key(for: PanelInput.Press(press), queryIsEmpty: model.query.isEmpty) else { return .ignored }
         let effect = reduce(&state, key)
         // A query change refreshes through .onChange; only a mode change alone needs it here.
@@ -144,9 +157,10 @@ struct SearchView: View {
         let queryChanged = model.query != state.query
         model.query = state.query; model.mode = state.mode
         if modeChanged && !queryChanged { Task { await model.refresh() } }
-        switch PanelInput.route(effect, files: shown.count, query: model.query, mode: model.mode) {
+        switch PanelInput.route(effect, rows: rows) {
         case let .perform(e): onEffect(e, shown)
         case let .switchMode(m): switchMode(m)
+        case let .runCommand(c): onCommand(c)
         case .ignore: break
         }
         return .handled

@@ -17,7 +17,8 @@ final class PanelController: PanelHost {
     private var previousApp: NSRunningApplication?
 
     final class Panel: NSPanel {
-        override var canBecomeKey: Bool { true }
+        /// The unit-test host's panel must never take the keyboard from the user.
+        override var canBecomeKey: Bool { !LaunchOptions.current.unitTestHost }
         override func resignKey() {
             super.resignKey()
             // UI tests keep the panel up even though the test runner holds focus.
@@ -61,7 +62,8 @@ final class PanelController: PanelHost {
         selection = resumed.selection
         let view = SearchView(model: app.search, state: resumed, onEffect: { [weak self] effect, items in
             self?.perform(effect, items)
-        }, onSelect: { [weak self] in self?.selection = $0 }).environmentObject(app)
+        }, onSelect: { [weak self] in self?.selection = $0 },
+        onCommand: { [weak self] in self?.run($0) }).environmentObject(app)
         let p = panel ?? Panel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         p.isFloatingPanel = true
         p.level = .floating
@@ -80,8 +82,22 @@ final class PanelController: PanelHost {
         let front = NSWorkspace.shared.frontmostApplication
         previousApp = front == NSRunningApplication.current ? nil : front
         AppActivation.activate()
-        p.makeKeyAndOrderFront(nil)
+        Self.present(p)
         Task { await app.search.refresh() }
+    }
+
+    /// Puts the panel on screen and makes it key. The inert unit-test host only
+    /// orders it in, fully transparent and deaf to the mouse, and never key.
+    static func present(_ p: NSPanel, inert: Bool = LaunchOptions.current.unitTestHost) {
+        if inert {
+            p.alphaValue = 0
+            p.ignoresMouseEvents = true
+            p.orderFrontRegardless()
+        } else {
+            p.alphaValue = 1
+            p.ignoresMouseEvents = false
+            p.makeKeyAndOrderFront(nil)
+        }
     }
 
     /// `returnFocus` is false when hiding because the user clicked another app.
@@ -109,6 +125,20 @@ final class PanelController: PanelHost {
         NSApp.windows.contains { w in
             w !== panel && w.isVisible && !(w is NSPanel) && w.styleMask.contains(.titled)
         }
+    }
+
+    /// Opens Settings, the same window the menu's SettingsLink opens.
+    static var openSettings: () -> Void = {
+        AppActivation.activate()
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+    }
+
+    /// Runs an app command from its panel row and puts the launcher away.
+    func run(_ command: AppCommand) {
+        switch command {
+        case .settings: Self.openSettings()
+        }
+        hide(returnFocus: false)
     }
 
     func perform(_ effect: PanelEffect, _ items: [ResultItem]) {

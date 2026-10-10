@@ -8,6 +8,17 @@ import Testing
 extension AppTests {
     @Suite @MainActor
     struct PanelControllerTests {
+        @Test func theTestHostsPanelCanNeverBecomeKey() {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let pc = PanelController()
+            pc.show(app: env.app)
+            defer { pc.hide(returnFocus: false) }
+            #expect(pc.panel?.canBecomeKey == false)
+            #expect(pc.panel?.isKeyWindow == false)
+            #expect(pc.panel?.alphaValue == 0)
+        }
+
         @Test func showHideResumesTheSession() async {
             let env = TestEnv()
             defer { env.tearDown() }
@@ -17,7 +28,7 @@ extension AppTests {
             pc.show(app: env.app)
             #expect(pc.isVisible)
             #expect(pc.panel?.isFloatingPanel == true)
-            #expect(pc.panel?.canBecomeKey == true)
+            #expect(pc.panel?.canBecomeKey == false)  // inert host
             #expect(env.app.search.query == "")
             env.app.search.query = "heron"
             env.app.search.mode = .content
