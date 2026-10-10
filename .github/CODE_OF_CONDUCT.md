@@ -12,6 +12,6 @@ This project follows the [Contributor Covenant, version 2.1](https://www.contrib
 
 ## Enforcement
 
-The maintainer is responsible for enforcing this code of conduct. To report a problem, contact the maintainer on GitHub: [@domfahey](https://github.com/domfahey). You can also use GitHub's report tools on a comment or user. Reports are handled in private where possible. The maintainer may edit or remove comments, close or lock threads, or block people who break these rules.
+The maintainer is responsible for enforcing this code of conduct. To report a problem privately, use the [security advisory form](https://github.com/domfahey/fsearch-app/security/advisories/new) and say that it is a Code of Conduct report. You can also use GitHub's report tools on a comment or user. Reports are handled in private where possible. The maintainer may edit or remove comments, close or lock threads, or block people who break these rules.
 
 This text is adapted from the Contributor Covenant, which is available under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

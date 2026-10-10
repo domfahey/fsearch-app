@@ -21,6 +21,10 @@ macOS grants Full Disk Access to a program. The daemon is the program that reads
 
 In the welcome window, the Full Disk Access step says which case applies. See [Grant Full Disk Access](grant-full-disk-access.md).
 
+## If you install the CLI later
+
+Say you already use FSearch, then install the CLI and run `fsearch install --login`. The CLI's login agent takes over from FSearch's helper. From then on the app uses the CLI's daemon, and Full Disk Access belongs to your `fsearch` binary, not to FSearch. Grant it there and restart that daemon. See [Grant Full Disk Access](grant-full-disk-access.md).
+
 ## Restarting
 
 Restart Daemon in debug mode's Index Details window restarts only a daemon the app registered. For a CLI daemon it just checks again. Restart a CLI daemon from the CLI.

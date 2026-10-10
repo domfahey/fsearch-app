@@ -6,7 +6,7 @@ Debug mode shows how the index is doing and records your searches so you can see
 
 Do either of these:
 
-- Click the menu-bar icon and choose **Turn On Debug Mode** (shortcut ⌥⌘D). The same item reads **Turn Off Debug Mode** when it is on.
+- Click the menu-bar icon and choose **Turn On Debug Mode**. The item shows ⌥⌘D, which works only while the menu is open. It is not a global hotkey. The same item reads **Turn Off Debug Mode** when it is on.
 - Open **Settings…** and switch **Debug mode** on or off.
 
 While debug mode is on:

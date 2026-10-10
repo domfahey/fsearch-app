@@ -24,9 +24,9 @@ Shown only in releases that can update themselves (a build without the update si
 
 When a background check finds an update and FSearch isn't the front app, it doesn't open a window. The menu-bar icon changes to a down-arrow circle and the menu gets **Update Available…** at the top; choose it to see the update.
 
-**Remove Background Helper and Data…** sits below the options. After you confirm, it removes the helper, the login item, the data and log folders (to the Trash) and the app's settings. See [Uninstall](../uninstall.md).
+**Remove Background Helper and Data…** sits below the options. After you confirm, it removes FSearch's own helper and its login item, moves the log folder to the Trash, and clears the app's settings. It moves the data folder (the index) to the Trash only if FSearch's helper was running the daemon and the fsearch CLI's login agent is not installed. Otherwise the folder stays and the window says why. See [Uninstall](../uninstall.md).
 
-The same debug switch is in the menu as **Turn On Debug Mode** (⌥⌘D).
+The same debug switch is in the menu-bar menu as **Turn On Debug Mode** (⌥⌘D). ⌥⌘D is a menu-item shortcut: it works while the menu is open, not as a global hotkey.
 
 ## Stored values
 
@@ -49,7 +49,7 @@ These are not settings:
 
 - The panel is 680 by 460 points and opens on the screen where the mouse is.
 - Reopening the panel within 60 seconds resumes your last query.
-- Name searches ask for 50 results.
+- Name searches ask for 50 results. See [Known limitations](limitations.md#the-50-result-cap-and-limit).
 - The search log keeps 10,000 searches.
 
 ## See also

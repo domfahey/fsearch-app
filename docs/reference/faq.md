@@ -16,7 +16,7 @@ No. The index and logs stay on your Mac. The app makes no network requests of it
 
 ## Does it replace Spotlight?
 
-No. It is a separate launcher with its own hotkey. It searches file names and file contents.
+No. It is a separate launcher with its own hotkey. It searches file names, and the contents of text and code files.
 
 ## Does it launch apps?
 
@@ -46,13 +46,33 @@ Type the name and choose **Find definitions**, or type `sym:name`.
 
 Yes. Use `in:` and `ext:` or `type:`. See [Query syntax](query-syntax.md).
 
+## Why doesn't it find text in my PDF?
+
+Search inside files reads text and code files only. It does not read PDF, Word (`.docx`) or Pages files. FSearch still finds those files by name. See [What content search covers](query-syntax.md#what-content-search-covers).
+
+## Why can't it find a file with an accent in its name?
+
+Matching ignores case for the letters A to Z only, and FSearch does not normalize Unicode. A name stored in one form of an accented letter may not match the same letter typed in the other form. Try the part of the name before or after the accented letter. See [Known limitations](limitations.md#case-folding-and-accented-names).
+
+## Why do I only see 50 results?
+
+The panel asks for up to 50 results. Add words or filters such as `ext:` or `in:` to narrow the list. See [Known limitations](limitations.md#the-50-result-cap-and-limit).
+
+## Does it search external drives?
+
+Probably not. The daemon treats `/Volumes`, where external drives mount, as a guarded folder and does not cross into other volumes. FSearch for Mac has not been tested with external drives, so treat them as unsupported. See [Known limitations](limitations.md).
+
+## Which folders does search inside files skip?
+
+It skips dependency, build and cache folders such as `node_modules`, `.git`, `build`, `dist`, `vendor` and `Library`, and the inside of `.app` bundles. Name search still finds those files. See [What content search covers](query-syntax.md#what-content-search-covers).
+
 ## Is it on the Mac App Store?
 
 No. It is distributed as a signed, notarized download. See [ADR 0006](../adr/0006-not-on-the-mac-app-store.md).
 
 ## How do I update it?
 
-Builds with updates configured show **Check for Updates…** in the menu. Other builds do not.
+Builds with updates configured check for new versions in the background and show **Update Available…** in the menu when one is ready. See [Update FSearch for Mac](../how-to/update.md).
 
 ## How do I remove it?
 
@@ -60,7 +80,7 @@ See [Uninstall](../uninstall.md).
 
 ## Why does the panel say "Starting search…" or "Indexing your disk…"?
 
-"Starting search…" means the app cannot reach the fsearch daemon yet or it did not answer in time. "Indexing your disk… results will appear shortly" means the first index is still being built. Both clear by themselves. See [Troubleshooting](troubleshooting.md).
+"Indexing your disk… results will appear shortly" means the first index is still being built. It clears by itself. For "Starting search…", see [Troubleshooting](troubleshooting.md#starting-search-does-not-go-away).
 
 ## Why is there a red line under the search field?
 
@@ -70,7 +90,17 @@ The daemon rejected your query, and the red text is its own message, for example
 
 See [Support](../../.github/SUPPORT.md). For security problems, see [Security](../../.github/SECURITY.md).
 
+## Glossary
+
+These words appear in the app and in these docs.
+
+- **Daemon.** The fsearch program that builds the index and answers searches. It runs in the background.
+- **Helper.** The copy of the daemon bundled inside FSearch for Mac. The app registers it so it runs in the background. In Index Details, **Restart Daemon** restarts it.
+- **Login item.** The macOS entry that starts the helper when you log in. You see it in System Settings, General, Login Items & Extensions. **Open FSearch at login** is a separate login item for the app itself.
+- **Owner and follower.** Index Details shows a **Role**. The owner is the daemon that writes the index. A follower reads an index that another daemon writes.
+
 ## See also
 
+- [Known limitations](limitations.md)
 - [Troubleshooting](troubleshooting.md)
 - [Documentation hub](../README.md)
