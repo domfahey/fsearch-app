@@ -1,5 +1,7 @@
 # Release checklist
 
+This checklist is for maintainers cutting a release of FSearch for Mac. Nothing has been released yet; 0.1.0 is next.
+
 ## One-time user steps (not automated)
 
 - [ ] Generate the Sparkle EdDSA key pair: run Sparkle's `generate_keys` (from the Sparkle package's `bin/`). The private key goes in your Keychain; put the printed public key in `SUPublicEDKey` in `App/Resources/Info.plist`. Until this is done the key is `REPLACE_WITH_SPARKLE_PUBLIC_KEY`, the updater is not started, "Check for Updates…" is hidden, and `scripts/release.sh` refuses to run.
@@ -36,3 +38,8 @@ Run on a real Mac, on the DMG produced by `scripts/release.sh`.
 - [ ] After verifying: run Sparkle's `generate_appcast` on `build/release` (it reads the EdDSA private key from your Keychain) and publish `appcast.xml`, the DMG and its `FSearch-<version>.dmg.sha256` (written by the release script; also attach both to the GitHub release) to the `SUFeedURL` GitHub Pages site; check that an older build sees the update.
 
 CI does not run the UI tests (no GUI session on hosted runners); run them locally.
+
+## See also
+
+- [Changelog](../CHANGELOG.md)
+- [Contributing](../CONTRIBUTING.md)

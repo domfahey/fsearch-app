@@ -1,5 +1,7 @@
 # Security policy
 
+This page explains which versions of FSearch for Mac get security fixes and how to report a vulnerability privately.
+
 ## Supported versions
 
 Only the latest release is supported. There is no release yet. Until 0.1.0 ships, only the `main` branch is supported.
