@@ -27,7 +27,12 @@ final class MenuBarStatus {
     private func bind(to daemon: DaemonManager) {
         guard !bound else { return }
         bound = true
-        let skipped = NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification).map { _ in () }.prepend(())
+        // Defaults can change on any thread: hop to main before anything else
+        // runs, and keep the map nonisolated so an off-main post can't trap.
+        let skipped = NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+            .receive(on: DispatchQueue.main)
+            .map { @Sendable _ in () }
+            .prepend(())
         Publishers.CombineLatest(daemon.$state, skipped)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] state, _ in
