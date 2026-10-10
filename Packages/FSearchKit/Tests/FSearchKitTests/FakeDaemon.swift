@@ -7,11 +7,18 @@ final class FakeDaemon: @unchecked Sendable {
     private let reply: @Sendable ([String: Any]) -> [String: Any]?
     private let lock = NSLock()
     // All fields below are guarded by `lock`.
-    private var listener: Int32 = -1
+    private var wake: Int32 = -1                   // write end of the accept thread's wake pipe
     private var owned: (dev: dev_t, ino: ino_t)?  // identity of our socket file
     private var conns: [Int32] = []                // accepted fds still open
     private var stopped = false
     private var _requests: [[String: Any]] = []
+    private var _accepted = 0
+
+    /// Connections accepted so far (a reconnecting client shows up as more than one).
+    var accepted: Int {
+        lock.lock(); defer { lock.unlock() }
+        return _accepted
+    }
 
     var requests: [[String: Any]] {
         lock.lock(); defer { lock.unlock() }
@@ -41,19 +48,32 @@ final class FakeDaemon: @unchecked Sendable {
         listen(fd, 8)
         var st = stat()
         if lstat(path, &st) == 0 { owned = (st.st_dev, st.st_ino) }
-        lock.lock(); listener = fd; lock.unlock()
+        // The accept thread owns `fd` and closes it itself. stop() must never close it:
+        // the thread may not have reached accept() yet, and once the number is free the
+        // next daemon's socket() can reuse it, so a stale thread would accept (and drop)
+        // a connection meant for the new daemon. stop() closes the pipe's write end instead.
+        var p: [Int32] = [-1, -1]
+        pipe(&p)
+        _ = fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK)  // poll() then accept(): never block
+        lock.lock(); wake = p[1]; lock.unlock()
+        let wakeRead = p[0]
         Thread.detachNewThread { [self] in
+            defer { close(fd); close(wakeRead) }
+            var fds = [pollfd(fd: fd, events: Int16(POLLIN), revents: 0),
+                       pollfd(fd: wakeRead, events: Int16(POLLIN), revents: 0)]
             while true {
+                fds[0].revents = 0; fds[1].revents = 0
+                if poll(&fds, 2, -1) < 0 { if errno == EINTR { continue }; return }
+                if fds[1].revents != 0 { return }  // stop() closed the write end
                 let c = accept(fd, nil, nil)
+                if c < 0 { if errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR || errno == ECONNABORTED { continue }; return }
+                _ = fcntl(c, F_SETFL, fcntl(c, F_GETFL) & ~O_NONBLOCK)  // accepted fds inherit O_NONBLOCK on Darwin
                 lock.lock()
-                if c < 0 || stopped {
-                    if c >= 0 { close(c) }
-                    lock.unlock()
-                    return
-                }
+                if stopped { close(c); lock.unlock(); return }
                 var one: Int32 = 1
                 setsockopt(c, SOL_SOCKET, SO_NOSIGPIPE, &one, socklen_t(MemoryLayout<Int32>.size))
                 conns.append(c)
+                _accepted += 1
                 lock.unlock()
                 Thread.detachNewThread { self.serve(c) }
             }
@@ -91,15 +111,15 @@ final class FakeDaemon: @unchecked Sendable {
     }
 
     /// Stop accepting, drop open connections, and remove the socket file if it is still ours.
-    /// Idempotent. A stopped daemon never closes an fd or unlinks a path it no longer owns.
+    /// Idempotent. A stopped daemon never closes an fd or unlinks a path it no longer owns,
+    /// and its accept thread never touches a listener fd number that could belong to another daemon.
     func stop() {
         lock.lock(); defer { lock.unlock() }
         if stopped { return }
         stopped = true
-        if listener >= 0 {
-            shutdown(listener, SHUT_RDWR)  // wakes the blocked accept()
-            close(listener)
-            listener = -1
+        if wake >= 0 {
+            close(wake)  // wakes the accept thread, which closes the listener itself
+            wake = -1
         }
         for c in conns { shutdown(c, SHUT_RDWR) }  // their serving threads close them
         var st = stat()
