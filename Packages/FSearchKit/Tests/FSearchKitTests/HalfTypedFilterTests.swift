@@ -20,6 +20,20 @@ import Testing
         #expect(!QuerySplit.endsInHalfTypedFilter(""))
         #expect(!QuerySplit.endsInHalfTypedFilter("EXT:"), "keys are case-sensitive")
     }
+
+    /// A quoted word is text in content and symbols modes (QuerySplit.split), so it is never half-typed there;
+    /// the daemon drops the quotes of a name query, so there it still is.
+    @Test func aQuotedWordIsTextOutsideNameMode() {
+        for mode in [SearchMode.content, .symbols] {
+            for q in ["foo \"ext:", "\"size:", "foo \"type:c"] {
+                #expect(!QuerySplit.endsInHalfTypedFilter(q, mode: mode), "\(q) \(mode)")
+            }
+            #expect(QuerySplit.endsInHalfTypedFilter("foo ext:", mode: mode))
+            #expect(QuerySplit.endsInHalfTypedFilter("foo in:\"", mode: mode), "a quoted value on its way")
+        }
+        #expect(QuerySplit.endsInHalfTypedFilter("foo \"ext:", mode: .names))
+        #expect(QuerySplit.endsInHalfTypedFilter("foo \"ext:"), "names by default")
+    }
 }
 
 @MainActor @Suite struct HalfTypedFilterModelTests {
@@ -37,6 +51,18 @@ import Testing
         await m.refresh()
         #expect(names.calls.count + content.calls.count == sent, "nothing new reaches the daemon")
         #expect(m.items == before.0 && m.phase == before.1 && m.lastTookUs == before.2)
+    }
+
+    @Test(arguments: [SearchMode.content, .symbols])
+    func aQuotedWordIsSentAsText(mode: SearchMode) async {
+        let content = RecordingBackend()
+        let m = SearchModel(names: RecordingBackend(), content: content)
+        m.mode = mode
+        m.query = "foo"
+        await m.refresh()
+        m.query = "foo \"ext:"
+        await m.refresh()
+        #expect(content.calls.count == 2 && m.resultsAreCurrent, "\(content.calls)")
     }
 
     @Test(arguments: [SearchMode.content, .names])
