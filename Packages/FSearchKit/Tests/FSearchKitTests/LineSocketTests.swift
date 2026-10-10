@@ -80,6 +80,8 @@ final class RawServer: @unchecked Sendable {
     }
 
     static func send(_ fd: Int32, _ s: String) {
+        var one: Int32 = 1
+        setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &one, socklen_t(MemoryLayout<Int32>.size))  // a gone client is not a crash
         let d = Array(s.utf8)
         var off = 0
         while off < d.count {

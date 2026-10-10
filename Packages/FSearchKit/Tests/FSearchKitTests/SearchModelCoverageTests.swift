@@ -92,8 +92,7 @@ struct FailingBackend: SearchBackend {
         m.query = "x"
         await m.refresh()
         #expect(log.count == 1)
-        // current behaviour, arguably wrong: the log stores the Swift enum text, not just the daemon's message.
-        #expect(log[0].error == #"daemon("bad regex")"#)
+        #expect(log[0].error == "bad regex")
         #expect(log[0].resultCount == 0 && log[0].tookUs == nil && log[0].mode == .names && log[0].roundTripMs >= 0)
     }
 
@@ -108,8 +107,7 @@ struct FailingBackend: SearchBackend {
         b.fail = .indexing("indexing")
         await m.refresh()
         #expect(m.phase == .indexing && m.items.isEmpty && m.lastTookUs == nil)
-        // current behaviour, arguably wrong: the log stores the Swift enum text, not just the daemon's message.
-        #expect(log.last?.error == #"indexing("indexing")"#)
+        #expect(log.last?.error == "The search index is still being built")
     }
 
     @Test func successThenBlankResetsEverything() async {

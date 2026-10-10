@@ -20,8 +20,7 @@ import Testing
     }
 
     @Test func daemonMessagePassesThroughVerbatim() {
-        // current behaviour, arguably wrong: an empty daemon error shows an empty message.
-        #expect(UserMessage.forPhase(.failed(.daemon(""))) == "")
+        #expect(UserMessage.forPhase(.failed(.daemon(""))) == "The search daemon reported an error")
         #expect(UserMessage.forPhase(.failed(.daemon("bad filter: 🏡"))) == "bad filter: 🏡")
     }
 }

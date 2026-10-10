@@ -6,8 +6,7 @@ public enum UserMessage {
         case .indexing: "Indexing your disk… results will appear shortly"
         case .failed(.disconnected), .failed(.timeout): "Starting search…"
         case .failed(.indexing(_)): "Indexing your disk… results will appear shortly"
-        case let .failed(.daemon(msg)): msg
-        case let .failed(.badReply(msg)): "Unexpected reply from the search daemon: \(msg)"
+        case let .failed(e): e.description  // .daemon and .badReply
         }
     }
 }
