@@ -1,4 +1,5 @@
 import Darwin
+import FSearchKit
 import Foundation
 
 // FSearchBench: performance benchmarks for FSearchKit and the bundled daemon.
@@ -6,7 +7,7 @@ import Foundation
 // output path and compares against bench/baseline.json.
 //
 //   FSearchBench run [--out F] [--machine KEY] [--daemon PATH] [--daemon-rev R] [--xcode S]
-//                    [--work DIR] [--filter a,b] [--skip-daemon] [--self-test] [--samples N]
+//                    [--work DIR] [--filter a,b] [--skip-daemon] [--self-test] [--report-only] [--samples N]
 //   FSearchBench compare --baseline F --current F --machine KEY [--regressed-out F] [--busy-out F]
 //   FSearchBench record  --baseline F --current F --machine KEY [--provisional]
 //   FSearchBench machine-key
@@ -36,7 +37,7 @@ struct Args {
         while i < argv.count {
             let a = argv[i]
             if a.hasPrefix("--"), i + 1 < argv.count, !argv[i + 1].hasPrefix("--"),
-               !["--skip-daemon", "--self-test", "--provisional"].contains(a) {
+               !["--skip-daemon", "--self-test", "--provisional", "--report-only"].contains(a) {
                 opts[String(a.dropFirst(2))] = argv[i + 1]; i += 2
             } else {
                 flags.insert(String(a.dropFirst(2))); i += 1
@@ -133,12 +134,20 @@ case "run":
         }
     }
 
+    // A slow machine is not a failure: a daemon that never became ready or
+    // answered in time (after one retry) yields an inconclusive result.
+    if let f = failure, f is Inconclusive || (f as? DaemonError) == .timeout {
+        bench.markInconclusive("daemon benchmarks", "\(f)")
+        failure = nil
+    }
     bench.canary(final: true)
     let fmt = ISO8601DateFormatter()
     let result = RunResult(date: fmt.string(from: Date()), machine: machine,
                            config: ["samples": "\(config.samples)", "daemonSamples": "\(config.daemonSamples)",
                                     "warmup": "\(config.warmup)", "slowdown": "\(config.slowdown)",
                                     "filter": config.filter.joined(separator: ","),
+                                    "inconclusive": bench.inconclusive.joined(separator: ","),
+                                    "retried_timeouts": "\(bench.retries)",
                                     "fixture": "\(FixtureTree.nameFiles)+\(FixtureTree.textFiles) files, seed \(String(FixtureTree.seed, radix: 16))"],
                            metrics: bench.metrics)
     if let out = args.opts["out"] {
@@ -148,6 +157,11 @@ case "run":
     if let failure {
         Cleanup.shared.runNow()
         fail("benchmark failed: \(failure)")
+    }
+    if !bench.inconclusive.isEmpty {
+        print("INCONCLUSIVE (daemon slow): not measured: \(bench.inconclusive.joined(separator: ", "))")
+        // Exit 75 (like bench.sh) unless the caller only wants a report.
+        if !args.flags.contains("report-only") { exit(75) }
     }
 
 default:

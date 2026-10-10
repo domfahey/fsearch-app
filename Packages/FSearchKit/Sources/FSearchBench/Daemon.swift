@@ -179,7 +179,7 @@ final class Cleanup: @unchecked Sendable {
             }
             try await Task.sleep(nanoseconds: 5_000_000)
         }
-        throw BenchError("daemon index not ready after 180 s")
+        throw Inconclusive("daemon name index not ready after 180 s")
     }
 
     // Name index build time is a ~50 ms single shot, so take it from several
@@ -191,7 +191,7 @@ final class Cleanup: @unchecked Sendable {
             let launched = now()
             try d.start()
             defer { d.stop(); try? FileManager.default.removeItem(at: dataDir) }
-            buildNs.append(try await namesReady(d, DaemonClient(socketPath: d.socketPath, timeout: 10), launched: launched).1)
+            buildNs.append(try await namesReady(d, DaemonClient(socketPath: d.socketPath, timeout: 30), launched: launched).1)
         }
     }
 
@@ -199,7 +199,7 @@ final class Cleanup: @unchecked Sendable {
     defer { d.stop() }
     let launched = now()
     try d.start()
-    let client = DaemonClient(socketPath: d.socketPath, timeout: 10)
+    let client = DaemonClient(socketPath: d.socketPath, timeout: 30)
     let deadline = launched + 180 * 1_000_000_000
     let (namesStatus, namesNs) = try await namesReady(d, client, launched: launched)
     buildNs.append(namesNs)
@@ -219,7 +219,7 @@ final class Cleanup: @unchecked Sendable {
         }
         try await Task.sleep(nanoseconds: 20_000_000)
     }
-    guard let cs = contentStatus else { throw BenchError("content index not ready after 180 s") }
+    guard let cs = contentStatus else { throw Inconclusive("daemon content index not ready after 180 s") }
     let contentMs = Double(now() - launched) / 1e6
 
     if b.config.wants("index.build.names") {

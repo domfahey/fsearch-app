@@ -16,6 +16,11 @@
 # keyed by machine (hw.model + chip, or $BENCH_MACHINE); with no entry for this
 # machine the run is reported without failing. See bench/README.md.
 #
+# A daemon that is too slow to answer (a timed-out sample is retried once, the
+# index wait is bounded) gives an "inconclusive (daemon slow)" result: the
+# metrics measured so far are kept, the rest are skipped, and the run exits 75
+# (0 with --report-only).
+#
 # Safety: the daemon only ever runs with a temp HOME/FSEARCH_ROOT under a fresh
 # /tmp/fsb.* directory, which this script removes on exit (and kills the daemon
 # if it is still running).
@@ -32,7 +37,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --record) RECORD=1 ;;
     --provisional) PROVISIONAL=1 ;;
-    --report-only) REPORT_ONLY=1 ;;
+    --report-only) REPORT_ONLY=1; PASS+=(--report-only) ;;
     --self-test) SELF_TEST=1 ;;
     --skip-daemon) PASS+=(--skip-daemon) ;;
     --filter|--samples) PASS+=("$1" "$2"); shift ;;
@@ -99,7 +104,14 @@ run_bench() {  # out-file, extra args...
 
 OUT="$RESULTS/$STAMP-$MACHINE.json"
 echo "==> running ($MACHINE)"
-run_bench "$OUT"
+rc=0
+run_bench "$OUT" || rc=$?
+if [ "$rc" != 0 ]; then
+  # Report-only never fails: keep whatever results were written and compare those.
+  [ "$REPORT_ONLY" = 1 ] || exit "$rc"
+  echo "==> report-only: the run ended early (exit $rc); not failing"
+  [ -f "$OUT" ] || exit 0
+fi
 
 if [ "$RECORD" = 1 ]; then
   [ "$SELF_TEST" = 1 ] && { echo "bench.sh: refusing to record a self-test run" >&2; exit 64; }

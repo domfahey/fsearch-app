@@ -79,7 +79,15 @@ waits 30 s and re-runs, up to three times, then exits 75 ("inconclusive")
 instead of 1.
 
 Exit codes: 0 pass (or no baseline for this machine, or `--report-only`),
-1 regression, 75 inconclusive (machine stayed busy), anything else an error.
+1 regression, 75 inconclusive (machine stayed busy, or the daemon was too slow),
+anything else an error.
+
+Slow machines: a daemon round trip that times out is retried once; a second
+timeout (or an index not ready within 180 s) marks that metric "inconclusive
+(daemon slow)", skips it and keeps the rest of the run (listed in the result's
+`config.inconclusive`). Client timeouts are generous (30 s for the daemon, 15 s
+for the in-process stub). With `--report-only` the script always exits 0 after
+writing whatever results it got.
 
 Default tolerances (stored per metric in `baseline.json`; edit one by hand to
 tune it, and `--record` keeps your value):
