@@ -20,6 +20,7 @@ fsearch does all of the indexing and searching; FSearch for Mac is a front end f
 FSearch for Mac is an independent project and is not affiliated with fsearch or its author.</p>
 <p>Also uses <a href="https://github.com/sindresorhus/KeyboardShortcuts">KeyboardShortcuts</a>
 by Sindre Sorhus and <a href="https://sparkle-project.org">Sparkle</a>.</p>
+<p>Inspired by <a href="https://www.raycast.com">Raycast</a> and <a href="https://www.voidtools.com">Everything</a> by voidtools. Not affiliated with either.</p>
 <pre>
 EOF
   sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' THIRD_PARTY_NOTICES.md

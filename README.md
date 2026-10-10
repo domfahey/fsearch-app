@@ -112,4 +112,11 @@ MIT. See [LICENSE](LICENSE). Bundled components are covered in [THIRD_PARTY_NOTI
 - [KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts) by Sindre Sorhus, for the global hotkey.
 - [Sparkle](https://sparkle-project.org) for updates.
 
+### Inspired by
+
+- [Raycast](https://www.raycast.com): the panel's layout and keyboard-first flow follow Raycast's file search.
+- [Everything](https://www.voidtools.com) by voidtools: instant search of a whole disk by file name, the experience this app aims to bring to the Mac.
+
+Raycast and Everything are trademarks of their owners. FSearch for Mac is not affiliated with either and uses none of their code or assets.
+
 Full license texts are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
