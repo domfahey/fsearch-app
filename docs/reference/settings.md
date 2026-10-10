@@ -10,7 +10,10 @@ Open **Settings…** from the menu-bar icon.
 |---|---|---|---|
 | Shortcut | Any key combination | ⌥Space | The global hotkey that shows and hides the panel. |
 | Open content results in | Default app, or an installed editor | Default app | The editor that opens a matching line at its line number. See [Open results in your editor](../how-to/open-results-in-your-editor.md). |
+| Open FSearch at login | On or off | Off | Opens the app when you log in, using a Login Item. Shows the real status: on, waiting for approval (with a button that opens Login Items), or off. A failure appears under the switch. |
 | Debug mode | On or off | Off | Shows the debug dot, timings, Index Details and Search Log. Turning it off deletes the search log. See [Turn on debug mode](../how-to/turn-on-debug-mode.md). |
+
+**Remove Background Helper and Data…** sits below the options. After you confirm, it removes the helper, the login item, the data and log folders (to the Trash) and the app's settings. See [Uninstall](../uninstall.md).
 
 The same debug switch is in the menu as **Turn On Debug Mode** (⌥⌘D).
 

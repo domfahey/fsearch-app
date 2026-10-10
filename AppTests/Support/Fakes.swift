@@ -134,6 +134,31 @@ final class FakeHelper: HelperService {
 }
 
 @MainActor
+final class FakeLoginItem: LoginItemService {
+    var status: DaemonPlan.ServiceStatus
+    var registerError: Error?
+    var unregisterError: Error?
+    var statusAfterRegister: DaemonPlan.ServiceStatus = .enabled
+    private(set) var registered = 0, unregistered = 0, openedSettings = 0
+
+    init(_ status: DaemonPlan.ServiceStatus = .notRegistered) { self.status = status }
+
+    func register() throws {
+        registered += 1
+        if let registerError { throw registerError }
+        status = statusAfterRegister
+    }
+
+    func unregister() async throws {
+        unregistered += 1
+        if let unregisterError { throw unregisterError }
+        status = .notRegistered
+    }
+
+    func openSystemSettingsLoginItems() { openedSettings += 1 }
+}
+
+@MainActor
 final class FakeWorkspace: Workspace {
     var apps: [String: URL] = [:]
     var appsToOpen: [URL] = []
