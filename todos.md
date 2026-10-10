@@ -14,7 +14,7 @@ Follow-ups not done yet, grouped by priority. "You" items need the maintainer: a
 - [ ] **Coverage gate in CI:** fail below 90% (FSearchKit and app), and post a report on each pull request. Uses the app-coverage script.
 - [ ] **Warnings as errors for our targets only:** set `SWIFT_TREAT_WARNINGS_AS_ERRORS` in project.yml for FSearch and the test targets (a command-line flag breaks KeyboardShortcuts). The two UI-test concurrency warnings must be gone first.
 - [ ] **Apply formatting:** run `make format` repo-wide in one commit with no other changes (259 style-only issues), then remove `continue-on-error` from the CI swift-format step.
-- [ ] **ARCHITECTURE.md:** update "There is no separate AppTests target" once the app unit-test target lands.
+- [x] **ARCHITECTURE.md:** describes AppTests, the seams, the UI tests and coverage.
 - [ ] **Help menu:** README, docs index, keyboard shortcuts, query syntax, changelog.
 
 ## P1: repository layout
@@ -28,7 +28,7 @@ Follow-ups not done yet, grouped by priority. "You" items need the maintainer: a
 
 ## P2: code quality and polish
 
-- [ ] **Docs best-practice pass:** README points to the docs index; troubleshooting shows the new error texts; query syntax explains that half-typed filters wait; ARCHITECTURE mentions reply ids; a Markdown link check in CI. *(In progress.)*
+- [x] **Docs best-practice pass:** README points to the docs index; troubleshooting shows the new error texts; query syntax explains that half-typed filters wait; ARCHITECTURE mentions reply ids; a Markdown link check in CI.
 - [ ] **Small panel polish:**
   - the ⌘K menu opens at a fixed point instead of next to the selected row;
   - ⌘⌃Y also triggers Quick Look;
