@@ -65,11 +65,11 @@ Follow-ups not done yet, grouped by priority. "You" items need the maintainer: a
 
 ## You: GitHub settings (repo-level changes; needs your go-ahead)
 
-- [ ] Turn on private vulnerability reporting (.github/SECURITY.md already points to it).
-- [ ] Turn on Dependabot alerts and security updates, and secret scanning with push protection.
-- [ ] Protect `main`: require pull requests and green CI.
-- [ ] Turn on GitHub Discussions (.github/SUPPORT.md already points to it).
-- [ ] Labels: `question`, `good first issue`, `help wanted`, `upstream (fsearch)`.
+- [x] Turn on private vulnerability reporting (.github/SECURITY.md already points to it).
+- [x] Turn on Dependabot alerts and security updates, and secret scanning with push protection.
+- [x] Protect `main`: pull requests and green CI (lint, app, kit on macOS 14 and 26) required; admins can still push in an emergency.
+- [x] Turn on GitHub Discussions (.github/SUPPORT.md already points to it).
+- [x] Labels: `question`, `good first issue`, `help wanted`, `upstream (fsearch)`.
 - [ ] OpenSSF Scorecard workflow and badge.
 
 ## You: before announcing
