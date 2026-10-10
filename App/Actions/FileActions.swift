@@ -5,8 +5,11 @@ import Quartz
 
 @MainActor
 enum FileActions {
-    /// Where actions go: the real workspace, or a fake under test.
-    static var workspace: Workspace = SystemWorkspace()
+    /// Where actions go: the real workspace; in test mode one that only records
+    /// (UI tests can press ↵ safely); a fake in unit tests.
+    static var workspace: Workspace = LaunchOptions.current.testMode
+        ? TestModeWorkspace(log: TestModeWorkspace.logFile(socketPath: LaunchOptions.current.socketPath))
+        : SystemWorkspace()
     /// ⌘⇧C and "Copy File" write here: the general pasteboard, or a private one under test.
     static var pasteboard: NSPasteboard = .general
 

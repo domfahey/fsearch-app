@@ -81,9 +81,14 @@ struct SearchView: View {
                         }
                     }
                     if rows.hasFallbacks {
+                        // UI tests press ↵ on a fallback only once the search is done and the row is selected.
                         section("Use “\(model.query)” with…")
+                            .accessibilityIdentifier("fallbacks")
+                            .accessibilityValue(model.phase == .loading ? "searching" : "done")
                         fallback("Search inside files", "doc.text.magnifyingglass", selected: state.selection == commands + shown.count) { switchMode(.content) }
+                            .accessibilityIdentifier("fallback-content")
                         fallback("Find definitions", "function", selected: state.selection == commands + shown.count + 1) { switchMode(.symbols) }
+                            .accessibilityIdentifier("fallback-symbols")
                     }
                 }
                 .padding(.bottom, 6)
@@ -134,6 +139,10 @@ struct SearchView: View {
             .padding(.horizontal, 12).padding(.vertical, 6)
             .background(selected ? Color.primary.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 8))
             .contentShape(Rectangle()).onTapGesture(perform: action)
+            // A container (its Text stays findable) whose value says whether ↵ would run it.
+            .accessibilityElement(children: .contain)
+            .accessibilityValue(selected ? "selected" : "")
+            .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private func hint(_ t: String, _ k: String) -> some View {

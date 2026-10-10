@@ -107,6 +107,28 @@ extension AppTests {
             #expect(throws: TestError.self) { try FileActions.trash("/p/y.txt") }
         }
 
+        /// UI tests' workspace: records every action, performs none.
+        @Test func testModeWorkspaceOnlyRecords() throws {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let log = TestModeWorkspace.logFile(socketPath: env.dir.path + "/sub/fsearch.sock")
+            #expect(log.path == env.dir.path + "/sub/actions.log")
+            let ws = TestModeWorkspace(log: log)
+            let f = env.file("keep.txt")
+            ws.open(URL(fileURLWithPath: f))
+            ws.activateFileViewerSelecting([URL(fileURLWithPath: f)])
+            ws.open([URL(fileURLWithPath: f)], withApplicationAt: URL(fileURLWithPath: "/Applications/X.app"), completion: nil)
+            let exited = Exited()
+            #expect(ws.run("/usr/bin/false", ["a"]) { _ in exited.set() })
+            try ws.trash(URL(fileURLWithPath: f))
+            ws.open(URL(string: "x-apple.systempreferences:x")!)
+            let want = ["open \(f)", "reveal \(f)", "openWith X.app \(f)", "run /usr/bin/false a", "trash \(f)", "open x-apple.systempreferences:x"]
+            #expect(ws.actions == want)
+            #expect(try String(contentsOf: log, encoding: .utf8) == want.joined(separator: "\n") + "\n")
+            #expect(FileManager.default.fileExists(atPath: f))  // not trashed
+            #expect(!exited.value)
+        }
+
         @Test func quickLookDataSource() {
             let q = QuickLookSource.shared
             #expect(!q.isPreviewing)
@@ -192,4 +214,12 @@ extension AppTests {
             ActionsMenu.show(for: .file(Wire.hit("/p/x.txt")), in: nil, app: env.app)
         }
     }
+}
+
+/// A flag a @Sendable callback can set.
+final class Exited: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _value = false
+    var value: Bool { lock.lock(); defer { lock.unlock() }; return _value }
+    func set() { lock.lock(); _value = true; lock.unlock() }
 }
