@@ -1,3 +1,4 @@
+import os
 import SwiftUI
 
 /// The one place debug mode is switched, so every path (Settings, the menu)
@@ -8,6 +9,7 @@ enum DebugMode {
 
     @MainActor static func set(_ on: Bool, app: AppState, dismiss: DismissWindowAction?) {
         app.debugMode = on
+        Log.debug.info("debug mode \(on ? "on" : "off", privacy: .public)")
         guard !on else { return }
         app.log.clear()
         if let dismiss {

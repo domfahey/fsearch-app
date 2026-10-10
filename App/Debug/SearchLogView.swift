@@ -1,5 +1,6 @@
 import AppKit
 import FSearchKit
+import os
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -80,6 +81,7 @@ struct SearchLogView: View {
             try DebugFormat.jsonl(rows).write(to: url, options: .atomic)
             exportError = nil
         } catch {
+            Log.debug.error("search log export failed: \(error.localizedDescription, privacy: .private)")
             exportError = "Export failed: \(error.localizedDescription)"
         }
     }

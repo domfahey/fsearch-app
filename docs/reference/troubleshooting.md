@@ -85,3 +85,15 @@ Quit FSearch from the menu and open it again. Then see [Support](../../.github/S
 - [Turn on debug mode](../how-to/turn-on-debug-mode.md)
 - [Files and locations](files-and-locations.md)
 - [FAQ](faq.md)
+
+## Collecting logs
+
+FSearch writes to the macOS unified log under the subsystem `com.domfahey.fsearch`, in the categories `daemon`, `onboarding`, `actions` and `debug`. To watch it live:
+
+```sh
+log stream --predicate 'subsystem == "com.domfahey.fsearch"' --level debug
+```
+
+In Console.app, choose your Mac, then search for `subsystem:com.domfahey.fsearch`. Turn on Action > Include Debug Messages to see routine polls.
+
+File paths, queries and file names are never logged in the clear. They show as `<private>` unless private data is enabled for logging on your Mac.

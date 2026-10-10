@@ -1,5 +1,6 @@
 import AppKit
 import FSearchKit
+import os
 import Quartz
 
 @MainActor
@@ -25,9 +26,11 @@ enum FileActions {
             // The editor's CLI can start and still fail (bad flag, editor gone): fall back to the default app.
             let started = workspace.run(c.executable, c.arguments) { status in
                 guard status != 0 else { return }
+                Log.actions.error("editor exited with status \(status, privacy: .public); falling back to the default app")
                 Task { @MainActor in FileActions.workspace.open(file) }
             }
             if started { return }
+            Log.actions.error("editor failed to start; falling back to the default app")
         }
         workspace.open(file)
     }
@@ -58,18 +61,23 @@ enum FileActions {
     static func openTerminal(at path: String, onError: @escaping @MainActor (String) -> Void) {
         let folder = terminalFolder(for: path)
         guard let terminal = workspace.urlForApplication(withBundleIdentifier: "com.apple.Terminal") else {
+            Log.actions.error("Terminal not found")
             onError("Couldn't find Terminal")
             return
         }
         workspace.open([url(folder)], withApplicationAt: terminal) { error in
             guard let error else { return }
+            Log.actions.error("open Terminal failed: \(error.localizedDescription, privacy: .private)")
             let message = "Couldn't open Terminal: \(error.localizedDescription)"
             Task { @MainActor in onError(message) }
         }
     }
 
     static func trash(_ path: String) throws {
-        try workspace.trash(url(path))
+        do { try workspace.trash(url(path)) } catch {
+            Log.actions.error("trash failed: \(error.localizedDescription, privacy: .private)")
+            throw error
+        }
     }
 
     /// ⌘Y: show the preview, or close it if it is already up.

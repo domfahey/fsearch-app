@@ -1,5 +1,6 @@
 import FSearchKit
 import Foundation
+import os
 
 /// Owns the daemon: use one that already answers (or a CLI login agent's,
 /// even while it restarts), otherwise register the bundled helper as a login
@@ -36,7 +37,10 @@ final class DaemonManager: ObservableObject {
 
     func start() async {
         guard let service else { await refresh(); return }
-        var plan = DaemonPlan.decide(existingAnswers: await answers(), ownStatus: service.status, cliAgentInstalled: cliAgentInstalled())
+        let existing = await answers()
+        let cli = cliAgentInstalled()
+        var plan = DaemonPlan.decide(existingAnswers: existing, ownStatus: service.status, cliAgentInstalled: cli)
+        Log.daemon.info("start: plan \(String(describing: plan), privacy: .public) (answers \(existing, privacy: .public), own \(String(describing: service.status), privacy: .public), cli agent \(cli, privacy: .public))")
         if plan == .recheckThenRegister {
             // A daemon that is only restarting answers again within a few seconds.
             let deadline = clock.now().advanced(by: DaemonPlan.recheckWindow)
@@ -46,10 +50,11 @@ final class DaemonManager: ObservableObject {
                 answered = await answers()
             }
             plan = DaemonPlan.afterRecheck(existingAnswers: answered)
+            Log.daemon.info("recheck: answered \(answered, privacy: .public), plan \(String(describing: plan), privacy: .public)")
         }
         if plan == .registerBundled { plan = register(service) }
         switch plan {
-        case .needsApproval: state = .needsApproval
+        case .needsApproval: setState(.needsApproval)
         case .useExisting, .refreshOwn: await refresh()
         case .recheckThenRegister, .registerBundled: break // `register()` returned a failure state
         }
@@ -57,10 +62,14 @@ final class DaemonManager: ObservableObject {
 
     /// Registers the helper; `.registerBundled` means it failed (state set).
     private func register(_ service: HelperService) -> DaemonPlan {
-        do { try service.register() } catch {
+        do {
+            try service.register()
+            Log.daemon.info("register ok, status \(String(describing: service.status), privacy: .public)")
+        } catch {
+            Log.daemon.error("register failed: \(error.localizedDescription, privacy: .public), status \(String(describing: service.status), privacy: .public)")
             // Already waiting for approval is not an error worth showing as one.
             if service.status == .requiresApproval { return .needsApproval }
-            state = .failed("Couldn't start the search helper: \(error.localizedDescription)")
+            setState(.failed("Couldn't start the search helper: \(error.localizedDescription)"))
             return .registerBundled
         }
         return DaemonPlan.afterRegister(ownStatus: service.status)
@@ -70,8 +79,8 @@ final class DaemonManager: ObservableObject {
     func refresh() async {
         for _ in 0..<50 {
             if Task.isCancelled { return }
-            do { state = .running(try await client.status()); return }
-            catch DaemonError.indexing { state = .indexing; return }
+            do { setState(.running(try await client.status())); return }
+            catch DaemonError.indexing { setState(.indexing); return }
             catch is CancellationError { return }
             catch {
                 do { try await clock.sleep(.milliseconds(200)) } catch { return }
@@ -79,27 +88,51 @@ final class DaemonManager: ObservableObject {
         }
         if Task.isCancelled { return }
         switch DaemonPlan.noAnswer(wasNeedingApproval: state == .needsApproval, ownStatus: service?.status) {
-        case .needsApproval: state = .needsApproval
-        case .failed: state = .failed("The search helper isn't answering.")
+        case .needsApproval: setState(.needsApproval)
+        case .failed: setState(.failed("The search helper isn't answering."))
+        }
+    }
+
+    /// Logs changes only; routine polls that find the same state stay quiet.
+    private func setState(_ new: State) {
+        if new != state {
+            let old = Self.name(state), now = Self.name(new)
+            Log.daemon.info("state \(old, privacy: .public) -> \(now, privacy: .public)")
+        }
+        state = new
+    }
+
+    private static func name(_ s: State) -> String {
+        switch s {
+        case .checking: "checking"
+        case .running: "running"
+        case .indexing: "indexing"
+        case .needsApproval: "needsApproval"
+        case .failed: "failed"
         }
     }
 
     func restart() async {
         guard let service, DaemonPlan.restartAction(owns: ownsDaemon) == .reregister else { await refresh(); return }
-        try? await service.unregister()
+        Log.daemon.info("restart: re-registering")
+        do { try await service.unregister() } catch {
+            Log.daemon.error("unregister failed: \(error.localizedDescription, privacy: .public)")
+        }
         // Wait for the old daemon to go away before starting the new one.
         for _ in 0..<30 {
             if !(await answers()) { break }
             try? await clock.sleep(.milliseconds(100))
         }
         switch register(service) {
-        case .needsApproval: state = .needsApproval
+        case .needsApproval: setState(.needsApproval)
         case .registerBundled: break // failed; state already says why
         default: await refresh()
         }
     }
 
-    func saveNow() async { try? await client.save() }
+    func saveNow() async {
+        do { try await client.save() } catch { Log.daemon.error("save failed: \(error.localizedDescription, privacy: .public)") }
+    }
 
     func openLoginItems() { service?.openSystemSettingsLoginItems() }
 }
