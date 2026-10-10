@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping. This guide is short. Please read it before you open a pull request.
+This guide tells you how to set up, build, test and submit a change to FSearch for Mac. Please read it before you open a pull request.
 
 By taking part you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
@@ -8,9 +8,18 @@ By taking part you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 You need Xcode 16 or later (Swift 6), Rust with both macOS targets, and XcodeGen. The README lists the exact steps in [Prerequisites](README.md#prerequisites).
 
+Run `make help` to list the developer tasks used below.
+
 ## Build
 
-From the repository root:
+From the repository root, build the pinned fsearch daemon once, then build the app:
+
+```sh
+make daemon   # scripts/build-daemon.sh
+make build    # xcodegen generate, then the Debug build (the same as CI)
+```
+
+Or run the raw commands:
 
 ```sh
 scripts/build-daemon.sh
@@ -22,8 +31,17 @@ xcodebuild -project FSearch.xcodeproj -scheme FSearch -configuration Debug \
 
 ## Run the tests
 
-- Core tests: `cd Packages/FSearchKit && swift test`. They need `Vendor/fsearch` from `scripts/build-daemon.sh`.
-- UI smoke test: `scripts/ui-smoke.sh`. It needs a logged-in GUI session and accessibility permission for the test runner. CI does not run it, so run it locally when you change the panel.
+| Task | Command | Raw equivalent |
+|---|---|---|
+| Core tests | `make test` | `cd Packages/FSearchKit && swift test` |
+| Lint (swift-format, credits, shell scripts, workflows) | `make lint` | see the `lint` target in the [Makefile](Makefile) |
+| Warnings as errors | `make type` | `swift build --build-tests -Xswiftc -warnings-as-errors` in the package, plus a warnings check of the app build |
+| Benchmarks | `make bench` | `scripts/bench.sh` |
+| Lint, type and test together | `make check` | |
+
+- Core tests need `Vendor/fsearch` from `make daemon`. Set `LINT_FORMAT=0` to skip the swift-format check in `make lint` if formatting is not applied yet.
+- Markdown links: `scripts/check-links.sh` checks that every relative link and anchor resolves. CI runs it, so run it when you edit docs.
+- UI smoke test: `make ui` (`scripts/ui-smoke.sh`). It needs a logged-in GUI session and accessibility permission for the test runner. CI does not run it, so run it locally when you change the panel.
 
 ## Running your own build
 
@@ -39,13 +57,13 @@ xcodebuild -project FSearch.xcodeproj -scheme FSearch -configuration Debug \
 - Indent with 4 spaces in Swift, and 2 spaces in YAML and JSON. This is set in `.editorconfig`.
 - Use LF line endings and end files with a newline.
 - Keep comments short. Explain why, not what.
-- There is no `.swift-format` config in the repo yet. Match the style of the code around your change.
+- Formatting is checked by `swift format` with the repository's `.swift-format` config. `make format` applies it.
 
 ## Tests
 
 - New behaviour needs a test that fails without it.
 - Tests must never touch the real index, `~/Library/LaunchAgents`, `~/.local/bin` or `~/Library/Application Support/FSearch`.
-- Use a temporary `HOME` and `FSEARCH_ROOT` for anything that starts a daemon.
+- Use a temporary `HOME` and `FSEARCH_ROOT` for anything that starts a daemon. In the core tests, use `RealDaemon`: it runs the daemon under a watchdog that stops it and deletes its temporary directory when the test process exits or crashes, and it sweeps orphans from earlier hard-killed runs. See [ADR 0005](docs/adr/0005-tests-never-touch-the-real-index.md).
 
 ## Commit messages
 
@@ -56,6 +74,7 @@ xcodebuild -project FSearch.xcodeproj -scheme FSearch -configuration Debug \
 
 - One topic per pull request.
 - CI must be green.
+- Run `make check` and `scripts/check-links.sh` first.
 - Update [CHANGELOG.md](CHANGELOG.md) under Unreleased.
 - Fill in the pull request template.
 
@@ -73,3 +92,9 @@ Use the issue templates. For a bug, include the Index Details output from debug 
 ## License
 
 There is no CLA or DCO. By contributing, you agree that your work is released under the [MIT License](LICENSE).
+
+## See also
+
+- [Architecture](ARCHITECTURE.md)
+- [Release checklist](docs/release-checklist.md)
+- [Documentation hub](docs/README.md)

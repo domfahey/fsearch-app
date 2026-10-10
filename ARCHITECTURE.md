@@ -1,5 +1,7 @@
 # Architecture
 
+This page explains how FSearch for Mac is put together and how a keystroke becomes a result.
+
 FSearch for Mac is a menu-bar launcher (`LSUIElement`, no Dock icon) in front of the `fsearch` Rust daemon. The app draws the UI and talks to the daemon; the daemon owns the index.
 
 ## The pieces
@@ -34,8 +36,8 @@ FSearch for Mac is a menu-bar launcher (`LSUIElement`, no Dock icon) in front of
 1. [`SearchView`](App/Panel/SearchView.swift) changes `model.query`; `.onChange` calls `SearchModel.refresh()`. A mode change calls it directly.
 2. `refresh()` bumps a generation counter and cancels the previous in-flight task. Only the newest generation may publish, so a slow old answer is dropped. A blank query, the `?` cheat sheet, or a `grep:`/`sym:` with no value yet sends nothing.
 3. `run` picks a backend. Plain name queries go to `names.search(q, limit: 50)`. A query with `grep:`, `regex:` or `sym:` in names mode, and the content and symbol modes, go to `content.grep(...)`. [`AppState`](App/AppState.swift) creates two `DaemonClient`s, each with its own `LineSocket`, so a slow content search never queues behind name searches.
-4. `DaemonClient` sends requests one at a time on a serial queue. A call cancelled while queued never touches the socket. `LineSocket` writes the line and reads one line back with a timeout (5 s by default). If a reused connection was dropped it dials again once and resends; timeouts are not retried.
-5. `decodeReply` turns the line into a `SearchReply` or `GrepReply`, and `SearchModel` publishes `items` and a `SearchPhase` (`results`, `indexing`, `failed`).
+4. `DaemonClient` sends requests one at a time on a serial queue. Each request carries a fresh integer `id`, and the daemon echoes it in its reply. A call cancelled while queued never touches the socket. `LineSocket` writes the line and reads lines back until `replyIsFor(id, line)` accepts one: a line with a different id is a stale leftover and is dropped, while a line with no id or a null id is accepted so that decoding reports it properly. All of this happens within one timeout (5 s by default); a call that sees only stale lines fails with `.timeout` and closes the connection. If a reused connection was dropped it dials again once and resends; timeouts are not retried.
+5. `decodeReply` turns the line into a `SearchReply` or `GrepReply`, and `SearchModel` publishes `items` and a `SearchPhase` (`results`, `indexing`, `failed`). A `failed` phase carries a `DaemonError`, and `UserMessage` turns it into the short text the panel shows (see [Troubleshooting](docs/reference/troubleshooting.md)).
 
 ## Who owns the daemon
 
@@ -65,6 +67,12 @@ Launch the app with `-FSEARCH_SOCKET <path>` and `AppState.socketPath` uses that
 
 ## Tests and benchmarks
 
-- **FSearchKit unit and integration tests**, [`Packages/FSearchKit/Tests/FSearchKitTests`](Packages/FSearchKit/Tests/FSearchKitTests): `FakeDaemon` is a scripted socket server; `RealDaemon` runs `Vendor/fsearch serve` with a temp `HOME` and `FSEARCH_ROOT` ([`IntegrationTests.swift`](Packages/FSearchKit/Tests/FSearchKitTests/IntegrationTests.swift)). Run `swift test` in the package.
+- **FSearchKit unit and integration tests**, [`Packages/FSearchKit/Tests/FSearchKitTests`](Packages/FSearchKit/Tests/FSearchKitTests): `FakeDaemon` is a scripted socket server; `RealDaemon` runs `Vendor/fsearch serve` with a temp `HOME` and `FSEARCH_ROOT` ([`IntegrationTests.swift`](Packages/FSearchKit/Tests/FSearchKitTests/IntegrationTests.swift)). `RealDaemon` has a watchdog: the daemon runs under a small `sh` wrapper that blocks on a pipe held by the test process, so when the test process exits or crashes, the wrapper stops the daemon and deletes the temp directory. At the start of a run it also sweeps orphaned fixture daemons left by hard-killed runs (see [ADR 0005](docs/adr/0005-tests-never-touch-the-real-index.md)). Run `make test`, or `swift test` in the package.
 - **UI smoke test**, [`AppUITests/PanelSmokeTests.swift`](AppUITests/PanelSmokeTests.swift), run by [`scripts/ui-smoke.sh`](scripts/ui-smoke.sh). The script starts a throwaway daemon and passes its socket to the app as `FSEARCH_SOCKET`. There is no separate `AppTests` target.
 - **Benchmarks**, `FSearchBench` in the package, run by [`scripts/bench.sh`](scripts/bench.sh) against a temporary daemon; see [`bench/README.md`](bench/README.md).
+
+## See also
+
+- [Architecture Decision Records](docs/adr/README.md)
+- [Files and locations](docs/reference/files-and-locations.md)
+- [Contributing](CONTRIBUTING.md)
