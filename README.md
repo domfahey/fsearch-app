@@ -3,6 +3,7 @@
 [![CI](https://github.com/domfahey/fsearch-app/actions/workflows/ci.yml/badge.svg)](https://github.com/domfahey/fsearch-app/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-lightgrey.svg)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/domfahey/fsearch-app/badge)](https://scorecard.dev/viewer/?uri=github.com/domfahey/fsearch-app)
 
 A fast, keyboard-driven file search launcher for the Mac menu bar, built on [fsearch](https://github.com/noahdunnagan/fsearch) by Noah Dunnagan.
 
