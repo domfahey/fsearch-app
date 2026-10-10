@@ -8,8 +8,12 @@ final class LineSocket {
     private var buffer = Data()
     let path: String
     let timeout: TimeInterval
+    /// The only uid whose socket is trusted: ours, unless a test says otherwise.
+    let expectedPeerUid: uid_t
 
-    init(path: String, timeout: TimeInterval) { (self.path, self.timeout) = (path, timeout) }
+    init(path: String, timeout: TimeInterval, expectedPeerUid: uid_t = getuid()) {
+        (self.path, self.timeout, self.expectedPeerUid) = (path, timeout, expectedPeerUid)
+    }
     deinit { close() }
 
     func close() {
@@ -37,6 +41,11 @@ final class LineSocket {
         let len = socklen_t(MemoryLayout<sockaddr_un>.size)
         let r = withUnsafePointer(to: &addr) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(s, $0, len) } }
         guard r == 0 else { Darwin.close(s); throw DaemonError.disconnected }
+        // A socket another user serves (a planted one) is never sent a query.
+        var uid: uid_t = 0, gid: gid_t = 0
+        guard peerIsTrusted(peerUid: getpeereid(s, &uid, &gid) == 0 ? uid : nil, expected: expectedPeerUid) else {
+            Darwin.close(s); throw DaemonError.disconnected
+        }
         fd = s
     }
 
@@ -92,3 +101,6 @@ final class LineSocket {
         }
     }
 }
+
+/// The daemon on the other end runs as the expected user (nil: unknown).
+func peerIsTrusted(peerUid: uid_t?, expected: uid_t) -> Bool { peerUid == expected }

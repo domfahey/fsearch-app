@@ -20,8 +20,9 @@ public final class DaemonClient: SearchBackend, @unchecked Sendable {
     private let queue = DispatchQueue(label: "fsearch.client")
     private var nextId = 0
 
-    public init(socketPath: String = DaemonClient.defaultSocketPath, timeout: TimeInterval = 5) {
-        socket = LineSocket(path: socketPath, timeout: timeout)
+    /// `expectedPeerUid`: the user whose daemon is trusted (us; tests vary it).
+    public init(socketPath: String = DaemonClient.defaultSocketPath, timeout: TimeInterval = 5, expectedPeerUid: uid_t = getuid()) {
+        socket = LineSocket(path: socketPath, timeout: timeout, expectedPeerUid: expectedPeerUid)
     }
 
     private func call<T: Decodable & Sendable>(_ req: Request, as: T.Type) async throws -> T {

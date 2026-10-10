@@ -9,6 +9,10 @@ import Foundation
 /// - Unit-test host: the app is hosting the AppTests bundle. It starts nothing
 ///   (no helper, no hotkey, no onboarding, no Sparkle) and behaves as test mode
 ///   with a socket nobody listens on, so no test can reach the real daemon.
+///
+/// Both hooks exist only in Debug builds. A Release build ignores them, so no
+/// other process can switch off the helper and updates (say, by setting
+/// XCTestSessionIdentifier with `launchctl setenv`) or point the app at its own socket.
 struct LaunchOptions: Equatable, Sendable {
     var socketPath: String
     var testMode: Bool
@@ -20,9 +24,22 @@ struct LaunchOptions: Equatable, Sendable {
 
     static let current = parse(arguments: CommandLine.arguments, environment: ProcessInfo.processInfo.environment)
 
-    static func parse(arguments a: [String], environment env: [String: String], defaultSocket: String = DaemonClient.defaultSocketPath)
-        -> LaunchOptions
-    {
+    /// Whether this build honours the test hooks: Debug only.
+    static var testHooksCompiledIn: Bool {
+        #if DEBUG
+            true
+        #else
+            false
+        #endif
+    }
+
+    static func parse(
+        arguments a: [String], environment env: [String: String], defaultSocket: String = DaemonClient.defaultSocketPath,
+        honorsTestHooks: Bool = LaunchOptions.testHooksCompiledIn
+    ) -> LaunchOptions {
+        guard honorsTestHooks else {
+            return LaunchOptions(socketPath: defaultSocket, testMode: false, unitTestHost: false, showPanel: false)
+        }
         var socket: String?
         if let i = a.firstIndex(of: "-FSEARCH_SOCKET"), i + 1 < a.count { socket = a[i + 1] }
         let explicitTest = a.contains("-FSEARCH_SOCKET")
