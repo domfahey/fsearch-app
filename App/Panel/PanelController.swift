@@ -49,7 +49,7 @@ final class PanelController: PanelHost {
 
     func install(app: AppState) {
         self.app = app
-        if Self.registersGlobalHotkey(LaunchOptions.current) {
+        if Self.registersGlobalHotkey(app.options) {
             KeyboardShortcuts.onKeyUp(for: .togglePanel) { [weak self] in self?.toggle(app: app) }
         }
         if LaunchOptions.current.showPanel { show(app: app) }
