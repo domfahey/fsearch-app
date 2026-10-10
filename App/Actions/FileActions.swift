@@ -24,31 +24,67 @@ enum FileActions {
 
     static func url(_ path: String) -> URL { URL(fileURLWithPath: path) }
 
-    /// The editor command for a content hit, if an editor is chosen and installed.
-    static func editorCommand(for item: ResultItem, editor: Editor?) -> EditorCommand? {
+    /// What opens a content hit in the chosen editor, if it is installed: its
+    /// open-at-line URL (the file itself for Xcode), handed to that app by
+    /// LaunchServices. Never the editor's CLI as our child process, which
+    /// would inherit FSearch's Full Disk Access.
+    static func editorTarget(for item: ResultItem, editor: Editor?) -> (url: URL, app: URL)? {
         guard case let .line(path, match) = item, let e = editor,
             let appURL = workspace.urlForApplication(withBundleIdentifier: e.bundleId)
         else { return nil }
-        return openAtLine(e, appURL: appURL, path: path, line: match.line)
+        return (editorURL(e, path: path, line: match.line) ?? url(path), appURL)
     }
 
-    /// Default app; content hits open at their line in the chosen editor if it is installed.
-    static func open(_ item: ResultItem, editor: Editor?) {
+    /// The footer line for a result that is no longer on disk.
+    static func missingMessage(_ path: String) -> String {
+        "“\((path as NSString).lastPathComponent)” is gone: moved or deleted"
+    }
+
+    /// False, after reporting it, if `path` is gone (moved or deleted since the search).
+    private static func exists(_ path: String, _ onError: @MainActor (String) -> Void) -> Bool {
+        if workspace.fileInfo(atPath: path) != nil { return true }
+        Log.actions.error("action on a missing file: \(path, privacy: .private)")
+        onError(missingMessage(path))
+        return false
+    }
+
+    /// Default app; content hits open at their line in the chosen editor if it
+    /// is installed. False (reported through `onError`) if the file is gone.
+    @discardableResult
+    static func open(_ item: ResultItem, editor: Editor?, onError: @escaping @MainActor (String) -> Void) -> Bool {
+        guard exists(item.path, onError) else { return false }
         let file = url(item.path)
-        if let c = editorCommand(for: item, editor: editor) {
-            // The editor's CLI can start and still fail (bad flag, editor gone): fall back to the default app.
-            let started = workspace.run(c.executable, c.arguments) { status in
-                guard status != 0 else { return }
-                Log.actions.error("editor exited with status \(status, privacy: .public); falling back to the default app")
-                Task { @MainActor in FileActions.workspace.open(file) }
-            }
-            if started { return }
-            Log.actions.error("editor failed to start; falling back to the default app")
+        guard let target = editorTarget(for: item, editor: editor) else {
+            workspace.open(file)
+            return true
         }
-        workspace.open(file)
+        // The editor may fail to take the URL (no handler, editor damaged): fall back to the default app.
+        workspace.open([target.url], withApplicationAt: target.app) { error in
+            guard let error else { return }
+            Log.actions.error("editor open failed: \(error.localizedDescription, privacy: .private); falling back to the default app")
+            Task { @MainActor in FileActions.workspace.open(file) }
+        }
+        return true
     }
 
-    static func reveal(_ path: String) { workspace.activateFileViewerSelecting([url(path)]) }
+    /// ↵ reveals, rather than opens, a result that would launch something (an
+    /// app, a script, an installer: see `Launchable`). A content hit that the
+    /// chosen editor opens runs nothing, so it opens. Only an extensionless
+    /// path is looked up on disk.
+    static func revealsOnReturn(_ item: ResultItem, editor: Editor?) -> Bool {
+        if editorTarget(for: item, editor: editor) != nil { return false }
+        let info = Launchable.needsFileCheck(item.path) ? workspace.fileInfo(atPath: item.path) : nil
+        return Launchable.revealsOnReturn(
+            path: item.path, isDirectory: info?.isDirectory ?? false, isExecutable: info?.isExecutable ?? false)
+    }
+
+    /// False (reported through `onError`) if the file is gone.
+    @discardableResult
+    static func reveal(_ path: String, onError: @MainActor (String) -> Void) -> Bool {
+        guard exists(path, onError) else { return false }
+        workspace.activateFileViewerSelecting([url(path)])
+        return true
+    }
 
     static func copyPath(_ path: String) {
         pasteboard.clearContents()
@@ -60,15 +96,23 @@ enum FileActions {
         pasteboard.writeObjects([url(path) as NSURL])
     }
 
-    static func openWith(_ path: String, app: URL) {
-        workspace.open([url(path)], withApplicationAt: app, completion: nil)
+    /// Opens `path` with `app`; a missing file or a launch error goes to `onError`.
+    static func openWith(_ path: String, app: URL, onError: @escaping @MainActor (String) -> Void) {
+        guard exists(path, onError) else { return }
+        let name = app.deletingPathExtension().lastPathComponent
+        workspace.open([url(path)], withApplicationAt: app) { error in
+            guard let error else { return }
+            Log.actions.error("Open With failed: \(error.localizedDescription, privacy: .private)")
+            let message = "Couldn't open with \(name): \(error.localizedDescription)"
+            Task { @MainActor in onError(message) }
+        }
     }
 
-    /// The folder Terminal opens for a result: itself if a folder, else its parent.
+    /// The folder Terminal opens for a result: itself if a plain folder, else
+    /// its parent. A package (an app, an .rtfd) is a file here: never its insides.
     static func terminalFolder(for path: String) -> String {
-        var isDir: ObjCBool = false
-        FileManager.default.fileExists(atPath: path, isDirectory: &isDir)
-        return isDir.boolValue ? path : (path as NSString).deletingLastPathComponent
+        let info = workspace.fileInfo(atPath: path)
+        return info?.isDirectory == true && info?.isPackage == false ? path : (path as NSString).deletingLastPathComponent
     }
 
     static func openTerminal(at path: String, onError: @escaping @MainActor (String) -> Void) {
@@ -142,9 +186,10 @@ final class QuickLookSource: NSObject, @preconcurrency QLPreviewPanelDataSource 
         keyMonitor =
             keyMonitor
             ?? NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-                let cmdY =
-                    event.modifierFlags.contains(.command)
-                    && PanelKey.commandLetter(event.charactersIgnoringModifiers ?? "", shift: event.modifierFlags.contains(.shift)) == .cmdY
+                // By key code too: on a non-Latin layout ⌘Y types "н".
+                let letter = PanelKey.commandLetter(
+                    event.charactersIgnoringModifiers ?? "", shift: event.modifierFlags.contains(.shift), keyCode: event.keyCode)
+                let cmdY = event.modifierFlags.contains(.command) && letter == .cmdY
                 guard cmdY, event.window is QLPreviewPanel else { return event }
                 MainActor.assumeIsolated { QuickLookSource.shared.close() }
                 return nil

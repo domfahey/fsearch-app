@@ -187,16 +187,17 @@ final class FakeLoginItem: LoginItemService {
 final class FakeWorkspace: Workspace {
     var apps: [String: URL] = [:]
     var appsToOpen: [URL] = []
-    var runStarts = true
-    /// The exit status the started process reports; nil: it never exits.
-    var runExitStatus: Int32? = 0
     var openWithError: Error?
+    /// Paths that don't exist. Any other path that isn't on disk either is a
+    /// plain file, so tests can use made-up paths like /p/x.txt.
+    var missing: Set<String> = []
+    /// What fileInfo says for a path, before the disk is asked.
+    var files: [String: FileInfo] = [:]
     var trashError: Error?
 
     private(set) var opened: [URL] = []
     private(set) var openedWith: [(urls: [URL], app: URL)] = []
     private(set) var revealed: [[URL]] = []
-    private(set) var runs: [(exe: String, args: [String])] = []
     private(set) var trashed: [URL] = []
 
     func open(_ url: URL) { opened.append(url) }
@@ -212,12 +213,9 @@ final class FakeWorkspace: Workspace {
     func urlForApplication(withBundleIdentifier id: String) -> URL? { apps[id] }
     func urlsForApplications(toOpen url: URL) -> [URL] { appsToOpen }
 
-    func run(_ executable: String, _ arguments: [String], onExit: @escaping @Sendable (Int32) -> Void) -> Bool {
-        runs.append((executable, arguments))
-        guard runStarts else { return false }
-        // Like Process.terminationHandler, off the main thread.
-        if let s = runExitStatus { DispatchQueue.global().async { onExit(s) } }
-        return true
+    func fileInfo(atPath path: String) -> FileInfo? {
+        if missing.contains(path) { return nil }
+        return files[path] ?? FileInfo.onDisk(path) ?? FileInfo()
     }
 
     func trash(_ url: URL) throws {

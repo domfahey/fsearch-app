@@ -2,15 +2,17 @@ import Foundation
 
 /// Editors that can open a file at a line, for content results.
 ///
-/// Verified on the dev Mac (2026-10-10, read-only: mdfind + ls, nothing launched):
-/// - installed, CLI tool present at the path in `openAtLine`: VS Code
-///   (`com.microsoft.VSCode`, `Contents/Resources/app/bin/code`), Cursor
-///   (`com.todesktop.230313mzl4w4u92`, `Contents/Resources/app/bin/cursor`),
-///   Xcode (`com.apple.dt.Xcode`, `/usr/bin/xed`).
-/// - not installed, so their CLI paths are UNVERIFIED: Zed (`dev.zed.Zed`,
-///   `Contents/MacOS/cli`), Sublime Text (`com.sublimetext.4`,
-///   `Contents/SharedSupport/bin/subl`), BBEdit (`com.barebones.bbedit`,
-///   `Contents/Helpers/bbedit_tool`).
+/// They are opened through LaunchServices with a URL (or, for Xcode, the
+/// file), never by running their command-line tool as a child process: macOS
+/// holds the launching app responsible for a child, so the editor, its
+/// extensions and its terminals would all run with FSearch's Full Disk Access.
+///
+/// URL schemes, checked on the dev Mac (2026-10-10, read-only: the apps'
+/// Info.plist CFBundleURLTypes, nothing launched): VS Code registers `vscode`,
+/// Cursor `cursor`. Xcode registers only an undocumented generic `xcode`
+/// scheme, so it opens the file without a line. Zed (`zed`), Sublime Text
+/// (`subl`) and BBEdit (`x-bbedit`) are not installed there, so their schemes
+/// are from their documentation, UNVERIFIED.
 public enum Editor: String, CaseIterable, Sendable {
     case vscode, cursor, zed, sublime, bbedit, xcode
 
@@ -37,22 +39,29 @@ public enum Editor: String, CaseIterable, Sendable {
     }
 }
 
-public struct EditorCommand: Equatable, Sendable {
-    public let executable: String
-    public let arguments: [String]
+/// URL-safe characters: everything else in a path is percent-encoded, so no
+/// path can end the path part, add a query item or start a fragment.
+private let unreserved = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+
+private func encode(_ s: String, keeping extra: String = "") -> String {
+    s.addingPercentEncoding(withAllowedCharacters: unreserved.union(CharacterSet(charactersIn: extra))) ?? ""
 }
 
-/// The command that opens `path` at `line`. Arguments go to the process as
-/// an array (never a shell string), so any path needs no quoting.
-public func openAtLine(_ e: Editor, appURL: URL, path: String, line: Int) -> EditorCommand {
-    let app = appURL.path
+/// The URL that opens `path` at `line` in `e`, for LaunchServices to hand to
+/// the editor app; nil when the editor has none (Xcode: open the file with it
+/// instead) or the path isn't absolute. Lines below 1 become 1.
+public func editorURL(_ e: Editor, path: String, line: Int) -> URL? {
+    guard path.hasPrefix("/") else { return nil }
+    let line = max(1, line)
+    let pathPart = encode(path, keeping: "/") + ":\(line)"
+    let fileQuery = "url=" + encode(URL(fileURLWithPath: path).absoluteString) + "&line=\(line)"
     switch e {
-    case .vscode: return EditorCommand(executable: app + "/Contents/Resources/app/bin/code", arguments: ["-g", "\(path):\(line)"])
-    case .cursor: return EditorCommand(executable: app + "/Contents/Resources/app/bin/cursor", arguments: ["-g", "\(path):\(line)"])
-    case .zed: return EditorCommand(executable: app + "/Contents/MacOS/cli", arguments: ["\(path):\(line)"])
-    case .sublime: return EditorCommand(executable: app + "/Contents/SharedSupport/bin/subl", arguments: ["\(path):\(line)"])
-    case .bbedit: return EditorCommand(executable: app + "/Contents/Helpers/bbedit_tool", arguments: ["+\(line)", path])
-    case .xcode: return EditorCommand(executable: "/usr/bin/xed", arguments: ["-l", "\(line)", path])
+    case .vscode: return URL(string: "vscode://file" + pathPart)
+    case .cursor: return URL(string: "cursor://file" + pathPart)
+    case .zed: return URL(string: "zed://file" + pathPart)
+    case .sublime: return URL(string: "subl://open?" + fileQuery)
+    case .bbedit: return URL(string: "x-bbedit://open?" + fileQuery)
+    case .xcode: return nil
     }
 }
 

@@ -29,8 +29,27 @@ protocol DaemonControl: SearchBackend {
 
 extension DaemonClient: DaemonControl {}
 
-/// Everything that sends the user to another app or changes files: opening,
-/// revealing, launching an editor's CLI, Trash. The real one is `SystemWorkspace`.
+/// What file actions need to know about a path on disk.
+struct FileInfo: Equatable, Sendable {
+    var isDirectory = false
+    var isExecutable = false
+    /// A folder Finder shows as one file: an app, an .rtfd, an .xcodeproj.
+    var isPackage = false
+
+    /// The path's info, or nil if nothing is there. Read-only.
+    @MainActor
+    static func onDisk(_ path: String) -> FileInfo? {
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: path, isDirectory: &isDir) else { return nil }
+        return FileInfo(
+            isDirectory: isDir.boolValue, isExecutable: FileManager.default.isExecutableFile(atPath: path),
+            isPackage: isDir.boolValue && NSWorkspace.shared.isFilePackage(atPath: path))
+    }
+}
+
+/// Everything that sends the user to another app or changes files: opening
+/// (editors too, through LaunchServices, never as a child process), revealing,
+/// Trash. The real one is `SystemWorkspace`.
 @MainActor
 protocol Workspace: AnyObject {
     func open(_ url: URL)
@@ -39,8 +58,8 @@ protocol Workspace: AnyObject {
     func activateFileViewerSelecting(_ urls: [URL])
     func urlForApplication(withBundleIdentifier id: String) -> URL?
     func urlsForApplications(toOpen url: URL) -> [URL]
-    /// Starts a process; `onExit` gets its status. False if it couldn't start.
-    func run(_ executable: String, _ arguments: [String], onExit: @escaping @Sendable (Int32) -> Void) -> Bool
+    /// The file at `path`, or nil if it is gone.
+    func fileInfo(atPath path: String) -> FileInfo?
     func trash(_ url: URL) throws
 }
 

@@ -45,7 +45,8 @@ final class SMAppLoginItemService: LoginItemService {
     func openSystemSettingsLoginItems() { SMAppService.openSystemSettingsLoginItems() }
 }
 
-/// NSWorkspace, Process and FileManager's Trash.
+/// NSWorkspace and FileManager's Trash. No child processes: an app FSearch
+/// started itself would run with FSearch's Full Disk Access.
 @MainActor
 final class SystemWorkspace: Workspace {
     private var ws: NSWorkspace { .shared }
@@ -60,13 +61,7 @@ final class SystemWorkspace: Workspace {
     func urlForApplication(withBundleIdentifier id: String) -> URL? { ws.urlForApplication(withBundleIdentifier: id) }
     func urlsForApplications(toOpen url: URL) -> [URL] { ws.urlsForApplications(toOpen: url) }
 
-    func run(_ executable: String, _ arguments: [String], onExit: @escaping @Sendable (Int32) -> Void) -> Bool {
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: executable)
-        p.arguments = arguments
-        p.terminationHandler = { onExit($0.terminationStatus) }
-        return (try? p.run()) != nil
-    }
+    func fileInfo(atPath path: String) -> FileInfo? { FileInfo.onDisk(path) }
 
     func trash(_ url: URL) throws { try FileManager.default.trashItem(at: url, resultingItemURL: nil) }
 }

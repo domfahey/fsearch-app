@@ -43,11 +43,8 @@ final class TestModeWorkspace: Workspace {
     func urlForApplication(withBundleIdentifier id: String) -> URL? { NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) }
     func urlsForApplications(toOpen url: URL) -> [URL] { NSWorkspace.shared.urlsForApplications(toOpen: url) }
 
-    /// Never starts the process; it "never exits", so nothing falls back to open.
-    func run(_ executable: String, _ arguments: [String], onExit: @escaping @Sendable (Int32) -> Void) -> Bool {
-        record("run \(executable) \(arguments.joined(separator: " "))")
-        return true
-    }
+    /// Real and read-only: a UI test's results are real files in its fixture.
+    func fileInfo(atPath path: String) -> FileInfo? { FileInfo.onDisk(path) }
 
     func trash(_ url: URL) throws { record("trash \(url.path)") }
 }
