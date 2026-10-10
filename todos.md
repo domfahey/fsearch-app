@@ -45,7 +45,7 @@ Ideas and follow-ups not done yet. Most important first within each section. "Yo
   - Quick Look has no delegate, so no zoom animation and no arrow-key navigation.
 - [ ] **API hygiene:** namespace FSearchKit's module-level free functions (`reduce`, `canContinue`, `openAtLine`, `installedEditors`, …), e.g. `PanelState.reduce`.
 - [ ] **Review:** the privacy manifest's file-timestamp reason C617.1 is the closest fit for a non-sandboxed app; confirm before an App Store-style review matters.
-- [ ] **Verify:** dependabot.yml's `cooldown` field against GitHub's current schema (the first Dependabot run will reject it if unsupported).
+- [x] **Verify:** dependabot.yml's `cooldown` field against GitHub's current schema (the first Dependabot run will reject it if unsupported).
 
 ## Upstream (fsearch) and the daemon pin
 
