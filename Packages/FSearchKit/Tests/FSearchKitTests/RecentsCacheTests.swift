@@ -10,7 +10,11 @@ final class ExistsProbe: @unchecked Sendable {
     private var _gone: Set<String> = []
     var checks: Int { lock.withLock { _checks } }
     func remove(_ p: String) { lock.withLock { _ = _gone.insert(p) } }
-    func exists(_ p: String) -> Bool { lock.withLock { _checks += 1; return !_gone.contains(p) } }
+    func exists(_ p: String) -> Bool {
+        lock.withLock {
+            _checks += 1; return !_gone.contains(p)
+        }
+    }
 }
 
 final class TestClock: @unchecked Sendable {

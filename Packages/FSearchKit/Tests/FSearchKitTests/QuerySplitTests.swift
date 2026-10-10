@@ -142,7 +142,7 @@ import Testing
 @Suite struct QuerySyntaxTests {
     @Test func cheatSheetListsTheFilters() {
         let text = QuerySyntax.cheatSheet.map(\.syntax).joined(separator: " ")
-        for key in ["ext:", "in:", "type:", "kind:", "size:", "mtime:", "path:", "re:", "\""] {
+        for key in ["ext:", "in:", "type:", "kind:", "size:", "mtime:", "path:", "re:", "limit:", "\""] {
             #expect(text.contains(key), "cheat sheet mentions \(key)")
         }
         #expect(QuerySyntax.cheatSheet.allSatisfy { !$0.meaning.isEmpty })
