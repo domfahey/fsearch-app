@@ -46,6 +46,28 @@ extension AppTests {
             #expect(key(P(key: "y", characters: "y")) == nil)
         }
 
+        /// Item 8: holding ↓/↑/⌃N/⌃P repeats; no other key acts on a repeat.
+        @Test func onlyMovingRepeats() {
+            #expect(key(P(key: .downArrow, isRepeat: true)) == .down)
+            #expect(key(P(key: .upArrow, isRepeat: true)) == .up)
+            #expect(key(P(key: "n", characters: "\u{0e}", control: true, isRepeat: true)) == .down)
+            #expect(key(P(key: "p", characters: "\u{10}", control: true, isRepeat: true)) == .up)
+            #expect(key(P(key: .return, isRepeat: true)) == nil)
+            #expect(key(P(key: .return, command: true, isRepeat: true)) == nil)
+            #expect(key(P(key: .escape, isRepeat: true)) == nil)
+            #expect(key(P(key: "k", characters: "k", command: true, isRepeat: true)) == nil)
+            #expect(key(P(key: .delete, isRepeat: true), empty: true) == nil)
+        }
+
+        /// Item 13: on a non-Latin layout ⌘Y types "н": the key code decides.
+        @Test func commandLettersOnANonLatinLayout() {
+            #expect(key(P(key: "н", characters: "н", command: true, keyCode: 0x10)) == .cmdY)
+            #expect(key(P(key: "л", characters: "л", command: true, keyCode: 0x28)) == .cmdK)
+            #expect(key(P(key: "С", characters: "С", command: true, shift: true, keyCode: 0x08)) == .cmdShiftC)
+            #expect(key(P(key: "f", characters: "f", command: true, keyCode: 0x10)) == nil)  // Dvorak
+            #expect(key(P(key: "н", characters: "н", keyCode: 0x10)) == nil)  // no ⌘: typed
+        }
+
         @Test func deleteOnlyOnAnEmptyQuery() {
             #expect(key(P(key: .delete), empty: true) == .backspaceOnEmpty)
             #expect(key(P(key: .delete), empty: false) == nil)
@@ -158,6 +180,59 @@ extension AppTests {
             main.addItem(settings)
             #expect(!PanelController.openSettingsWindow(menu: main))
             #expect(target.settingsHits == 0)
+        }
+
+        /// Item 7: the id the list scrolls to for each selectable row.
+        @Test func rowIDsForScrolling() {
+            let shown: [ResultItem] = [.file(Wire.hit("/p/a")), .line(path: "/p/b", match: Match(line: 3, text: "x"))]
+            let rows = PanelRows(files: 2, query: "set", mode: .names)
+            #expect(PanelInput.rowID(at: 0, shown: shown, rows: rows) == "/p/a")
+            #expect(PanelInput.rowID(at: 1, shown: shown, rows: rows) == "/p/b:3")
+            #expect(PanelInput.rowID(at: 2, shown: shown, rows: rows) == "command-FSearch Settings")
+            #expect(PanelInput.rowID(at: 3, shown: shown, rows: rows) == "fallback-content")
+            #expect(PanelInput.rowID(at: 4, shown: shown, rows: rows) == "fallback-symbols")
+            #expect(PanelInput.rowID(at: 5, shown: shown, rows: rows) == nil)
+        }
+
+        /// Item 6: ↵ before the results answer the query is held, then runs
+        /// on the new results; never on the previous query's rows.
+        @Test func resultKeysWaitForCurrentResults() async {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let model = env.app.search
+            env.daemon.onSearch = { q in SearchReply(tookUs: 1, hits: [Wire.hit("/p/\(q).txt")]) }
+            model.query = "old"
+            await model.refresh()
+            #expect(model.resultsAreCurrent)
+            var held = HeldKey()
+            #expect(PanelInput.gate(.enter, held: &held, model: model) == .enter)
+
+            model.query = "new"  // pasted; its search hasn't answered yet
+            #expect(!model.resultsAreCurrent)
+            #expect(PanelInput.gate(.enter, held: &held, model: model) == nil)
+            #expect(PanelInput.gate(.down, held: &held, model: model) == .down)
+            #expect(PanelInput.gate(.cmdDigit(1), held: &held, model: model) == nil)
+            #expect(PanelInput.replay(held: &held, model: model) == nil)  // still stale
+            await model.refresh()
+            #expect(model.items == [.file(Wire.hit("/p/new.txt"))])
+            #expect(PanelInput.replay(held: &held, model: model) == .cmdDigit(1))
+            #expect(PanelInput.replay(held: &held, model: model) == nil)
+
+            // Recents (an empty names query) never wait on a search.
+            model.query = ""
+            #expect(PanelInput.gate(.enter, held: &held, model: model) == .enter)
+        }
+
+        /// Item 12: folders, dotted ones included, and apps get their own icon, not their extension's.
+        @Test func iconLookupForFoldersAndBundles() {
+            #expect(IconCache.usesFileIcon(path: "/p/v1.2", isDirectory: true))
+            #expect(IconCache.usesFileIcon(path: "/p/com.foo.bar", isDirectory: true))
+            #expect(IconCache.usesFileIcon(path: "/p/folder", isDirectory: false))
+            #expect(IconCache.usesFileIcon(path: "/Applications/Safari.app", isDirectory: false))
+            #expect(!IconCache.usesFileIcon(path: "/p/a.txt", isDirectory: false))
+            #expect(ResultRow.isDirectory(.file(Hit(path: "/p/v1.2", kind: "dir", size: 0, mtime: 0, score: 0))))
+            #expect(!ResultRow.isDirectory(.file(Wire.hit("/p/a.txt"))))
+            #expect(!ResultRow.isDirectory(.line(path: "/p/a.txt", match: Match(line: 1, text: ""))))
         }
 
         /// A key and its ⌘K menu item agree on whether the launcher goes away.
