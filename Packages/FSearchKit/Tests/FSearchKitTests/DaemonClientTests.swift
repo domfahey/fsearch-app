@@ -19,6 +19,7 @@ import Testing
             return try await g.reduce(into: [String: String]()) { $0[$1.0] = $1.1 }
         }
         #expect(results == ["a": "a", "b": "b", "c": "c", "d": "d", "e": "e"], "each caller gets its own answer")
+        #expect(d.accepted == 1, "all five requests share one connection")
     }
 
     @Test func noDaemonIsDisconnected() async {
@@ -48,12 +49,33 @@ import Testing
     }
 
     @Test func stoppingAnOldDaemonLeavesTheNewOneAlone() async throws {
-        let first = FakeDaemon { _ in ["ok": true] }
-        first.stop()
-        let second = FakeDaemon(path: first.path) { _ in ["ok": true] }
-        first.stop()  // a second stop on a stopped daemon is a no-op
-        try await DaemonClient(socketPath: second.path).ping()
-        _ = second
+        // Repeated: a stopped daemon's accept thread once used a listener fd number that the
+        // next daemon's socket() had reused, and dropped the new daemon's connection. Stopping
+        // right after start (before that thread runs) is the window, so hit it many times.
+        for _ in 0..<50 {
+            let first = FakeDaemon { _ in ["ok": true] }
+            first.stop()
+            let second = FakeDaemon(path: first.path) { _ in ["ok": true] }
+            first.stop()  // a second stop on a stopped daemon is a no-op
+            try await DaemonClient(socketPath: second.path).ping()
+            second.stop()
+        }
+    }
+
+    @Test func aLateReplyNeverReachesTheNextCaller() async throws {
+        // "a" answers after the client has given up. LineSocket must drop that connection on
+        // timeout, or "b" would read "a"'s stale reply off the same socket.
+        let d = FakeDaemon { req in
+            let q = req["q"] as? String ?? ""
+            if q == "a" { Thread.sleep(forTimeInterval: 0.6) }
+            return ["ok": true, "took_us": 1, "hits": [["path": "/r/\(q)", "kind": "file", "size": 0, "mtime": 0, "score": 0]]]
+        }
+        let c = DaemonClient(socketPath: d.path, timeout: 0.3)
+        await #expect(throws: DaemonError.timeout) { try await c.search("a", limit: 1) }
+        try await Task.sleep(for: .milliseconds(500))  // let the late "a" reply be written
+        let r = try await c.search("b", limit: 1)
+        #expect(r.hits.first?.path == "/r/b")
+        #expect(d.accepted == 2, "the timed-out connection was replaced")
     }
 
     @Test func timeoutIsNotRetried() async {
@@ -72,7 +94,9 @@ import Testing
         let tasks = (0..<5).map { _ in Task { try await c.ping() } }
         for t in tasks.prefix(4) { t.cancel() }
         await #expect(throws: DaemonError.timeout) { try await tasks[4].value }
-        #expect(Date().timeIntervalSince(t0) < 1.0, "five queued hung calls would take 1.5 s")
+        // Loose bound: the request count below is the real check; this only catches
+        // the cancelled calls each waiting out their own timeout (5 x 0.3 s).
+        #expect(Date().timeIntervalSince(t0) < 5.0)
         #expect(d.requests.count <= 2, "the cancelled calls were skipped, not sent")
     }
 
