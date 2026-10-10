@@ -44,6 +44,7 @@ Follow-ups not done yet, grouped by priority. "You" items need the maintainer: a
 
 ## P2: code quality and polish
 
+- [ ] **Raise the CI app-coverage gate to 90%:** CI gates app unit-test coverage at 80% (it's 84% excluding system adapters; the combined unit + UI number was 94%). Add unit tests for the remaining app code, then raise `--min` in ci.yml.
 - [ ] **AppTests cleanup at end of run:** throwaway `com.domfahey.fsearch.apptests.*` plists are swept at the start of the next run but about 24 remain after each run; remove them in teardown too.
 - [ ] **UI-test builds register the global ⌥Space hotkey** while running; skip hotkey registration in test mode.
 - [ ] **Test-only API in shipped code:** wrap `OnboardingLauncher.reset()` and the `private(set)` widenings added for AppTests in `#if DEBUG`.
