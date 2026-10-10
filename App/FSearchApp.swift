@@ -9,7 +9,7 @@ struct FSearchApp: App {
         _app = StateObject(wrappedValue: state)
         DispatchQueue.main.async {
             PanelController.shared.install(app: state)
-            Task { await state.daemon.start() }
+            OnboardingLauncher.launch(app: state)
         }
     }
 
