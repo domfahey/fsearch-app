@@ -28,6 +28,8 @@ Nothing has been released yet. Version 0.1.0 will be the first release.
 - Release script, CI workflow and release checklist.
 - FSearchKit Swift package with unit, integration and UI smoke tests.
 - Third-party notices for fsearch, KeyboardShortcuts and Sparkle ([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
+- Privacy manifest declaring no tracking, no data collection and the required-reason APIs the app uses (UserDefaults, file timestamps).
+- App Store category set to Productivity (`LSApplicationCategoryType`).
 - About FSearch window (menu bar) crediting fsearch by Noah Dunnagan, with the full third-party licenses (`scripts/gen-credits.sh` builds it from THIRD_PARTY_NOTICES.md).
 - Release script verifies the stapled app and DMG and the app signature, and writes a SHA-256 checksum file next to the DMG.
 - CI runs the FSearchKit tests on macOS 14 (Xcode 16.2) as well as the current runner.

@@ -7,11 +7,11 @@ Ideas and follow-ups not done yet. Most important first within each section. "Yo
 - [ ] **Launch at login for the app itself.** A Settings toggle (SMAppService.mainApp). Today only the helper starts at login, so the menu-bar icon and hotkey are missing after a reboot until the app is opened.
 - [ ] **Uninstall from inside the app.** A Settings button, "Remove Background Helper and Data…": unregister the login item and move the data folder to the Trash. Document the Full Disk Access entry the user should remove by hand.
 - [ ] **Uninstall documentation.** A page covering the login item, the data folder (`~/Library/Application Support/FSearch`), the logs (`~/Library/Logs/FSearch`) and the Full Disk Access entry.
-- [ ] **Privacy manifest** (`PrivacyInfo.xcprivacy`): no tracking, no data collection, plus the required-reason APIs used (UserDefaults, file timestamps).
+- [x] **Privacy manifest** (`PrivacyInfo.xcprivacy`): no tracking, no data collection, plus the required-reason APIs used (UserDefaults, file timestamps).
 - [ ] **PRIVACY.md:** what the index holds, that it stays on the Mac, no telemetry, Sparkle only checks for updates. Link it from the README and the About window.
 - [ ] **Unified logging:** `os.Logger` with subsystem `com.domfahey.fsearch` and categories (daemon, panel, onboarding), so users can filter Console.app. No crash reporting service.
 - [ ] **"Report an Issue…" menu item:** opens a new GitHub issue pre-filled with the app version, macOS version, chip and daemon status, for the user to review. Nothing is sent automatically.
-- [ ] **`LSApplicationCategoryType`** in Info.plist (`public.app-category.productivity`).
+- [x] **`LSApplicationCategoryType`** in Info.plist (`public.app-category.productivity`).
 - [x] **Release script verification:** `xcrun stapler validate` and `codesign --verify --deep --strict` on the finished DMG; publish SHA-256 checksums.
 - [x] **CI on the oldest supported macOS:** run the FSearchKit tests on the `macos-14` runner too. Today everything runs on macOS 26 with Apple silicon.
 - [ ] **Makefile:** `make lint`, `format`, `type`, `test`, `ui`, `coverage`, `bench`, matching the fsearch repo. CI calls the same targets.
