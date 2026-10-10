@@ -4,6 +4,7 @@ Ideas and follow-ups not done yet. Most important first within each section. "Yo
 
 ## Now (small, closes a real gap)
 
+- [ ] **App commands in the search panel:** typing "settings", "preferences" or "prefs" (a prefix match, so "set" works) shows an "FSearch Settings" row in its own section above the files; ↵ opens Settings. Matching is a pure FSearchKit function with tests; leave room for About and Quit rows later.
 - [ ] **Launch at login for the app itself.** A Settings toggle (SMAppService.mainApp). Today only the helper starts at login, so the menu-bar icon and hotkey are missing after a reboot until the app is opened.
 - [ ] **Uninstall from inside the app.** A Settings button, "Remove Background Helper and Data…": unregister the login item and move the data folder to the Trash. Document the Full Disk Access entry the user should remove by hand.
 - [ ] **Uninstall documentation.** A page covering the login item, the data folder (`~/Library/Application Support/FSearch`), the logs (`~/Library/Logs/FSearch`) and the Full Disk Access entry.
