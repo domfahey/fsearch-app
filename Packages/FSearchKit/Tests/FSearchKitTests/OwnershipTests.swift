@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import Security
 import Testing
 
 @testable import FSearchKit
@@ -28,13 +29,12 @@ import Testing
             "/Users/me/.Trash/FSearch.app/Contents/Helpers/fsearch",
             "/private/var/folders/x/T/org.sparkle-project/FSearch.app/Contents/Helpers/fsearch",
         ] {
-            #expect(SocketHolder.classify(pid: 99, path: moved, identifier: nil, bundlePath: bundle) == .ours, "\(moved)")
+            #expect(SocketHolder.classify(pid: 99, path: moved, signedAsHelper: false, bundlePath: bundle) == .ours, "\(moved)")
         }
-        // Our helper's signing identifier, wherever it runs from (or with no path left to read).
-        let id = SocketHolder.helperIdentifier
-        #expect(SocketHolder.classify(pid: 99, path: "/private/tmp/x/fsearch", identifier: id, bundlePath: bundle) == .ours)
-        #expect(SocketHolder.classify(pid: 99, path: nil, identifier: id, bundlePath: bundle) == .ours)
-        #expect(SocketHolder.classify(pid: nil, path: nil, identifier: id, bundlePath: bundle) == SocketHolder.none)
+        // Signed as our helper by our team, wherever it runs from (or with no path left to read).
+        #expect(SocketHolder.classify(pid: 99, path: "/private/tmp/x/fsearch", signedAsHelper: true, bundlePath: bundle) == .ours)
+        #expect(SocketHolder.classify(pid: 99, path: nil, signedAsHelper: true, bundlePath: bundle) == .ours)
+        #expect(SocketHolder.classify(pid: nil, path: nil, signedAsHelper: true, bundlePath: bundle) == SocketHolder.none)
     }
 
     @Test func anythingElseIsNeverOurs() {
@@ -45,13 +45,19 @@ import Testing
             "/Applications/FSearch.app/Contents/MacOS/fsearch", "/x/FSearch.app/Contents/Helpers/fsearch/../../../evil",
         ] {
             #expect(
-                SocketHolder.classify(pid: 99, path: path, identifier: "fsearch", bundlePath: "/Applications/Mine.app") == .other, "\(path)"
-            )
+                SocketHolder.classify(pid: 99, path: path, signedAsHelper: false, bundlePath: "/Applications/Mine.app") == .other,
+                "\(path)")
         }
-        for id in ["fsearch", "com.domfahey.fsearch", "com.domfahey.fsearch.daemon2", ""] {
-            #expect(
-                SocketHolder.classify(pid: 99, path: "/opt/homebrew/bin/fsearch", identifier: id, bundlePath: bundle) == .other, "\(id)")
-        }
+        #expect(SocketHolder.classify(pid: 99, path: "/opt/homebrew/bin/fsearch", signedAsHelper: false, bundlePath: bundle) == .other)
+    }
+
+    @Test func theHelperRequirementNamesOurTeamNotJustTheIdentifier() {
+        let r = SocketHolder.helperRequirement
+        #expect(r.contains("identifier \"\(SocketHolder.helperIdentifier)\""))
+        #expect(r.contains("anchor apple generic"))
+        #expect(r.contains("certificate leaf[subject.OU] = \"MR3WJZ83MR\""))
+        var req: SecRequirement?
+        #expect(SecRequirementCreateWithString(r as CFString, [], &req) == errSecSuccess, "it parses")
     }
 
     @Test func readsThroughInjectedResolvers() throws {
@@ -61,25 +67,57 @@ import Testing
         let bundle = "/Applications/FSearch.app"
         let ours = SocketHolder.read(
             dataDir: dir, bundlePath: bundle, path: { $0 == 4242 ? "/tmp/gone/fsearch" : nil },
-            identifier: { $0 == 4242 ? SocketHolder.helperIdentifier : nil })
+            signedAsHelper: { $0 == 4242 })
         #expect(ours == .ours)
         let other = SocketHolder.read(
-            dataDir: dir, bundlePath: bundle, path: { _ in "/opt/homebrew/bin/fsearch" }, identifier: { _ in "fsearch" })
+            dataDir: dir, bundlePath: bundle, path: { _ in "/opt/homebrew/bin/fsearch" }, signedAsHelper: { _ in false })
         #expect(other == .other)
-        let gone = SocketHolder.read(dataDir: dir, bundlePath: bundle, path: { _ in nil }, identifier: { _ in nil })
+        let gone = SocketHolder.read(dataDir: dir, bundlePath: bundle, path: { _ in nil }, signedAsHelper: { _ in false })
         #expect(gone == SocketHolder.none)
     }
 
-    @Test func readsARunningProcesssSigningIdentifier() throws {
-        // The linker signs every arm64 binary, ad hoc at least, so the test runner has an identifier.
-        let me = try #require(SocketHolder.signingIdentifier(pid: getpid()))
-        #expect(!me.isEmpty)
-        #expect(me != SocketHolder.helperIdentifier)
+    @Test func checksARunningProcessAgainstARequirement() throws {
+        // The linker signs every arm64 binary, ad hoc at least: the test runner is signed, but not by our team.
+        #expect(!SocketHolder.isSignedAsHelper(pid: getpid()))
+        #expect(SocketHolder.isSignedAsHelper(pid: getpid(), requirement: "anchor apple generic or !anchor apple generic"))
+        #expect(!SocketHolder.isSignedAsHelper(pid: getpid(), requirement: "not a requirement ("), "a bad requirement")
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/usr/bin/true")
         try p.run()
         p.waitUntilExit()
-        #expect(SocketHolder.signingIdentifier(pid: p.processIdentifier) == nil)
+        #expect(!SocketHolder.isSignedAsHelper(pid: p.processIdentifier, requirement: "anchor apple"), "a dead pid")
+    }
+
+    @Test func anAdHocSignatureClaimingOurIdentifierIsNotOurs() throws {
+        // Anyone can sign ad hoc with any identifier; only our team's certificate makes it our helper.
+        let dir = tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let src = dir.appendingPathComponent("main.c")
+        let bin = dir.appendingPathComponent("fsearch")
+        try "#include <unistd.h>\nint main(void) { sleep(30); return 0; }\n".write(to: src, atomically: true, encoding: .utf8)
+        try run("/usr/bin/xcrun", ["clang", "-o", bin.path, src.path])
+        try run("/usr/bin/codesign", ["-f", "-s", "-", "-i", SocketHolder.helperIdentifier, bin.path])
+        let p = Process()
+        p.executableURL = bin
+        try p.run()
+        defer { p.terminate(); p.waitUntilExit() }
+        let identifierOnly = "identifier \"\(SocketHolder.helperIdentifier)\""
+        #expect(SocketHolder.isSignedAsHelper(pid: p.processIdentifier, requirement: identifierOnly), "it does claim the identifier")
+        #expect(!SocketHolder.isSignedAsHelper(pid: p.processIdentifier))
+        let lock = dir.appendingPathComponent("socket.lock")
+        try "\(p.processIdentifier)".write(to: lock, atomically: true, encoding: .utf8)
+        #expect(SocketHolder.read(dataDir: dir, bundlePath: "/Applications/FSearch.app") == .other)
+    }
+
+    private func run(_ tool: String, _ args: [String]) throws {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: tool)
+        p.arguments = args
+        p.standardOutput = FileHandle.nullDevice
+        p.standardError = FileHandle.nullDevice
+        try p.run()
+        p.waitUntilExit()
+        try #require(p.terminationStatus == 0, "\(tool) \(args)")
     }
 
     private func tempDir() -> URL {
