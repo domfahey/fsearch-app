@@ -46,3 +46,14 @@ targets:
         CODE_SIGN_IDENTITY: "-"
         ENABLE_APP_SANDBOX: NO
     dependencies: [{ target: FSearch }]
+  AppTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources: [AppTests]
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "6.0"
+        CODE_SIGN_IDENTITY: "-"
+        ENABLE_APP_SANDBOX: NO
+    dependencies: [{ target: FSearch }]
