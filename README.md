@@ -59,7 +59,7 @@ The app bundles a universal (arm64 and x86_64) fsearch daemon and registers it a
 
 ### Prerequisites
 
-- Xcode 16 or later (Swift 6). CI uses Xcode 26.6; locally, select it with `export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
+- Xcode 16 or later (Swift 6). CI uses Xcode 26.6. The Makefile and scripts use `DEVELOPER_DIR` if set, otherwise the Xcode that `xcode-select -p` reports; select one with `sudo xcode-select -s /Applications/Xcode.app` or `export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
 - Rust via [rustup](https://rustup.rs), with both macOS targets: `rustup target add aarch64-apple-darwin x86_64-apple-darwin`.
 - XcodeGen: `brew install xcodegen`.
 

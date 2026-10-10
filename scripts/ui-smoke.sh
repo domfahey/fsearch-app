@@ -7,7 +7,7 @@
 # skipped, no test ran, or the app wrote its search log outside the temp HOME.
 set -u -o pipefail
 cd "$(dirname "$0")/.." || exit 1
-export DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}
+export DEVELOPER_DIR=${DEVELOPER_DIR:-$(xcode-select -p)}
 H=/private/tmp/fsa-ui-$(openssl rand -hex 3)
 LOG=$(mktemp -t ui-smoke)
 SOCK="$H/Library/Application Support/FSearch/fsearch.sock"
