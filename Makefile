@@ -138,7 +138,7 @@ lint: ## Lint swift-format (LINT_FORMAT=0 skips), links, credits, shell scripts,
 	$(Q)scripts/check-links.sh
 	$(Q)scripts/gen-credits.sh --check
 	$(Q)for f in scripts/*.sh scripts/hooks/*; do bash -n "$$f"; done
-	$(Q)if command -v shellcheck >/dev/null; then shellcheck -S warning scripts/*.sh; \
+	$(Q)if command -v shellcheck >/dev/null; then shellcheck -S warning scripts/*.sh scripts/hooks/*; \
 	else echo "shellcheck not installed; skipped (brew install shellcheck)"; fi
 	$(Q)if command -v actionlint >/dev/null; then actionlint; \
 	else echo "actionlint not installed; skipped (brew install actionlint)"; fi
