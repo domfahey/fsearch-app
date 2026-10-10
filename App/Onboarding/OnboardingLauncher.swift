@@ -14,7 +14,8 @@ enum OnboardingLauncher {
 
     /// Opens onboarding the first time; afterwards just starts the helper.
     static func launch(app: AppState) {
-        guard !onboarded else { startDaemon(app: app); return }
+        // Test mode (UI tests) never shows onboarding: it would take focus from the panel.
+        guard !onboarded, !AppState.testMode else { startDaemon(app: app); return }
         show(app: app)
     }
 
