@@ -64,6 +64,9 @@ extension AppTests {
             let plain = PanelController()
             plain.install(app: env.app)
             #expect(!plain.isVisible)
+            plain.show(app: env.app)
+            #expect(plain.panel?.staysUpWithoutKey == false)
+            plain.hide(returnFocus: false)
             var options = env.app.options
             options.showPanel = true
             let app = AppState(
@@ -76,8 +79,20 @@ extension AppTests {
             defer { pc.hide(returnFocus: false) }
             #expect(pc.isVisible)
             // It stays up when it loses key, as UI tests need.
-            pc.panel?.resignKey()
+            #expect(pc.panel?.staysUpWithoutKey == true)
+        }
+
+        /// Without `showPanel`, losing key puts the launcher away (the panel hides the shared controller).
+        @Test func losingKeyHidesTheSharedPanel() {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let pc = PanelController.shared
+            pc.show(app: env.app)
+            defer { pc.hide(returnFocus: false) }
             #expect(pc.isVisible)
+            #expect(pc.panel?.staysUpWithoutKey == false)
+            pc.panel?.resignKey()
+            #expect(!pc.isVisible)
         }
 
         @Test func effectsRunTheirActions() async {

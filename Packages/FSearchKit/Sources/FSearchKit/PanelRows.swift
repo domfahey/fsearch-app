@@ -24,7 +24,7 @@ public enum PanelRow: Equatable, Sendable {
 /// The rows below the search field, in order: files, then app commands, then the two fallbacks.
 ///
 /// That order is a contract: ↵ on the first row opens the top file, and ⌘1–9 open the first nine
-/// files only (see ``PanelState/reduce(_:_:)``), never a command or fallback.
+/// files only (see ``PanelState/reduce(_:)``), never a command or fallback.
 ///
 /// The two "Use <query> with..." rows come after the files, so the keyboard
 /// reaches them: they exist only for a non-blank query in names mode (the

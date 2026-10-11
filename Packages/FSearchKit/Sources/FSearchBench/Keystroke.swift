@@ -64,7 +64,7 @@ enum LogEntryFactory {
     b.measure("keystroke.panelKeys.reduce10") {
         var s = PanelState(query: plain, mode: .content, selection: 0, count: 52, files: 50)
         var acc = 0
-        for k in keys { if case .open(let i) = PanelState.reduce(&s, k) { acc &+= i } }
+        for k in keys { if case .open(let i) = s.reduce(k) { acc &+= i } }
         blackHole(acc)
     }
 

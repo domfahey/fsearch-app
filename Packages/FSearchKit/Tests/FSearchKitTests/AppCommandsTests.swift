@@ -56,9 +56,9 @@ import Testing
 
     @Test func commandNeverAnswersAFileAction() {
         var s = PanelState(query: "set", selection: 0, count: 5, files: 2)
-        #expect(PanelState.reduce(&s, .cmdDigit(1)) == .open(0))
-        #expect(PanelState.reduce(&s, .cmdDigit(2)) == .open(1))
-        #expect(PanelState.reduce(&s, .cmdDigit(3)) == .none)
-        #expect(PanelState.reduce(&s, .enter) == .open(0))
+        #expect(s.reduce(.cmdDigit(1)) == .open(0))
+        #expect(s.reduce(.cmdDigit(2)) == .open(1))
+        #expect(s.reduce(.cmdDigit(3)) == .none)
+        #expect(s.reduce(.enter) == .open(0))
     }
 }

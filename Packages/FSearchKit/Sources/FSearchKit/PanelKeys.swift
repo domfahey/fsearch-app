@@ -1,6 +1,6 @@
 import Foundation
 
-/// A key the panel handles itself, independent of AppKit so ``PanelState/reduce(_:_:)`` is testable.
+/// A key the panel handles itself, independent of AppKit so ``PanelState/reduce(_:)`` is testable.
 public enum PanelKey: Equatable, Sendable {
     /// Moves the selection up one row.
     case up
@@ -84,7 +84,7 @@ public enum MenuAction: CaseIterable, Hashable, Sendable {
     public var recordsRecent: Bool { self == .open || self == .openWith }
 }
 
-/// What the panel's owner must do after ``PanelState/reduce(_:_:)``; row payloads are row indices (see ``PanelRows``).
+/// What the panel's owner must do after ``PanelState/reduce(_:)``; row payloads are row indices (see ``PanelRows``).
 public enum PanelEffect: Equatable, Sendable {
     /// Nothing beyond the state change.
     case none
@@ -102,13 +102,13 @@ public enum PanelEffect: Equatable, Sendable {
     case hide
 }
 
-/// The panel's keyboard-relevant state, reduced by ``PanelState/reduce(_:_:)``.
+/// The panel's keyboard-relevant state, reduced by ``PanelState/reduce(_:)``.
 public struct PanelState: Equatable, Sendable {
     /// The text in the search field.
     public var query: String
     /// Names, content or symbols.
     public var mode: SearchMode
-    /// The selected row index; clamped to the rows by ``PanelState/reduce(_:_:)``.
+    /// The selected row index; clamped to the rows by ``PanelState/reduce(_:)``.
     public var selection: Int
     /// Every selectable row, the commands and "use with..." rows included.
     public var count: Int
@@ -123,34 +123,34 @@ public struct PanelState: Equatable, Sendable {
 extension PanelState {
     /// What a key does to the panel. No UI involved, so every binding is testable.
     ///
-    /// - Parameters:
-    ///   - s: The state, updated in place (selection, query, mode).
-    ///   - key: The key pressed.
+    /// Updates the state in place (selection, query, mode).
+    ///
+    /// - Parameter key: The key pressed.
     /// - Returns: The side effect the caller must perform, if any.
-    public static func reduce(_ s: inout PanelState, _ key: PanelKey) -> PanelEffect {
+    public mutating func reduce(_ key: PanelKey) -> PanelEffect {
         // Never act on a row that does not exist.
-        s.selection = min(max(0, s.selection), max(0, s.count - 1))
-        let has = s.count > 0
+        self.selection = min(max(0, self.selection), max(0, self.count - 1))
+        let has = self.count > 0
         switch key {
-        case .up: s.selection = max(0, s.selection - 1); return .none
-        case .down: s.selection = min(max(0, s.count - 1), s.selection + 1); return .none
-        case .enter: return has ? .open(s.selection) : .none
-        case .cmdEnter: return has ? .reveal(s.selection) : .none
-        case .cmdY: return has ? .quickLook(s.selection) : .none
-        case .cmdShiftC: return has ? .copyPath(s.selection) : .none
-        case .cmdK: return has ? .showActions(s.selection) : .none
+        case .up: self.selection = max(0, self.selection - 1); return .none
+        case .down: self.selection = min(max(0, self.count - 1), self.selection + 1); return .none
+        case .enter: return has ? .open(self.selection) : .none
+        case .cmdEnter: return has ? .reveal(self.selection) : .none
+        case .cmdY: return has ? .quickLook(self.selection) : .none
+        case .cmdShiftC: return has ? .copyPath(self.selection) : .none
+        case .cmdK: return has ? .showActions(self.selection) : .none
         // ⌘N opens the Nth file; it never lands on a command or "use with..." row.
         case let .cmdDigit(n):
-            let files = min(s.count, s.files ?? s.count)
+            let files = min(self.count, self.files ?? self.count)
             return (1...9).contains(n) && n <= files ? .open(n - 1) : .none
         case .escape:
             // Clear the query, then drop the content/symbols chip, then hide.
-            if !s.query.isEmpty { s.query = ""; s.selection = 0; return .none }
-            if s.mode != .names { s.mode = .names; return .none }
+            if !self.query.isEmpty { self.query = ""; self.selection = 0; return .none }
+            if self.mode != .names { self.mode = .names; return .none }
             return .hide
         case .backspaceOnEmpty:
-            guard s.query.isEmpty else { return .none }
-            s.mode = .names
+            guard self.query.isEmpty else { return .none }
+            self.mode = .names
             return .none
         }
     }

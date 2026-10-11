@@ -24,7 +24,9 @@ public struct OnboardingFacts: Equatable, Sendable {
     public init() {}
 }
 
-/// Onboarding's rules: when a step may continue, and the shortcut warning.
+/// Onboarding's rules and copy: when a step may continue, the shortcut warning,
+/// which daemon steps 2 and 3 talk about, when to restart the helper after
+/// System Settings, and step 4's lines (the last ones in OnboardingCopy.swift).
 public enum Onboarding {
     /// Each step checks its own result before moving on.
     ///

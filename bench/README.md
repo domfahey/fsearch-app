@@ -28,7 +28,7 @@ Times are per operation (stored in ns, shown as ns/µs/ms).
 | `keystroke.split.{plain,filters,quoted}` | `QuerySplit.split` on a plain query, one with four filters, one with quoted words |
 | `keystroke.contentSearch` | `QuerySplit.contentSearch` (`grep:` detection, run on every names-mode keystroke) |
 | `keystroke.panelRows.50` | `PanelRows.count` + `row(at:)` for every row of a 50-result list |
-| `keystroke.panelKeys.reduce10` | `PanelState.reduce(_:_:)` over a 10-key burst |
+| `keystroke.panelKeys.reduce10` | `PanelState.reduce(_:)` over a 10-key burst |
 | `decode.search50`, `decode.grep50` | `DaemonClient.decodeReply` of a 50-hit `SearchReply` and a 50-file (3 lines each) `GrepReply` |
 | `searchlog.append.10k` | `SearchLog.append` onto a 10,000-line log (file reset before each sample) |
 | `searchlog.entries.10k` | `SearchLog.entries()` reading a 10,000-line log |

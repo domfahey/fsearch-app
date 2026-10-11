@@ -17,7 +17,7 @@ import SwiftUI
 final class PanelController: PanelHost {
     static let shared = PanelController()
     /// The panel, created on the first `show`.
-    private(set) var panel: NSPanel?
+    private(set) var panel: Panel?
     /// Remembers the state at hide, so a quick reopen resumes.
     private var session = PanelSession()
     private weak var app: AppState?
@@ -91,7 +91,7 @@ final class PanelController: PanelHost {
             onCommand: { [weak self] in self?.run($0) }
         ).environmentObject(app)
         let p = panel ?? Panel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        (p as? Panel)?.staysUpWithoutKey = app.options.showPanel
+        p.staysUpWithoutKey = app.options.showPanel
         p.isFloatingPanel = true
         p.level = .floating
         p.isOpaque = false
@@ -197,7 +197,7 @@ final class PanelController: PanelHost {
     /// Carries out a panel key's effect on the results.
     ///
     /// - Parameters:
-    ///   - effect: What ``PanelState/reduce(_:_:)`` asked for; indices are file indices.
+    ///   - effect: What ``PanelState/reduce(_:)`` asked for; indices are file indices.
     ///   - items: The results showing; an index outside them is ignored.
     func perform(_ effect: PanelEffect, _ items: [ResultItem]) {
         guard let app else { return }
