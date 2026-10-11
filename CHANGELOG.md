@@ -47,7 +47,7 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
   - Pre-commit scans staged blobs and pre-push scans every unpushed commit for GitHub tokens and EdDSA-style keys. Key and certificate file types are git-ignored.
   - Every public FSearchKit API has a doc comment.
   - Documentation: limitations and update pages, an FAQ glossary, the content-search scope, ADRs 0007–0010, test tiers in the contributing guide, and, in the security policy, known limitations (same-user access to the daemon and its index), scope, a 90-day disclosure target, how to verify a download and a key-compromise process.
-  - Repository settings: CodeQL, private vulnerability reporting, protected release environment and tags, and an Actions allow list that requires SHA pins.
+  - Repository settings: CodeQL for Swift and the workflows, private vulnerability reporting, a protected `main` (required checks on up-to-date branches, linear history, squash merges), a protected release environment and tags, and an Actions allow list that requires SHA pins.
   - Open-source project files: contributing guide, security policy, code of conduct, architecture overview, issue and pull request templates, CODEOWNERS, and Dependabot for GitHub Actions.
 
 ### Changed

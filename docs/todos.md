@@ -4,12 +4,9 @@ Open work, by priority. "You" items need the maintainer: a decision, credentials
 
 Detail for the bug-audit items is in `.superpowers/audit-round2.md`, and for the final-review fixes in `.superpowers/final-fix-brief.md`. Both are local working notes, not committed.
 
-## After the pull request merges
+## CI
 
-- [ ] Stricter `main`: enforce for admins, require up-to-date branches, linear history, conversation resolution; squash-only merges; delete merged branches.
-- [ ] Remove `dtolnay/rust-toolchain` from the Actions allow list once this branch is on `main` (the branch no longer uses it).
 - [ ] Pin `actionlint` and `shellcheck` in the CI lint job (it uses an unpinned `brew install`).
-- [ ] CodeQL: add Swift analysis (needs an advanced setup with a build step; default setup covers the workflows only).
 
 ## P1: bugs from audit round 2
 
