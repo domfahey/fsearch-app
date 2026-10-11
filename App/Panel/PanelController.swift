@@ -31,6 +31,8 @@ final class PanelController: PanelHost {
     let keys = PanelKeyFeed()
     /// Where the view laid out its rows, so ⌘K's menu opens at the selected one.
     let geometry = PanelGeometry()
+    /// The FSearch menu (⌘/); hiding the panel closes it, and opening it drops the held key.
+    private(set) lazy var menu = AppMenuState(held: held)
 
     /// The panel window: key only outside the unit-test host, hides on resign, and hosts the Quick Look controller.
     final class Panel: NSPanel {
@@ -89,7 +91,7 @@ final class PanelController: PanelHost {
         held.key.cancel()
         geometry.rows = [:]
         let view = SearchView(
-            model: app.search, state: resumed, held: held, keys: keys, geometry: geometry,
+            model: app.search, state: resumed, held: held, keys: keys, geometry: geometry, menu: menu,
             isVisible: { [weak self] in self?.isVisible == true },
             onEffect: { [weak self] effect, items in
                 self?.perform(effect, items)
@@ -131,6 +133,7 @@ final class PanelController: PanelHost {
     /// - Parameter returnFocus: False when hiding because the user clicked another app, so focus isn't pulled back.
     func hide(returnFocus: Bool = true) {
         held.key.cancel()
+        menu.close()
         guard let p = panel, p.isVisible, let app else { return }
         session.hidden(PanelState(query: app.search.query, mode: app.search.mode, selection: selection), at: Date())
         p.orderOut(nil)

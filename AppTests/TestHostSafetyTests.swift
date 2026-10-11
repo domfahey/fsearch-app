@@ -48,6 +48,9 @@ extension AppTests {
             QuickLookSource.shared.toggle(URL(fileURLWithPath: path))
             #expect(QuickLookSource.shared.item == URL(fileURLWithPath: path))
             pc.perform(.quickLook(0), items)
+            // The FSearch menu draws inside the panel; About is the one row that would show a window.
+            pc.menu.toggle()
+            AppMenuActions.showAbout()
             let w = await render(Text("render"), size: NSSize(width: 100, height: 40))
             defer { w.close() }
             #expect(w.canBecomeKey == false)

@@ -5,7 +5,8 @@ import Foundation
 /// The Help menu: titles and the pages they open.
 enum HelpLinks {
     /// Where the Help pages live; the links open the rendered Markdown on GitHub.
-    static let base = "https://github.com/domfahey/fsearch-app/blob/main/"
+    static let repo = "https://github.com/domfahey/fsearch-app"
+    static let base = repo + "/blob/main/"
 
     /// A Help menu entry.
     struct Item: Equatable { let title: String; let url: URL }
@@ -18,6 +19,16 @@ enum HelpLinks {
         ("Changelog", "CHANGELOG.md"),
         ("Privacy", "docs/privacy.md"),
     ].map { Item(title: $0.0, url: URL(string: base + $0.1)!) }
+
+    /// The project's own pages on GitHub, below the Help pages.
+    static let community: [Item] = [
+        ("GitHub", repo), ("Discussions", repo + "/discussions"),
+    ].map { Item(title: $0.0, url: URL(string: $0.1)!) }
+
+    /// The entry with this title, so the panel's FSearch menu opens the same pages as the menu bar.
+    static func item(_ title: String) -> Item? {
+        (items + community).first { $0.title == title }
+    }
 
     /// The title of the menu item that opens the pre-filled bug report.
     static let reportTitle = "Report an Issue…"
