@@ -8,7 +8,7 @@ enum PanelInput {
     struct Press: Equatable {
         var key: KeyEquivalent
         var characters: String
-        var command = false, shift = false, control = false
+        var command = false, shift = false, control = false, option = false
         /// The physical key (an ANSI kVK_ code), for ⌘ letters on a non-Latin layout.
         var keyCode: UInt16?
         /// The key is being held down (KeyPress.Phases.repeat).
@@ -16,9 +16,10 @@ enum PanelInput {
 
         init(
             key: KeyEquivalent, characters: String = "", command: Bool = false, shift: Bool = false, control: Bool = false,
-            keyCode: UInt16? = nil, isRepeat: Bool = false
+            option: Bool = false, keyCode: UInt16? = nil, isRepeat: Bool = false
         ) {
             (self.key, self.characters, self.command, self.shift, self.control) = (key, characters, command, shift, control)
+            self.option = option
             (self.keyCode, self.isRepeat) = (keyCode, isRepeat)
         }
 
@@ -29,7 +30,7 @@ enum PanelInput {
             self.init(
                 key: p.key, characters: p.characters, command: p.modifiers.contains(.command),
                 shift: p.modifiers.contains(.shift), control: p.modifiers.contains(.control),
-                keyCode: code, isRepeat: p.phase == .repeat)
+                option: p.modifiers.contains(.option), keyCode: code, isRepeat: p.phase == .repeat)
         }
     }
 
@@ -42,15 +43,21 @@ enum PanelInput {
 
     private static func firstKey(for p: Press, queryIsEmpty: Bool) -> PanelKey? {
         // ⌃ letters can arrive as control characters (⌃N is U+000E).
-        let ctrlLetter = p.control && !p.command && !p.shift ? letter(p.key.character) : nil
+        let ctrlLetter = p.control && !p.command && !p.shift && !p.option ? letter(p.key.character) : nil
         if ctrlLetter == "p" { return .up }
         if ctrlLetter == "n" { return .down }
+        // Moving and Escape take any modifiers.
+        switch p.key {
+        case .upArrow: return .up
+        case .downArrow: return .down
+        case .escape: return .escape
+        default: break
+        }
+        // ↵ and the ⌘ shortcuts take no ⌃ or ⌥: ⌘⌃Y is not ⌘Y.
+        if p.control || p.option, p.key == .return || p.command { return nil }
         switch (p.key, p.command, p.shift, p.control) {
-        case (.upArrow, _, _, _): return .up
-        case (.downArrow, _, _, _): return .down
         case (.return, true, _, _): return .cmdEnter
         case (.return, false, _, _): return .enter
-        case (.escape, _, _, _): return .escape
         // ⌘Y, ⌘K, ⌘⇧C ignoring case (Shift or Caps Lock change the character),
         // or by key code on a non-Latin layout.
         case (_, true, _, _) where commandLetter(p) != nil: return commandLetter(p)
@@ -76,6 +83,27 @@ enum PanelInput {
         guard let v = c.unicodeScalars.first?.value, c.unicodeScalars.count == 1 else { return nil }
         if (1...26).contains(v) { return Character(UnicodeScalar(v + 0x60)!) }
         return Character(String(c).lowercased())
+    }
+
+    /// A press that is no panel key but must not reach the field either: ⌃↵
+    /// and ⌥↵ would type a line break into the query, and a ⌘ shortcut with
+    /// ⌃ or ⌥ added should do nothing. The view takes these and does nothing.
+    static func swallows(_ p: Press) -> Bool {
+        guard p.control || p.option else { return false }
+        if p.key == .return { return true }
+        var bare = p
+        (bare.control, bare.option) = (false, false)
+        return p.command && firstKey(for: bare, queryIsEmpty: false) != nil
+    }
+
+    /// A held ⌘K replays a main-actor turn later, so its menu opens where the
+    /// new rows have been laid out, not where the old ones were.
+    static func replaysAfterLayout(_ k: PanelKey) -> Bool { k == .cmdK }
+
+    /// The file Quick Look follows to when row `i` is selected; nil on a command or fallback row.
+    static func previewPath(at i: Int, shown: [ResultItem], rows: PanelRows) -> String? {
+        guard case let .result(f)? = rows.row(at: i), shown.indices.contains(f) else { return nil }
+        return shown[f].path
     }
 
     /// What the view does with an effect once row indices are resolved.
@@ -211,4 +239,21 @@ enum PanelInput {
 @MainActor
 final class HeldKeyBox {
     var key = HeldKey()
+}
+
+/// Keys for the panel from outside its own key handling: ↑/↓ pressed in
+/// Quick Look, which holds the keyboard while it is up.
+@MainActor @Observable
+final class PanelKeyFeed {
+    /// A key sent, numbered so the same key twice is still a change.
+    struct Sent: Equatable {
+        let key: PanelKey
+        let n: Int
+    }
+
+    /// The last key sent; the view acts on each new one.
+    private(set) var last: Sent?
+
+    /// Sends a key to the panel.
+    func send(_ k: PanelKey) { last = Sent(key: k, n: (last?.n ?? 0) + 1) }
 }

@@ -201,6 +201,48 @@ final class QuickLookSource: NSObject, @preconcurrency QLPreviewPanelDataSource 
         if QLPreviewPanel.sharedPreviewPanelExists(), QLPreviewPanel.shared().isVisible { QLPreviewPanel.shared().orderOut(nil) }
     }
 
+    /// The launcher's selection moved: while the preview is up it shows the
+    /// newly selected file. Nil (a command or fallback row) keeps the last one.
+    func follow(_ u: URL?, previewing: Bool? = nil, inert: Bool = Presentation.inert) {
+        guard let u, u != item, previewing ?? isPreviewing else { return }
+        item = u
+        guard !inert, QLPreviewPanel.sharedPreviewPanelExists() else { return }
+        QLPreviewPanel.shared().reloadData()
+    }
+
+    /// What a key pressed in the preview does.
+    enum PreviewKey: Equatable {
+        /// ⌘Y: close the preview, as ⌘Y toggles it.
+        case close
+        /// ↑/↓: move the launcher's selection; the preview follows.
+        case up, down
+    }
+
+    /// The preview's keys, with no extra modifiers: ⌘⌃Y is not ⌘Y.
+    nonisolated static func previewKey(characters: String, modifiers: NSEvent.ModifierFlags, keyCode: UInt16) -> PreviewKey? {
+        let mods = modifiers.intersection([.command, .shift, .control, .option])
+        switch keyCode {
+        case 126 where mods.isEmpty: return .up
+        case 125 where mods.isEmpty: return .down
+        default:
+            // By key code too: on a non-Latin layout ⌘Y types "н".
+            let cmdY = mods == .command && PanelKey.commandLetter(characters, shift: false, keyCode: keyCode) == .cmdY
+            return cmdY ? .close : nil
+        }
+    }
+
+    /// Moves the launcher's selection (↑/↓ in the preview); tests replace it.
+    var move: @MainActor (PanelKey) -> Void = { PanelController.shared.keys.send($0) }
+
+    /// Does what a key pressed in the preview asks.
+    func handle(_ k: PreviewKey) {
+        switch k {
+        case .close: close()
+        case .up: move(.up)
+        case .down: move(.down)
+        }
+    }
+
     func numberOfPreviewItems(in panel: QLPreviewPanel!) -> Int { item == nil ? 0 : 1 }
     func previewPanel(_ panel: QLPreviewPanel!, previewItemAt index: Int) -> (any QLPreviewItem)! { item as NSURL? }
 
@@ -210,16 +252,14 @@ final class QuickLookSource: NSObject, @preconcurrency QLPreviewPanelDataSource 
     /// The launcher took control of the preview.
     func attach(_ panel: QLPreviewPanel) {
         panel.dataSource = self
-        // The preview is key while it is up, so ⌘Y goes to it, not the launcher's key handling: close it here, as ⌘Y toggles.
+        // The preview is key while it is up, so its keys (⌘Y, ↑/↓) go to it, not the launcher's key handling: handle them here.
         keyMonitor =
             keyMonitor
             ?? NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-                // By key code too: on a non-Latin layout ⌘Y types "н".
-                let letter = PanelKey.commandLetter(
-                    event.charactersIgnoringModifiers ?? "", shift: event.modifierFlags.contains(.shift), keyCode: event.keyCode)
-                let cmdY = event.modifierFlags.contains(.command) && letter == .cmdY
-                guard cmdY, event.window is QLPreviewPanel else { return event }
-                MainActor.assumeIsolated { QuickLookSource.shared.close() }
+                let key = Self.previewKey(
+                    characters: event.charactersIgnoringModifiers ?? "", modifiers: event.modifierFlags, keyCode: event.keyCode)
+                guard let key, event.window is QLPreviewPanel else { return event }
+                MainActor.assumeIsolated { QuickLookSource.shared.handle(key) }
                 return nil
             }
     }

@@ -16,9 +16,9 @@ This page lists every keyboard shortcut in FSearch for Mac.
 | ↓ or ⌃N | Move the selection down |
 | ↵ | Open the selected file in its default app. For a line from a content search, open it at that line in your chosen editor. On a "Use … with…" row, switch to that search. On the **FSearch Settings** row, open Settings. The panel hides after a file opens. |
 | ⌘↵ | Reveal the selected file in Finder, and hide the panel |
-| ⌘Y | Quick Look the selected file. Press ⌘Y again to close the preview. |
+| ⌘Y | Quick Look the selected file. While the preview is up, ↑ and ↓ (with no modifiers) move the selection and the preview follows; ⌘ or ⇧ arrows go to Quick Look. Press ⌘Y again to close it. |
 | ⌘⇧C | Copy the selected file's path |
-| ⌘K | Open the actions menu for the selected file |
+| ⌘K | Open the actions menu under the selected file |
 | ⌘1 to ⌘9 | Open the first to ninth file result. It never lands on a command or "Use … with…" row. |
 | Esc | Clear the query. If the query is already empty, remove the **Inside files** or **Definitions** chip. If there is no chip, hide the panel. |
 | Backspace on an empty field | Remove the **Inside files** or **Definitions** chip |
@@ -26,6 +26,7 @@ This page lists every keyboard shortcut in FSearch for Mac.
 Notes:
 
 - ⌘Y, ⌘K and ⌘⇧C work with Caps Lock on.
+- The ⌘ shortcuts and ↵ do nothing with ⌃ or ⌥ held too: ⌘⌃Y is not ⌘Y.
 - Keys that act on a result do nothing when there are no rows.
 - ⌘1 to ⌘9 open the first nine file results only.
 - Copy Path leaves the panel open. Open, Reveal and the actions that go to another app hide it.

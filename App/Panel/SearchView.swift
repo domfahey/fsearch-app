@@ -18,6 +18,10 @@ struct SearchView: View {
     @FocusState private var focused: Bool
     /// A result key pressed before the rows answered the query, run once they do.
     let held: HeldKeyBox
+    /// Keys from outside the view: ↑/↓ pressed in Quick Look.
+    let keys: PanelKeyFeed
+    /// Where the rows are laid out, for ⌘K's menu.
+    let geometry: PanelGeometry
     /// Whether the panel is on screen; a hidden panel never replays a held key.
     let isVisible: () -> Bool
     /// What ↵ does on the selected row, remembered per row.
@@ -73,6 +77,7 @@ struct SearchView: View {
                 if app.debugMode { Circle().fill(.orange).frame(width: 6, height: 6).help("Debug mode") }
             }
             .padding(14)
+            .onPanelFrame { geometry.field = $0 }
             DaemonMessageLine(model: model, daemon: app.daemon)
             Divider()
             ScrollViewReader { proxy in
@@ -90,6 +95,8 @@ struct SearchView: View {
                             ForEach(Array(shown.enumerated()), id: \.element.id) { i, item in
                                 ResultRow(item: item, query: highlightQuery, selected: i == state.selection)
                                     .id(item.id)
+                                    .onPanelFrame { geometry.rows[item.id] = $0 }
+                                    .onDisappear { geometry.rows[item.id] = nil }
                                     .onTapGesture(count: 2) { onEffect(.open(i), shown) }
                                     .onTapGesture { state.selection = i }
                                     .draggable(URL(fileURLWithPath: item.path))
@@ -123,6 +130,7 @@ struct SearchView: View {
                     }
                     .padding(.bottom, 6)
                 }
+                .onPanelFrame { geometry.list = $0 }
                 // The keyboard selection stays in view (anchor nil: the least scrolling).
                 .onChange(of: state.selection) {
                     if let id = PanelInput.rowID(at: state.selection, shown: shown, rows: self.rows) { proxy.scrollTo(id) }
@@ -150,14 +158,28 @@ struct SearchView: View {
         }
         .frame(width: 680, height: 460)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .coordinateSpace(.named(PanelGeometry.space))
         .onAppear { focused = true }
         .onChange(of: state.selection) { onSelect(state.selection) }
+        // An open preview follows the selected file: a new selection, or new rows under the same one.
+        .onChange(of: PanelInput.previewPath(at: state.selection, shown: shown, rows: rows)) { _, path in
+            QuickLookSource.shared.follow(path.map(FileActions.url))
+        }
+        // ↑/↓ pressed in Quick Look, which holds the keyboard while it is up.
+        .onChange(of: keys.last) { if let k = keys.last?.key { act(k) } }
         .onChange(of: model.mode) { held.key.cancel() }
         // The results for the query in the box arrived: run a key held for them.
         .onChange(of: PanelInput.answer(model)) { old, new in
+            geometry.rowsChanged(keeping: Set(shown.map(\.id)))
             let k = PanelInput.rowsChanged(
                 from: old, to: new, selection: &state.selection, held: &held.key, model: model, visible: isVisible())
-            if let k { act(k) }
+            guard let k else { return }
+            if PanelInput.replaysAfterLayout(k) {
+                // Unless the panel was hidden in the meantime.
+                DispatchQueue.main.async { if isVisible() { act(k) } }
+            } else {
+                act(k)
+            }
         }
         // .repeat: holding ↓/↑ keeps moving (PanelInput ignores other repeats).
         .onKeyPress(phases: [.down, .repeat]) { press in handle(press) }
@@ -211,7 +233,9 @@ struct SearchView: View {
     /// Routes a key press through ``PanelInput`` and ``PanelState/reduce(_:)``, then performs the effect.
     private func handle(_ press: KeyPress) -> KeyPress.Result {
         let p = PanelInput.Press(press, event: NSApp.currentEvent)
-        guard let key = PanelInput.key(for: p, queryIsEmpty: model.query.isEmpty) else { return .ignored }
+        guard let key = PanelInput.key(for: p, queryIsEmpty: model.query.isEmpty) else {
+            return PanelInput.swallows(p) ? .handled : .ignored
+        }
         // A result key waits for results that answer the query in the box.
         if let now = PanelInput.gate(key, held: &held.key, model: model) { act(now) }
         return .handled
@@ -231,6 +255,17 @@ struct SearchView: View {
         case let .switchMode(m): switchMode(m)
         case let .runCommand(c): onCommand(c)
         case .ignore: break
+        }
+    }
+}
+
+extension View {
+    /// Reports the view's frame in the panel's coordinates (``PanelGeometry``) whenever it changes.
+    fileprivate func onPanelFrame(_ action: @escaping (CGRect) -> Void) -> some View {
+        onGeometryChange(for: CGRect.self) { proxy in
+            proxy.frame(in: .named(PanelGeometry.space))
+        } action: { frame in
+            action(frame)
         }
     }
 }

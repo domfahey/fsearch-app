@@ -112,6 +112,28 @@ final class PanelUITests: PanelUITestCase {
         waitUntil(5, "field focused") { self.field.value(forKey: "hasKeyboardFocus") as? Bool == true }
     }
 
+    /// In Quick Look, ↓ moves the launcher's selection; ⌘Y still closes the preview.
+    func testQuickLookArrowMovesTheSelection() throws {
+        try launch()
+        try search("plover")
+        waitFor(text("plover-one.txt"))
+        waitFor(text("plover-two.txt"))
+        try press("c", [.command, .shift])
+        let first = try XCTUnwrap(clipboard)
+        let preview = app.windows["Quick Look"]
+        try press("y", .command)
+        waitFor(preview, 10)
+        try pressInApp(.downArrow)
+        try pressInApp("y", .command)
+        XCTAssertTrue(preview.waitForNonExistence(timeout: 10), tree())
+        waitUntil(5, "field focused") { self.field.value(forKey: "hasKeyboardFocus") as? Bool == true }
+        // The selection moved while the preview was up.
+        try press("c", [.command, .shift])
+        let second = try XCTUnwrap(clipboard)
+        XCTAssertNotEqual(first, second)
+        XCTAssertEqual(Set([first, second].map { ($0 as NSString).lastPathComponent }), ["plover-one.txt", "plover-two.txt"])
+    }
+
     func testActionsMenuListsItsItems() throws {
         try launch()
         try search("heronfile")

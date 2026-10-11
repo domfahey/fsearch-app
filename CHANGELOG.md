@@ -61,6 +61,9 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
 
 ### Fixed
 
+- The ⌘K actions menu opens under the selected row, or under the search field when that row is out of view, instead of at a fixed spot.
+- ⌘Y, ⌘K, ⌘⇧C, ⌘1–9, ⌘↵ and ↵ no longer fire with ⌃ or ⌥ held too, so ⌘⌃Y no longer opens Quick Look.
+- In Quick Look, ↑ and ↓ move the panel's selection and the preview follows it.
 - Backspace in an empty search field drops the Inside files or Definitions chip again. It only matched the key some synthesized events send, not a real keyboard's Backspace.
 - The panel no longer opens with its search field behind the menu bar on screens shorter than about 1290pt.
 - ↵ and the row shortcuts pressed before results arrive wait for them, instead of opening the previous query's result. New results put the selection back on the top row first, so a waiting key never opens a row picked from the old results. A waiting key is dropped if the panel is hidden, the search fails or the index is still building, and it acts on the rows shown while a filter is still being typed (`foo ext:`) instead of being swallowed.
