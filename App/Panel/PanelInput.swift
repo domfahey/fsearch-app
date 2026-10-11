@@ -61,8 +61,9 @@ enum PanelInput {
         // ⌘Y, ⌘K, ⌘⇧C ignoring case (Shift or Caps Lock change the character),
         // or by key code on a non-Latin layout.
         case (_, true, _, _) where commandLetter(p) != nil: return commandLetter(p)
-        // ⌘/ opens the FSearch menu: by character, or by key code (kVK_ANSI_Slash) on other layouts.
-        case (_, true, false, _) where p.characters == "/" || p.keyCode == 0x2C: return .appMenu
+        // ⌘/ opens the FSearch menu: by the "/" it types, with or without ⇧ (German types it with ⇧7),
+        // or by the US slash key (kVK_ANSI_Slash) without ⇧, where ⇧ types "?" (⌘? is Help search).
+        case (_, true, _, _) where p.characters == "/" || (p.keyCode == 0x2C && !p.shift): return .appMenu
         // Backspace: SwiftUI's .delete is BS, a keyboard sends DEL; key code 51 either way.
         case (_, false, _, _) where queryIsEmpty && isBackspace(p): return .backspaceOnEmpty
         default:
