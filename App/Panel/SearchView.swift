@@ -13,7 +13,7 @@ extension KeyboardShortcuts.Name {
 struct SearchView: View {
     @EnvironmentObject var app: AppState
     @Bindable var model: SearchModel
-    /// The keyboard state, reduced by ``reduce(_:_:)``.
+    /// The keyboard state, reduced by ``PanelState/reduce(_:_:)``.
     @State var state: PanelState
     @FocusState private var focused: Bool
     /// A result key pressed before the rows answered the query, run once they do.
@@ -208,7 +208,7 @@ struct SearchView: View {
         Task { await model.refresh() }
     }
 
-    /// Routes a key press through ``PanelInput`` and ``reduce(_:_:)``, then performs the effect.
+    /// Routes a key press through ``PanelInput`` and ``PanelState/reduce(_:_:)``, then performs the effect.
     private func handle(_ press: KeyPress) -> KeyPress.Result {
         let p = PanelInput.Press(press, event: NSApp.currentEvent)
         guard let key = PanelInput.key(for: p, queryIsEmpty: model.query.isEmpty) else { return .ignored }
@@ -220,7 +220,7 @@ struct SearchView: View {
     private func act(_ key: PanelKey) {
         let rows = rows
         state.query = model.query; state.mode = model.mode; state.count = rows.count; state.files = shown.count
-        let effect = reduce(&state, key)
+        let effect = PanelState.reduce(&state, key)
         // A query change refreshes through .onChange; only a mode change alone needs it here.
         let modeChanged = model.mode != state.mode
         let queryChanged = model.query != state.query

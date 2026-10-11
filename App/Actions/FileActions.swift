@@ -44,7 +44,7 @@ enum FileActions {
     /// drop the URL without an error, so the fallback below would never run.
     static func editorTarget(for item: ResultItem, editor: Editor?) -> (url: URL, app: URL)? {
         guard case let .line(path, match) = item, let e = editor, let appURL = editorApp(for: item, editor: e) else { return nil }
-        guard let lineURL = editorURL(e, path: path, line: match.line),
+        guard let lineURL = e.openURL(path: path, line: match.line),
             workspace.urlsForApplications(toOpen: lineURL).contains(where: { $0.path == appURL.path })
         else { return (url(path), appURL) }
         return (lineURL, appURL)

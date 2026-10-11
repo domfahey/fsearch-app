@@ -31,7 +31,7 @@ The app logs through `os.Logger` (subsystem `com.domfahey.fsearch`, see `App/Sup
 
 ## FSearchKit and the App target
 
-[`Packages/FSearchKit`](../Packages/FSearchKit) holds everything that can be tested without a UI: the wire types and `decodeReply`, `LineSocket`, `DaemonClient`, `SearchModel`, `QuerySplit`/`QuerySyntax`, `DaemonPlan`, `RestartBudget`, `MenuBarWarning`, onboarding rules, `Recents`, `SearchLog`, key handling (`PanelKeys`) and row layout (`PanelRows`). It has no dependencies. The `FSearch` target in [`project.yml`](../project.yml) is the glue: windows, `SMAppService`, Sparkle, the global shortcut, and file actions. Put new logic in the package and keep the App code thin.
+[`Packages/FSearchKit`](../Packages/FSearchKit) holds everything that can be tested without a UI: the wire types and `DaemonClient.decodeReply`, `LineSocket`, `DaemonClient`, `SearchModel`, `QuerySplit`/`QuerySyntax`, `DaemonPlan`, `RestartBudget`, `MenuBarWarning`, onboarding rules, `Recents`, `SearchLog`, key handling (`PanelKeys`) and row layout (`PanelRows`). It has no dependencies. The `FSearch` target in [`project.yml`](../project.yml) is the glue: windows, `SMAppService`, Sparkle, the global shortcut, and file actions. Put new logic in the package and keep the App code thin.
 
 ## One keystroke
 
@@ -39,7 +39,7 @@ The app logs through `os.Logger` (subsystem `com.domfahey.fsearch`, see `App/Sup
 2. `refresh()` bumps a generation counter and cancels the previous in-flight task. Only the newest generation may publish, so a slow old answer is dropped. A blank query, the `?` cheat sheet, a half-typed filter, or a `grep:`/`sym:` with no value yet sends nothing. Published results are tagged with the query and mode they answer; `resultsAreCurrent` is false until they match the box, so the panel doesn't act on a stale row.
 3. `run` picks a backend. Plain name queries go to `names.search(q, limit: 50)`; the request leaves the JSON limit out when the query has its own `limit:`. A query with an accented letter also searches its other Unicode normal form, and the hits are merged by path. A query with `grep:`, `regex:` or `sym:` in names mode, and the content and symbol modes, go to `content.grep(...)`. [`AppState`](../App/AppState.swift) creates two `DaemonClient`s, each with its own `LineSocket`, so a slow content search never queues behind name searches.
 4. `DaemonClient` sends requests one at a time on a serial queue. Each request carries a fresh integer `id`, and the daemon echoes it in its reply. A call cancelled while queued never touches the socket. `LineSocket` writes the line and reads lines back until `replyIsFor(id, line)` accepts one: a line with a different id is a stale leftover and is dropped, while a line with no id or a null id is accepted so that decoding reports it properly. All of this happens within one timeout (5 s by default); a call that sees only stale lines fails with `.timeout` and closes the connection. If a reused connection was dropped it dials again once and resends; timeouts are not retried.
-5. `decodeReply` turns the line into a `SearchReply` or `GrepReply`, and `SearchModel` publishes `items` and a `SearchPhase` (`results`, `indexing`, `failed`). A `failed` phase carries a `DaemonError`, and `UserMessage` turns it into the short text the panel shows (see [Troubleshooting](reference/troubleshooting.md)).
+5. `DaemonClient.decodeReply` turns the line into a `SearchReply` or `GrepReply`, and `SearchModel` publishes `items` and a `SearchPhase` (`results`, `indexing`, `failed`). A `failed` phase carries a `DaemonError`, and `UserMessage` turns it into the short text the panel shows (see [Troubleshooting](reference/troubleshooting.md)).
 
 ## Who owns the daemon
 
@@ -65,7 +65,7 @@ At launch, a second running copy of the app hands over to the first and quits. A
 
 ## Onboarding, errors and the menu bar
 
-[`OnboardingLauncher`](../App/Onboarding/OnboardingLauncher.swift) shows a four-step window (welcome, helper, Full Disk Access, indexing; `OnboardingStep`) until `onboarded` is set, and starts the helper itself if the window is closed early. Each step checks a fact from the system or daemon (`canContinue`), not a button press. Full Disk Access can be skipped (`skippedFullDiskAccess`).
+[`OnboardingLauncher`](../App/Onboarding/OnboardingLauncher.swift) shows a four-step window (welcome, helper, Full Disk Access, indexing; `OnboardingStep`) until `onboarded` is set, and starts the helper itself if the window is closed early. Each step checks a fact from the system or daemon (`Onboarding.canContinue`), not a button press. Full Disk Access can be skipped (`skippedFullDiskAccess`).
 
 `DaemonManager.state` is `checking`, `running`, `indexing`, `needsApproval` or `failed`. [`MenuBarStatus`](../App/Errors/MenuBarStatus.swift) maps it, plus the skip flag, through `MenuBarWarning.evaluate` to the menu-bar symbol and a message. Failure and approval offer "Fix…", which opens Index Details; missing Full Disk Access is only a reminder. [`DaemonMessageLine`](../App/Errors/DaemonMessageLine.swift) shows the same problems in the panel and drives recovery checks and restarts.
 

@@ -58,7 +58,7 @@ final class OnboardingFlow: ObservableObject {
     }
 
     /// Whether the current step's result is in.
-    var canContinue: Bool { FSearchKit.canContinue(step, facts) }
+    var canContinue: Bool { Onboarding.canContinue(step, facts) }
 
     /// Reads the saved "skipped" flag when the window opens.
     func appeared() { facts.skippedFullDiskAccess = defaults.bool(forKey: "skippedFullDiskAccess") }
@@ -158,7 +158,7 @@ final class OnboardingFlow: ObservableObject {
         Log.onboarding.info("returned from System Settings at step \(String(describing: self.step), privacy: .public)")
         if app.daemon.state == .needsApproval { await startDaemon().value; return }
         if step == .fullDiskAccess,
-            restartAfterSettings(pressedTurnOn: pressedTurnOn, owns: app.daemon.ownsDaemon, fullDiskAccess: facts.fullDiskAccess)
+            Onboarding.restartAfterSettings(pressedTurnOn: pressedTurnOn, owns: app.daemon.ownsDaemon, fullDiskAccess: facts.fullDiskAccess)
         {
             Log.onboarding.info("restarting the helper to pick up Full Disk Access")
             pressedTurnOn = false
@@ -195,8 +195,8 @@ struct OnboardingView: View {
             case .indexing:
                 Text("Indexing your disk").font(.title3.bold())
                 ProgressView().progressViewStyle(.linear)
-                Text(indexingLine(entries: flow.entries)).foregroundStyle(.secondary)
-                Text(tryItLine(shortcut: shortcut?.description))
+                Text(Onboarding.indexingLine(entries: flow.entries)).foregroundStyle(.secondary)
+                Text(Onboarding.tryItLine(shortcut: shortcut?.description))
             }
             Spacer()
             HStack {
@@ -225,7 +225,7 @@ struct OnboardingView: View {
         HStack {
             Text("Your shortcut:"); KeyboardShortcuts.Recorder(for: .togglePanel) { shortcut = $0 }
         }
-        if let w = hotkeyWarning(
+        if let w = Onboarding.hotkeyWarning(
             defaultIsOptionSpace: shortcut == .init(.space, modifiers: [.option]),
             runningBundleIds: Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier)))
         {
@@ -235,7 +235,7 @@ struct OnboardingView: View {
 
     @ViewBuilder private var helper: some View {
         Text("Keep search ready in the background").font(.title3.bold())
-        if helperStepMode(owns: daemon.ownsDaemon, running: flow.daemonRunning) == .existingDaemon {
+        if Onboarding.helperStepMode(owns: daemon.ownsDaemon, running: flow.daemonRunning) == .existingDaemon {
             Label("Using the fsearch daemon that's already running", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
         } else {
             Text("A small background helper keeps the index up to date as files change, so results are instant. It starts when you log in.")
@@ -255,7 +255,9 @@ struct OnboardingView: View {
         Text(
             "Without Full Disk Access, macOS hides Desktop, Documents, Downloads, Mail, Messages and iCloud Drive from every app. Nothing leaves your Mac: the index stays on this computer."
         )
-        switch fullDiskAccessStepMode(owns: daemon.ownsDaemon, running: flow.daemonRunning, fullDiskAccess: flow.facts.fullDiskAccess) {
+        switch Onboarding.fullDiskAccessStepMode(
+            owns: daemon.ownsDaemon, running: flow.daemonRunning, fullDiskAccess: flow.facts.fullDiskAccess)
+        {
         case .granted:
             Label("Full Disk Access is on", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
         case .bundledHelper:

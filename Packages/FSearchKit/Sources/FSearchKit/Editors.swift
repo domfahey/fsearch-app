@@ -56,41 +56,42 @@ public enum Editor: String, CaseIterable, Sendable {
 /// path can end the path part, add a query item or start a fragment.
 private let unreserved = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
 
-private func encode(_ s: String, keeping extra: String = "") -> String {
+private func percentEncode(_ s: String, keeping extra: String = "") -> String {
     s.addingPercentEncoding(withAllowedCharacters: unreserved.union(CharacterSet(charactersIn: extra))) ?? ""
 }
 
-/// The URL that opens `path` at `line` in `e`, for LaunchServices to hand to
-/// the editor app. Nothing is run as a child process, and every character
-/// outside the unreserved set is percent-encoded, so any path is safe.
-///
-/// - Parameters:
-///   - e: The editor to use.
-///   - path: The file to open; must be absolute.
-///   - line: The 1-based line to jump to; lines below 1 become 1.
-/// - Returns: The editor's open-at-line URL (schemes listed in ``Editor``), or
-///   nil when the editor has none (Xcode: open the file with it instead) or the
-///   path isn't absolute.
-public func editorURL(_ e: Editor, path: String, line: Int) -> URL? {
-    guard path.hasPrefix("/") else { return nil }
-    let line = max(1, line)
-    let pathPart = encode(path, keeping: "/") + ":\(line)"
-    let fileQuery = "url=" + encode(URL(fileURLWithPath: path).absoluteString) + "&line=\(line)"
-    switch e {
-    case .vscode: return URL(string: "vscode://file" + pathPart)
-    case .cursor: return URL(string: "cursor://file" + pathPart)
-    case .zed: return URL(string: "zed://file" + pathPart)
-    case .sublime: return URL(string: "subl://open?" + fileQuery)
-    case .bbedit: return URL(string: "x-bbedit://open?" + fileQuery)
-    case .xcode: return nil
+extension Editor {
+    /// The URL that opens `path` at `line` in this editor, for LaunchServices to hand to
+    /// the editor app. Nothing is run as a child process, and every character
+    /// outside the unreserved set is percent-encoded, so any path is safe.
+    ///
+    /// - Parameters:
+    ///   - path: The file to open; must be absolute.
+    ///   - line: The 1-based line to jump to; lines below 1 become 1.
+    /// - Returns: The editor's open-at-line URL (schemes listed in ``Editor``), or
+    ///   nil when the editor has none (Xcode: open the file with it instead) or the
+    ///   path isn't absolute.
+    public func openURL(path: String, line: Int) -> URL? {
+        guard path.hasPrefix("/") else { return nil }
+        let line = max(1, line)
+        let pathPart = percentEncode(path, keeping: "/") + ":\(line)"
+        let fileQuery = "url=" + percentEncode(URL(fileURLWithPath: path).absoluteString) + "&line=\(line)"
+        switch self {
+        case .vscode: return URL(string: "vscode://file" + pathPart)
+        case .cursor: return URL(string: "cursor://file" + pathPart)
+        case .zed: return URL(string: "zed://file" + pathPart)
+        case .sublime: return URL(string: "subl://open?" + fileQuery)
+        case .bbedit: return URL(string: "x-bbedit://open?" + fileQuery)
+        case .xcode: return nil
+        }
     }
-}
 
-/// Editors present on this Mac. `lookup` maps a bundle id to its app URL
-/// (NSWorkspace.urlForApplication(withBundleIdentifier:) in the app).
-///
-/// - Parameter lookup: Finds an app by bundle id, or returns nil when it isn't installed.
-/// - Returns: Each installed editor with its app URL, in ``Editor`` declaration order.
-public func installedEditors(lookup: (String) -> URL?) -> [(Editor, URL)] {
-    Editor.allCases.compactMap { e in lookup(e.bundleId).map { (e, $0) } }
+    /// Editors present on this Mac. `lookup` maps a bundle id to its app URL
+    /// (NSWorkspace.urlForApplication(withBundleIdentifier:) in the app).
+    ///
+    /// - Parameter lookup: Finds an app by bundle id, or returns nil when it isn't installed.
+    /// - Returns: Each installed editor with its app URL, in ``Editor`` declaration order.
+    public static func installed(lookup: (String) -> URL?) -> [(Editor, URL)] {
+        Editor.allCases.compactMap { e in lookup(e.bundleId).map { (e, $0) } }
+    }
 }

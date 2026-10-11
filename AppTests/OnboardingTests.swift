@@ -225,10 +225,12 @@ extension AppTests {
                 switch f.step {
                 case .welcome: return "welcome"
                 case .helper:
-                    if helperStepMode(owns: owns, running: f.daemonRunning) == .existingDaemon { return "existing daemon" }
+                    if Onboarding.helperStepMode(owns: owns, running: f.daemonRunning) == .existingDaemon { return "existing daemon" }
                     return f.facts.helperEnabled ? "allowed" : "ask"
                 case .fullDiskAccess:
-                    return "\(fullDiskAccessStepMode(owns: owns, running: f.daemonRunning, fullDiskAccess: f.facts.fullDiskAccess))"
+                    let mode = Onboarding.fullDiskAccessStepMode(
+                        owns: owns, running: f.daemonRunning, fullDiskAccess: f.facts.fullDiskAccess)
+                    return "\(mode)"
                 case .indexing: return "indexing \(f.entries)"
                 }
             }
@@ -265,7 +267,7 @@ extension AppTests {
                 let w = await render(OnboardingView(flow: flow).environmentObject(env.app), size: NSSize(width: 440, height: 300))
                 defer { w.close() }
                 // The inputs that pick "failed: Try Again" vs "Open Login Items Settings".
-                #expect(helperStepMode(owns: env.app.daemon.ownsDaemon, running: flow.daemonRunning) == .bundledHelper)
+                #expect(Onboarding.helperStepMode(owns: env.app.daemon.ownsDaemon, running: flow.daemonRunning) == .bundledHelper)
                 #expect(!flow.facts.helperEnabled && !flow.busy)
                 #expect(env.app.daemon.state == (fail ? .failed("The search helper isn't answering.") : .checking))
             }

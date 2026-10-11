@@ -69,8 +69,8 @@ public final class DaemonClient: SearchBackend, @unchecked Sendable {
                     nextId += 1
                     let id = nextId
                     do {
-                        cont.resume(
-                            returning: try decodeReply(try socket.roundTrip(req.json(id: id), accepts: { replyIsFor(id, $0) }), as: T.self))
+                        let line = try socket.roundTrip(req.json(id: id), accepts: { replyIsFor(id, $0) })
+                        cont.resume(returning: try Self.decodeReply(line, as: T.self))
                     } catch { cont.resume(throwing: error) }
                 }
             }

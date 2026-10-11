@@ -324,7 +324,7 @@ final class DaemonManager: ObservableObject {
         fullDiskAccessRestartArmed = false
         let fullDiskAccess: Bool
         if case let .running(s) = state { fullDiskAccess = s.fullDiskAccess } else { return }
-        guard restartAfterSettings(pressedTurnOn: true, owns: ownsDaemon, fullDiskAccess: fullDiskAccess) else { return }
+        guard Onboarding.restartAfterSettings(pressedTurnOn: true, owns: ownsDaemon, fullDiskAccess: fullDiskAccess) else { return }
         Log.daemon.info("restarting the helper to pick up Full Disk Access")
         await restart()
     }

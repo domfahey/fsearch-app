@@ -197,7 +197,7 @@ final class PanelController: PanelHost {
     /// Carries out a panel key's effect on the results.
     ///
     /// - Parameters:
-    ///   - effect: What ``reduce(_:_:)`` asked for; indices are file indices.
+    ///   - effect: What ``PanelState/reduce(_:_:)`` asked for; indices are file indices.
     ///   - items: The results showing; an index outside them is ignored.
     func perform(_ effect: PanelEffect, _ items: [ResultItem]) {
         guard let app else { return }

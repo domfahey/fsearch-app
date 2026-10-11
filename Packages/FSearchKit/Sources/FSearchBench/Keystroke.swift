@@ -59,20 +59,20 @@ enum LogEntryFactory {
         blackHole(acc)
     }
 
-    // PanelKeys.reduce: a burst of navigation keys plus escape handling.
+    // PanelState.reduce: a burst of navigation keys plus escape handling.
     let keys: [PanelKey] = [.down, .down, .down, .up, .cmdDigit(3), .enter, .cmdK, .escape, .backspaceOnEmpty, .escape]
     b.measure("keystroke.panelKeys.reduce10") {
         var s = PanelState(query: plain, mode: .content, selection: 0, count: 52, files: 50)
         var acc = 0
-        for k in keys { if case .open(let i) = FSearchKit.reduce(&s, k) { acc &+= i } }
+        for k in keys { if case .open(let i) = PanelState.reduce(&s, k) { acc &+= i } }
         blackHole(acc)
     }
 
-    // decodeReply
+    // DaemonClient.decodeReply
     let sr = Fixtures.searchReplyLine(hits: 50)
     let gr = Fixtures.grepReplyLine(files: 50)
-    b.measure("decode.search50") { blackHole(try? decodeReply(sr, as: SearchReply.self)) }
-    b.measure("decode.grep50") { blackHole(try? decodeReply(gr, as: GrepReply.self)) }
+    b.measure("decode.search50") { blackHole(try? DaemonClient.decodeReply(sr, as: SearchReply.self)) }
+    b.measure("decode.grep50") { blackHole(try? DaemonClient.decodeReply(gr, as: GrepReply.self)) }
 
     // SearchLog with a 10k-line file.
     await LogEntryFactory.prepare()
@@ -114,8 +114,8 @@ final class StubBackend: SearchBackend, @unchecked Sendable {
     let reply: SearchReply
     let grepReply: GrepReply
     init() {
-        reply = try! decodeReply(Fixtures.searchReplyLine(), as: SearchReply.self)
-        grepReply = try! decodeReply(Fixtures.grepReplyLine(), as: GrepReply.self)
+        reply = try! DaemonClient.decodeReply(Fixtures.searchReplyLine(), as: SearchReply.self)
+        grepReply = try! DaemonClient.decodeReply(Fixtures.grepReplyLine(), as: GrepReply.self)
     }
     func search(_ q: String, limit: Int) async throws -> SearchReply { reply }
     func grep(q: String, pattern: String, mode: GrepMode) async throws -> GrepReply { grepReply }

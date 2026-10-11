@@ -129,9 +129,9 @@ extension AppTests {
 
         @Test func commandNKeysStillOpenFilesOnly() {
             var s = PanelState(query: "set", selection: 0, count: 5, files: 2)
-            let effect = reduce(&s, .cmdDigit(1))
+            let effect = PanelState.reduce(&s, .cmdDigit(1))
             #expect(PanelInput.route(effect, rows: commandRows()) == .perform(.open(0)))
-            let past = reduce(&s, .cmdDigit(3))
+            let past = PanelState.reduce(&s, .cmdDigit(3))
             #expect(PanelInput.route(past, rows: commandRows()) == .perform(.none))
         }
 
