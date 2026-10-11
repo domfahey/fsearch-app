@@ -93,7 +93,7 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
 - The test hooks (`-FSEARCH_SOCKET`, XCTest environment variables) work only in Debug builds.
 - Release builds no longer inject `get-task-allow`, and the helper is signed with its own identifier.
 - Editors no longer inherit FSearch's Full Disk Access (see Changed).
-- The Rust toolchain (1.94.0) and XcodeGen (2.46.0, sha256-checked) are pinned. `dtolnay/rust-toolchain` is no longer used in CI.
+- The Rust toolchain (1.94.0), XcodeGen (2.46.0), actionlint (1.7.12) and shellcheck (0.11.0) are pinned; the downloaded tools are sha256-checked. `dtolnay/rust-toolchain` is no longer used in CI.
 - The daemon builds with `cargo build --locked` from the exact pinned commit (a protected tag on the fork), before the signing keychain is imported in CI.
 - `Package.resolved` is committed, and CI and release builds use only it.
 - CI actions are pinned to full commit SHAs. Workflows are read-only by default; the release job gets write for the draft release and attestation.
