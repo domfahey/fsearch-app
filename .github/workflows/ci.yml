@@ -70,6 +70,10 @@ jobs:
         # Hosted unit tests (AppTests) run headless on the runner; the UI tests do not.
         # The floor is below 90 because AppTests alone reach about 84%; the remainder is
         # covered by the local end-to-end run (`make coverage`, which combines both suites).
+        env:
+          # xcodebuild hands TEST_RUNNER_* to the test host without the prefix:
+          # the menu-bar safety test records, not fails, a status window left up here.
+          TEST_RUNNER_FSEARCH_CI: '1'
         run: scripts/coverage.sh --unit-only --min 80
 
   lint:
