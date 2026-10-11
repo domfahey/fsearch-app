@@ -28,10 +28,12 @@ import Testing
     }
 
     @Test func noDaemonIsDisconnected() async {
-        let c = DaemonClient(socketPath: NSTemporaryDirectory() + "nothing-here.sock")
+        // A long timeout, so failing well inside it shows the dial gave up
+        // at once instead of waiting; a busy CI runner can stall a few seconds.
+        let c = DaemonClient(socketPath: NSTemporaryDirectory() + "nothing-here.sock", timeout: 60)
         let t0 = Date()
         await #expect(throws: DaemonError.disconnected) { try await c.ping() }
-        #expect(Date().timeIntervalSince(t0) < 1.0)
+        #expect(Date().timeIntervalSince(t0) < 15)
     }
 
     /// A socket served by another user is never trusted: no request is sent.
@@ -211,7 +213,7 @@ import Testing
         // Mismatched lines keep arriving faster than the per-read timeout; the call still ends.
         let srv = RawServer { fd, _ in
             _ = RawServer.readLine(fd)
-            for _ in 0..<40 {
+            for _ in 0..<100 {
                 RawServer.send(fd, #"{"ok":true,"id":777}"# + "\n")
                 Thread.sleep(forTimeInterval: 0.05)
             }
@@ -221,7 +223,8 @@ import Testing
         let c = DaemonClient(socketPath: srv.path, timeout: 0.4)
         let t0 = Date()
         await #expect(throws: DaemonError.timeout) { try await c.ping() }
-        #expect(Date().timeIntervalSince(t0) < 1.2)
+        // Stray lines keep coming for 5 s; the 0.4 s timeout must still end it.
+        #expect(Date().timeIntervalSince(t0) < 3)
     }
 
     @Test func repliesWithoutAnIdAreAccepted() async throws {

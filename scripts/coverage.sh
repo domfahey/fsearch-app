@@ -95,7 +95,7 @@ if [ "$mode" != reuse ]; then
   xcodebuild test -project FSearch.xcodeproj -scheme FSearch -derivedDataPath build \
     ${CI:+-onlyUsePackageVersionsFromResolvedFile} \
     -only-testing:AppTests -enableCodeCoverage YES -resultBundlePath "$UNIT" > "$OUT/unit.log" 2>&1 || rc=1
-  grep -E 'Test run with|error:|\*\* TEST' "$OUT/unit.log" | sort -u
+  grep -E 'Test run with|error:|\*\* TEST|✘|recorded an issue' "$OUT/unit.log" | sort -u
   if [ "$mode" = both ]; then
     rm -rf "$UI"
     echo "== AppUITests (end to end)"

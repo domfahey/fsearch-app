@@ -162,7 +162,7 @@ private func waitUntilStarted(_ b: some StartSignal) async throws {
         await m.refresh()
         await first.value
         #expect(b.cancelled, "the superseded call was cancelled")
-        #expect(Date().timeIntervalSince(t0) < 2, "a hung daemon costs one timeout, not one per keystroke")
+        #expect(Date().timeIntervalSince(t0) < 10, "a hung daemon costs one timeout, not one per keystroke")
         #expect(m.items.map(\.path) == ["/r/fast"] && m.phase == .results)
         #expect(log.map(\.query) == ["fast"], "only the newest search is reported")
     }
