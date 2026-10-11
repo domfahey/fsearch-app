@@ -116,10 +116,12 @@ enum PanelInput {
         return .ignore
     }
 
-    /// Convenience for tests: builds the rows from their inputs.
-    static func route(_ effect: PanelEffect, files: Int, query: String, mode: SearchMode) -> Route {
-        route(effect, rows: PanelRows(files: files, query: query, mode: mode))
-    }
+    #if DEBUG
+        /// Convenience for tests: builds the rows from their inputs.
+        static func route(_ effect: PanelEffect, files: Int, query: String, mode: SearchMode) -> Route {
+            route(effect, rows: PanelRows(files: files, query: query, mode: mode))
+        }
+    #endif
 
     /// The id of the view for row `i`, which the list scrolls to when the
     /// keyboard selects it. File rows use their result's id, as the list does.

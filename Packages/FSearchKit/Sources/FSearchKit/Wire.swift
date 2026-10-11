@@ -184,27 +184,29 @@ public enum DaemonError: Error, Equatable, Sendable, LocalizedError, CustomStrin
 /// The `ok`/`error` fields every reply has.
 private struct Envelope: Decodable { let ok: Bool; let error: String? }
 
-/// Decode one reply line, turning `{"ok": false, "error": ...}` into a DaemonError.
-///
-/// An error beginning "indexing" becomes ``DaemonError/indexing(_:)``; any other becomes `.daemon`.
-///
-/// - Parameters:
-///   - line: One reply, without the newline.
-///   - as: The type to decode (snake_case keys are converted).
-/// - Throws: ``DaemonError``; `.badReply` carries a short description (an unparseable line is cut to 200 characters).
-public func decodeReply<T: Decodable>(_ line: Data, as: T.Type) throws -> T {
-    let dec = JSONDecoder()
-    dec.keyDecodingStrategy = .convertFromSnakeCase
-    guard let env = try? dec.decode(Envelope.self, from: line) else {
-        throw DaemonError.badReply(String(decoding: line.prefix(200), as: UTF8.self))
+extension DaemonClient {
+    /// Decode one reply line, turning `{"ok": false, "error": ...}` into a DaemonError.
+    ///
+    /// An error beginning "indexing" becomes ``DaemonError/indexing(_:)``; any other becomes `.daemon`.
+    ///
+    /// - Parameters:
+    ///   - line: One reply, without the newline.
+    ///   - as: The type to decode (snake_case keys are converted).
+    /// - Throws: ``DaemonError``; `.badReply` carries a short description (an unparseable line is cut to 200 characters).
+    public static func decodeReply<T: Decodable>(_ line: Data, as: T.Type) throws -> T {
+        let dec = JSONDecoder()
+        dec.keyDecodingStrategy = .convertFromSnakeCase
+        guard let env = try? dec.decode(Envelope.self, from: line) else {
+            throw DaemonError.badReply(String(decoding: line.prefix(200), as: UTF8.self))
+        }
+        if !env.ok {
+            let msg = env.error ?? "error"
+            throw msg.hasPrefix("indexing") ? DaemonError.indexing(msg) : DaemonError.daemon(msg)
+        }
+        do { return try dec.decode(T.self, from: line) } catch let e as DaemonError { throw e } catch let e as DecodingError {
+            throw DaemonError.badReply(describe(e))
+        } catch { throw DaemonError.badReply(String(describing: error)) }
     }
-    if !env.ok {
-        let msg = env.error ?? "error"
-        throw msg.hasPrefix("indexing") ? DaemonError.indexing(msg) : DaemonError.daemon(msg)
-    }
-    do { return try dec.decode(T.self, from: line) } catch let e as DaemonError { throw e } catch let e as DecodingError {
-        throw DaemonError.badReply(describe(e))
-    } catch { throw DaemonError.badReply(String(describing: error)) }
 }
 
 /// One short line for a reply that didn't have the expected shape.

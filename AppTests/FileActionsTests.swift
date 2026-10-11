@@ -24,7 +24,7 @@ extension AppTests {
             env.workspace.apps[Editor.vscode.bundleId] = vscodeApp
             env.workspace.schemeHandlers["vscode"] = [vscodeApp]
             let t = try #require(FileActions.editorTarget(for: line, editor: .vscode))
-            #expect(t.url == editorURL(.vscode, path: "/p/main.swift", line: 12))
+            #expect(t.url == Editor.vscode.openURL(path: "/p/main.swift", line: 12))
             #expect(t.app == vscodeApp)
             // Xcode has no open-at-line URL: the file, opened with Xcode.
             let xcode = URL(fileURLWithPath: "/Applications/Xcode.app")

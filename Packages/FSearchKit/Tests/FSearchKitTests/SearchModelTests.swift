@@ -16,7 +16,7 @@ final class ScriptedBackend: SearchBackend, @unchecked Sendable {
         if let fail { throw fail }
         let json =
             #"{"ok":true,"took_us":50,"source":"index","candidates":1,"read":1,"complete":true,"files":[{"path":"/r/f.txt","matches":[{"line":3,"text":"\#(pattern)|\#(q)|\#(mode.rawValue)"}]}]}"#
-        return try decodeReply(Data(json.utf8), as: GrepReply.self)
+        return try DaemonClient.decodeReply(Data(json.utf8), as: GrepReply.self)
     }
     func status() async throws -> DaemonStatus { throw DaemonError.disconnected }
     func ping() async throws {}
@@ -215,7 +215,7 @@ final class RecordingBackend: SearchBackend, @unchecked Sendable {
         lock.withLock { _calls.append("grep \(q)|\(pattern)|\(mode.rawValue)") }
         let json =
             #"{"ok":true,"took_us":5,"source":"index","candidates":1,"read":1,"complete":true,"files":[{"path":"/r/g.txt","matches":[{"line":1,"text":"x"}]}]}"#
-        return try decodeReply(Data(json.utf8), as: GrepReply.self)
+        return try DaemonClient.decodeReply(Data(json.utf8), as: GrepReply.self)
     }
     func status() async throws -> DaemonStatus { throw DaemonError.disconnected }
     func ping() async throws {}

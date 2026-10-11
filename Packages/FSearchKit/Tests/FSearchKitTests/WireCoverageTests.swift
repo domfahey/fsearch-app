@@ -11,33 +11,34 @@ private struct Exploding: Decodable {
 
 @Suite struct WireCoverageTests {
     func badReplyMessage<T: Decodable>(_ json: String, as: T.Type) -> String? {
-        do { _ = try decodeReply(Data(json.utf8), as: T.self); return nil } catch let DaemonError.badReply(m) { return m } catch {
-            return "other: \(error)"
-        }
+        do {
+            _ = try DaemonClient.decodeReply(Data(json.utf8), as: T.self)
+            return nil
+        } catch let DaemonError.badReply(m) { return m } catch { return "other: \(error)" }
     }
 
     @Test func notOkWithoutAMessageIsAGenericDaemonError() {
         #expect(throws: DaemonError.daemon("error")) {
-            try decodeReply(Data(#"{"ok":false}"#.utf8), as: SearchReply.self)
+            try DaemonClient.decodeReply(Data(#"{"ok":false}"#.utf8), as: SearchReply.self)
         }
     }
 
     @Test func indexingPrefixDecidesTheCase() {
         #expect(throws: DaemonError.indexing("indexing")) {
-            try decodeReply(Data(#"{"ok":false,"error":"indexing"}"#.utf8), as: DaemonStatus.self)
+            try DaemonClient.decodeReply(Data(#"{"ok":false,"error":"indexing"}"#.utf8), as: DaemonStatus.self)
         }
         // Only a prefix counts.
         #expect(throws: DaemonError.daemon("still indexing")) {
-            try decodeReply(Data(#"{"ok":false,"error":"still indexing"}"#.utf8), as: DaemonStatus.self)
+            try DaemonClient.decodeReply(Data(#"{"ok":false,"error":"still indexing"}"#.utf8), as: DaemonStatus.self)
         }
         #expect(throws: DaemonError.daemon("")) {
-            try decodeReply(Data(#"{"ok":false,"error":""}"#.utf8), as: DaemonStatus.self)
+            try DaemonClient.decodeReply(Data(#"{"ok":false,"error":""}"#.utf8), as: DaemonStatus.self)
         }
     }
 
     @Test func okFalseWinsEvenWhenTheRestLooksValid() {
         let json = #"{"ok":false,"error":"nope","took_us":1,"hits":[]}"#
-        #expect(throws: DaemonError.daemon("nope")) { try decodeReply(Data(json.utf8), as: SearchReply.self) }
+        #expect(throws: DaemonError.daemon("nope")) { try DaemonClient.decodeReply(Data(json.utf8), as: SearchReply.self) }
     }
 
     @Test func notAnEnvelopeIsBadReplyWithTheText() {
@@ -88,7 +89,7 @@ private struct Exploding: Decodable {
 
     @Test func emptyOkObjectDecodesAsPong() throws {
         struct Pong: Decodable {}
-        _ = try decodeReply(Data(#"{"ok":true,"id":1}"#.utf8), as: Pong.self)
+        _ = try DaemonClient.decodeReply(Data(#"{"ok":true,"id":1}"#.utf8), as: Pong.self)
     }
 
     @Test func requestJSONEscapesAndIsDeterministic() {

@@ -11,10 +11,7 @@ All fixed; see the CHANGELOG.
 ## P2: smaller bugs and polish
 
 - [ ] Panel: the ⌘K menu opens at a fixed point; ⌘⌃Y also triggers Quick Look; Quick Look has no arrow-key navigation.
-- [ ] Test-only API in shipped code: the `LaunchOptions` test hooks are now Debug-only; wrap the remaining test seams in `#if DEBUG` or confirm none are left.
-- [ ] One source for launch options: `PanelController` still reads `LaunchOptions.current.showPanel`; use `app.options`.
 - [ ] One empty `com.domfahey.fsearch.apptests.unit.plist` stays in ~/Library/Preferences after a full AppTests run (cfprefsd writes it back); it is swept on the next run.
-- [ ] API hygiene: namespace FSearchKit's free functions (`reduce`, `canContinue`, `openAtLine`, …).
 - [ ] Raise the CI app unit-test coverage gate from 80% to 90% (the FSearchKit gate is already 90%).
 - [ ] CI benchmark baseline: add a `ci-macos-26` entry from a CI artifact, so the bench job can gate.
 - [ ] Accessibility: VoiceOver labels, keyboard navigation in Settings and onboarding, Reduce Motion and Transparency, Increase Contrast.

@@ -29,7 +29,7 @@ import Testing
     @Test func pathsCantBreakOutOfTheURL() throws {
         let tricky = "/tmp/it's \"x\" $HOME; rm -rf *.txt?a=1&line=99#frag"
         for e in Editor.allCases where e != .xcode {
-            let u = try #require(editorURL(e, path: tricky, line: 5), "\(e)")
+            let u = try #require(e.openURL(path: tricky, line: 5), "\(e)")
             let c = try #require(URLComponents(url: u, resolvingAgainstBaseURL: false))
             #expect(c.fragment == nil, "\(e)")
             switch e {
@@ -46,14 +46,14 @@ import Testing
 
     /// Only absolute paths make a URL; a non-positive line becomes line 1.
     @Test func relativePathsAndBadLines() {
-        for e in Editor.allCases { #expect(editorURL(e, path: "rel/a.txt", line: 2) == nil) }
-        #expect(editorURL(.vscode, path: "/a.txt", line: 0)?.absoluteString == "vscode://file/a.txt:1")
-        #expect(editorURL(.bbedit, path: "/a.txt", line: -4)?.absoluteString == "x-bbedit://open?url=file%3A%2F%2F%2Fa.txt&line=1")
+        for e in Editor.allCases { #expect(e.openURL(path: "rel/a.txt", line: 2) == nil) }
+        #expect(Editor.vscode.openURL(path: "/a.txt", line: 0)?.absoluteString == "vscode://file/a.txt:1")
+        #expect(Editor.bbedit.openURL(path: "/a.txt", line: -4)?.absoluteString == "x-bbedit://open?url=file%3A%2F%2F%2Fa.txt&line=1")
     }
 
     @Test func everyEditorIsLookedUpOnceInDeclaredOrder() {
         var asked: [String] = []
-        let found = installedEditors { id in
+        let found = Editor.installed { id in
             asked.append(id)
             return URL(fileURLWithPath: "/Applications/\(id).app")
         }
@@ -63,12 +63,12 @@ import Testing
     }
 
     @Test func noneInstalledIsEmpty() {
-        #expect(installedEditors { _ in nil }.isEmpty)
+        #expect(Editor.installed { _ in nil }.isEmpty)
     }
 
     @Test func missingAppsAreSkippedAndOthersKeepOrder() {
         let have: Set<String> = [Editor.xcode.bundleId, Editor.vscode.bundleId]
-        let found = installedEditors { have.contains($0) ? URL(fileURLWithPath: "/Applications/\($0).app") : nil }
+        let found = Editor.installed { have.contains($0) ? URL(fileURLWithPath: "/Applications/\($0).app") : nil }
         #expect(found.map(\.0) == [.vscode, .xcode])
         #expect(found.map(\.1.path) == ["/Applications/com.microsoft.VSCode.app", "/Applications/com.apple.dt.Xcode.app"])
     }

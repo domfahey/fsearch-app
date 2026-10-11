@@ -22,8 +22,10 @@ struct LaunchOptions: Equatable, Sendable {
     var unitTestHost: Bool
     /// `-UITestShowPanel`: open the panel at launch and keep it up without focus.
     var showPanel: Bool
-    /// Where the search log goes instead (unit tests point it at a temp folder).
-    var searchLogOverride: URL? = nil
+    #if DEBUG
+        /// Where the search log goes instead (unit tests point it at a temp folder).
+        var searchLogOverride: URL? = nil
+    #endif
 
     /// The options of this process.
     static let current = parse(arguments: CommandLine.arguments, environment: ProcessInfo.processInfo.environment)
@@ -69,7 +71,9 @@ struct LaunchOptions: Equatable, Sendable {
     /// Debug mode's search log. In test mode it lives in the test daemon's data
     /// folder (inside its temp HOME), never in the user's ~/Library/Logs.
     var searchLogFile: URL {
-        if let searchLogOverride { return searchLogOverride }
+        #if DEBUG
+            if let searchLogOverride { return searchLogOverride }
+        #endif
         if testMode { return DebugFormat.dataDir(socketPath: socketPath).appendingPathComponent("searches.jsonl") }
         return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/FSearch/searches.jsonl")
     }

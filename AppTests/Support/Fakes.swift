@@ -19,7 +19,7 @@ enum Wire {
             "content_docs":5,"content_segments":1,"content_bytes":4096,"content_pending":0,\
             "full_disk_access":\(fullDiskAccess),"owner":\(owner)}
             """
-        return try! decodeReply(Data(json.utf8), as: DaemonStatus.self)
+        return try! DaemonClient.decodeReply(Data(json.utf8), as: DaemonStatus.self)
     }
 
     static func grep(_ files: [(String, [(Int, String)])], tookUs: UInt64 = 900) -> GrepReply {
@@ -30,7 +30,7 @@ enum Wire {
             "ok": true, "took_us": tookUs, "source": "index", "candidates": files.count,
             "read": files.count, "complete": true, "files": fs,
         ]
-        return try! decodeReply(try! JSONSerialization.data(withJSONObject: o), as: GrepReply.self)
+        return try! DaemonClient.decodeReply(try! JSONSerialization.data(withJSONObject: o), as: GrepReply.self)
     }
 
     static func hit(_ path: String) -> Hit { Hit(path: path, kind: "file", size: 1, mtime: 0, score: 1) }

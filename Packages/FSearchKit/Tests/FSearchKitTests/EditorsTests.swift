@@ -27,13 +27,13 @@ import Testing
         ]
         #expect(want.count == Editor.allCases.count)
         for e in Editor.allCases {
-            #expect(editorURL(e, path: path, line: 12)?.absoluteString == want[e]!, "\(e)")
+            #expect(e.openURL(path: path, line: 12)?.absoluteString == want[e]!, "\(e)")
         }
     }
 
     /// The file URL inside the query decodes back to the path.
     @Test func queryURLDecodesToThePath() throws {
-        let u = try #require(editorURL(.sublime, path: path, line: 3))
+        let u = try #require(Editor.sublime.openURL(path: path, line: 3))
         let items = try #require(URLComponents(url: u, resolvingAgainstBaseURL: false)?.queryItems)
         #expect(items.map(\.name) == ["url", "line"])
         #expect(URL(string: try #require(items[0].value))?.path == path)
@@ -42,13 +42,13 @@ import Testing
 
     /// A path-style URL decodes back to "<path>:<line>".
     @Test func pathURLDecodesToThePath() throws {
-        let u = try #require(editorURL(.vscode, path: path, line: 7))
+        let u = try #require(Editor.vscode.openURL(path: path, line: 7))
         #expect(u.host == "file")
         #expect(URLComponents(url: u, resolvingAgainstBaseURL: false)?.path == "\(path):7")
     }
 
     @Test func installedIsOnlyWhatLookupFinds() {
-        let found = installedEditors { $0 == Editor.zed.bundleId ? URL(fileURLWithPath: "/Applications/Zed.app") : nil }
+        let found = Editor.installed { $0 == Editor.zed.bundleId ? URL(fileURLWithPath: "/Applications/Zed.app") : nil }
         #expect(found.map(\.0) == [.zed])
     }
 }

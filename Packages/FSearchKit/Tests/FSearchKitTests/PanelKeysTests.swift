@@ -10,25 +10,25 @@ import Testing
 
     @Test func movesWithinBounds() {
         var s = state()
-        #expect(reduce(&s, .down) == .none); #expect(s.selection == 1)
-        s.selection = 4; _ = reduce(&s, .down); #expect(s.selection == 4)
-        s.selection = 0; _ = reduce(&s, .up); #expect(s.selection == 0)
+        #expect(s.reduce(.down) == .none); #expect(s.selection == 1)
+        s.selection = 4; _ = s.reduce(.down); #expect(s.selection == 4)
+        s.selection = 0; _ = s.reduce(.up); #expect(s.selection == 0)
     }
 
     @Test func actionsUseTheSelection() {
         var s = state(sel: 2)
-        #expect(reduce(&s, .enter) == .open(2))
-        #expect(reduce(&s, .cmdEnter) == .reveal(2))
-        #expect(reduce(&s, .cmdY) == .quickLook(2))
-        #expect(reduce(&s, .cmdShiftC) == .copyPath(2))
-        #expect(reduce(&s, .cmdK) == .showActions(2))
+        #expect(s.reduce(.enter) == .open(2))
+        #expect(s.reduce(.cmdEnter) == .reveal(2))
+        #expect(s.reduce(.cmdY) == .quickLook(2))
+        #expect(s.reduce(.cmdShiftC) == .copyPath(2))
+        #expect(s.reduce(.cmdK) == .showActions(2))
     }
 
     @Test func cmdDigitOpensTheNthResult() {
         var s = state(count: 3)
-        #expect(reduce(&s, .cmdDigit(1)) == .open(0))
-        #expect(reduce(&s, .cmdDigit(3)) == .open(2))
-        #expect(reduce(&s, .cmdDigit(4)) == .none)
+        #expect(s.reduce(.cmdDigit(1)) == .open(0))
+        #expect(s.reduce(.cmdDigit(3)) == .open(2))
+        #expect(s.reduce(.cmdDigit(4)) == .none)
     }
 
     /// Each escape, in order: clear the query (and the selection), then drop
@@ -40,15 +40,15 @@ import Testing
     func escapeClearsThenBacksOutThenHides(_ mode: SearchMode, _ steps: [(PanelEffect, String, SearchMode)]) {
         var s = state("abc", mode, sel: 2)
         for (i, (effect, query, mode)) in steps.enumerated() {
-            #expect(reduce(&s, .escape) == effect, "escape \(i + 1)")
+            #expect(s.reduce(.escape) == effect, "escape \(i + 1)")
             #expect(s.query == query && s.mode == mode && s.selection == 0, "escape \(i + 1)")
         }
     }
 
     @Test func backspaceOnEmptyDropsTheChip() {
         var s = state("", .symbols)
-        #expect(reduce(&s, .backspaceOnEmpty) == .none); #expect(s.mode == .names)
-        #expect(reduce(&s, .backspaceOnEmpty) == .none); #expect(s.mode == .names)
+        #expect(s.reduce(.backspaceOnEmpty) == .none); #expect(s.mode == .names)
+        #expect(s.reduce(.backspaceOnEmpty) == .none); #expect(s.mode == .names)
     }
 
     @Test func resumeWindowIsSixtySecondsInclusive() {
@@ -72,25 +72,25 @@ import Testing
 
     @Test func outOfRangeSelectionClampsBeforeActing() {
         var s = state(sel: 7, count: 3)
-        #expect(reduce(&s, .enter) == .open(2))
+        #expect(s.reduce(.enter) == .open(2))
     }
 
     @Test func upFromOutOfRangeSelectionStepsFromTheLastRow() {
         var s = state(sel: 7, count: 3)
-        _ = reduce(&s, .up)
+        _ = s.reduce(.up)
         #expect(s.selection == 1)
     }
 
     @Test func negativeSelectionClampsToFirstRow() {
         var s = state(sel: -1, count: 3)
-        #expect(reduce(&s, .enter) == .open(0))
+        #expect(s.reduce(.enter) == .open(0))
     }
 
     // Fix round 1: backspace only drops the chip when the query is empty.
 
     @Test func backspaceWithQueryKeepsTheChip() {
         var s = state("abc", .symbols)
-        #expect(reduce(&s, .backspaceOnEmpty) == .none)
+        #expect(s.reduce(.backspaceOnEmpty) == .none)
         #expect(s.mode == .symbols)
         #expect(s.query == "abc")
     }
@@ -99,27 +99,27 @@ import Testing
 
     @Test func cmdDigitOutsideOneToNineIsIgnored() {
         var s = state(count: 20)
-        #expect(reduce(&s, .cmdDigit(0)) == .none)
-        #expect(reduce(&s, .cmdDigit(10)) == .none)
-        #expect(reduce(&s, .cmdDigit(-1)) == .none)
+        #expect(s.reduce(.cmdDigit(0)) == .none)
+        #expect(s.reduce(.cmdDigit(10)) == .none)
+        #expect(s.reduce(.cmdDigit(-1)) == .none)
     }
 
     @Test func cmdDigitNineReachesTheNinthRow() {
         var s = state(count: 20)
-        #expect(reduce(&s, .cmdDigit(9)) == .open(8))
+        #expect(s.reduce(.cmdDigit(9)) == .open(8))
     }
 
     @Test func emptyResultsIgnoreEveryActionAndPinSelectionAtZero() {
         var s = state(count: 0)
-        #expect(reduce(&s, .enter) == .none)
-        #expect(reduce(&s, .cmdK) == .none)
-        #expect(reduce(&s, .cmdEnter) == .none)
-        #expect(reduce(&s, .cmdY) == .none)
-        #expect(reduce(&s, .cmdShiftC) == .none)
-        #expect(reduce(&s, .cmdDigit(1)) == .none)
-        #expect(reduce(&s, .up) == .none)
+        #expect(s.reduce(.enter) == .none)
+        #expect(s.reduce(.cmdK) == .none)
+        #expect(s.reduce(.cmdEnter) == .none)
+        #expect(s.reduce(.cmdY) == .none)
+        #expect(s.reduce(.cmdShiftC) == .none)
+        #expect(s.reduce(.cmdDigit(1)) == .none)
+        #expect(s.reduce(.up) == .none)
         #expect(s.selection == 0)
-        #expect(reduce(&s, .down) == .none)
+        #expect(s.reduce(.down) == .none)
         #expect(s.selection == 0)
     }
 }
@@ -147,9 +147,9 @@ import Testing
     @Test func cmdDigitPastTheFilesIsIgnored() {
         // Two files plus the two "use with..." rows: ⌘3 and ⌘4 don't switch mode.
         var s = PanelState(query: "abc", count: 4, files: 2)
-        #expect(reduce(&s, .cmdDigit(2)) == .open(1))
-        #expect(reduce(&s, .cmdDigit(3)) == .none)
-        #expect(reduce(&s, .cmdDigit(4)) == .none)
+        #expect(s.reduce(.cmdDigit(2)) == .open(1))
+        #expect(s.reduce(.cmdDigit(3)) == .none)
+        #expect(s.reduce(.cmdDigit(4)) == .none)
         #expect(s.mode == .names)
     }
 
