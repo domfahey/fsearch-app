@@ -2,12 +2,12 @@
 
 [![CI](https://github.com/domfahey/fsearch-app/actions/workflows/ci.yml/badge.svg)](https://github.com/domfahey/fsearch-app/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![macOS 14+](https://img.shields.io/badge/macOS-14%2B-lightgrey.svg)
+![macOS 15+](https://img.shields.io/badge/macOS-15%2B-lightgrey.svg)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/domfahey/fsearch-app/badge)](https://scorecard.dev/viewer/?uri=github.com/domfahey/fsearch-app)
 
 A fast, keyboard-driven file search launcher for the Mac menu bar, built on [fsearch](https://github.com/noahdunnagan/fsearch) by Noah Dunnagan.
 
-Press a hotkey, type, and find any file by name, or search inside text and code files. FSearch for Mac is a native SwiftUI and AppKit app for macOS 14 and later. It is a graphical front end for the fsearch daemon, which does all the indexing and searching: the app bundles a pinned build of fsearch and talks to it over its socket API. This is an independent project and is not affiliated with fsearch or its author.
+Press a hotkey, type, and find any file by name, or search inside text and code files. FSearch for Mac is a native SwiftUI and AppKit app for macOS 15 and later. It is a graphical front end for the fsearch daemon, which does all the indexing and searching: the app bundles a pinned build of fsearch and talks to it over its socket API. This is an independent project and is not affiliated with fsearch or its author.
 
 > There is no screenshot yet. Run the app, or follow [Tutorial: your first search](docs/tutorial-first-search.md), to see the panel.
 
@@ -28,7 +28,7 @@ Press a hotkey, type, and find any file by name, or search inside text and code 
 
 ## Requirements
 
-- macOS 14 (Sonoma) or later, Apple silicon or Intel.
+- macOS 15 (Sequoia) or later, Apple silicon or Intel.
 - Full Disk Access is optional but lets FSearch for Mac index the whole disk.
 
 ## Install

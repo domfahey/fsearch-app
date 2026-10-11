@@ -8,7 +8,7 @@ A menu-bar launcher for the [fsearch](https://github.com/noahdunnagan/fsearch) f
 
 ## Which macOS versions work?
 
-macOS 14 (Sonoma) and later, on Apple silicon and Intel.
+macOS 15 (Sequoia) and later, on Apple silicon and Intel.
 
 ## Does it send my files or searches anywhere?
 

@@ -1,6 +1,6 @@
 # Install FSearch for Mac
 
-FSearch for Mac needs macOS 14 (Sonoma) or later. It runs on Apple silicon and Intel Macs.
+FSearch for Mac needs macOS 15 (Sequoia) or later. It runs on Apple silicon and Intel Macs.
 
 ## Download
 

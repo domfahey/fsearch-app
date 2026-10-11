@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "FSearchKit",
-    platforms: [.macOS(.v14)],
+    platforms: [.macOS(.v15)],
     products: [.library(name: "FSearchKit", targets: ["FSearchKit"])],
     targets: [
         .target(name: "FSearchKit"),

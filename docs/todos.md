@@ -49,7 +49,6 @@ All fixed; see the CHANGELOG.
   - Unicode normalization and case folding for names and queries;
   - apply the query's `limit:` over the JSON limit;
   - a daemon.log path option for the bundled helper: let the daemon open its own `daemon.log` via a flag or env var (SMAppService plists can't set a per-user `StandardErrorPath`).
-- [ ] Decide whether macOS 14 stays the minimum. Then drop the `macos-14` CI leg before GitHub retires that image (Nov 2, 2026), or move it to `macos-15`.
 
 ## You
 
