@@ -449,6 +449,24 @@ extension AppTests {
             #expect(g.menuAnchor(rowID: "/p/other") == CGPoint(x: i, y: 50))
         }
 
+        /// New rows for another query drop the old row frames, so a ⌘K held for
+        /// them opens under the field rather than at a row's old place; the same
+        /// query refreshed keeps them.
+        @Test func newRowsDropOldRowFrames() {
+            let g = PanelGeometry()
+            g.list = CGRect(x: 0, y: 60, width: 680, height: 360)
+            g.rows["/p/x.txt"] = CGRect(x: 4, y: 100, width: 672, height: 34)
+            let a = PanelInput.Answer(query: "x", mode: .names, current: false)
+            g.answerChanged(from: a, to: PanelInput.Answer(query: "x", mode: .names, current: true))
+            #expect(g.rows.count == 1)
+            g.answerChanged(from: a, to: PanelInput.Answer(query: "x", mode: .content, current: true))
+            #expect(g.rows.isEmpty)
+            g.rows["/p/x.txt"] = CGRect(x: 4, y: 100, width: 672, height: 34)
+            g.answerChanged(from: a, to: PanelInput.Answer(query: "xy", mode: .names, current: true))
+            #expect(g.rows.isEmpty)
+            #expect(g.menuAnchor(rowID: "/p/x.txt") == CGPoint(x: PanelGeometry.inset, y: 50))
+        }
+
         /// The anchor is measured from the top left; an unflipped view counts from the bottom.
         @Test func menuAnchorInViewCoordinates() {
             final class Flipped: NSView { override var isFlipped: Bool { true } }

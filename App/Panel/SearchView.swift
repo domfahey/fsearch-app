@@ -159,10 +159,9 @@ struct SearchView: View {
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
         .coordinateSpace(.named(PanelGeometry.space))
         .onAppear { focused = true }
-        .onChange(of: state.selection) {
-            onSelect(state.selection)
-            // An open preview follows the selection.
-            let path = PanelInput.previewPath(at: state.selection, shown: shown, rows: self.rows)
+        .onChange(of: state.selection) { onSelect(state.selection) }
+        // An open preview follows the selected file: a new selection, or new rows under the same one.
+        .onChange(of: PanelInput.previewPath(at: state.selection, shown: shown, rows: rows)) { _, path in
             QuickLookSource.shared.follow(path.map(FileActions.url))
         }
         // ↑/↓ pressed in Quick Look, which holds the keyboard while it is up.
@@ -170,6 +169,7 @@ struct SearchView: View {
         .onChange(of: model.mode) { held.key.cancel() }
         // The results for the query in the box arrived: run a key held for them.
         .onChange(of: PanelInput.answer(model)) { old, new in
+            geometry.answerChanged(from: old, to: new)
             let k = PanelInput.rowsChanged(
                 from: old, to: new, selection: &state.selection, held: &held.key, model: model, visible: isVisible())
             if let k { act(k) }
@@ -226,7 +226,9 @@ struct SearchView: View {
     /// Routes a key press through ``PanelInput`` and ``PanelState/reduce(_:)``, then performs the effect.
     private func handle(_ press: KeyPress) -> KeyPress.Result {
         let p = PanelInput.Press(press, event: NSApp.currentEvent)
-        guard let key = PanelInput.key(for: p, queryIsEmpty: model.query.isEmpty) else { return .ignored }
+        guard let key = PanelInput.key(for: p, queryIsEmpty: model.query.isEmpty) else {
+            return PanelInput.swallows(p) ? .handled : .ignored
+        }
         // A result key waits for results that answer the query in the box.
         if let now = PanelInput.gate(key, held: &held.key, model: model) { act(now) }
         return .handled

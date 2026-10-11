@@ -226,6 +226,46 @@ extension AppTests {
             #expect(PanelInput.rowID(at: 5, shown: shown, rows: rows) == nil)
         }
 
+        /// ⌃↵ and ⌥↵ would type a line break into the field, and a ⌘ shortcut
+        /// with ⌃ or ⌥ added should do nothing: the panel takes them and does nothing.
+        @Test func rejectedShortcutsAreSwallowed() {
+            #expect(PanelInput.swallows(P(key: .return, control: true)))
+            #expect(PanelInput.swallows(P(key: .return, option: true)))
+            #expect(PanelInput.swallows(P(key: .return, command: true, option: true)))
+            #expect(PanelInput.swallows(P(key: "y", characters: "\u{19}", command: true, control: true, keyCode: 0x10)))
+            #expect(PanelInput.swallows(P(key: "y", characters: "y", command: true, option: true, keyCode: 0x10)))
+            #expect(PanelInput.swallows(P(key: "k", characters: "k", command: true, control: true)))
+            #expect(PanelInput.swallows(P(key: "C", characters: "C", command: true, shift: true, option: true)))
+            #expect(PanelInput.swallows(P(key: "1", characters: "1", command: true, control: true)))
+            // Not shortcuts: the field (and the text system) handle them as before.
+            #expect(!PanelInput.swallows(P(key: .return)))
+            #expect(!PanelInput.swallows(P(key: "y", characters: "y", command: true)))
+            #expect(!PanelInput.swallows(P(key: "a", characters: "å", option: true)))  // ⌥A types å
+            #expect(!PanelInput.swallows(P(key: "x", characters: "x", command: true, control: true)))
+            #expect(!PanelInput.swallows(P(key: .delete, option: true)))  // ⌥⌫ deletes a word
+        }
+
+        /// A ⌘ shortcut with ⌃ or ⌥ added that falls through to the field types
+        /// nothing there. (⌃↵ and ⌥↵ would type U+2028 and a newline: see above.)
+        @Test func commandCombosTypeNothingInATextView() throws {
+            // Never ordered in: no window shows, nothing takes focus.
+            let frame = NSRect(x: 0, y: 0, width: 200, height: 40)
+            let w = NSWindow(contentRect: frame, styleMask: [.borderless], backing: .buffered, defer: true)
+            let tv = NSTextView(frame: frame)
+            w.contentView = tv
+            let presses: [(String, String, NSEvent.ModifierFlags, UInt16)] = [
+                ("\u{19}", "y", [.command, .control], 0x10), ("¥", "y", [.command, .option], 0x10),
+                ("£", "3", [.command, .option], 0x14), ("1", "1", [.command, .control], 0x12),
+            ]
+            for (c, ign, mods, code) in presses {
+                let e = NSEvent.keyEvent(
+                    with: .keyDown, location: .zero, modifierFlags: mods, timestamp: 0, windowNumber: w.windowNumber, context: nil,
+                    characters: c, charactersIgnoringModifiers: ign, isARepeat: false, keyCode: code)
+                tv.keyDown(with: try #require(e))
+                #expect(tv.string.isEmpty, "\(ign) \(mods)")
+            }
+        }
+
         /// Quick Look follows the selection onto file rows only.
         @Test func previewPathsForTheSelection() {
             let shown: [ResultItem] = [.file(Wire.hit("/p/a")), .line(path: "/p/b", match: Match(line: 3, text: "x"))]

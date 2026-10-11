@@ -85,6 +85,17 @@ enum PanelInput {
         return Character(String(c).lowercased())
     }
 
+    /// A press that is no panel key but must not reach the field either: ⌃↵
+    /// and ⌥↵ would type a line break into the query, and a ⌘ shortcut with
+    /// ⌃ or ⌥ added should do nothing. The view takes these and does nothing.
+    static func swallows(_ p: Press) -> Bool {
+        guard p.control || p.option else { return false }
+        if p.key == .return { return true }
+        var bare = p
+        (bare.control, bare.option) = (false, false)
+        return p.command && firstKey(for: bare, queryIsEmpty: false) != nil
+    }
+
     /// The file Quick Look follows to when row `i` is selected; nil on a command or fallback row.
     static func previewPath(at i: Int, shown: [ResultItem], rows: PanelRows) -> String? {
         guard case let .result(f)? = rows.row(at: i), shown.indices.contains(f) else { return nil }
