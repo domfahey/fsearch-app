@@ -14,6 +14,16 @@ struct SettingsView: View {
     @StateObject private var uninstaller = Uninstaller.live(options: .current)
     @State private var confirming = false
 
+    init() {}
+
+    #if DEBUG
+        /// Tests pass the login item and uninstaller, with fakes behind them.
+        init(loginItem: LoginItemModel, uninstaller: Uninstaller) {
+            _loginItem = StateObject(wrappedValue: loginItem)
+            _uninstaller = StateObject(wrappedValue: uninstaller)
+        }
+    #endif
+
     var body: some View {
         Form {
             KeyboardShortcuts.Recorder("Shortcut:", name: .togglePanel)

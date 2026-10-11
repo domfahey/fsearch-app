@@ -142,10 +142,8 @@ EXCLUDE = {
         "SystemWorkspace.trash(_:)",
     ],
     "Updater.swift": [                                            # Sparkle
-        "static Updater.start()", "variable initialization expression of UpdateCheckState._canCheck",
-        "UpdateCheckState.init(updater:)", "CheckForUpdatesButton.init(controller:)",
-        "implicit closure #1 in CheckForUpdatesButton.init(controller:)",
-        "CheckForUpdatesButton.body.getter", "closure #1 in CheckForUpdatesButton.body.getter",
+        # The rest of the update items are tested with an unstarted controller.
+        "static Updater.start()", "closure #1 in CheckForUpdatesButton.body.getter",
     ],
     "Seams.swift": [                                              # NSApp.activate
         "closure #1 in default argument 1 of static AppActivation.live(inert:activate:)",

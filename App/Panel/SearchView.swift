@@ -221,6 +221,8 @@ struct SearchView: View {
         .accessibilityElement(children: .contain)
         .accessibilityValue(selected ? "selected" : "")
         .accessibilityAddTraits(selected ? .isSelected : [])
+        // VoiceOver's press runs it too, as a click does.
+        .accessibilityAction(.default, action)
     }
 
     private func hint(_ t: String, _ k: String) -> some View {
