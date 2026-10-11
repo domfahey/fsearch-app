@@ -58,7 +58,8 @@ import Testing
         let c = DaemonClient(socketPath: d.path, timeout: 0.3)
         let t = Date()
         await #expect(throws: DaemonError.timeout) { try await c.ping() }
-        #expect(Date().timeIntervalSince(t) < 2)
+        // Loose bound: it times out instead of hanging; CI runners can take 2 s.
+        #expect(Date().timeIntervalSince(t) < 10)
     }
 
     @Test func reconnectsAfterTheDaemonComesBack() async throws {
