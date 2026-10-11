@@ -27,6 +27,10 @@ final class PanelController: PanelHost {
     private var previousApp: NSRunningApplication?
     /// A result key waiting for results; hiding drops it, so it never runs behind the user's back.
     let held = HeldKeyBox()
+    /// Keys sent to the view from outside it: ↑/↓ in Quick Look.
+    let keys = PanelKeyFeed()
+    /// Where the view laid out its rows, so ⌘K's menu opens at the selected one.
+    let geometry = PanelGeometry()
 
     /// The panel window: key only outside the unit-test host, hides on resign, and hosts the Quick Look controller.
     final class Panel: NSPanel {
@@ -83,8 +87,10 @@ final class PanelController: PanelHost {
         app.search.mode = resumed.mode
         selection = resumed.selection
         held.key.cancel()
+        geometry.rows = [:]
         let view = SearchView(
-            model: app.search, state: resumed, held: held, isVisible: { [weak self] in self?.isVisible == true },
+            model: app.search, state: resumed, held: held, keys: keys, geometry: geometry,
+            isVisible: { [weak self] in self?.isVisible == true },
             onEffect: { [weak self] effect, items in
                 self?.perform(effect, items)
             }, onSelect: { [weak self] in self?.selection = $0 },
@@ -220,7 +226,7 @@ final class PanelController: PanelHost {
         case let .reveal(i): FileActions.reveal(items[i].path, onError: app.showActionError)
         case let .quickLook(i): FileActions.quickLook(items[i].path)
         case let .copyPath(i): FileActions.copyPath(items[i].path)
-        case let .showActions(i): ActionsMenu.show(for: items[i], in: panel, app: app)
+        case let .showActions(i): ActionsMenu.show(for: items[i], in: panel, app: app, geometry: geometry)
         }
         // The same rule as the ⌘K menu: going to another app puts the launcher
         // away, unless the action failed at once and its error needs reading.

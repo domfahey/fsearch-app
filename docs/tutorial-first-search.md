@@ -29,7 +29,7 @@ Press the hotkey again. The file you just opened is now under "Recent" when the 
 Type a name again, then try these on a result:
 
 - ⌘↵ shows the file in Finder.
-- ⌘Y shows a Quick Look preview. Press ⌘Y again to close it. The panel stays open behind the preview.
+- ⌘Y shows a Quick Look preview. ↑ and ↓ move to the next file and the preview follows. Press ⌘Y again to close it. The panel stays open behind the preview.
 - ⌘1 to ⌘9 opens the first to ninth file directly.
 
 ## 4. Search inside files

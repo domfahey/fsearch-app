@@ -4,11 +4,11 @@ import FSearchKit
 /// The ⌘K menu of actions for a result.
 @MainActor
 enum ActionsMenu {
-    /// Pops the menu up near the panel's lower right.
-    static func show(for item: ResultItem, in panel: NSPanel?, app: AppState) {
+    /// Pops the menu up under the result's row, or under the search field if the row is out of view.
+    static func show(for item: ResultItem, in panel: NSPanel?, app: AppState, geometry: PanelGeometry = PanelGeometry()) {
         let menu = build(for: item, app: app)
         guard let view = panel?.contentView else { return }
-        popUp(menu, NSPoint(x: view.bounds.maxX - 220, y: 40), view)
+        popUp(menu, PanelGeometry.viewPoint(geometry.menuAnchor(rowID: item.id), in: view), view)
     }
 
     /// Shows the menu (modal, on screen). Never in the unit-test host; tests
@@ -83,5 +83,40 @@ enum ActionsMenu {
         let action: @MainActor () -> Void
         init(_ a: @escaping @MainActor () -> Void) { action = a }
         @MainActor @objc func run(_ sender: Any?) { action() }
+    }
+}
+
+/// Where the panel's rows, list and search field are, from the panel's top
+/// left, as the view last laid them out; ⌘K's menu opens from here.
+@MainActor
+final class PanelGeometry {
+    /// The coordinate space the frames are in: the panel's whole view.
+    nonisolated static let space = "panel"
+    /// The menu's left edge sits this far in from a row's, under its name.
+    nonisolated static let inset: CGFloat = 44
+
+    /// Row frames by row id (``PanelInput/rowID(at:shown:rows:)``).
+    var rows: [String: CGRect] = [:]
+    /// The scrolling list's frame: rows outside it are out of view.
+    var list: CGRect = .zero
+    /// The search field's row; the menu opens under it when no row is in view.
+    var field = CGRect(x: 0, y: 0, width: 680, height: 50)
+
+    /// Where the menu for a row opens, from the panel's top left.
+    func menuAnchor(rowID: String) -> CGPoint {
+        Self.menuAnchor(row: rows[rowID], list: list, field: field)
+    }
+
+    /// Under the row if any of it is in the list's view (no lower than the
+    /// list's bottom), else under the search field.
+    nonisolated static func menuAnchor(row: CGRect?, list: CGRect, field: CGRect) -> CGPoint {
+        guard let row, row.intersects(list) else { return CGPoint(x: field.minX + inset, y: field.maxY) }
+        return CGPoint(x: row.minX + inset, y: min(row.maxY, list.maxY))
+    }
+
+    /// A point from the top left in `view`'s own coordinates, which count from
+    /// the bottom unless the view is flipped.
+    static func viewPoint(_ p: CGPoint, in view: NSView) -> NSPoint {
+        view.isFlipped ? p : NSPoint(x: p.x, y: view.bounds.height - p.y)
     }
 }

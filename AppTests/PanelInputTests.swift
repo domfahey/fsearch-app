@@ -59,6 +59,29 @@ extension AppTests {
             #expect(key(P(key: .delete, isRepeat: true), empty: true) == nil)
         }
 
+        /// ⌘⌃Y is not ⌘Y: a command shortcut with an extra ⌃ or ⌥ is not a binding.
+        @Test func commandShortcutsRejectExtraModifiers() {
+            // ⌃ can turn the letter into a control character; the key code still says Y.
+            #expect(key(P(key: "y", characters: "\u{19}", command: true, control: true, keyCode: 0x10)) == nil)
+            #expect(key(P(key: "y", characters: "y", command: true, control: true)) == nil)
+            #expect(key(P(key: "y", characters: "y", command: true, option: true, keyCode: 0x10)) == nil)
+            #expect(key(P(key: "k", characters: "k", command: true, control: true)) == nil)
+            #expect(key(P(key: "k", characters: "k", command: true, option: true)) == nil)
+            #expect(key(P(key: "C", characters: "C", command: true, shift: true, control: true)) == nil)
+            #expect(key(P(key: "C", characters: "C", command: true, shift: true, option: true)) == nil)
+            #expect(key(P(key: "3", characters: "3", command: true, control: true)) == nil)
+            #expect(key(P(key: "3", characters: "3", command: true, option: true)) == nil)
+            #expect(key(P(key: .return, command: true, control: true)) == nil)
+            #expect(key(P(key: .return, command: true, option: true)) == nil)
+            #expect(key(P(key: .return, control: true)) == nil)
+            #expect(key(P(key: .return, option: true)) == nil)
+            // ⌃P/⌃N with ⌥ are not bindings either.
+            #expect(key(P(key: "p", characters: "\u{10}", control: true, option: true)) == nil)
+            // Moving and Escape take any modifiers, as before.
+            #expect(key(P(key: .downArrow, option: true)) == .down)
+            #expect(key(P(key: .escape, option: true)) == .escape)
+        }
+
         /// Item 13: on a non-Latin layout ⌘Y types "н": the key code decides.
         @Test func commandLettersOnANonLatinLayout() {
             #expect(key(P(key: "н", characters: "н", command: true, keyCode: 0x10)) == .cmdY)
@@ -201,6 +224,17 @@ extension AppTests {
             #expect(PanelInput.rowID(at: 3, shown: shown, rows: rows) == "fallback-content")
             #expect(PanelInput.rowID(at: 4, shown: shown, rows: rows) == "fallback-symbols")
             #expect(PanelInput.rowID(at: 5, shown: shown, rows: rows) == nil)
+        }
+
+        /// Quick Look follows the selection onto file rows only.
+        @Test func previewPathsForTheSelection() {
+            let shown: [ResultItem] = [.file(Wire.hit("/p/a")), .line(path: "/p/b", match: Match(line: 3, text: "x"))]
+            let rows = PanelRows(files: 2, query: "set", mode: .names)
+            #expect(PanelInput.previewPath(at: 0, shown: shown, rows: rows) == "/p/a")
+            #expect(PanelInput.previewPath(at: 1, shown: shown, rows: rows) == "/p/b")
+            #expect(PanelInput.previewPath(at: 2, shown: shown, rows: rows) == nil)  // the command
+            #expect(PanelInput.previewPath(at: 3, shown: shown, rows: rows) == nil)  // a fallback
+            #expect(PanelInput.previewPath(at: 9, shown: shown, rows: rows) == nil)
         }
 
         /// Item 6: ↵ before the results answer the query is held, then runs

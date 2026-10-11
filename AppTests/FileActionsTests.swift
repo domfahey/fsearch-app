@@ -248,6 +248,62 @@ extension AppTests {
             #expect((q.previewPanel(nil, previewItemAt: 0) as? URL) == u)
             q.close()  // nothing up: no-op
         }
+
+        /// In the preview, ⌘Y closes it and ↑/↓ move the launcher's selection; extra modifiers make it no binding.
+        @Test func previewKeys() {
+            typealias Q = QuickLookSource
+            #expect(Q.previewKey(characters: "y", modifiers: .command, keyCode: 0x10) == .close)
+            #expect(Q.previewKey(characters: "Y", modifiers: .command, keyCode: 0x10) == .close)
+            #expect(Q.previewKey(characters: "н", modifiers: .command, keyCode: 0x10) == .close)
+            #expect(Q.previewKey(characters: "y", modifiers: [.command, .control], keyCode: 0x10) == nil)
+            #expect(Q.previewKey(characters: "y", modifiers: [.command, .option], keyCode: 0x10) == nil)
+            #expect(Q.previewKey(characters: "y", modifiers: [.command, .shift], keyCode: 0x10) == nil)
+            #expect(Q.previewKey(characters: "y", modifiers: [], keyCode: 0x10) == nil)
+            // Arrow keys carry the function and numeric-pad flags.
+            let arrow: NSEvent.ModifierFlags = [.function, .numericPad]
+            #expect(Q.previewKey(characters: "\u{F700}", modifiers: arrow, keyCode: 126) == .up)
+            #expect(Q.previewKey(characters: "\u{F701}", modifiers: arrow, keyCode: 125) == .down)
+            #expect(Q.previewKey(characters: "\u{F701}", modifiers: arrow.union(.command), keyCode: 125) == nil)
+            #expect(Q.previewKey(characters: "\u{F701}", modifiers: arrow.union(.shift), keyCode: 125) == nil)
+            #expect(Q.previewKey(characters: "\u{F702}", modifiers: arrow, keyCode: 123) == nil)  // ←
+            #expect(Q.previewKey(characters: " ", modifiers: [], keyCode: 49) == nil)
+        }
+
+        /// ↑/↓ in the preview move the launcher's selection; ⌘Y closes.
+        @Test func previewArrowsMoveTheLaunchersSelection() {
+            let q = QuickLookSource.shared
+            var moved: [PanelKey] = []
+            let saved = q.move
+            q.move = { moved.append($0) }
+            defer { q.move = saved }
+            q.handle(.down)
+            q.handle(.up)
+            q.handle(.close)  // nothing up: no-op
+            #expect(moved == [.down, .up])
+        }
+
+        /// The preview follows the launcher's selection while it is up, and only then.
+        @Test func previewFollowsTheSelection() {
+            let q = QuickLookSource.shared
+            let a = URL(fileURLWithPath: "/p/a.txt"), b = URL(fileURLWithPath: "/p/b.txt")
+            q.toggle(a)
+            q.follow(b)  // not previewing in this host: unchanged
+            #expect(q.item == a)
+            q.follow(b, previewing: true)
+            #expect(q.item == b)
+            q.follow(nil, previewing: true)  // a command or fallback row: keep the last file
+            #expect(q.item == b)
+            #expect(!QLPreviewPanel.sharedPreviewPanelExists() || !QLPreviewPanel.shared().isVisible)
+        }
+
+        /// Sent keys are numbered, so the same key twice is still a change the view sees.
+        @Test func keyFeedNumbersEachKey() {
+            let feed = PanelKeyFeed()
+            #expect(feed.last == nil)
+            feed.send(.down)
+            feed.send(.down)
+            #expect(feed.last == PanelKeyFeed.Sent(key: .down, n: 2))
+        }
     }
 
     @Suite @MainActor
@@ -368,6 +424,55 @@ extension AppTests {
             ActionsMenu.show(for: .file(Wire.hit("/p/x.txt")), in: panel, app: env.app)
             #expect(shown.first?.first == "Open")
             #expect(shown.first?.last == "Move to Trash")
+        }
+
+        /// ⌘K's menu opens under the selected row, or under the search field when the row is out of view.
+        @Test func menuAnchorsAtTheSelectedRow() {
+            let field = CGRect(x: 0, y: 0, width: 680, height: 50)
+            let list = CGRect(x: 0, y: 60, width: 680, height: 360)
+            let row = CGRect(x: 4, y: 100, width: 672, height: 34)
+            let i = PanelGeometry.inset
+            #expect(PanelGeometry.menuAnchor(row: row, list: list, field: field) == CGPoint(x: 4 + i, y: 134))
+            // Cut off at the bottom of the list: the list's bottom edge.
+            let low = CGRect(x: 4, y: 400, width: 672, height: 34)
+            #expect(PanelGeometry.menuAnchor(row: low, list: list, field: field) == CGPoint(x: 4 + i, y: 420))
+            // Scrolled out of view, or never laid out: under the search field.
+            let gone = CGRect(x: 4, y: 500, width: 672, height: 34)
+            #expect(PanelGeometry.menuAnchor(row: gone, list: list, field: field) == CGPoint(x: i, y: 50))
+            #expect(PanelGeometry.menuAnchor(row: nil, list: list, field: field) == CGPoint(x: i, y: 50))
+
+            let g = PanelGeometry()
+            g.field = field
+            g.list = list
+            g.rows["/p/x.txt"] = row
+            #expect(g.menuAnchor(rowID: "/p/x.txt") == CGPoint(x: 4 + i, y: 134))
+            #expect(g.menuAnchor(rowID: "/p/other") == CGPoint(x: i, y: 50))
+        }
+
+        /// The anchor is measured from the top left; an unflipped view counts from the bottom.
+        @Test func menuAnchorInViewCoordinates() {
+            final class Flipped: NSView { override var isFlipped: Bool { true } }
+            let plain = NSView(frame: NSRect(x: 0, y: 0, width: 680, height: 460))
+            let flipped = Flipped(frame: plain.frame)
+            #expect(PanelGeometry.viewPoint(CGPoint(x: 10, y: 100), in: flipped) == NSPoint(x: 10, y: 100))
+            #expect(PanelGeometry.viewPoint(CGPoint(x: 10, y: 100), in: plain) == NSPoint(x: 10, y: 360))
+        }
+
+        @Test func showPopsUpAtTheSelectedRow() {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            var at: [NSPoint] = []
+            let saved = ActionsMenu.popUp
+            ActionsMenu.popUp = { _, p, _ in at.append(p) }
+            defer { ActionsMenu.popUp = saved }
+            let panel = NSPanel(
+                contentRect: NSRect(x: 0, y: 0, width: 680, height: 460), styleMask: [.borderless], backing: .buffered, defer: true)
+            panel.contentView = NSView()
+            let g = PanelGeometry()
+            g.list = CGRect(x: 0, y: 60, width: 680, height: 360)
+            g.rows["/p/x.txt"] = CGRect(x: 4, y: 100, width: 672, height: 34)
+            ActionsMenu.show(for: .file(Wire.hit("/p/x.txt")), in: panel, app: env.app, geometry: g)
+            #expect(at == [NSPoint(x: 4 + PanelGeometry.inset, y: 460 - 134)])
         }
 
         /// Like ↵, an action that sends you to another app puts the launcher
