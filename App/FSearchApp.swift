@@ -134,10 +134,11 @@ enum LaunchGuards {
     }
 
     /// Back from System Settings after the menu's Full Disk Access item.
+    /// Observes once; tests pass their own notification center.
     private static var activationObserver: NSObjectProtocol?
-    static func observeActivation(daemon: DaemonManager) {
+    static func observeActivation(daemon: DaemonManager, center: NotificationCenter = .default) {
         guard activationObserver == nil else { return }
-        activationObserver = NotificationCenter.default.addObserver(
+        activationObserver = center.addObserver(
             forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main
         ) { _ in
             MainActor.assumeIsolated { _ = Task { await daemon.appBecameActive() } }

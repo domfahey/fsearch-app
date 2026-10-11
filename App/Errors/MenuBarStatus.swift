@@ -100,11 +100,13 @@ struct MenuBarLabel: View {
 /// First items of the menu while something needs attention.
 struct MenuBarFixItem: View {
     @ObservedObject var app: AppState
+    /// Where the warning comes from; tests pass their own.
+    var status = MenuBarStatus.shared
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         UpdateAvailableItem()
-        if let w = MenuBarStatus.shared.warning {
+        if let w = status.warning {
             Text(w.message)
             if w.offersFix {
                 Button("Fix…") {

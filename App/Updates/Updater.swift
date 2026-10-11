@@ -34,6 +34,11 @@ enum Updater {
         resumeReminder(model: .shared, updaterRunning: true) { c.updater.checkForUpdatesInBackground() }
     }
 
+    #if DEBUG
+        /// Tests install an unstarted controller to render the update items, then remove it.
+        static func setController(_ c: SPUStandardUpdaterController?) { controller = c }
+    #endif
+
     /// The menu-bar reminder lives in memory: if the last run quit with one up,
     /// look again in the background, which brings it back (gently) if the
     /// update is still there. The flag is cleared, so it isn't asked twice.

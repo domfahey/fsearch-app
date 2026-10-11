@@ -49,7 +49,7 @@ xcodebuild -project FSearch.xcodeproj -scheme FSearch -configuration Debug \
 | Pure logic with no UI or system calls, such as query splitting, the wire format, the search model and the daemon plan | `Packages/FSearchKit`, with unit tests there |
 | Glue between the app and macOS, such as the panel, menus, onboarding, settings and the updater | `App/` |
 | A call to something macOS owns, such as `SMAppService`, `NSWorkspace`, the Trash or Sparkle | A protocol (a seam) in `App/Support/Seams.swift` or `SystemSeams.swift`. Add a fake to `AppTests/Support/Fakes.swift` and test against it. |
-| A test of app code | `AppTests/` |
+| A test of app code | `AppTests/`. For a view, render it off screen with `render(_:)` and read or press it through its accessibility tree (`axNode`, in `AppTests/Support/Accessibility.swift`). Never press a button that opens a real window or quits. |
 | A test that drives the real UI | `AppUITests/` (see the focus-safety rule below) |
 
 Two modes keep tests away from your real setup. **Test mode** starts when you pass `-FSEARCH_SOCKET <path>`. The app then talks to that throwaway daemon and never touches the login item or shows onboarding. The **inert host** is the app when it hosts AppTests: it starts no helper, hotkey, onboarding or updater, and it points at a socket nobody listens on. See [ADR 0007](docs/adr/0007-test-seams-inert-test-host-and-test-mode.md) and [ADR 0005](docs/adr/0005-tests-never-touch-the-real-index.md).
@@ -59,7 +59,7 @@ Two modes keep tests away from your real setup. **Test mode** starts when you pa
 | Tier | Run it | Safe to run while you work? | In CI? |
 |---|---|---|---|
 | FSearchKit unit and integration tests, against a real daemon in a temporary `HOME` | `make test` | Yes | Yes, on macOS 26 |
-| AppTests, the app's unit tests, in an inert host with fakes | `make apptest` or `scripts/coverage.sh --unit-only` | Yes. The host shows nothing and takes no focus. | Yes, with an 80% coverage gate |
+| AppTests, the app's unit tests, in an inert host with fakes | `make apptest` or `scripts/coverage.sh --unit-only` | Yes. The host shows nothing and takes no focus. | Yes, with a 90% coverage gate |
 | UI and end-to-end tests (AppUITests) | `make ui` | No. It synthesizes keystrokes. Use a hands-off GUI session. | No |
 | Benchmarks | `scripts/bench.sh --report-only --skip-daemon` (or `make bench` for the full run) | Yes | Report-only |
 
@@ -102,7 +102,7 @@ Two modes keep tests away from your real setup. **Test mode** starts when you pa
 ## Tests
 
 - New behavior needs a test that fails without it.
-- Coverage gates: CI fails if FSearchKit line coverage drops below 90% (`scripts/coverage.sh --kit-only --min 90`) or if AppTests-only app coverage (excluding documented system adapters) drops below 80% (`scripts/coverage.sh --unit-only --min 80`). `make ci` runs both gates. To try a different floor, pass `--min` or set `COVERAGE_MIN`, for example `scripts/coverage.sh --kit-only --min 90` or `COVERAGE_MIN=90 scripts/coverage.sh --kit-only`. The full app number, which combines AppTests with the UI tests, needs a hands-off GUI session: run `make coverage`.
+- Coverage gates: CI fails if FSearchKit line coverage drops below 90% (`scripts/coverage.sh --kit-only --min 90`) or if AppTests-only app coverage (excluding documented system adapters) drops below 90% (`scripts/coverage.sh --unit-only --min 90`). `make ci` runs both gates. To try a different floor, pass `--min` or set `COVERAGE_MIN`, for example `scripts/coverage.sh --kit-only --min 90` or `COVERAGE_MIN=90 scripts/coverage.sh --kit-only`. The full app number, which combines AppTests with the UI tests, needs a hands-off GUI session: run `make coverage`.
 - Tests must never touch the real index, `~/Library/LaunchAgents`, `~/.local/bin` or `~/Library/Application Support/FSearch`.
 - Use a temporary `HOME` and `FSEARCH_ROOT` for anything that starts a daemon. In the core tests, use `RealDaemon`: it runs the daemon under a watchdog that stops it and deletes its temporary directory when the test process exits or crashes, and it sweeps orphans from earlier hard-killed runs. See [ADR 0005](docs/adr/0005-tests-never-touch-the-real-index.md).
 

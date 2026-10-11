@@ -3,8 +3,8 @@ import Foundation
 import os
 
 /// Moving the app out of a translocated copy or a disk image into
-/// /Applications. A system adapter (Security, the file system, Finder): tests
-/// never run it, and it runs only outside test mode, after the user agreed.
+/// /Applications. It runs only outside test mode, after the user agreed; tests
+/// move into a temp folder with a fake workspace and never start the relaunch.
 @MainActor
 enum InstallMover {
     private typealias IsTranslocated =
@@ -36,13 +36,22 @@ enum InstallMover {
     /// Copies the app to /Applications and opens the copy once this process
     /// has quit (the copy would otherwise see this one running and quit).
     /// If it can't, shows the app and the Applications folder in Finder.
-    static func moveToApplications(from bundle: URL) {
+    ///
+    /// - Parameters:
+    ///   - bundle: This app's bundle, possibly a translocated copy.
+    ///   - applications: The folder to copy into; tests use a temp folder.
+    ///   - workspace: Reveals files in Finder.
+    ///   - run: Starts the relaunch process.
+    static func moveToApplications(
+        from bundle: URL, applications: URL = URL(fileURLWithPath: "/Applications"),
+        workspace: Workspace = SystemWorkspace(), run: (Process) throws -> Void = { try $0.run() }
+    ) {
         let source = originalURL(of: bundle)
-        let dest = URL(fileURLWithPath: "/Applications").appendingPathComponent(source.lastPathComponent)
+        let dest = applications.appendingPathComponent(source.lastPathComponent)
         let fm = FileManager.default
         guard !fm.fileExists(atPath: dest.path) else {
             // Never overwrite: the user replaces an older copy in Finder.
-            NSWorkspace.shared.activateFileViewerSelecting([source, dest])
+            workspace.activateFileViewerSelecting([source, dest])
             return
         }
         do {
@@ -52,10 +61,10 @@ enum InstallMover {
             let p = Process()
             p.executableURL = URL(fileURLWithPath: "/bin/sh")
             p.arguments = relaunchArguments(app: dest, waitingFor: ProcessInfo.processInfo.processIdentifier)
-            try p.run()
+            try run(p)
         } catch {
             Log.daemon.error("move to Applications failed: \(error.localizedDescription, privacy: .private)")
-            NSWorkspace.shared.activateFileViewerSelecting([source, URL(fileURLWithPath: "/Applications")])
+            workspace.activateFileViewerSelecting([source, applications])
         }
     }
 

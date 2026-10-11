@@ -43,7 +43,7 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
   - FSearchKit Swift package with unit and daemon integration tests. A separate UI smoke test (`scripts/ui-smoke.sh`) runs locally, not in CI.
   - Benchmarks: `scripts/bench.sh` measures keystroke, client and real-daemon performance and fails when a result regresses against `bench/baseline.json`. See [bench/README.md](bench/README.md).
   - A Makefile for common tasks (`make test`, `apptest`, `coverage-kit`, `lint`, `type`, `bench`, `check`, `ci`, `doctor`, `install`, `clean`) and a `.swift-format` style config.
-  - CI runs the FSearchKit tests on macOS 26 (Xcode 26.6), builds the universal app, runs the app's unit tests (AppTests), gates coverage (FSearchKit at 90%, the app's unit tests at 80%), treats compiler warnings as errors, blocks on swift-format lint, checks Markdown links, lints the scripts and workflows, and reports benchmarks.
+  - CI runs the FSearchKit tests on macOS 26 (Xcode 26.6), builds the universal app, runs the app's unit tests (AppTests), gates coverage (FSearchKit at 90%, the app's unit tests at 90%), treats compiler warnings as errors, blocks on swift-format lint, checks Markdown links, lints the scripts and workflows, and reports benchmarks.
   - The CI release job runs in the protected `release` environment, only for tags on main, after the kit, app and lint jobs, with a 60-minute timeout. It publishes a draft GitHub release with the DMG, checksum and build-provenance attestation (verify with `gh attestation verify`).
   - Pre-commit scans staged blobs and pre-push scans every unpushed commit for GitHub tokens and EdDSA-style keys. Key and certificate file types are git-ignored.
   - Every public FSearchKit API has a doc comment.
@@ -59,6 +59,7 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
 - The panel shows at most 1000 results.
 - `limit:` now works in name searches, because the app no longer sends its own limit over it.
 - The debug search log folder is private (0700) and its file 0600, both excluded from backups. The privacy manifest gives one reason for file timestamps, C617.1: the app reads them only for its own files and never shows them.
+- CI's coverage gate for the app's unit tests is 90%, up from 80%.
 
 ### Fixed
 
@@ -91,6 +92,7 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
 - When the chosen editor doesn't handle open-at-line links, a content hit opens in it as a plain file, without the line, instead of not opening.
 - Remove Background Helper and Data… keeps the shared index unless FSearch's own helper is confirmed to hold it, and says why it kept it: the helper is off, another fsearch daemon holds it, or it couldn't confirm.
 - Move to Applications opens the moved copy only after the old one has quit.
+- VoiceOver can activate the panel's "Use … with" rows and the FSearch Settings row. Before, only a click ran them.
 
 ### Security
 
