@@ -214,7 +214,7 @@ import Testing
         // Mismatched lines keep arriving faster than the per-read timeout; the call still ends.
         let srv = RawServer { fd, _ in
             _ = RawServer.readLine(fd)
-            for _ in 0..<100 {
+            for _ in 0..<200 {
                 RawServer.send(fd, #"{"ok":true,"id":777}"# + "\n")
                 Thread.sleep(forTimeInterval: 0.05)
             }
@@ -224,8 +224,9 @@ import Testing
         let c = DaemonClient(socketPath: srv.path, timeout: 0.4)
         let t0 = Date()
         await #expect(throws: DaemonError.timeout) { try await c.ping() }
-        // Stray lines keep coming for 5 s; the 0.4 s timeout must still end it.
-        #expect(Date().timeIntervalSince(t0) < 3)
+        // Stray lines keep coming for 10 s; the 0.4 s timeout must still end it well before.
+        // Loose bound: CI runners have taken 3 s.
+        #expect(Date().timeIntervalSince(t0) < 7)
     }
 
     @Test func repliesWithoutAnIdAreAccepted() async throws {
