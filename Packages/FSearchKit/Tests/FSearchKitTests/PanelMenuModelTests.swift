@@ -153,7 +153,7 @@ import Testing
     @Test func theMenuKeyNeverWaitsForResults() {
         #expect(!PanelKey.appMenu.actsOnResults)
         var s = PanelState(query: "x", selection: 0, count: 3)
-        #expect(reduce(&s, .appMenu) == .none)
+        #expect(s.reduce(.appMenu) == .none)
         #expect(s == PanelState(query: "x", selection: 0, count: 3))
     }
 }
