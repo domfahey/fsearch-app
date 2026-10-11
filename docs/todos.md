@@ -68,9 +68,7 @@ All fixed; see the CHANGELOG.
 - [ ] Tag v0.1.0 and run `scripts/release.sh 0.1.0`; GitHub release with DMG + SHA-256; artifact attestations and SBOM; Homebrew cask (with `zap`).
 - [x] Confirm the privacy manifest's file-timestamp reason (C617.1). It is the only reason now: the app reads timestamps only of its own helper and log files.
 
-**On an idle Mac** (these tests synthesize keystrokes)
-- [ ] Run the 16 end-to-end UI tests (`make ui`).
-- [ ] Re-record the benchmark baseline (`scripts/bench.sh --record`, after deleting this machine's entry).
+**By hand**
 - [ ] Manual checks:
   - the ⌥Space hotkey and the Raycast warning;
   - Japanese and Chinese input in the panel;

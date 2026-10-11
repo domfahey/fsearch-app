@@ -251,8 +251,10 @@ class PanelUITestCase: XCTestCase {
     func pressReturnOnFallback(_ id: String, file: StaticString = #filePath, line: UInt = #line) throws {
         let header = element("fallbacks"), row = element(id)
         waitUntil(10, "the name search finished", { header.value as? String == "done" }, file: file, line: line)
-        waitUntil(5, "\(id) is selected", { row.value as? String == "selected" }, file: file, line: line)
-        guard header.value as? String == "done", row.value as? String == "selected" else {
+        // The row's value says "selected"; some macOS versions report only the Selected trait.
+        let selected = { row.isSelected || row.value as? String == "selected" }
+        waitUntil(5, "\(id) is selected", selected, file: file, line: line)
+        guard header.value as? String == "done", selected() else {
             throw UITestRefusal("\(id) isn't the selected row: not pressing ↵", file: file, line: line)
         }
         try press(.return, file: file, line: line)
