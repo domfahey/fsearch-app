@@ -25,7 +25,7 @@ extension AppTests {
             defer { Updater.setController(nil) }
             let w = await render(Form { UpdatesSettingsSection() }, size: NSSize(width: 440, height: 160))
             defer { w.close() }
-            let toggle = try #require(axNode("Automatically check for updates", in: w))
+            let toggle = try #require(await axWait("Automatically check for updates", in: w))
             let on = c.updater.automaticallyChecksForUpdates
             #expect(await eventually { (toggle.object.value(forKey: "accessibilityValue") as? NSNumber)?.boolValue == on })
             // Not started, so no check can run yet.
@@ -53,8 +53,7 @@ extension AppTests {
                     UpdateAvailableItem(); CheckForUpdatesItem()
                 }, size: NSSize(width: 300, height: 80))
             defer { w.close() }
-            #expect(axTexts(in: w).contains("Check for Updates…"))
-            #expect(try #require(axNode("Check for Updates…", in: w)).isEnabled == false)
+            #expect(try #require(await axWait("Check for Updates…", in: w)).isEnabled == false)
             #expect(!axTexts(in: w).contains("Update Available…"))
             model.update { $0.willShow(bySparkle: false, userInitiated: false) }
             #expect(await eventually { axTexts(in: w).contains("Update Available…") })
@@ -65,10 +64,11 @@ extension AppTests {
             #expect(Updater.controller == nil)
             let w = await render(
                 VStack {
-                    UpdateAvailableItem(); CheckForUpdatesItem(); Form { UpdatesSettingsSection() }
+                    Text(axSentinel); UpdateAvailableItem(); CheckForUpdatesItem(); Form { UpdatesSettingsSection() }
                 },
                 size: NSSize(width: 300, height: 120))
             defer { w.close() }
+            #expect(await axWait(axSentinel, in: w) != nil)
             #expect(!axTexts(in: w).contains("Check for Updates…"))
             #expect(!axTexts(in: w).contains("Automatically check for updates"))
         }
@@ -137,6 +137,7 @@ extension AppTests {
             m.armFullDiskAccessRestart()
             let center = NotificationCenter()
             LaunchGuards.observeActivation(daemon: m, center: center)
+            defer { LaunchGuards.stopObservingActivation(center: center) }
             #expect(h.unregistered == 0)
             center.post(name: NSApplication.didBecomeActiveNotification, object: nil)
             #expect(await eventually { h.unregistered == 1 })

@@ -144,4 +144,12 @@ enum LaunchGuards {
             MainActor.assumeIsolated { _ = Task { await daemon.appBecameActive() } }
         }
     }
+
+    #if DEBUG
+        /// Tests stop the observer they started, so the next test can observe again.
+        static func stopObservingActivation(center: NotificationCenter) {
+            if let o = activationObserver { center.removeObserver(o) }
+            activationObserver = nil
+        }
+    #endif
 }

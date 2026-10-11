@@ -10,6 +10,25 @@ import Testing
 /// what they show, and what their buttons do when pressed. Buttons that would
 /// open a real window (Settings, About, the debug windows) or quit are never pressed.
 extension AppTests {
+    /// The tree every test in this file reads: if SwiftUI stops building it in the
+    /// test host, this fails with one clear message.
+    @Suite @MainActor
+    struct AccessibilityTreeTests {
+        @Test func theAccessibilityTreeIsBuilt() async throws {
+            var presses = 0
+            let w = await render(
+                VStack {
+                    Text("hello"); Button("Press me") { presses += 1 }
+                }, size: NSSize(width: 200, height: 80))
+            defer { w.close() }
+            let button = try #require(
+                await axWait("Press me", in: w), "SwiftUI built no accessibility tree in the test host: every view test depends on it")
+            #expect(axTexts(in: w).contains("hello"))
+            button.press()
+            #expect(presses == 1)
+        }
+    }
+
     @Suite @MainActor
     struct MenuViewTests {
         /// A status following `env`'s daemon, once the daemon reports `state`.
@@ -25,9 +44,13 @@ extension AppTests {
             let env = TestEnv()
             defer { env.tearDown() }
             let s = await status(env) { $0.warning == nil && env.app.daemon.state != .checking }
-            let w = await render(VStack { MenuBarFixItem(app: env.app, status: s) })
+            let w = await render(
+                VStack {
+                    Text(axSentinel); MenuBarFixItem(app: env.app, status: s)
+                })
             defer { w.close() }
-            #expect(axTexts(in: w).isEmpty)
+            #expect(await axWait(axSentinel, in: w) != nil)
+            #expect(axTexts(in: w) == [axSentinel])
         }
 
         /// A helper that stopped answering: the warning and a Fix… item, no Full Disk Access items.
@@ -38,6 +61,7 @@ extension AppTests {
             let s = await status(env) { $0.warning?.offersFix == true }
             let w = await render(VStack { MenuBarFixItem(app: env.app, status: s) })
             defer { w.close() }
+            #expect(await axWait("Fix…", in: w) != nil)
             let texts = axTexts(in: w)
             #expect(texts.contains(s.warning?.message ?? "-"))
             #expect(texts.contains("Fix…"))
@@ -54,9 +78,9 @@ extension AppTests {
             let s = await status(env) { $0.warning?.offersFullDiskAccess == true }
             let w = await render(VStack { MenuBarFixItem(app: env.app, status: s) })
             defer { w.close() }
-            #expect(!axTexts(in: w).contains("Fix…"))
             // Not our helper (test mode), so the CLI binary is the one to grant.
-            let grant = try #require(axNode(MenuBarWarning.fullDiskAccessItemTitle(ownsDaemon: false), in: w))
+            let grant = try #require(await axWait(MenuBarWarning.fullDiskAccessItemTitle(ownsDaemon: false), in: w))
+            #expect(!axTexts(in: w).contains("Fix…"))
             grant.press()
             #expect(env.workspace.opened == [FullDiskAccessReminder.settingsURL])
             #expect(!env.app.daemon.fullDiskAccessRestartArmed, "only our own helper is restarted")
@@ -73,13 +97,12 @@ extension AppTests {
             defer { env.tearDown() }
             let w = await render(VStack { DebugMenuItem(app: env.app) })
             defer { w.close() }
-            try #require(axNode("Turn On Debug Mode", in: w)).press()
+            try #require(await axWait("Turn On Debug Mode", in: w)).press()
             #expect(env.app.debugMode)
             env.app.search.query = "q"
             await env.app.search.refresh()
             #expect(FileManager.default.fileExists(atPath: env.app.log.file.path))
-            #expect(await eventually { axNode("Turn Off Debug Mode", in: w) != nil })
-            try #require(axNode("Turn Off Debug Mode", in: w)).press()
+            try #require(await axWait("Turn Off Debug Mode", in: w)).press()
             #expect(!env.app.debugMode)
             #expect(!FileManager.default.fileExists(atPath: env.app.log.file.path))
         }
@@ -92,6 +115,7 @@ extension AppTests {
                 env.app.debugMode = debug
                 let w = await render(VStack { MenuContent(app: env.app) }, size: NSSize(width: 300, height: 400))
                 defer { w.close() }
+                #expect(await axWait("Search…", in: w) != nil)
                 let texts = axTexts(in: w)
                 #expect(texts.contains("Search…"))
                 #expect(texts.contains("Quit FSearch"))
@@ -105,7 +129,7 @@ extension AppTests {
             let w = await render(VStack { MenuContent(app: env.app) }, size: NSSize(width: 300, height: 400))
             defer { w.close() }
             #expect(!PanelController.shared.isVisible)
-            try #require(axNode("Search…", in: w)).press()
+            try #require(await axWait("Search…", in: w)).press()
             #expect(PanelController.shared.isVisible)
         }
     }
@@ -134,8 +158,9 @@ extension AppTests {
             let login = LoginItemModel(service: item)
             let w = await show(env, login: login, uninstaller: uninstaller(env))
             defer { w.close() }
+            let open = try #require(await axWait("Open Login Items…", in: w))
             #expect(axTexts(in: w).contains(login.statusText))
-            try #require(axNode("Open Login Items…", in: w)).press()
+            open.press()
             #expect(item.openedSettings == 1)
         }
 
@@ -148,8 +173,9 @@ extension AppTests {
             let login = LoginItemModel(service: item)
             let w = await show(env, login: login, uninstaller: uninstaller(env))
             defer { w.close() }
+            let toggle = try #require(await axWait("Open FSearch at login", in: w))
             #expect(!axTexts(in: w).contains("Open Login Items…"))
-            try #require(axNode("Open FSearch at login", in: w)).press()
+            toggle.press()
             #expect(await eventually { item.registered == 1 })
             #expect(await eventually { axTexts(in: w).contains { $0.contains("denied by policy") } })
         }
@@ -160,7 +186,7 @@ extension AppTests {
             defer { env.tearDown() }
             let w = await show(env, login: LoginItemModel(service: nil), uninstaller: uninstaller(env))
             defer { w.close() }
-            #expect(try #require(axNode("Open FSearch at login", in: w)).isEnabled == false)
+            #expect(try #require(await axWait("Open FSearch at login", in: w)).isEnabled == false)
             // Removing needs the real helper, which test mode never touches.
             #expect(try #require(axNode("Remove Background Helper and Data…", in: w)).isEnabled == false)
         }
@@ -174,6 +200,7 @@ extension AppTests {
             guard case let .done(report) = u.phase else { Issue.record("not done"); return }
             let w = await show(env, login: LoginItemModel(service: nil), uninstaller: u)
             defer { w.close() }
+            #expect(await axWait("Done", in: w) != nil)
             let texts = axTexts(in: w)
             for line in report.removed { #expect(texts.contains(line), "\(line)") }
             #expect(!texts.contains("Remove Background Helper and Data…"))
@@ -191,7 +218,7 @@ extension AppTests {
             let w = await show(env, login: LoginItemModel(service: nil), uninstaller: uninstaller(env))
             defer { w.close() }
             #expect(!env.app.debugMode)
-            try #require(axNode("Debug mode", in: w)).press()
+            try #require(await axWait("Debug mode", in: w)).press()
             #expect(await eventually { env.app.debugMode })
         }
     }
@@ -210,7 +237,7 @@ extension AppTests {
             let w = await render(SearchLogView().environmentObject(env.app), size: NSSize(width: 760, height: 420))
             defer { w.close() }
             #expect(env.app.log.entries().map(\.query).sorted() == ["alpha", "beta"])
-            #expect(axNode("Export…", in: w) != nil)
+            #expect(await axWait("Export…", in: w) != nil)
             try #require(axNode("Clear Log", in: w)).press()
             #expect(env.app.log.entries().isEmpty)
         }
@@ -264,13 +291,11 @@ extension AppTests {
             defer { w.close() }
             env.app.search.query = "heron"
             #expect(await eventually { env.app.search.phase == .results })
-            #expect(await eventually { axNode(id: "fallback-content", in: w) != nil })
-            try #require(axNode(id: "fallback-content", in: w)).press()
+            try #require(await axWait(id: "fallback-content", in: w)).press()
             #expect(env.app.search.mode == .content)
             #expect(await eventually { env.daemon.greps.contains { $0.pattern == "heron" } })
             env.app.search.mode = .names
-            #expect(await eventually { axNode(id: "fallback-symbols", in: w) != nil })
-            try #require(axNode(id: "fallback-symbols", in: w)).press()
+            try #require(await axWait(id: "fallback-symbols", in: w)).press()
             #expect(env.app.search.mode == .symbols)
         }
 
@@ -283,8 +308,7 @@ extension AppTests {
             defer { w.close() }
             env.app.search.query = "settings"
             let id = "command-\(AppCommand.settings.title)"
-            #expect(await eventually { axNode(id: id, in: w) != nil })
-            try #require(axNode(id: id, in: w)).press()
+            try #require(await axWait(id: id, in: w)).press()
             #expect(r.commands == [.settings])
         }
     }

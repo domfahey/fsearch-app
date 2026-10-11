@@ -31,9 +31,11 @@ struct AXNode {
     func press() { _ = object.perform(NSSelectorFromString("accessibilityPerformPress")) }
 }
 
-/// SwiftUI builds its accessibility tree only once an assistive client has
-/// asked this process something; any AX request to our own app does that.
-/// Nothing leaves the process: the request itself fails untrusted.
+/// SwiftUI's hosting views expose no accessibility children until the process
+/// has been asked an accessibility question. Setting AXManualAccessibility on our
+/// own app element is enough: the call returns at once with
+/// kAXErrorAttributeUnsupported (-25205), and afterwards the tree is there. Why
+/// is undocumented; `theAccessibilityTreeIsBuilt` fails first if it stops working.
 @MainActor
 let enableSwiftUIAccessibility: Void = {
     _ = AXUIElementSetAttributeValue(AXUIElementCreateApplication(getpid()), "AXManualAccessibility" as CFString, kCFBooleanTrue)
@@ -61,6 +63,24 @@ func axTexts(in w: NSWindow) -> [String] { axNodes(in: w).flatMap(\.texts) }
 /// The first element in the window reading `text`.
 @MainActor
 func axNode(_ text: String, in w: NSWindow) -> AXNode? { axNodes(in: w).first { $0.texts.contains(text) } }
+
+/// Text rendered next to a view under test, so a check that something is absent
+/// first proves the tree was built.
+let axSentinel = "fsearch-ax-sentinel"
+
+/// Waits (up to 3 s) for an element reading `text`; the tree fills in after the first render.
+@MainActor
+func axWait(_ text: String, in w: NSWindow) async -> AXNode? {
+    _ = await eventually { axNode(text, in: w) != nil }
+    return axNode(text, in: w)
+}
+
+/// Waits (up to 3 s) for an element with the identifier `id`.
+@MainActor
+func axWait(id: String, in w: NSWindow) async -> AXNode? {
+    _ = await eventually { axNode(id: id, in: w) != nil }
+    return axNode(id: id, in: w)
+}
 
 /// The first element in the window with the accessibility identifier `id`.
 @MainActor

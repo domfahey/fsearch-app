@@ -63,8 +63,7 @@ jobs:
           CODE_SIGN_IDENTITY=- build
       - name: App unit tests and coverage gate
         # Hosted unit tests (AppTests) run headless on the runner; the UI tests do not.
-        # The floor is below 90 because AppTests alone reach about 84%; the remainder is
-        # covered by the local end-to-end run (`make coverage`, which combines both suites).
+        # The floor is 90% (ADR 0011); the local end-to-end run (`make coverage`) combines both suites.
         env:
           # xcodebuild hands TEST_RUNNER_* to the test host without the prefix:
           # the menu-bar safety test records, not fails, a status window left up here.

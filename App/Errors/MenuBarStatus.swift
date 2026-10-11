@@ -101,8 +101,13 @@ struct MenuBarLabel: View {
 struct MenuBarFixItem: View {
     @ObservedObject var app: AppState
     /// Where the warning comes from; tests pass their own.
-    var status = MenuBarStatus.shared
+    let status: MenuBarStatus
     @Environment(\.openWindow) private var openWindow
+
+    init(app: AppState, status: MenuBarStatus = .shared) {
+        self.app = app
+        self.status = status
+    }
 
     var body: some View {
         UpdateAvailableItem()

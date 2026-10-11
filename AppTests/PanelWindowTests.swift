@@ -49,8 +49,10 @@ extension AppTests {
         }
 
         /// The preview closing while FSearch isn't the active app puts the launcher away
-        /// (it would otherwise float without the keyboard).
-        @Test func previewClosingWhileInactiveHidesTheLauncher() async throws {
+        /// (it would otherwise float without the keyboard). Runs only while the test
+        /// host is inactive, which is the usual case; the active branch needs a key panel.
+        @Test(.enabled("needs the test host inactive") { await MainActor.run { !NSApp.isActive } })
+        func previewClosingWhileInactiveHidesTheLauncher() async throws {
             let env = TestEnv()
             defer { env.tearDown() }
             defer { PanelController.shared.hide(returnFocus: false) }
@@ -58,13 +60,7 @@ extension AppTests {
             let ql = try #require(QLPreviewPanel.shared())
             p.beginPreviewPanelControl(ql)
             p.endPreviewPanelControl(ql)
-            if NSApp.isActive {
-                // Active: the launcher would take key back, which the inert host's panel can't.
-                try? await Task.sleep(for: .milliseconds(50))
-                #expect(PanelController.shared.isVisible && !p.isKeyWindow)
-            } else {
-                #expect(await eventually { !PanelController.shared.isVisible })
-            }
+            #expect(await eventually { !PanelController.shared.isVisible })
         }
 
         /// The data source shows the chosen file, and nothing before one is chosen.
