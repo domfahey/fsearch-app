@@ -4,10 +4,6 @@ Open work, by priority. "You" items need the maintainer: a decision, credentials
 
 Detail for the bug-audit items is in `.superpowers/audit-round2.md`, and for the final-review fixes in `.superpowers/final-fix-brief.md`. Both are local working notes, not committed.
 
-## CI
-
-- [ ] Pin `actionlint` and `shellcheck` in the CI lint job (it uses an unpinned `brew install`).
-
 ## P1: bugs from audit round 2
 
 All fixed; see the CHANGELOG.

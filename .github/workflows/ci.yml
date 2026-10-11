@@ -89,7 +89,24 @@ jobs:
         run: scripts/check-links.sh
       - name: Syntax-check shell scripts
         run: for f in scripts/*.sh scripts/hooks/*; do bash -n "$f"; done
-      - run: brew install actionlint shellcheck
+      - name: Install actionlint and shellcheck (pinned, checksum-verified)
+        env:
+          ACTIONLINT: '1.7.12'
+          ACTIONLINT_SHA256: aba9ced2dee8d27fecca3dc7feb1a7f9a52caefa1eb46f3271ea66b6e0e6953f
+          SHELLCHECK: '0.11.0'
+          SHELLCHECK_SHA256: 339b930feb1ea764467013cc1f72d09cd6b869ebf1013296ba9055ab2ffbd26f
+        run: |
+          set -euo pipefail
+          bin="$RUNNER_TEMP/lint-bin"; mkdir -p "$bin"; cd "$RUNNER_TEMP"
+          a="actionlint_${ACTIONLINT}_darwin_arm64.tar.gz"
+          curl -fsSLo "$a" "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT}/$a"
+          echo "$ACTIONLINT_SHA256  $a" | shasum -a 256 -c -
+          tar -xzf "$a" -C "$bin" actionlint
+          s="shellcheck-v${SHELLCHECK}.darwin.aarch64.tar.gz"
+          curl -fsSLo "$s" "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK}/$s"
+          echo "$SHELLCHECK_SHA256  $s" | shasum -a 256 -c -
+          tar -xzf "$s" --strip-components 1 -C "$bin" "shellcheck-v${SHELLCHECK}/shellcheck"
+          echo "$bin" >> "$GITHUB_PATH"
       - run: actionlint
       - run: shellcheck -S warning scripts/*.sh scripts/hooks/*
       - name: swift format lint
