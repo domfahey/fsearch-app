@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import FSearchKit
 
 @Suite(.serialized) struct RecentsCoverageTests {
@@ -55,7 +56,8 @@ import Testing
         r.opened(real.path); r.opened(missing.path)
         #expect(r.paths == [real.path])
         try FileManager.default.removeItem(at: real)
-        #expect(r.paths.isEmpty, "a file deleted later drops out on the next read")
+        r.invalidate()
+        #expect(r.paths.isEmpty, "a file deleted later drops out on the next check")
     }
 
     @Test func pathsAreStoredVerbatim() {

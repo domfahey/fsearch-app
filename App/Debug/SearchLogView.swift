@@ -2,7 +2,9 @@ import AppKit
 import FSearchKit
 import SwiftUI
 import UniformTypeIdentifiers
+import os
 
+/// Debug window: the search log, newest first, with a filter, export and clear.
 struct SearchLogView: View {
     @EnvironmentObject var app: AppState
     @State private var rows: [SearchLog.Record] = []
@@ -19,7 +21,9 @@ struct SearchLogView: View {
             HStack {
                 TextField("Filter", text: $filter)
                 Button("Export…", action: export)
-                Button("Clear Log") { app.log.clear(); setRows([]) }
+                Button("Clear Log") {
+                    app.log.clear(); setRows([])
+                }
             }.padding([.horizontal, .top])
             if let exportError {
                 Text(exportError).font(.caption).foregroundStyle(.red)
@@ -80,6 +84,7 @@ struct SearchLogView: View {
             try DebugFormat.jsonl(rows).write(to: url, options: .atomic)
             exportError = nil
         } catch {
+            Log.debug.error("search log export failed: \(error.localizedDescription, privacy: .private)")
             exportError = "Export failed: \(error.localizedDescription)"
         }
     }

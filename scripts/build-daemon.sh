@@ -1,16 +1,30 @@
 #!/usr/bin/env bash
-# Build the pinned fsearch daemon as a universal binary into Vendor/fsearch.
+# Build the pinned fsearch daemon as a universal (arm64 + x86_64) binary into
+# Vendor/fsearch, and record the revision in Vendor/fsearch.rev.
+#
+# Usage: scripts/build-daemon.sh        (FSEARCH_REPO / FSEARCH_REV override the pin)
+# Prerequisites: git, rustup and cargo, lipo (Xcode). Needs network access to clone.
+#
+# It builds in a temp directory and writes only to Vendor/. It never touches the
+# real index (~/Library/Application Support/FSearch), LaunchAgents or ~/.local/bin.
+# Exit codes: 0 on success; non-zero (from set -e) if any step fails.
 set -euo pipefail
 REPO=${FSEARCH_REPO:-https://github.com/domfahey/fsearch.git}
 REV=${FSEARCH_REV:-d26cf78da7a0136b0632aa7cc55d271ae7b049e7}   # domfahey/fsearch fork; bump to an upstream tag once #12-#14 merge
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 WORK=$(mktemp -d)
+# The clone and both target builds are large; remove them however the script ends.
 trap 'rm -rf "$WORK"' EXIT
-git clone --quiet "$REPO" "$WORK/fsearch"
-git -C "$WORK/fsearch" checkout --quiet "$REV"
+# Fetch exactly the pinned commit. It is reachable through the protected tag
+# app-pin-2026-10-10 on the fork, so no branch is needed.
+git init -q "$WORK/fsearch"
+git -C "$WORK/fsearch" fetch --quiet --depth 1 "$REPO" "$REV"
+git -C "$WORK/fsearch" checkout --quiet FETCH_HEAD
+[ "$(git -C "$WORK/fsearch" rev-parse HEAD)" = "$REV" ] || { echo "build-daemon: fetched commit is not $REV" >&2; exit 1; }
+# Quiet: the targets are usually installed already; a real failure shows up in the cargo build.
 rustup target add aarch64-apple-darwin x86_64-apple-darwin >/dev/null 2>&1
 for t in aarch64-apple-darwin x86_64-apple-darwin; do
-  (cd "$WORK/fsearch" && cargo build --release --quiet --target "$t")
+  (cd "$WORK/fsearch" && cargo build --release --locked --quiet --target "$t")
 done
 mkdir -p "$ROOT/Vendor"
 lipo -create -output "$ROOT/Vendor/fsearch" \

@@ -79,7 +79,15 @@ waits 30 s and re-runs, up to three times, then exits 75 ("inconclusive")
 instead of 1.
 
 Exit codes: 0 pass (or no baseline for this machine, or `--report-only`),
-1 regression, 75 inconclusive (machine stayed busy), anything else an error.
+1 regression, 75 inconclusive (machine stayed busy, or the daemon was too slow),
+anything else an error.
+
+Slow machines: a daemon round trip that times out is retried once; a second
+timeout (or an index not ready within 180 s) marks that metric "inconclusive
+(daemon slow)", skips it and keeps the rest of the run (listed in the result's
+`config.inconclusive`). Client timeouts are generous (30 s for the daemon, 15 s
+for the in-process stub). With `--report-only` the script always exits 0 after
+writing whatever results it got.
 
 Default tolerances (stored per metric in `baseline.json`; edit one by hand to
 tune it, and `--record` keeps your value):
@@ -124,7 +132,10 @@ daemon metrics move with it.
 The `bench` job in `.github/workflows/ci.yml` runs `scripts/bench.sh
 --report-only` with `BENCH_MACHINE=ci-macos-26` and uploads `bench/results/*.json`
 as the `bench-results` artifact. It is `continue-on-error` and never fails the
-workflow. There is no `ci-macos-26` entry yet, so it only reports; to add one,
+workflow. It also sets `FSEARCH_BENCH_TIMEOUT=90`: the seconds one daemon request
+may take before the run gives up. It replaces the local defaults (15 s for the
+canned server, 30 s for the real daemon) and works the same way locally.
+There is no `ci-macos-26` entry yet, so it only reports; to add one,
 take the JSON from a CI artifact and run
 `swift run -c release --package-path Packages/FSearchKit FSearchBench record --baseline bench/baseline.json --current <file> --machine ci-macos-26`.
 Hosted runners vary between runs, so treat CI numbers as a trend.

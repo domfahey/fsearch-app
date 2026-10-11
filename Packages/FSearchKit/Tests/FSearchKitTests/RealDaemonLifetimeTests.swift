@@ -1,6 +1,7 @@
 import Darwin
 import Foundation
 import Testing
+
 @testable import FSearchKit
 
 /// The fixture daemon must not outlive its test process. Serialized: both
@@ -62,10 +63,13 @@ struct RealDaemonLifetimeTests {
         // The subshell exits at once, orphaning the daemons to launchd.
         let sh = Process()
         sh.executableURL = URL(fileURLWithPath: "/bin/sh")
-        sh.arguments = ["-c", """
+        sh.arguments = [
+            "-c",
+            """
             (HOME=\(fsk) FSEARCH_ROOT=\(fsk)/root "\(bin)" serve </dev/null >/dev/null 2>&1 &)
             (HOME=\(other) FSEARCH_ROOT=\(other)/root "\(bin)" serve </dev/null >/dev/null 2>&1 &)
-            """]
+            """,
+        ]
         try sh.run()
         sh.waitUntilExit()
         #expect(waitFor(10) { daemonPID(under: fsk) != nil && daemonPID(under: other) != nil })

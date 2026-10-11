@@ -1,27 +1,50 @@
 import Foundation
 import Testing
+
 @testable import FSearchKit
 
 @Suite struct EditorsTests {
     let path = "/Users/me/Downloads/🏡 105 25Th Street So, Brigantine.txt"
+    let encoded = "/Users/me/Downloads/%F0%9F%8F%A1%20105%2025Th%20Street%20So%2C%20Brigantine.txt"
 
-    /// The path (with spaces and an emoji) is always one argument, never split.
-    /// The Zed, Sublime Text and BBEdit CLI paths are UNVERIFIED (not installed
-    /// on the dev Mac); see Editors.swift.
-    @Test func commandsPerEditor() {
-        let app = URL(fileURLWithPath: "/Applications/X.app")
-        let want: [Editor: EditorCommand] = [
-            .vscode: EditorCommand(executable: "/Applications/X.app/Contents/Resources/app/bin/code", arguments: ["-g", "\(path):12"]),
-            .cursor: EditorCommand(executable: "/Applications/X.app/Contents/Resources/app/bin/cursor", arguments: ["-g", "\(path):12"]),
-            .zed: EditorCommand(executable: "/Applications/X.app/Contents/MacOS/cli", arguments: ["\(path):12"]),
-            .sublime: EditorCommand(executable: "/Applications/X.app/Contents/SharedSupport/bin/subl", arguments: ["\(path):12"]),
-            .bbedit: EditorCommand(executable: "/Applications/X.app/Contents/Helpers/bbedit_tool", arguments: ["+12", path]),
-            .xcode: EditorCommand(executable: "/usr/bin/xed", arguments: ["-l", "12", path]),
+    /// Editors open through LaunchServices URLs, never as a child process of
+    /// FSearch (which would inherit its Full Disk Access). Xcode has no
+    /// documented open-at-line URL, so it gets the file.
+    @Test func urlsPerEditor() throws {
+        // The file URL, itself percent-encoded once more as a query value.
+        let asFileURL = "/Users/me/Downloads/%F0%9F%8F%A1%20105%2025Th%20Street%20So,%20Brigantine.txt"
+        let fileURL =
+            "file%3A%2F%2F"
+            + asFileURL.replacingOccurrences(of: "%", with: "%25").replacingOccurrences(of: "/", with: "%2F")
+            .replacingOccurrences(of: ",", with: "%2C")
+        let want: [Editor: String?] = [
+            .vscode: "vscode://file\(encoded):12",
+            .cursor: "cursor://file\(encoded):12",
+            .zed: "zed://file\(encoded):12",
+            .sublime: "subl://open?url=\(fileURL)&line=12",
+            .bbedit: "x-bbedit://open?url=\(fileURL)&line=12",
+            .xcode: nil,
         ]
         #expect(want.count == Editor.allCases.count)
         for e in Editor.allCases {
-            #expect(openAtLine(e, appURL: app, path: path, line: 12) == want[e], "\(e)")
+            #expect(editorURL(e, path: path, line: 12)?.absoluteString == want[e]!, "\(e)")
         }
+    }
+
+    /// The file URL inside the query decodes back to the path.
+    @Test func queryURLDecodesToThePath() throws {
+        let u = try #require(editorURL(.sublime, path: path, line: 3))
+        let items = try #require(URLComponents(url: u, resolvingAgainstBaseURL: false)?.queryItems)
+        #expect(items.map(\.name) == ["url", "line"])
+        #expect(URL(string: try #require(items[0].value))?.path == path)
+        #expect(items[1].value == "3")
+    }
+
+    /// A path-style URL decodes back to "<path>:<line>".
+    @Test func pathURLDecodesToThePath() throws {
+        let u = try #require(editorURL(.vscode, path: path, line: 7))
+        #expect(u.host == "file")
+        #expect(URLComponents(url: u, resolvingAgainstBaseURL: false)?.path == "\(path):7")
     }
 
     @Test func installedIsOnlyWhatLookupFinds() {

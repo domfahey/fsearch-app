@@ -2,17 +2,23 @@ name: CI
 on:
   push:
     branches: [main, v1]
-    tags: ['v*']
+    tags: ['v[0-9]*']
   pull_request:
 
 permissions:
   contents: read
+
+env:
+  # Pinned Rust toolchain, installed by scripts/setup-rust.sh with the rustup that
+  # ships on the runner image. Bump when the daemon needs a newer compiler.
+  RUST_TOOLCHAIN: '1.94.0'
 
 # Actions are pinned to full commit SHAs; the comment names the version.
 # Xcode is pinned to 26.6 on the macos-26 image (the same Xcode used locally),
 # per actions/runner-images macos-26-arm64 Readme, image 20260907. Bump both together.
 # UI tests (AppUITests) are not run here: they need a logged-in GUI session and
 # accessibility permission that hosted runners don't grant reliably. Run locally.
+# Coverage: the kit job gates FSearchKit at 90%; the app job gates AppTests-only coverage at 80%.
 jobs:
   kit:
     # macos-14 is the deployment target (macOS 14): its newest Xcode with Swift 6 is
@@ -27,66 +33,123 @@ jobs:
           - os: macos-14
             xcode: '16.2'
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     continue-on-error: false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: sudo xcode-select -s /Applications/Xcode_${{ matrix.xcode }}.app
-      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master, 2026-09-12 (merge of #185)
         with:
-          toolchain: stable
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
+          persist-credentials: false
+      - run: sudo xcode-select -s /Applications/Xcode_${{ matrix.xcode }}.app
+      - run: scripts/setup-rust.sh
       - run: scripts/build-daemon.sh
+      - run: swift build --build-tests -Xswiftc -warnings-as-errors
+        working-directory: Packages/FSearchKit
       - run: swift test
         working-directory: Packages/FSearchKit
+      - name: FSearchKit coverage gate (90%)
+        if: matrix.os == 'macos-26'
+        run: scripts/coverage.sh --kit-only --min 90
 
   app:
     runs-on: macos-26
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: sudo xcode-select -s /Applications/Xcode_26.6.app
-      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master, 2026-09-12 (merge of #185)
         with:
-          toolchain: stable
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
-      - run: brew install xcodegen
+          persist-credentials: false
+      - run: sudo xcode-select -s /Applications/Xcode_26.6.app
+      - run: scripts/setup-rust.sh
+      - run: scripts/install-xcodegen.sh
       - run: scripts/build-daemon.sh
-      - run: xcodegen generate
+      - run: scripts/generate-project.sh
       - run: >
           xcodebuild -project FSearch.xcodeproj -scheme FSearch -configuration Debug
-          -derivedDataPath build -destination 'generic/platform=macOS'
+          -onlyUsePackageVersionsFromResolvedFile -derivedDataPath build -destination 'generic/platform=macOS'
           CODE_SIGN_IDENTITY=- build
+      - name: App unit tests and coverage gate
+        # Hosted unit tests (AppTests) run headless on the runner; the UI tests do not.
+        # The floor is below 90 because AppTests alone reach about 84%; the remainder is
+        # covered by the local end-to-end run (`make coverage`, which combines both suites).
+        env:
+          # xcodebuild hands TEST_RUNNER_* to the test host without the prefix:
+          # the menu-bar safety test records, not fails, a status window left up here.
+          TEST_RUNNER_FSEARCH_CI: '1'
+        run: scripts/coverage.sh --unit-only --min 80
 
   lint:
     runs-on: macos-26
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - run: sudo xcode-select -s /Applications/Xcode_26.6.app
       - run: scripts/gen-credits.sh --check
+      - name: Check Markdown links
+        run: scripts/check-links.sh
       - name: Syntax-check shell scripts
-        run: for f in scripts/*.sh; do bash -n "$f"; done
+        run: for f in scripts/*.sh scripts/hooks/*; do bash -n "$f"; done
       - run: brew install actionlint shellcheck
       - run: actionlint
-      - run: shellcheck -S warning scripts/*.sh
+      - run: shellcheck -S warning scripts/*.sh scripts/hooks/*
       - name: swift format lint
-        # Remove continue-on-error once the codebase has been formatted.
-        continue-on-error: true
-        run: xcrun swift format lint --strict --configuration .swift-format -r App AppUITests Packages/FSearchKit/Sources Packages/FSearchKit/Tests
+        run: xcrun swift format lint --strict --configuration .swift-format -r App AppTests AppUITests Packages/FSearchKit/Sources Packages/FSearchKit/Tests
 
   release:
-    # Only on version tags. Secrets are referenced by name; none live in the repo.
+    # Only on version tags, and only for commits on main. Secrets are referenced by
+    # name; none live in the repo. The `release` environment (created in the repo
+    # settings) gates the signing secrets; a tag ruleset limits who can push v* tags.
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [kit, app]
+    needs: [kit, app, lint]
     runs-on: macos-26
+    timeout-minutes: 60
+    environment: release
     env:
-      DEVELOPER_ID: ${{ secrets.DEVELOPER_ID }}
+      # release.sh resolves and archives in this derived-data folder; the steps below
+      # resolve into it before the keychain exists.
+      RELEASE_DERIVED_DATA: build/release-derived
+    concurrency:
+      group: release
+      cancel-in-progress: false
+    # Scoped to this job: draft release, build provenance attestation.
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: sudo xcode-select -s /Applications/Xcode_26.6.app
-      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master, 2026-09-12 (merge of #185)
         with:
-          toolchain: stable
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
-      - run: brew install xcodegen
+          # release.sh numbers the build from the full history (git rev-list --count) and
+          # checks it against the previous v[0-9]* tag's; the next step needs origin/main.
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+      - name: Refuse a tag that is not on main
+        run: |
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main; then
+            echo "::error::$GITHUB_REF_NAME ($GITHUB_SHA) is not on main; releases are tagged on main only"
+            exit 1
+          fi
+      - run: sudo xcode-select -s /Applications/Xcode_26.6.app
+      - run: scripts/setup-rust.sh
+      - run: scripts/install-xcodegen.sh
+      # Build the daemon before the signing keychain exists: its third-party crates'
+      # build scripts must never run while codesign access to the Developer ID key is unlocked.
+      - run: scripts/build-daemon.sh
+      # Likewise generate the project, resolve the Swift packages (only the versions in the
+      # committed Package.resolved) and archive the app before the keychain exists. After
+      # it, release.sh --sign only signs, notarizes and packages: nothing is fetched or built.
+      - run: scripts/generate-project.sh
+      - name: Resolve Swift packages
+        run: >
+          xcodebuild -resolvePackageDependencies -project FSearch.xcodeproj -scheme FSearch
+          -derivedDataPath "$RELEASE_DERIVED_DATA" -onlyUsePackageVersionsFromResolvedFile
+      - name: Build the release archive (unsigned)
+        env:
+          FSEARCH_PREBUILT: '1'
+          FSEARCH_PROJECT_READY: '1'
+        run: scripts/release.sh --prepare
       - name: Import signing certificate
         env:
           CERT_P12_BASE64: ${{ secrets.DEVELOPER_ID_CERT_P12_BASE64 }}
@@ -96,6 +159,7 @@ jobs:
           KEYCHAIN="$RUNNER_TEMP/build.keychain-db"
           echo "KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
           umask 077
+          trap 'rm -f "$RUNNER_TEMP/cert.p12"' EXIT
           echo "$CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
           security set-keychain-settings -lut 21600 "$KEYCHAIN"
@@ -104,7 +168,9 @@ jobs:
           rm -f "$RUNNER_TEMP/cert.p12"
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
           # Add to the user search list (keeping the existing ones) and make it default.
-          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          EXISTING=()
+          while IFS= read -r kc; do [ -n "$kc" ] && EXISTING+=("$kc"); done < <(security list-keychains -d user | tr -d '"')
+          security list-keychains -d user -s "$KEYCHAIN" ${EXISTING[@]+"${EXISTING[@]}"}
           security default-keychain -d user -s "$KEYCHAIN"
       - name: Store notary credentials (App Store Connect API key)
         env:
@@ -119,11 +185,34 @@ jobs:
           xcrun notarytool store-credentials fsearch-notary \
             --key "$KEYFILE" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" \
             --keychain "$KEYCHAIN"
-      - run: scripts/release.sh
+      - name: Sign, notarize, package
+        env:
+          DEVELOPER_ID: ${{ secrets.DEVELOPER_ID }}
+        # Signs the archive built above, before the keychain existed; builds nothing.
+        run: scripts/release.sh --sign
+      - name: Attest build provenance
+        id: attest
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: build/release/*.dmg
+      - name: Draft GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ATTESTATION_BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          set -euo pipefail
+          DMG=$(ls build/release/*.dmg)
+          cp "$ATTESTATION_BUNDLE" "$DMG.intoto.jsonl"
+          gh release create "$GITHUB_REF_NAME" --draft --verify-tag --title "FSearch ${GITHUB_REF_NAME#v}" \
+            --notes "Draft. Verify the download with the instructions in .github/SECURITY.md." \
+            "$DMG" "$DMG.sha256" "$DMG.intoto.jsonl"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: FSearch-dmg
-          path: build/release/*.dmg
+          path: |
+            build/release/*.dmg
+            build/release/*.sha256
+            build/release/*.intoto.jsonl
       - name: Delete signing keychain
         if: always()
         run: security delete-keychain "$KEYCHAIN" || true
@@ -133,16 +222,18 @@ jobs:
     # "ci-macos-26" baseline entry if one exists, never fails the workflow, and
     # uploads the results JSON. Hosted-runner timings are noisy; read trends, not single runs.
     runs-on: macos-26
+    timeout-minutes: 45
     continue-on-error: true
     env:
       BENCH_MACHINE: ci-macos-26
+      # Seconds each daemon request may take (local default 15 or 30). Hosted runners stall.
+      FSEARCH_BENCH_TIMEOUT: '90'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: sudo xcode-select -s /Applications/Xcode_26.6.app
-      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master, 2026-09-12 (merge of #185)
         with:
-          toolchain: stable
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
+          persist-credentials: false
+      - run: sudo xcode-select -s /Applications/Xcode_26.6.app
+      - run: scripts/setup-rust.sh
       - run: scripts/build-daemon.sh
       - run: scripts/bench.sh --report-only
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

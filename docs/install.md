@@ -6,7 +6,7 @@ FSearch for Mac needs macOS 14 (Sonoma) or later. It runs on Apple silicon and I
 
 Releases are not published yet. When they are, download the DMG from the [Releases](https://github.com/domfahey/fsearch-app/releases) page, open it, and drag **FSearch** to **Applications**.
 
-Until then, you can build the app from source. See [Development](../README.md#development) in the README.
+Until then, you can build the app from source. See [Contributing](../CONTRIBUTING.md).
 
 ## First run and Gatekeeper
 
@@ -25,13 +25,17 @@ FSearch opens a four-step setup window the first time you run it.
 
 ## Why it is not on the Mac App Store
 
-FSearch needs Full Disk Access, and it runs a background helper that indexes your files. App Store apps must run in a sandbox, and a sandboxed app cannot have either. So FSearch is distributed directly, as a signed and notarized download.
+FSearch needs Full Disk Access and runs a background helper, which the App Store sandbox does not allow. See [ADR 0006](adr/0006-not-on-the-mac-app-store.md).
 
 ## Using FSearch with the fsearch CLI
 
-FSearch can share a daemon with the fsearch command-line tool.
-
-- If an fsearch daemon is already running, for example from `fsearch install --login`, FSearch uses it. It does not start a second one, and it does not stop or replace the daemon.
-- In that case, Full Disk Access belongs to that daemon. Grant it to the fsearch binary in Privacy & Security, then restart that daemon.
+If you already run the fsearch command-line tool, FSearch uses its daemon instead of starting a second one. Full Disk Access then belongs to the fsearch binary. See [Use FSearch with the fsearch CLI](how-to/use-with-the-fsearch-cli.md).
 
 To remove FSearch, see [Uninstall](uninstall.md).
+
+## See also
+
+- [Tutorial: your first search](tutorial-first-search.md)
+- [Grant Full Disk Access](how-to/grant-full-disk-access.md)
+- [Update FSearch for Mac](how-to/update.md)
+- [Troubleshooting](reference/troubleshooting.md)

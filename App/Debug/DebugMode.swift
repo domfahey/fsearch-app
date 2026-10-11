@@ -1,18 +1,30 @@
 import SwiftUI
+import os
 
 /// The one place debug mode is switched, so every path (Settings, the menu)
 /// does the same thing: turning it off deletes the search log (privacy) and
 /// closes the debug windows.
 enum DebugMode {
+    /// The ids of the windows that only exist in debug mode.
     static let windowIDs = ["index", "log"]
 
+    /// Turns debug mode on or off from a SwiftUI view.
     @MainActor static func set(_ on: Bool, app: AppState, dismiss: DismissWindowAction?) {
+        set(on, app: app) { id in dismiss?(id: id) }
+    }
+
+    /// Turns debug mode on or off.
+    ///
+    /// - Parameters:
+    ///   - on: The new setting; off deletes the search log and closes the debug windows.
+    ///   - app: The app state.
+    ///   - dismissWindow: Closes one window by id (tests record the ids).
+    @MainActor static func set(_ on: Bool, app: AppState, dismissWindow: (String) -> Void) {
         app.debugMode = on
+        Log.debug.info("debug mode \(on ? "on" : "off", privacy: .public)")
         guard !on else { return }
         app.log.clear()
-        if let dismiss {
-            for id in windowIDs { dismiss(id: id) }
-        }
+        for id in windowIDs { dismissWindow(id) }
     }
 }
 

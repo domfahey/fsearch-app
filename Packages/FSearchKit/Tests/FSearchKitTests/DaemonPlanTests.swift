@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import FSearchKit
 
 @Suite struct DaemonPlanTests {
@@ -17,9 +18,19 @@ import Testing
     }
 
     @Test func aBrieflyDownCLIDaemonIsWaitedForNotTakenOver() {
+        // A CLI agent's plist alone isn't a daemon: wait longer for it, then start ours.
         for own in [DaemonPlan.ServiceStatus.notRegistered, .notFound, .requiresApproval] {
-            #expect(DaemonPlan.decide(existingAnswers: false, ownStatus: own, cliAgentInstalled: true) == .useExisting)
+            #expect(DaemonPlan.decide(existingAnswers: false, ownStatus: own, cliAgentInstalled: true) == .recheckThenRegister)
         }
+        #expect(DaemonPlan.recheckWindow(cliAgentInstalled: true) == .seconds(10))
+        #expect(DaemonPlan.recheckWindow(cliAgentInstalled: false) == DaemonPlan.recheckWindow)
+    }
+
+    @Test func aLeftoverCLIPlistFallsBackToOurHelper() {
+        #expect(DaemonPlan.afterRecheck(existingAnswers: false, ownStatus: .notRegistered) == .registerBundled)
+        #expect(DaemonPlan.afterRecheck(existingAnswers: false, ownStatus: .notFound) == .registerBundled)
+        #expect(DaemonPlan.afterRecheck(existingAnswers: false, ownStatus: .requiresApproval) == .needsApproval)
+        #expect(DaemonPlan.afterRecheck(existingAnswers: true, ownStatus: .requiresApproval) == .useExisting)
     }
 
     @Test func aPendingApprovalIsShownNotRegisteredAgain() {
@@ -30,8 +41,8 @@ import Testing
         for own in [DaemonPlan.ServiceStatus.notRegistered, .notFound] {
             #expect(DaemonPlan.decide(existingAnswers: false, ownStatus: own, cliAgentInstalled: false) == .recheckThenRegister)
         }
-        #expect(DaemonPlan.afterRecheck(existingAnswers: true) == .useExisting)
-        #expect(DaemonPlan.afterRecheck(existingAnswers: false) == .registerBundled)
+        #expect(DaemonPlan.afterRecheck(existingAnswers: true, ownStatus: .notRegistered) == .useExisting)
+        #expect(DaemonPlan.afterRecheck(existingAnswers: false, ownStatus: .notRegistered) == .registerBundled)
         #expect(DaemonPlan.recheckWindow <= .seconds(5) && DaemonPlan.recheckWindow >= .seconds(2))
     }
 
@@ -42,8 +53,12 @@ import Testing
     }
 
     @Test func restartOnlyWhatWeOwn() {
-        #expect(DaemonPlan.restartAction(owns: true) == .reregister)
-        #expect(DaemonPlan.restartAction(owns: false) == .refreshOnly)
+        #expect(DaemonPlan.restartAction(owns: true, answers: true) == .reregister)
+        #expect(DaemonPlan.restartAction(owns: true, answers: false) == .reregister)
+        // Someone else's daemon that answers is left running.
+        #expect(DaemonPlan.restartAction(owns: false, answers: true) == .refreshOnly)
+        // Nothing answers and nothing is ours: start one (start() rechecks first).
+        #expect(DaemonPlan.restartAction(owns: false, answers: false) == .start)
     }
 
     @Test func noAnswerKeepsAPendingApprovalUntilTheHelperIsEnabled() {

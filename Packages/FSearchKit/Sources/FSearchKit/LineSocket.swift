@@ -3,15 +3,22 @@ import Foundation
 
 /// A blocking, newline-framed Unix-socket connection. Not thread-safe: the
 /// owner serializes calls.
+///
+/// It dials lazily and keeps the connection between calls; any failure closes it.
 final class LineSocket {
     private var fd: Int32 = -1
     private var buffer = Data()
     let path: String
     let timeout: TimeInterval
+    /// The only uid whose socket is trusted: ours, unless a test says otherwise.
+    let expectedPeerUid: uid_t
 
-    init(path: String, timeout: TimeInterval) { (self.path, self.timeout) = (path, timeout) }
+    init(path: String, timeout: TimeInterval, expectedPeerUid: uid_t = getuid()) {
+        (self.path, self.timeout, self.expectedPeerUid) = (path, timeout, expectedPeerUid)
+    }
     deinit { close() }
 
+    /// Closes the connection and drops any buffered bytes, so the next call dials again.
     func close() {
         if fd >= 0 { Darwin.close(fd) }
         fd = -1
@@ -24,17 +31,27 @@ final class LineSocket {
         guard s >= 0 else { throw DaemonError.disconnected }
         var addr = sockaddr_un()
         addr.sun_family = sa_family_t(AF_UNIX)
+        // sun_path is a fixed 104-byte buffer on macOS (NUL included); a longer path can't be addressed.
         let fits = path.utf8.count < MemoryLayout.size(ofValue: addr.sun_path)
         guard fits else { Darwin.close(s); throw DaemonError.disconnected }
-        withUnsafeMutableBytes(of: &addr.sun_path) { p in _ = path.withCString { strncpy(p.baseAddress!.assumingMemoryBound(to: CChar.self), $0, p.count - 1) } }
+        withUnsafeMutableBytes(of: &addr.sun_path) { p in
+            _ = path.withCString { strncpy(p.baseAddress!.assumingMemoryBound(to: CChar.self), $0, p.count - 1) }
+        }
+        // Receive and send time out after `timeout`, so a hung daemon can't block the caller; read() then fails with EAGAIN.
         var tv = timeval(tv_sec: Int(timeout), tv_usec: Int32((timeout - Double(Int(timeout))) * 1_000_000))
         setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
         setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
+        // Writing to a closed peer should fail with EPIPE, not kill the app with SIGPIPE.
         var one: Int32 = 1
         setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, &one, socklen_t(MemoryLayout<Int32>.size))
         let len = socklen_t(MemoryLayout<sockaddr_un>.size)
         let r = withUnsafePointer(to: &addr) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(s, $0, len) } }
         guard r == 0 else { Darwin.close(s); throw DaemonError.disconnected }
+        // A socket another user serves (a planted one) is never sent a query.
+        var uid: uid_t = 0, gid: gid_t = 0
+        guard peerIsTrusted(peerUid: getpeereid(s, &uid, &gid) == 0 ? uid : nil, expected: expectedPeerUid) else {
+            Darwin.close(s); throw DaemonError.disconnected
+        }
         fd = s
     }
 
@@ -75,6 +92,7 @@ final class LineSocket {
         }
     }
 
+    /// Returns the next buffered line, reading from the socket as needed. Bytes after the newline stay buffered for the next call.
     private func readLine() throws -> Data {
         var chunk = [UInt8](repeating: 0, count: 64 * 1024)
         while true {
@@ -90,3 +108,6 @@ final class LineSocket {
         }
     }
 }
+
+/// The daemon on the other end runs as the expected user (nil: unknown).
+func peerIsTrusted(peerUid: uid_t?, expected: uid_t) -> Bool { peerUid == expected }

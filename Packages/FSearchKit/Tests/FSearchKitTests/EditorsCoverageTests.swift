@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import FSearchKit
 
 @Suite struct EditorsCoverageTests {
@@ -23,19 +24,31 @@ import Testing
         #expect(Editor(rawValue: "emacs") == nil)
     }
 
-    @Test func appPathWithSpacesStaysOneExecutable() {
-        let app = URL(fileURLWithPath: "/Applications/Sublime Text.app")
-        let c = openAtLine(.sublime, appURL: app, path: "/a b/c d.txt", line: 3)
-        #expect(c.executable == "/Applications/Sublime Text.app/Contents/SharedSupport/bin/subl")
-        #expect(c.arguments == ["/a b/c d.txt:3"])
+    /// Shell and URL metacharacters in a path are percent-encoded, so they can
+    /// neither end the path nor add a query item or fragment.
+    @Test func pathsCantBreakOutOfTheURL() throws {
+        let tricky = "/tmp/it's \"x\" $HOME; rm -rf *.txt?a=1&line=99#frag"
+        for e in Editor.allCases where e != .xcode {
+            let u = try #require(editorURL(e, path: tricky, line: 5), "\(e)")
+            let c = try #require(URLComponents(url: u, resolvingAgainstBaseURL: false))
+            #expect(c.fragment == nil, "\(e)")
+            switch e {
+            case .sublime, .bbedit:
+                #expect(c.queryItems?.count == 2, "\(e)")
+                #expect(c.queryItems?.last?.value == "5", "\(e)")
+                #expect(URL(string: c.queryItems?.first?.value ?? "")?.path == tricky, "\(e)")
+            default:
+                #expect(c.query == nil, "\(e)")
+                #expect(c.path == "\(tricky):5", "\(e)")
+            }
+        }
     }
 
-    @Test func pathsAreNeverQuotedOrSplit() {
-        let tricky = "/tmp/it's \"x\" $HOME; rm -rf *.txt"
-        for e in Editor.allCases {
-            let c = openAtLine(e, appURL: URL(fileURLWithPath: "/A.app"), path: tricky, line: 5)
-            #expect(c.arguments.contains(tricky) || c.arguments.contains("\(tricky):5"), "\(e) passes the path untouched")
-        }
+    /// Only absolute paths make a URL; a non-positive line becomes line 1.
+    @Test func relativePathsAndBadLines() {
+        for e in Editor.allCases { #expect(editorURL(e, path: "rel/a.txt", line: 2) == nil) }
+        #expect(editorURL(.vscode, path: "/a.txt", line: 0)?.absoluteString == "vscode://file/a.txt:1")
+        #expect(editorURL(.bbedit, path: "/a.txt", line: -4)?.absoluteString == "x-bbedit://open?url=file%3A%2F%2F%2Fa.txt&line=1")
     }
 
     @Test func everyEditorIsLookedUpOnceInDeclaredOrder() {

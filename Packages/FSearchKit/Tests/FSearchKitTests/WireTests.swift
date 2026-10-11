@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import FSearchKit
 
 @Suite struct WireTests {
@@ -33,23 +34,40 @@ import Testing
     }
 
     @Test func decodesSearch() throws {
-        let line = #"{"ok":true,"took_us":372,"hits":[{"path":"/Users/me/a b/🏡 x.pdf","kind":"file","size":19,"mtime":1791515321,"score":-22}],"id":4}"#
+        let line =
+            #"{"ok":true,"took_us":372,"hits":[{"path":"/Users/me/a b/🏡 x.pdf","kind":"file","size":19,"mtime":1791515321,"score":-22}],"id":4}"#
         let r = try decodeReply(Data(line.utf8), as: SearchReply.self)
         #expect(r.tookUs == 372)
         #expect(r.hits == [Hit(path: "/Users/me/a b/🏡 x.pdf", kind: "file", size: 19, mtime: 1791515321, score: -22)])
     }
 
     @Test func decodesGrep() throws {
-        let line = #"{"ok":true,"took_us":900,"source":"index","candidates":3,"read":3,"complete":true,"indexing":0,"files":[{"path":"/p/f.txt","matches":[{"line":2,"text":"a heron needle"}]}],"id":1}"#
+        let line =
+            #"{"ok":true,"took_us":900,"source":"index","candidates":3,"read":3,"complete":true,"indexing":0,"files":[{"path":"/p/f.txt","matches":[{"line":2,"text":"a heron needle"}]}],"id":1}"#
         let r = try decodeReply(Data(line.utf8), as: GrepReply.self)
         #expect(r.files.first?.matches == [Match(line: 2, text: "a heron needle")])
         #expect(r.source == "index" && r.complete)
     }
 
     @Test func decodesStatus() throws {
-        let line = #"{"content_bytes":644805248,"content_docs":583120,"content_pending":0,"content_segments":39,"dirs":1055573,"entries":6646939,"event_id":1304740247,"full_disk_access":true,"id":null,"index_bytes":232654400,"ok":true,"overlay":0,"owner":true,"removed":0}"#
+        let line =
+            #"{"content_bytes":644805248,"content_docs":583120,"content_pending":0,"content_segments":39,"dirs":1055573,"entries":6646939,"event_id":1304740247,"full_disk_access":true,"id":null,"index_bytes":232654400,"ok":true,"overlay":0,"owner":true,"removed":0}"#
         let s = try decodeReply(Data(line.utf8), as: DaemonStatus.self)
         #expect(s.entries == 6646939 && s.fullDiskAccess && s.owner && s.eventId == 1304740247)
+    }
+
+    /// A CLI daemon from before fsearch 9560a09 has no `owner` (and older ones
+    /// lack more): status still decodes, with defaults that raise no warning.
+    @Test func decodesAnOlderDaemonsStatus() throws {
+        let line = #"{"ok":true,"entries":12,"dirs":3,"overlay":0,"removed":0,"event_id":9}"#
+        let s = try decodeReply(Data(line.utf8), as: DaemonStatus.self)
+        #expect(s.entries == 12 && s.dirs == 3 && s.eventId == 9)
+        #expect(s.owner && s.fullDiskAccess)
+        #expect(s.indexBytes == 0 && s.contentDocs == 0 && s.contentSegments == 0 && s.contentBytes == 0 && s.contentPending == 0)
+        let bare = try decodeReply(Data(#"{"ok":true,"entries":1}"#.utf8), as: DaemonStatus.self)
+        #expect(bare.entries == 1 && bare.dirs == 0 && bare.eventId == 0)
+        // Not a status at all: still an error.
+        #expect(throws: DaemonError.self) { try decodeReply(Data(#"{"ok":true}"#.utf8), as: DaemonStatus.self) }
     }
 
     @Test func errorsMapToDaemonError() {

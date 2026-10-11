@@ -16,9 +16,26 @@
 # keyed by machine (hw.model + chip, or $BENCH_MACHINE); with no entry for this
 # machine the run is reported without failing. See bench/README.md.
 #
+# A daemon that is too slow to answer (a timed-out sample is retried once, the
+# index wait is bounded) gives an "inconclusive (daemon slow)" result: the
+# metrics measured so far are kept, the rest are skipped, and the run exits 75
+# (0 with --report-only).
+#
 # Safety: the daemon only ever runs with a temp HOME/FSEARCH_ROOT under a fresh
 # /tmp/fsb.* directory, which this script removes on exit (and kills the daemon
 # if it is still running).
+#
+# Prerequisites: Xcode's Swift toolchain, and the daemon at Vendor/fsearch (or
+# $FSEARCH_DAEMON; scripts/build-daemon.sh makes it). It never touches the real
+# index, ~/Library/Application Support/FSearch or the user's LaunchAgents.
+#
+# Exit codes: 0 pass (or report-only, or no baseline for this machine); 1 a
+# metric regressed twice; 64 bad usage; 75 inconclusive (busy machine or slow
+# daemon); anything else is passed through from the benchmark binary.
+#
+# (--help prints only lines 2-21 of this header, so keep new text below them.)
+# -e and pipefail stop at the first failing step; the places that expect a
+# non-zero status (compare, the benchmark run) capture it with `|| rc=$?`.
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -26,13 +43,14 @@ PKG="$ROOT/Packages/FSearchKit"
 BASELINE="$ROOT/bench/baseline.json"
 RESULTS="$ROOT/bench/results"
 
+# Flags for this script; everything in PASS is forwarded to the benchmark binary.
 RECORD=0 PROVISIONAL=0 REPORT_ONLY=0 SELF_TEST=0
 PASS=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --record) RECORD=1 ;;
     --provisional) PROVISIONAL=1 ;;
-    --report-only) REPORT_ONLY=1 ;;
+    --report-only) REPORT_ONLY=1; PASS+=(--report-only) ;;
     --self-test) SELF_TEST=1 ;;
     --skip-daemon) PASS+=(--skip-daemon) ;;
     --filter|--samples) PASS+=("$1" "$2"); shift ;;
@@ -44,7 +62,10 @@ done
 
 # Short path (Unix socket paths max out at 104 bytes), with /tmp resolved to
 # /private/tmp: the daemon content-indexes only under HOME, compared by real path.
-WORK=$(cd "$(mktemp -d /tmp/fsb.XXXXXX)" && pwd -P)
+TMPW=$(mktemp -d /tmp/fsb.XXXXXX) || { echo "bench: cannot create a temp dir" >&2; exit 1; }
+WORK=$(cd "$TMPW" && pwd -P) || exit 1
+case "$WORK" in /private/tmp/fsb.*) ;; *) echo "bench: unexpected work dir: $WORK" >&2; exit 1 ;; esac
+# Stops the daemon (TERM, then KILL after ~5 s) and deletes the work dir.
 cleanup() {
   local pid
   if [ -f "$WORK/daemon.pid" ]; then
@@ -55,9 +76,11 @@ cleanup() {
       kill -KILL "$pid" 2>/dev/null || true
     fi
   fi
-  rm -rf "$WORK"
+  # rm -rf only a directory that still looks like ours, never an empty or reassigned $WORK.
+  case "$WORK" in /private/tmp/fsb.?*) rm -rf "$WORK" ;; esac
 }
 trap cleanup EXIT
+# Turn Ctrl-C and TERM into a normal exit so the EXIT trap above still runs.
 trap 'exit 130' INT TERM
 
 echo "==> building FSearchBench (release)"
@@ -91,6 +114,8 @@ mkdir -p "$RESULTS"
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
 [ "$SELF_TEST" = 1 ] && PASS+=(--self-test) && STAMP="$STAMP-selftest"
 
+# run_bench OUT [ARGS...]: one benchmark run writing OUT. The ${PASS[@]+...} form
+# expands an empty array safely under `set -u` on macOS's bash 3.2.
 run_bench() {  # out-file, extra args...
   local out=$1; shift
   "$BIN" run --out "$out" --machine "$MACHINE" --daemon "$DAEMON" --daemon-rev "$REV" \
@@ -99,7 +124,14 @@ run_bench() {  # out-file, extra args...
 
 OUT="$RESULTS/$STAMP-$MACHINE.json"
 echo "==> running ($MACHINE)"
-run_bench "$OUT"
+rc=0
+run_bench "$OUT" || rc=$?
+if [ "$rc" != 0 ]; then
+  # Report-only never fails: keep whatever results were written and compare those.
+  [ "$REPORT_ONLY" = 1 ] || exit "$rc"
+  echo "==> report-only: the run ended early (exit $rc); not failing"
+  [ -f "$OUT" ] || exit 0
+fi
 
 if [ "$RECORD" = 1 ]; then
   [ "$SELF_TEST" = 1 ] && { echo "bench.sh: refusing to record a self-test run" >&2; exit 64; }

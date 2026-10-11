@@ -1,18 +1,23 @@
 # Roadmap
 
-This is a plan, not a promise. Items may change, move or be dropped. None of them have dates.
+This page lists what FSearch for Mac may do next. It is a plan, not a promise: items may change, move or be dropped, and none of them have dates.
 
-## v1: launcher panel (now)
+## v1: launcher panel (unreleased, 0.1.0 is next)
+
+Nothing has been released yet. Version 0.1.0 will be the first release. See the [Changelog](../CHANGELOG.md).
 
 The launcher panel, opened with a shortcut. It searches by name, inside files, and for definitions. It includes the query filters, recent files, the actions menu, and debug mode.
 
+Also in v1:
+
+- App commands in the panel ("settings" opens Settings).
+- Open FSearch at login.
+- An in-app uninstall button. See [Uninstall](uninstall.md).
+- Unified logging.
+- Report an Issue in the Help menu.
+
 ## Next
 
-- App commands in the panel, with a Settings screen.
-- Launch FSearch itself at login.
-- An in-app uninstall button. Until then, see [docs/uninstall.md](docs/uninstall.md).
-- Unified logging.
-- A Report an Issue action in the app.
 - Accessibility and localization.
 
 ## v2: an Everything-style search window
@@ -41,3 +46,9 @@ FSearch for Mac depends on the [fsearch](https://github.com/noahdunnagan/fsearch
 - A version in the daemon's status, so the app can detect a mismatched daemon.
 - Agent ownership, so the app's helper can take over from a stray daemon.
 - A daemon-wide query log, so the debug log can cover searches from every client.
+
+## See also
+
+- [Changelog](../CHANGELOG.md)
+- [Contributing](../CONTRIBUTING.md)
+- [Architecture](architecture.md)

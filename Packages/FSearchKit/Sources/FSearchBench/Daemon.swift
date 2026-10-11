@@ -8,10 +8,12 @@ enum FixtureTree {
     static let nameFiles = 50_000
     static let textFiles = 2_000
 
-    static let words = ["alpha", "bravo", "cedar", "delta", "ember", "falcon", "garnet", "harbor", "iris", "juniper",
-                        "kepler", "lumen", "maple", "nimbus", "onyx", "pebble", "quartz", "raven", "sierra", "tundra",
-                        "umber", "vortex", "willow", "xenon", "yarrow", "zephyr", "heron", "lattice", "quantum", "needle",
-                        "module", "report", "invoice", "sketch", "backup", "draft", "final", "notes", "config", "assets"]
+    static let words = [
+        "alpha", "bravo", "cedar", "delta", "ember", "falcon", "garnet", "harbor", "iris", "juniper",
+        "kepler", "lumen", "maple", "nimbus", "onyx", "pebble", "quartz", "raven", "sierra", "tundra",
+        "umber", "vortex", "willow", "xenon", "yarrow", "zephyr", "heron", "lattice", "quantum", "needle",
+        "module", "report", "invoice", "sketch", "backup", "draft", "final", "notes", "config", "assets",
+    ]
     static let exts = ["rs", "swift", "txt", "md", "json", "png", "jpg", "log", "c", "h", "py", "pdf", "csv", "zip"]
 
     /// Creates the tree under `root`; returns the files and dirs created and
@@ -32,9 +34,14 @@ enum FixtureTree {
         }
 
         // Name corpus: 10 × 10 × 10 leaf folders, 50 empty files each.
-        let leaves: [URL] = (0..<10).flatMap { a in (0..<10).flatMap { b in (0..<10).map { c in
-            root.appendingPathComponent("\(words[a])-\(a)/\(words[(a + b + 10) % words.count])-\(b)/\(words[(a * 3 + b + c) % words.count])-\(c)")
-        } } }
+        let leaves: [URL] = (0..<10).flatMap { a in
+            (0..<10).flatMap { b in
+                (0..<10).map { c in
+                    root.appendingPathComponent(
+                        "\(words[a])-\(a)/\(words[(a + b + 10) % words.count])-\(b)/\(words[(a * 3 + b + c) % words.count])-\(c)")
+                }
+            }
+        }
         for l in leaves { try mkdir(l) }
         let perLeaf = nameFiles / leaves.count
         var sample = ""
@@ -57,15 +64,15 @@ enum FixtureTree {
         ]
         for i in 0..<textFiles {
             let dir = src.appendingPathComponent("pkg\(i % 40)/mod\(i % 7)")
-            if i < 280 { try mkdir(dir) }   // 40 × 7 distinct folders
+            if i < 280 { try mkdir(dir) }  // 40 × 7 distinct folders
             let lang = langs[i % langs.count]
             var body = "// generated fixture \(i)\n"
             body += lang.def(i)
             for l in 0..<20 {
                 body += "\(rng.pick(words)) \(rng.pick(words)) \(rng.pick(words)) line \(l)\n"
             }
-            if i % 10 == 0 { body += "the quantum lattice holds\n" }        // literal: 200 files
-            if i % 25 == 0 { body += "fsbench needle_\(i)7 marker\n" }      // regex: 80 files
+            if i % 10 == 0 { body += "the quantum lattice holds\n" }  // literal: 200 files
+            if i % 25 == 0 { body += "fsbench needle_\(i)7 marker\n" }  // regex: 80 files
             try touch(dir.appendingPathComponent("file\(i).\(lang.ext)").path, body)
         }
         return (nameFiles + textFiles, dirs, sample)
@@ -152,7 +159,10 @@ final class Cleanup: @unchecked Sendable {
     let c = b.config
     // Real path (no /tmp symlink): the daemon content-indexes only under HOME, compared by real path.
     // (Foundation's resolvingSymlinksInPath maps /private/tmp back to /tmp, so use realpath.)
-    let real = realpath(work.path, nil).map { p in defer { free(p) }; return URL(fileURLWithPath: String(validatingCString: p) ?? work.path) } ?? work
+    let real =
+        realpath(work.path, nil).map { p in
+            defer { free(p) }; return URL(fileURLWithPath: String(validatingCString: p) ?? work.path)
+        } ?? work
     let base = real.appendingPathComponent("d", isDirectory: true)
     let home = base.appendingPathComponent("h", isDirectory: true)
     // The daemon only content-indexes files under HOME, so the tree lives inside it.
@@ -164,7 +174,9 @@ final class Cleanup: @unchecked Sendable {
     let t0 = now()
     let built = try FixtureTree.build(at: root)
     let genMs = Double(now() - t0) / 1e6
-    print("  fixture: \(built.files) files, \(built.dirs) dirs in \(String(format: "%.0f", genMs)) ms (seed \(String(FixtureTree.seed, radix: 16)))")
+    print(
+        "  fixture: \(built.files) files, \(built.dirs) dirs in \(String(format: "%.0f", genMs)) ms (seed \(String(FixtureTree.seed, radix: 16)))"
+    )
 
     let pidFile = work.appendingPathComponent("daemon.pid")
     let dataDir = home.appendingPathComponent("Library/Application Support/FSearch")
@@ -179,7 +191,7 @@ final class Cleanup: @unchecked Sendable {
             }
             try await Task.sleep(nanoseconds: 5_000_000)
         }
-        throw BenchError("daemon index not ready after 180 s")
+        throw Inconclusive("daemon name index not ready after 180 s")
     }
 
     // Name index build time is a ~50 ms single shot, so take it from several
@@ -191,7 +203,7 @@ final class Cleanup: @unchecked Sendable {
             let launched = now()
             try d.start()
             defer { d.stop(); try? FileManager.default.removeItem(at: dataDir) }
-            buildNs.append(try await namesReady(d, DaemonClient(socketPath: d.socketPath, timeout: 10), launched: launched).1)
+            buildNs.append(try await namesReady(d, DaemonClient(socketPath: d.socketPath, timeout: benchTimeout(30)), launched: launched).1)
         }
     }
 
@@ -199,7 +211,7 @@ final class Cleanup: @unchecked Sendable {
     defer { d.stop() }
     let launched = now()
     try d.start()
-    let client = DaemonClient(socketPath: d.socketPath, timeout: 10)
+    let client = DaemonClient(socketPath: d.socketPath, timeout: benchTimeout(30))
     let deadline = launched + 180 * 1_000_000_000
     let (namesStatus, namesNs) = try await namesReady(d, client, launched: launched)
     buildNs.append(namesNs)
@@ -215,19 +227,24 @@ final class Cleanup: @unchecked Sendable {
         }
         if now() - lastLog > 5_000_000_000 {
             lastLog = now()
-            print("  waiting for content index: \(s.map { "docs \($0.contentDocs), pending \($0.contentPending), segments \($0.contentSegments)" } ?? "no status"); grep \(g.map { "\($0.files.count) files, complete \($0.complete), source \($0.source)" } ?? "failed")")
+            print(
+                "  waiting for content index: \(s.map { "docs \($0.contentDocs), pending \($0.contentPending), segments \($0.contentSegments)" } ?? "no status"); grep \(g.map { "\($0.files.count) files, complete \($0.complete), source \($0.source)" } ?? "failed")"
+            )
         }
         try await Task.sleep(nanoseconds: 20_000_000)
     }
-    guard let cs = contentStatus else { throw BenchError("content index not ready after 180 s") }
+    guard let cs = contentStatus else { throw Inconclusive("daemon content index not ready after 180 s") }
     let contentMs = Double(now() - launched) / 1e6
 
     if b.config.wants("index.build.names") {
-        b.add(stats("index.build.names", .tracked, perOp: buildNs, ops: 1,
-                    info: ["entries": "\(namesStatus.entries)", "dirs": "\(namesStatus.dirs)", "cold_starts": "\(buildNs.count)"]))
+        b.add(
+            stats(
+                "index.build.names", .tracked, perOp: buildNs, ops: 1,
+                info: ["entries": "\(namesStatus.entries)", "dirs": "\(namesStatus.dirs)", "cold_starts": "\(buildNs.count)"]))
     }
-    b.track("index.build.content", value: contentMs * 1e6, unit: "ns",
-            info: ["contentDocs": "\(cs.contentDocs)", "contentSegments": "\(cs.contentSegments)"])
+    b.track(
+        "index.build.content", value: contentMs * 1e6, unit: "ns",
+        info: ["contentDocs": "\(cs.contentDocs)", "contentSegments": "\(cs.contentSegments)"])
     b.track("index.bytes.names", value: Double(cs.indexBytes), unit: "bytes")
     b.track("index.bytes.content", value: Double(cs.contentBytes), unit: "bytes")
 
@@ -243,8 +260,10 @@ final class Cleanup: @unchecked Sendable {
     for (metric, q) in names {
         var hits = 0
         var took: [UInt64] = []
-        try await b.measureAsync(metric, group: .daemon, warmup: w, samples: n,
-                                 info: { ["q": q, "hits": "\(hits)", "daemon_took_us_median": "\(median(took))"] }) {
+        try await b.measureAsync(
+            metric, group: .daemon, warmup: w, samples: n,
+            info: { ["q": q, "hits": "\(hits)", "daemon_took_us_median": "\(median(took))"] }
+        ) {
             let r = try await client.search(q, limit: 50)
             hits = r.hits.count
             took.append(r.tookUs)
@@ -261,8 +280,10 @@ final class Cleanup: @unchecked Sendable {
         var took: [UInt64] = []
         // Content search fans out over the daemon's thread pool, so other work
         // on the machine moves it more than name search: wider tolerance.
-        try await b.measureAsync(metric, group: .daemon, warmup: w, samples: n, tolerance: 0.50,
-                                 info: { ["pattern": p, "files": "\(files)", "complete": "\(complete)", "daemon_took_us_median": "\(median(took))"] }) {
+        try await b.measureAsync(
+            metric, group: .daemon, warmup: w, samples: n, tolerance: 0.50,
+            info: { ["pattern": p, "files": "\(files)", "complete": "\(complete)", "daemon_took_us_median": "\(median(took))"] }
+        ) {
             let r = try await client.grep(q: "", pattern: p, mode: mode)
             files = r.files.count
             complete = complete && r.complete

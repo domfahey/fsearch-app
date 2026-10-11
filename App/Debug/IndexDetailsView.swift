@@ -1,13 +1,15 @@
 import AppKit
 import FSearchKit
 import SwiftUI
+import os
 
+/// Debug window: the daemon's index statistics, skipped folders and log tail, with Save Now and Restart Daemon.
 struct IndexDetailsView: View {
     @EnvironmentObject var app: AppState
     @State private var skipped: [String] = []
     @State private var logTail = ""
     /// The running daemon's folder (a temp folder in test mode).
-    private let dataDir = DebugFormat.dataDir(socketPath: AppState.socketPath)
+    private var dataDir: URL { DebugFormat.dataDir(socketPath: app.options.socketPath) }
 
     var body: some View {
         Form {
@@ -22,14 +24,18 @@ struct IndexDetailsView: View {
             }
             Section("daemon.log (last 30 lines)") {
                 ScrollView {
-                    Text(logTail).font(.system(.caption, design: .monospaced))
+                    Text(Self.logText(logTail)).font(.system(.caption, design: .monospaced))
                         .frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled)
                 }.frame(height: 160)
             }
             HStack {
-                Button("Reveal Data Folder") { NSWorkspace.shared.activateFileViewerSelecting([dataDir]) }
-                Button("Save Now") { Task { await app.daemon.saveNow() } }
-                Button("Restart Daemon") { Task { await app.daemon.restart() } }
+                Button("Reveal Data Folder") { FileActions.workspace.activateFileViewerSelecting([dataDir]) }
+                Button("Save Now") {
+                    Log.debug.info("Save Now pressed"); Task { await app.daemon.saveNow() }
+                }
+                Button("Restart Daemon") {
+                    Log.debug.info("Restart Daemon pressed"); Task { await app.daemon.restart() }
+                }
                 Button("Copy All") {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(report(), forType: .string)
@@ -51,12 +57,20 @@ struct IndexDetailsView: View {
     private func load() async {
         let dir = dataDir
         let (s, t) = await Task.detached {
-            (DebugFormat.lines((try? String(contentsOf: dir.appendingPathComponent("skipped"), encoding: .utf8)) ?? ""),
-             DebugFormat.tail(of: dir.appendingPathComponent("daemon.log"), lines: 30))
+            (
+                DebugFormat.lines((try? String(contentsOf: dir.appendingPathComponent("skipped"), encoding: .utf8)) ?? ""),
+                DebugFormat.tail(of: dir.appendingPathComponent("daemon.log"), lines: 30)
+            )
         }.value
         skipped = s
         logTail = t
     }
+
+    /// Shown instead of an empty log: the bundled helper can't write one.
+    static let noLogNote =
+        "No daemon.log. FSearch's own background helper doesn't write one: its launchd plist is fixed inside the app and can't name a log file in your home folder. A daemon started by the fsearch command-line tool writes its log here."
+
+    static func logText(_ tail: String) -> String { tail.isEmpty ? noLogNote : tail }
 
     private func report() -> String {
         "state: \(app.daemon.state)\nskipped:\n\(skipped.joined(separator: "\n"))\nlog:\n\(logTail)"

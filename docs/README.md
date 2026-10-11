@@ -1,6 +1,6 @@
 # FSearch for Mac documentation
 
-FSearch for Mac is a menu-bar launcher for the [fsearch](https://github.com/noahdunnagan/fsearch) file-search daemon by Noah Dunnagan. Press a shortcut, type, and open any file on your Mac, by name or by what is inside it.
+FSearch for Mac is a menu-bar launcher for the [fsearch](https://github.com/noahdunnagan/fsearch) file-search daemon by Noah Dunnagan. Press a shortcut, type, and open any file on your Mac, by name, or by what is inside text and code files.
 
 These docs are grouped by what you want to do.
 
@@ -18,6 +18,7 @@ Short pages for one task each.
 - [Use FSearch with the fsearch CLI](how-to/use-with-the-fsearch-cli.md)
 - [Turn on debug mode](how-to/turn-on-debug-mode.md)
 - [Grant Full Disk Access](how-to/grant-full-disk-access.md)
+- [Update FSearch for Mac](how-to/update.md)
 - [Uninstall](uninstall.md)
 
 ## Reference
@@ -30,22 +31,32 @@ Facts to look up.
 - [Files and locations](reference/files-and-locations.md)
 - [Troubleshooting](reference/troubleshooting.md)
 - [FAQ](reference/faq.md)
+- [Known limitations](reference/limitations.md)
 
 ## Explanation
 
 Why the app is built the way it is.
 
-- [Architecture](../ARCHITECTURE.md)
+- [Architecture](architecture.md)
 - [Architecture Decision Records](adr/README.md)
 
 ## Project
 
 - [Contributing](../CONTRIBUTING.md)
-- [Security](../SECURITY.md)
-- [Privacy](../PRIVACY.md)
-- [Support](../SUPPORT.md)
-- [Roadmap](../ROADMAP.md)
+- [Code of Conduct](../.github/CODE_OF_CONDUCT.md)
+- [Security](../.github/SECURITY.md)
+- [Privacy](privacy.md)
+- [Support](../.github/SUPPORT.md)
+- [Roadmap](roadmap.md)
+- [Maintainer to-do list](todos.md)
 - [Changelog](../CHANGELOG.md)
-- [Release checklist](release-checklist.md)
+- [Release runbook](release-checklist.md)
+- [Third-party notices](../THIRD_PARTY_NOTICES.md)
+- [Benchmarks](../bench/README.md)
+
+## Historical notes
+
+These early planning documents are kept for context. They may not match the current app.
+
 - [Design spec](superpowers/specs/2026-10-10-fsearch-app-design.md)
 - [Implementation plan](superpowers/plans/2026-10-10-fsearch-app-v1.md)

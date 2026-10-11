@@ -7,9 +7,9 @@ final class FakeDaemon: @unchecked Sendable {
     private let reply: @Sendable ([String: Any]) -> [String: Any]?
     private let lock = NSLock()
     // All fields below are guarded by `lock`.
-    private var wake: Int32 = -1                   // write end of the accept thread's wake pipe
+    private var wake: Int32 = -1  // write end of the accept thread's wake pipe
     private var owned: (dev: dev_t, ino: ino_t)?  // identity of our socket file
-    private var conns: [Int32] = []                // accepted fds still open
+    private var conns: [Int32] = []  // accepted fds still open
     private var stopped = false
     private var _requests: [[String: Any]] = []
     private var _accepted = 0
@@ -42,7 +42,9 @@ final class FakeDaemon: @unchecked Sendable {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         var addr = sockaddr_un()
         addr.sun_family = sa_family_t(AF_UNIX)
-        withUnsafeMutableBytes(of: &addr.sun_path) { p in _ = path.withCString { strncpy(p.baseAddress!.assumingMemoryBound(to: CChar.self), $0, p.count - 1) } }
+        withUnsafeMutableBytes(of: &addr.sun_path) { p in
+            _ = path.withCString { strncpy(p.baseAddress!.assumingMemoryBound(to: CChar.self), $0, p.count - 1) }
+        }
         let len = socklen_t(MemoryLayout<sockaddr_un>.size)
         withUnsafePointer(to: &addr) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { _ = bind(fd, $0, len) } }
         listen(fd, 8)
@@ -59,8 +61,10 @@ final class FakeDaemon: @unchecked Sendable {
         let wakeRead = p[0]
         Thread.detachNewThread { [self] in
             defer { close(fd); close(wakeRead) }
-            var fds = [pollfd(fd: fd, events: Int16(POLLIN), revents: 0),
-                       pollfd(fd: wakeRead, events: Int16(POLLIN), revents: 0)]
+            var fds = [
+                pollfd(fd: fd, events: Int16(POLLIN), revents: 0),
+                pollfd(fd: wakeRead, events: Int16(POLLIN), revents: 0),
+            ]
             while true {
                 fds[0].revents = 0; fds[1].revents = 0
                 if poll(&fds, 2, -1) < 0 { if errno == EINTR { continue }; return }

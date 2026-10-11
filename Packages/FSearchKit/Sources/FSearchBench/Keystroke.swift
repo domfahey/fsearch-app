@@ -17,7 +17,9 @@ enum Fixtures {
             }
             return #"{"path":"/Users/someone/Developer/project/src/file\#(i).rs","matches":[\#(ms.joined(separator: ","))]}"#
         }
-        return Data(#"{"ok":true,"took_us":1900,"source":"index","candidates":120,"read":120,"complete":true,"indexing":0,"files":[\#(fs.joined(separator: ","))],"id":8}"#.utf8)
+        return Data(
+            #"{"ok":true,"took_us":1900,"source":"index","candidates":120,"read":120,"complete":true,"indexing":0,"files":[\#(fs.joined(separator: ","))],"id":8}"#
+                .utf8)
     }
 }
 
@@ -87,7 +89,7 @@ enum LogEntryFactory {
         try? FileManager.default.removeItem(at: live)
         try? FileManager.default.copyItem(at: seed, to: live)
         log = SearchLog(file: live, cap: 10_000)
-        log.append(entry, at: Date())   // seeds the line count; untimed
+        log.append(entry, at: Date())  // seeds the line count; untimed
     }
     // File I/O (open, seek, write, close per append): other processes' disk
     // activity moves it more than CPU work, hence the wider tolerance.

@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import FSearchKit
 
 @Suite struct PanelKeysTests {
@@ -150,5 +151,21 @@ import Testing
         #expect(reduce(&s, .cmdDigit(3)) == .none)
         #expect(reduce(&s, .cmdDigit(4)) == .none)
         #expect(s.mode == .names)
+    }
+
+    /// ⌘ letters match the character first (Dvorak, AZERTY), then, for a
+    /// non-Latin layout whose character is no letter we bind, the ANSI key code.
+    @Test func commandLettersFallBackToTheKeyCode() {
+        #expect(PanelKey.commandLetter("y", shift: false, keyCode: nil) == .cmdY)
+        #expect(PanelKey.commandLetter("н", shift: false, keyCode: 0x10) == .cmdY)  // Russian: the Y key
+        #expect(PanelKey.commandLetter("л", shift: false, keyCode: 0x28) == .cmdK)  // Russian: the K key
+        #expect(PanelKey.commandLetter("С", shift: true, keyCode: 0x08) == .cmdShiftC)
+        #expect(PanelKey.commandLetter("ν", shift: false, keyCode: 0x10) == .cmdY)  // Greek
+        #expect(PanelKey.commandLetter("н", shift: false, keyCode: nil) == nil)
+        // A Latin character decides on its own: Dvorak's Y is on QWERTY's T key (0x11).
+        #expect(PanelKey.commandLetter("y", shift: false, keyCode: 0x11) == .cmdY)
+        #expect(PanelKey.commandLetter("f", shift: false, keyCode: 0x10) == nil)  // Dvorak F on the Y key
+        #expect(PanelKey.commandLetter("н", shift: false, keyCode: 0x00) == nil)  // A key: not bound
+        #expect(PanelKey.commandLetter("с", shift: false, keyCode: 0x08) == nil)  // ⌘C without Shift is copy
     }
 }

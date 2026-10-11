@@ -9,6 +9,12 @@ Some people already run the fsearch CLI with its own login agent (`mt.nd.fsearch
 
 If the app's own helper starts while another daemon holds the socket, the helper exits normally. A LaunchAgent that always restarts would then relaunch it forever.
 
+## Considered options
+
+- Always use the app's own helper, and stop any other daemon. This breaks an existing CLI setup and moves Full Disk Access without warning.
+- Never register the helper if the CLI is installed. This is simpler but leaves the app with no daemon when the CLI's agent is not installed.
+- Use whichever daemon answers, and register the helper only when none does. This is the choice below.
+
 ## Decision
 
 At launch, the app decides with `DaemonPlan.decide`:

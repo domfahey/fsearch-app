@@ -8,7 +8,10 @@ struct DaemonMessageLine: View {
     @Bindable var model: SearchModel
     @ObservedObject var daemon: DaemonManager
     @State private var host = HostWindow()
+    /// Bumped each time the panel comes on screen.
+    @State private var shown = 0
 
+    /// Whether the daemon, or the last search, says the first index is still being built.
     private var isIndexing: Bool {
         if daemon.state == .indexing { return true }
         switch model.phase {
@@ -18,7 +21,10 @@ struct DaemonMessageLine: View {
     }
 
     var body: some View {
-        Group {
+        VStack(spacing: 0) {
+            // Always present (a background on an empty Group is never created,
+            // which left `host.window` nil and the indexing poll idle forever).
+            HostWindowReader(host: host).frame(width: 0, height: 0)
             if case let .failed(.daemon(msg)) = model.phase {
                 Text(msg).font(.caption).foregroundStyle(.red).lineLimit(2)
                     .padding(.horizontal, 16).padding(.bottom, 6)
@@ -26,40 +32,43 @@ struct DaemonMessageLine: View {
                     .accessibilityIdentifier("queryError")
             }
         }
-        .background(HostWindowReader(host: host))
-        .onChange(of: model.phase) { _, p in
-            switch p {
-            case .results:
-                MenuBarStatus.shared.restartBudget.reset()
-                // Searches work, so a "failed" or "needs approval" warning is
-                // stale (e.g. the daemon came back): re-check, at most every 5 s.
-                let unhealthy = switch daemon.state {
-                case .failed, .needsApproval: true
-                default: false
-                }
-                if MenuBarStatus.shared.recoveryCheck.shouldRefresh(daemonUnhealthy: unhealthy) {
-                    Task { await daemon.refresh() }
-                }
-            case .failed(.disconnected):
-                // One budget per outage, shared across panel opens. `restart()`
-                // re-registers only a daemon the app owns; a CLI daemon is just re-checked.
-                guard MenuBarStatus.shared.restartBudget.spend() else { break }
-                Task { await daemon.restart(); await model.refresh() }
-            default: break
-            }
+        // Restarts and recovery checks run in AppState.searchSettled, on every
+        // finished search, not on phase changes this view happens to render.
+        // Showing the panel again restarts a poll that stopped while hidden.
+        .task(id: PollKey(indexing: isIndexing, shown: shown)) {
+            let host = host
+            await Self.pollWhileIndexing(
+                isIndexing: { isIndexing }, visible: { host.window?.isVisible == true },
+                sleep: { try await Task.sleep(for: .seconds(2)) },
+                step: {
+                    await daemon.refresh()
+                    await model.refresh()
+                })
         }
-        .task(id: isIndexing) {
-            // Poll every ~2 s (up to ~5 min of visible polling) until the daemon
-            // answers or gives up. Paused while the panel is hidden.
-            var tries = 0
-            while isIndexing && tries < 150 && !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(2))
-                if Task.isCancelled { break }
-                guard host.window?.isVisible == true else { continue }
-                await daemon.refresh()
-                await model.refresh()
-                tries += 1
-            }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didChangeOcclusionStateNotification)) { note in
+            guard let w = note.object as? NSWindow, w === host.window, w.occlusionState.contains(.visible) else { return }
+            shown &+= 1
+        }
+    }
+
+    private struct PollKey: Equatable {
+        let indexing: Bool
+        let shown: Int
+    }
+
+    /// Polls every ~2 s, up to `maxTries` times, until the daemon is done
+    /// indexing. Stops as soon as the panel is hidden (the view starts it
+    /// again when the panel shows), so a hidden panel never polls forever.
+    static func pollWhileIndexing(
+        isIndexing: () -> Bool, visible: () -> Bool, sleep: () async throws -> Void, step: () async -> Void,
+        maxTries: Int = 150
+    ) async {
+        var tries = 0
+        while isIndexing() && tries < maxTries && !Task.isCancelled {
+            try? await sleep()
+            if Task.isCancelled || !visible() { return }
+            await step()
+            tries += 1
         }
     }
 }
@@ -69,6 +78,7 @@ final class HostWindow {
     weak var window: NSWindow?
 }
 
+/// Fills a `HostWindow` once the view lands in a window.
 private struct HostWindowReader: NSViewRepresentable {
     let host: HostWindow
 

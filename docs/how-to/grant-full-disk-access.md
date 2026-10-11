@@ -1,5 +1,7 @@
 # Grant Full Disk Access
 
+This guide shows you how to let FSearch for Mac index folders that macOS protects.
+
 ## Why
 
 Without Full Disk Access, macOS hides some folders from every app: Desktop, Documents, Downloads, Mail, Messages and iCloud Drive. The search daemon reads your disk to build the index, so it cannot find files in those folders until you allow it. The index stays on your Mac.
@@ -16,17 +18,17 @@ After setup:
 
 1. Open System Settings, then Privacy & Security, then Full Disk Access.
 2. Turn on FSearch.
-3. Quit and reopen FSearch, or use **Restart Daemon** in the Index Details window (see [Turn on debug mode](turn-on-debug-mode.md)).
+3. Restart the helper: turn on debug mode, open **Index Details…** and press **Restart Daemon** (see [Turn on debug mode](turn-on-debug-mode.md)). Quitting the app does not restart the helper, so the grant does not take effect until you restart it.
 
 To check, turn on debug mode and look for "Full Disk Access: On" in Index Details.
 
 ## If you use the fsearch CLI daemon
 
-Full Disk Access belongs to whichever daemon is running. If the app is using your CLI daemon, grant access to your `fsearch` binary and restart that daemon. See [Use FSearch with the fsearch CLI](use-with-the-fsearch-cli.md).
+Full Disk Access belongs to whichever daemon is running. If the app is using your CLI daemon, the third setup step shows **Open Privacy Settings** instead of **Turn on FSearch**. Press it, add your `fsearch` binary to the list and turn it on, then restart that daemon from the CLI. **Restart Daemon** in Index Details only checks again for a daemon the app did not start. See [Use FSearch with the fsearch CLI](use-with-the-fsearch-cli.md).
 
 ## Skip it
 
-You can press **Skip for now**. Search works, but the protected folders are missing. Once you skip, the app shows no menu-bar reminder, so grant access later when you want those folders.
+You can press **Skip for now**. Search works, but the protected folders are missing. After you skip, the menu bar shows a quiet reminder (a magnifying glass in a circle) for as long as access is off. Its menu has **Turn On Full Disk Access…**, which opens Privacy & Security, Full Disk Access (**Grant Full Disk Access to fsearch…** if the app is using your CLI daemon), and **Don't Remind Me**, which hides the reminder for good. The reminder goes away by itself once access is on.
 
 If you close the welcome window without granting or skipping, the menu bar shows "Full Disk Access is off, so some files won't be found" (with no Fix… button) until you do one or the other.
 
@@ -34,4 +36,8 @@ If you close the welcome window without granting or skipping, the menu bar shows
 
 macOS ties the grant to the program's code signature. A build you compile yourself with an ad-hoc signature (`CODE_SIGN_IDENTITY=-`) has a new identity each time, so you may need to turn the entry off and on again, or remove and re-add it, after each rebuild. The release app is signed with a Developer ID, and its grant is meant to carry across updates.
 
-Which binary macOS lists for the bundled helper (the app or the helper) is still being confirmed. It is tracked in the [release checklist](../release-checklist.md).
+## See also
+
+- [Known limitations](../reference/limitations.md)
+- [Troubleshooting](../reference/troubleshooting.md)
+- [Privacy](../privacy.md)

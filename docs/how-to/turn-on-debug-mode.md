@@ -6,7 +6,7 @@ Debug mode shows how the index is doing and records your searches so you can see
 
 Do either of these:
 
-- Click the menu-bar icon and choose **Turn On Debug Mode** (shortcut ⌥⌘D). The same item reads **Turn Off Debug Mode** when it is on.
+- Click the menu-bar icon and choose **Turn On Debug Mode**. The item shows ⌥⌘D, which works only while the menu is open. It is not a global hotkey. The same item reads **Turn Off Debug Mode** when it is on.
 - Open **Settings…** and switch **Debug mode** on or off.
 
 While debug mode is on:
@@ -46,4 +46,9 @@ Open **Search Log…** from the menu. It lists each search this app makes: time,
 - Turning debug mode off deletes the log and closes the debug windows.
 - Nothing is recorded while debug mode is off.
 
-See [Privacy](../../PRIVACY.md).
+See [Privacy](../privacy.md).
+
+## See also
+
+- [Troubleshooting](../reference/troubleshooting.md)
+- [Files and locations](../reference/files-and-locations.md)

@@ -1,4 +1,5 @@
 import Testing
+
 @testable import FSearchKit
 
 @Suite struct MessagesCoverageTests {
@@ -15,7 +16,9 @@ import Testing
     }
 
     @Test func badReplyIsPrefixed() {
-        #expect(UserMessage.forPhase(.failed(.badReply("reply has no \"hits\""))) == "Unexpected reply from the search daemon: reply has no \"hits\"")
+        #expect(
+            UserMessage.forPhase(.failed(.badReply("reply has no \"hits\"")))
+                == "Unexpected reply from the search daemon: reply has no \"hits\"")
         #expect(UserMessage.forPhase(.failed(.badReply(""))) == "Unexpected reply from the search daemon: ")
     }
 

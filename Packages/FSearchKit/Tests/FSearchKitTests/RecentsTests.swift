@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import FSearchKit
 
 /// All tests share one defaults suite, which is cleared at the start of each
@@ -27,6 +28,15 @@ import Testing
         let r = Recents(defaults: fresh(), exists: { $0 != "/f10" && $0 != "/f9" })
         for i in 1...10 { r.opened("/f\(i)") }
         #expect(r.paths == (1...8).reversed().map { "/f\($0)" })
+    }
+
+    /// The panel draws a recent folder with a folder icon, a dotted one (v1.2) too, so the check that it still exists
+    /// also says whether it is a folder.
+    @Test func entriesSayWhichAreFolders() {
+        let r = Recents(defaults: fresh(), probe: { ["/d/v1.2": true, "/f.txt": false][$0] })
+        for p in ["/gone", "/f.txt", "/d/v1.2"] { r.opened(p) }
+        #expect(r.entries == [Recents.Entry(path: "/d/v1.2", isDirectory: true), Recents.Entry(path: "/f.txt", isDirectory: false)])
+        #expect(r.paths == ["/d/v1.2", "/f.txt"])
     }
 
     @Test func persists() {

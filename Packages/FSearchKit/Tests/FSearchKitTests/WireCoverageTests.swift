@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import FSearchKit
 
 /// A Decodable whose decoding fails with an error that is neither a
@@ -10,9 +11,9 @@ private struct Exploding: Decodable {
 
 @Suite struct WireCoverageTests {
     func badReplyMessage<T: Decodable>(_ json: String, as: T.Type) -> String? {
-        do { _ = try decodeReply(Data(json.utf8), as: T.self); return nil }
-        catch let DaemonError.badReply(m) { return m }
-        catch { return "other: \(error)" }
+        do { _ = try decodeReply(Data(json.utf8), as: T.self); return nil } catch let DaemonError.badReply(m) { return m } catch {
+            return "other: \(error)"
+        }
     }
 
     @Test func notOkWithoutAMessageIsAGenericDaemonError() {
@@ -76,8 +77,8 @@ private struct Exploding: Decodable {
 
     @Test func missingTopLevelKeyHasNoPathSuffix() {
         #expect(badReplyMessage(#"{"ok":true}"#, as: SearchReply.self) == #"reply has no "took_us""#)
-        let m = badReplyMessage(#"{"ok":true,"entries":1,"dirs":1,"overlay":1,"removed":1}"#, as: DaemonStatus.self)
-        #expect(m?.contains("eventId") == false && m?.hasPrefix(#"reply has no ""#) == true)
+        // Status needs only `entries` (older daemons lack the newer fields).
+        #expect(badReplyMessage(#"{"ok":true,"dirs":1}"#, as: DaemonStatus.self) == #"reply has no "entries""#)
     }
 
     @Test func unrelatedDecoderErrorsBecomeBadReply() {

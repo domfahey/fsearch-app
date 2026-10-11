@@ -1,5 +1,7 @@
 # Files and locations
 
+This page lists where FSearch for Mac and the fsearch daemon keep files on your Mac.
+
 ## Data folder
 
 `~/Library/Application Support/FSearch`
@@ -46,3 +48,8 @@ If you use the CLI's login agent, it lives at `~/Library/LaunchAgents/mt.nd.fsea
 ## Removing everything
 
 See [Uninstall](../uninstall.md).
+
+## See also
+
+- [Uninstall](../uninstall.md)
+- [Privacy](../privacy.md)

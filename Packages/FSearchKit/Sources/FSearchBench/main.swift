@@ -1,4 +1,5 @@
 import Darwin
+import FSearchKit
 import Foundation
 
 // FSearchBench: performance benchmarks for FSearchKit and the bundled daemon.
@@ -6,7 +7,7 @@ import Foundation
 // output path and compares against bench/baseline.json.
 //
 //   FSearchBench run [--out F] [--machine KEY] [--daemon PATH] [--daemon-rev R] [--xcode S]
-//                    [--work DIR] [--filter a,b] [--skip-daemon] [--self-test] [--samples N]
+//                    [--work DIR] [--filter a,b] [--skip-daemon] [--self-test] [--report-only] [--samples N]
 //   FSearchBench compare --baseline F --current F --machine KEY [--regressed-out F] [--busy-out F]
 //   FSearchBench record  --baseline F --current F --machine KEY [--provisional]
 //   FSearchBench machine-key
@@ -26,6 +27,18 @@ func machineKey() -> String {
     return "\(sysctlString("hw.model"))-\(String(chip))".replacingOccurrences(of: "--", with: "-")
 }
 
+/// The daemon client timeout in seconds: `$FSEARCH_BENCH_TIMEOUT` when it is a
+/// positive number (it replaces every default, it doesn't scale them), else
+/// `fallback`. CI sets it higher because hosted runners can stall.
+func benchTimeout(_ fallback: TimeInterval, env: [String: String] = ProcessInfo.processInfo.environment)
+    -> TimeInterval
+{
+    guard let raw = env["FSEARCH_BENCH_TIMEOUT"], let t = TimeInterval(raw), t.isFinite, t > 0 else {
+        return fallback
+    }
+    return t
+}
+
 struct Args {
     var command: String
     var opts: [String: String] = [:]
@@ -36,7 +49,8 @@ struct Args {
         while i < argv.count {
             let a = argv[i]
             if a.hasPrefix("--"), i + 1 < argv.count, !argv[i + 1].hasPrefix("--"),
-               !["--skip-daemon", "--self-test", "--provisional"].contains(a) {
+                !["--skip-daemon", "--self-test", "--provisional", "--report-only"].contains(a)
+            {
                 opts[String(a.dropFirst(2))] = argv[i + 1]; i += 2
             } else {
                 flags.insert(String(a.dropFirst(2))); i += 1
@@ -66,8 +80,9 @@ case "machine-key":
 
 case "compare":
     let run = try Baseline.loadRun(URL(fileURLWithPath: args.need("current")))
-    let (outcome, regressed, busy) = try Baseline.compare(baseline: URL(fileURLWithPath: args.need("baseline")), run: run,
-                                                          key: args.opts["machine"] ?? run.machine.key)
+    let (outcome, regressed, busy) = try Baseline.compare(
+        baseline: URL(fileURLWithPath: args.need("baseline")), run: run,
+        key: args.opts["machine"] ?? run.machine.key)
     if let out = args.opts["regressed-out"] {
         try (regressed.joined(separator: "\n") + (regressed.isEmpty ? "" : "\n")).write(toFile: out, atomically: true, encoding: .utf8)
     }
@@ -78,8 +93,9 @@ case "compare":
 
 case "record":
     let run = try Baseline.loadRun(URL(fileURLWithPath: args.need("current")))
-    try Baseline.record(baseline: URL(fileURLWithPath: args.need("baseline")), run: run,
-                        key: args.opts["machine"] ?? run.machine.key, provisional: args.flags.contains("provisional"))
+    try Baseline.record(
+        baseline: URL(fileURLWithPath: args.need("baseline")), run: run,
+        key: args.opts["machine"] ?? run.machine.key, provisional: args.flags.contains("provisional"))
 
 case "run":
     var config = BenchConfig()
@@ -106,7 +122,9 @@ case "run":
     } else {
         var tmpl = Array("/private/tmp/fsb.XXXXXX".utf8CString)
         guard mkdtemp(&tmpl) != nil else { fail("mkdtemp failed") }
-        work = URL(fileURLWithPath: String(decoding: tmpl.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self), isDirectory: true); ownWork = true
+        work = URL(
+            fileURLWithPath: String(decoding: tmpl.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self), isDirectory: true);
+        ownWork = true
     }
     try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
     if ownWork { Cleanup.shared.removeLater(work) }
@@ -123,7 +141,8 @@ case "run":
     await benchKeystroke(bench, work: work)
     do { try await benchClient(bench, work: work) } catch { failure = error }
 
-    let daemonWanted = config.filter.isEmpty || config.filter.contains { "daemon.".hasPrefix($0) || $0.hasPrefix("daemon") || $0.hasPrefix("index") }
+    let daemonWanted =
+        config.filter.isEmpty || config.filter.contains { "daemon.".hasPrefix($0) || $0.hasPrefix("daemon") || $0.hasPrefix("index") }
     if failure == nil, daemonWanted, !args.flags.contains("skip-daemon") {
         let bin = args.opts["daemon"].map { URL(fileURLWithPath: $0) }
         if let bin, FileManager.default.isExecutableFile(atPath: bin.path) {
@@ -133,14 +152,25 @@ case "run":
         }
     }
 
+    // A slow machine is not a failure: a daemon that never became ready or
+    // answered in time (after one retry) yields an inconclusive result.
+    if let f = failure, f is Inconclusive || (f as? DaemonError) == .timeout {
+        bench.markInconclusive("daemon benchmarks", "\(f)")
+        failure = nil
+    }
     bench.canary(final: true)
     let fmt = ISO8601DateFormatter()
-    let result = RunResult(date: fmt.string(from: Date()), machine: machine,
-                           config: ["samples": "\(config.samples)", "daemonSamples": "\(config.daemonSamples)",
-                                    "warmup": "\(config.warmup)", "slowdown": "\(config.slowdown)",
-                                    "filter": config.filter.joined(separator: ","),
-                                    "fixture": "\(FixtureTree.nameFiles)+\(FixtureTree.textFiles) files, seed \(String(FixtureTree.seed, radix: 16))"],
-                           metrics: bench.metrics)
+    let result = RunResult(
+        date: fmt.string(from: Date()), machine: machine,
+        config: [
+            "samples": "\(config.samples)", "daemonSamples": "\(config.daemonSamples)",
+            "warmup": "\(config.warmup)", "slowdown": "\(config.slowdown)",
+            "filter": config.filter.joined(separator: ","),
+            "inconclusive": bench.inconclusive.joined(separator: ","),
+            "retried_timeouts": "\(bench.retries)",
+            "fixture": "\(FixtureTree.nameFiles)+\(FixtureTree.textFiles) files, seed \(String(FixtureTree.seed, radix: 16))",
+        ],
+        metrics: bench.metrics)
     if let out = args.opts["out"] {
         try Baseline.write(result, to: URL(fileURLWithPath: out))
         print("wrote \(out)")
@@ -148,6 +178,11 @@ case "run":
     if let failure {
         Cleanup.shared.runNow()
         fail("benchmark failed: \(failure)")
+    }
+    if !bench.inconclusive.isEmpty {
+        print("INCONCLUSIVE (daemon slow): not measured: \(bench.inconclusive.joined(separator: ", "))")
+        // Exit 75 (like bench.sh) unless the caller only wants a report.
+        if !args.flags.contains("report-only") { exit(75) }
     }
 
 default:

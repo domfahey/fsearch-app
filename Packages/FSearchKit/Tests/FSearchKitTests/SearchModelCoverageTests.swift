@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import FSearchKit
 
 /// A name search for "old" parks until `release()`, ignoring cancellation, then
@@ -14,7 +15,9 @@ final class GatedFailBackend: SearchBackend, @unchecked Sendable {
     var parked: Bool { lock.withLock { _parked } }
 
     func release() {
-        let c = lock.withLock { () -> CheckedContinuation<Void, Never>? in released = true; defer { cont = nil }; return cont }
+        let c = lock.withLock { () -> CheckedContinuation<Void, Never>? in
+            released = true; defer { cont = nil }; return cont
+        }
         c?.resume()
     }
 

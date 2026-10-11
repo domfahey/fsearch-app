@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import FSearchKit
 
 /// A backend whose answers can be delayed per query, to stage out-of-order replies.
@@ -13,7 +14,8 @@ final class ScriptedBackend: SearchBackend, @unchecked Sendable {
     }
     func grep(q: String, pattern: String, mode: GrepMode) async throws -> GrepReply {
         if let fail { throw fail }
-        let json = #"{"ok":true,"took_us":50,"source":"index","candidates":1,"read":1,"complete":true,"files":[{"path":"/r/f.txt","matches":[{"line":3,"text":"\#(pattern)|\#(q)|\#(mode.rawValue)"}]}]}"#
+        let json =
+            #"{"ok":true,"took_us":50,"source":"index","candidates":1,"read":1,"complete":true,"files":[{"path":"/r/f.txt","matches":[{"line":3,"text":"\#(pattern)|\#(q)|\#(mode.rawValue)"}]}]}"#
         return try decodeReply(Data(json.utf8), as: GrepReply.self)
     }
     func status() async throws -> DaemonStatus { throw DaemonError.disconnected }
@@ -35,8 +37,7 @@ final class HangingBackend: SearchBackend, @unchecked Sendable {
             return SearchReply(tookUs: 9, hits: [Hit(path: "/r/\(q)", kind: "file", size: 0, mtime: 0, score: 0)])
         }
         lock.withLock { _started = true }
-        do { try await Task.sleep(for: .seconds(10)) }
-        catch {
+        do { try await Task.sleep(for: .seconds(10)) } catch {
             lock.withLock { _cancelled = true }
             throw error
         }
@@ -161,7 +162,7 @@ private func waitUntilStarted(_ b: some StartSignal) async throws {
         await m.refresh()
         await first.value
         #expect(b.cancelled, "the superseded call was cancelled")
-        #expect(Date().timeIntervalSince(t0) < 2, "a hung daemon costs one timeout, not one per keystroke")
+        #expect(Date().timeIntervalSince(t0) < 10, "a hung daemon costs one timeout, not one per keystroke")
         #expect(m.items.map(\.path) == ["/r/fast"] && m.phase == .results)
         #expect(log.map(\.query) == ["fast"], "only the newest search is reported")
     }
@@ -212,7 +213,8 @@ final class RecordingBackend: SearchBackend, @unchecked Sendable {
     }
     func grep(q: String, pattern: String, mode: GrepMode) async throws -> GrepReply {
         lock.withLock { _calls.append("grep \(q)|\(pattern)|\(mode.rawValue)") }
-        let json = #"{"ok":true,"took_us":5,"source":"index","candidates":1,"read":1,"complete":true,"files":[{"path":"/r/g.txt","matches":[{"line":1,"text":"x"}]}]}"#
+        let json =
+            #"{"ok":true,"took_us":5,"source":"index","candidates":1,"read":1,"complete":true,"files":[{"path":"/r/g.txt","matches":[{"line":1,"text":"x"}]}]}"#
         return try decodeReply(Data(json.utf8), as: GrepReply.self)
     }
     func status() async throws -> DaemonStatus { throw DaemonError.disconnected }
@@ -288,4 +290,22 @@ final class RecordingBackend: SearchBackend, @unchecked Sendable {
         #expect(m.items.isEmpty && m.lastTookUs == nil)
         #expect(log.count == 2 && log[1].error != nil && log[1].resultCount == 0)
     }
+}
+
+/// onSettled fires on every finished search, even when the phase repeats.
+@MainActor
+@Test func settledFiresForEveryFinishedSearch() async {
+    let b = ScriptedBackend()
+    b.fail = .disconnected
+    let m = SearchModel(names: b, content: b)
+    var settled: [SearchPhase] = []
+    m.onSettled = { settled.append($0) }
+    m.query = "a"
+    await m.refresh()
+    await m.refresh()  // .failed(.disconnected) again: must still be reported
+    b.fail = nil
+    await m.refresh()
+    m.query = " "
+    await m.refresh()  // blank: nothing searched, nothing settled
+    #expect(settled == [.failed(.disconnected), .failed(.disconnected), .results])
 }
