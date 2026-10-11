@@ -18,6 +18,23 @@ extension AppTests {
             #expect(HelpLinks.reportTitle == "Report an Issue…")
         }
 
+        @Test func communityLinks() {
+            #expect(HelpLinks.community.map(\.title) == ["GitHub", "Discussions"])
+            #expect(
+                HelpLinks.community.map(\.url.absoluteString) == [
+                    "https://github.com/domfahey/fsearch-app", "https://github.com/domfahey/fsearch-app/discussions",
+                ])
+        }
+
+        /// The panel's FSearch menu looks links up by title, so it and the menu bar can't drift.
+        @Test func lookupByTitle() {
+            let b = "https://github.com/domfahey/fsearch-app/blob/main/"
+            #expect(HelpLinks.item("FSearch Help")?.url.absoluteString == b + "docs/README.md")
+            #expect(HelpLinks.item("Changelog")?.url.absoluteString == b + "CHANGELOG.md")
+            #expect(HelpLinks.item("Discussions")?.url.absoluteString == "https://github.com/domfahey/fsearch-app/discussions")
+            #expect(HelpLinks.item("Nope") == nil)
+        }
+
         @Test func installKind() {
             #expect(HelpLinks.install(owns: true, state: .failed) == .bundled)
             #expect(HelpLinks.install(owns: false, state: .running) == .cli)

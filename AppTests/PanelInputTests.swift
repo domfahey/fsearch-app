@@ -91,6 +91,18 @@ extension AppTests {
             #expect(key(P(key: "н", characters: "н", keyCode: 0x10)) == nil)  // no ⌘: typed
         }
 
+        /// ⌘/ opens the FSearch menu, by its character or by the physical key.
+        @Test func commandSlashOpensTheAppMenu() {
+            #expect(key(P(key: "/", characters: "/", command: true)) == .appMenu)
+            #expect(key(P(key: "/", characters: "/", command: true), empty: true) == .appMenu)
+            // A layout where that key types something else still has ⌘/ by key code.
+            #expect(key(P(key: "-", characters: "-", command: true, keyCode: 0x2C)) == .appMenu)
+            #expect(key(P(key: "/", characters: "/", command: true, shift: true)) == nil)  // ⇧⌘/ is Help search
+            #expect(key(P(key: "/", characters: "/")) == nil)  // typed into the field
+            #expect(key(P(key: "/", characters: "/", command: true, isRepeat: true)) == nil)
+            #expect(!PanelKey.appMenu.actsOnResults)
+        }
+
         @Test func deleteOnlyOnAnEmptyQuery() {
             #expect(key(P(key: .delete), empty: true) == .backspaceOnEmpty)
             #expect(key(P(key: .delete), empty: false) == nil)

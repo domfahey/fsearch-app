@@ -22,6 +22,8 @@ struct SearchView: View {
     let keys: PanelKeyFeed
     /// Where the rows are laid out, for ⌘K's menu.
     let geometry: PanelGeometry
+    /// The FSearch menu (⌘/ or the footer's gear), owned by the controller.
+    let menu: AppMenuState
     /// Whether the panel is on screen; a hidden panel never replays a held key.
     let isVisible: () -> Bool
     /// What ↵ does on the selected row, remembered per row.
@@ -138,6 +140,7 @@ struct SearchView: View {
             }
             Divider()
             HStack(spacing: 14) {
+                AppMenuButton(menu: menu)
                 if app.debugMode, let us = model.lastTookUs {
                     Text(String(format: "%.1f ms · %d results", Double(us) / 1000, model.items.count)).foregroundStyle(.secondary)
                 }
@@ -168,6 +171,9 @@ struct SearchView: View {
         // ↑/↓ pressed in Quick Look, which holds the keyboard while it is up.
         .onChange(of: keys.last) { if let k = keys.last?.key { act(k) } }
         .onChange(of: model.mode) { held.key.cancel() }
+        .overlay(alignment: .bottomLeading) { AppMenuOverlay(menu: menu) { AppMenuActions.run($0, app: app) } }
+        // The menu's field had the keyboard: give it back to the search field.
+        .onChange(of: menu.isOpen) { _, open in if !open { focused = true } }
         // The results for the query in the box arrived: run a key held for them.
         .onChange(of: PanelInput.answer(model)) { old, new in
             geometry.rowsChanged(keeping: Set(shown.map(\.id)))
@@ -233,6 +239,8 @@ struct SearchView: View {
     /// Routes a key press through ``PanelInput`` and ``PanelState/reduce(_:)``, then performs the effect.
     private func handle(_ press: KeyPress) -> KeyPress.Result {
         let p = PanelInput.Press(press, event: NSApp.currentEvent)
+        // ⌘/, and every key while the FSearch menu is open, go to the menu.
+        if let r = menu.handle(p, run: { AppMenuActions.run($0, app: app) }) { return r }
         guard let key = PanelInput.key(for: p, queryIsEmpty: model.query.isEmpty) else {
             return PanelInput.swallows(p) ? .handled : .ignored
         }

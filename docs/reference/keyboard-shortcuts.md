@@ -19,6 +19,7 @@ This page lists every keyboard shortcut in FSearch for Mac.
 | ⌘Y | Quick Look the selected file. While the preview is up, ↑ and ↓ (with no modifiers) move the selection and the preview follows; ⌘ or ⇧ arrows go to Quick Look. Press ⌘Y again to close it. |
 | ⌘⇧C | Copy the selected file's path |
 | ⌘K | Open the actions menu under the selected file |
+| ⌘/ | Open or close the FSearch menu. See [FSearch menu (⌘/)](#fsearch-menu-) below. |
 | ⌘1 to ⌘9 | Open the first to ninth file result. It never lands on a command or "Use … with…" row. |
 | Esc | Clear the query. If the query is already empty, remove the **Inside files** or **Definitions** chip. If there is no chip, hide the panel. |
 | Backspace on an empty field | Remove the **Inside files** or **Definitions** chip |
@@ -48,6 +49,7 @@ Type a command's name (or the start of it) to show its row under the file result
 | Drag a row | Drag the file into Finder, Mail or another app |
 | Click a "Use … with…" row | Switch to Search inside files or Find definitions |
 | Click the FSearch Settings row | Open Settings |
+| Click the gear (**FSearch**) at the left of the footer | Open or close the FSearch menu |
 
 ## In the actions menu (⌘K)
 
@@ -66,6 +68,34 @@ The menu has no key equivalents of its own. Choose an entry with the mouse or th
 
 If an action fails, the panel stays up (or comes back) and shows the error in its footer for a few seconds.
 
+## FSearch menu (⌘/)
+
+Press ⌘/ or click the gear (**FSearch**) at the left of the panel's footer. The menu opens over the results, with the app version at the top and a **Search for actions…** field at the bottom. It is separate from the ⌘K actions menu, which acts on the selected file.
+
+| Row | Shortcut | Does |
+|---|---|---|
+| Send Feedback | | Open a pre-filled GitHub bug report (versions, chip and daemon state; never paths or queries) |
+| Manual | | Open the FSearch Help pages |
+| Keyboard Shortcuts | | Open this page |
+| Changelog | | Open the changelog |
+| About FSearch | | Show the About window |
+| Settings… | ⌘, | Open Settings |
+| GitHub (under **Community**) | | Open the project on GitHub |
+| Discussions (under **Community**) | | Open GitHub Discussions |
+| Quit FSearch | ⌘Q | Quit the app |
+
+Every row except Quit hides the panel.
+
+| Key | Action |
+|---|---|
+| Type | Filter the rows by name (for example `chan` for Changelog). The first match is selected. |
+| ↑ or ⌃P, ↓ or ⌃N | Move the selection. It wraps from the last row to the first. |
+| ↵ | Run the selected row |
+| Esc | Clear the filter. If it is already empty, close the menu. The panel stays up. |
+| ⌘/ | Close the menu |
+
+The mouse works too: point at a row to select it, click to run it, and click outside the menu to close it.
+
 ## Menu-bar menu
 
 | Item | Shortcut | Does |
@@ -78,7 +108,7 @@ If an action fails, the panel stays up (or comes back) and shows the error in it
 | Search Log… | | Debug mode only |
 | Turn On Debug Mode or Turn Off Debug Mode | ⌥⌘D | Toggle [debug mode](../how-to/turn-on-debug-mode.md). A menu-item shortcut: it works while the menu is open, not as a global hotkey. |
 | Finish Setup… | | Shown until the welcome window is done |
-| Help | | A submenu: FSearch Help, Keyboard Shortcuts, Query Syntax, Changelog, Privacy, and **Report an Issue…**, which opens a pre-filled GitHub bug report (versions, chip and daemon state; never paths or queries) |
+| Help | | A submenu: FSearch Help, Keyboard Shortcuts, Query Syntax, Changelog, Privacy, GitHub, Discussions, and **Report an Issue…**, which opens a pre-filled GitHub bug report (versions, chip and daemon state; never paths or queries) |
 | About FSearch | | |
 | Settings… | | See [Settings](settings.md) |
 | Check for Updates… | | Shown only in builds with updates configured |

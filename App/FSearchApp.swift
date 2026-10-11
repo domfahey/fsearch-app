@@ -68,6 +68,10 @@ struct MenuContent: View {
                 Button(item.title) { FileActions.workspace.open(item.url) }
             }
             Divider()
+            ForEach(HelpLinks.community, id: \.title) { item in
+                Button(item.title) { FileActions.workspace.open(item.url) }
+            }
+            Divider()
             Button(HelpLinks.reportTitle) { HelpLinks.reportIssue(daemon: app.daemon, workspace: FileActions.workspace) }
         }
         Button("About FSearch") {

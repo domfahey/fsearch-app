@@ -159,6 +159,27 @@ final class PanelUITests: PanelUITestCase {
         XCTAssertTrue(app.menuItems["Move to Trash"].waitForNonExistence(timeout: 5))
     }
 
+    /// ⌘/ opens the FSearch menu; its field filters the rows, and Esc clears, then closes, with the panel still up.
+    func testAppMenuFiltersAndEscapeCloses() throws {
+        try launch()
+        try press("/", .command)
+        waitFor(element("appMenu-Settings"), 10)
+        XCTAssertTrue(element("appMenuButton").exists)
+        // The menu's field has the keyboard now, not the search field.
+        let menuField = element("appMenuField")
+        waitUntil(5, "menu field focused") { menuField.value(forKey: "hasKeyboardFocus") as? Bool == true }
+        try requireFocus(field: false)
+        menuField.typeText("chan")
+        waitFor(element("appMenu-Changelog"), 5)
+        XCTAssertTrue(element("appMenu-Settings").waitForNonExistence(timeout: 5), tree())
+        XCTAssertEqual(field.value as? String ?? "", "", "typing went to the menu, not the search")
+        try pressInApp(.escape)
+        waitFor(element("appMenu-Settings"), 5)
+        try pressInApp(.escape)
+        XCTAssertTrue(element("appMenu-Changelog").waitForNonExistence(timeout: 5))
+        XCTAssertTrue(field.exists, "the panel stays up")
+    }
+
     func testQuestionMarkShowsTheCheatSheet() throws {
         try launch()
         try search("?")

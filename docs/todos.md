@@ -27,7 +27,6 @@ All fixed; see the CHANGELOG.
 ## P2: features
 
 - [ ] Everything-style search window (v2): sortable table, status bar, match toggles, filter chips, saved searches, preview pane. Needs a design pass and daemon paging. See [roadmap](roadmap.md).
-- [ ] App menu in the panel, like Raycast's: a header with the app name and version, then Send Feedback, Manual, Changelog, About FSearch and Settings (⌘,), with a "Search for actions…" field at the bottom. Open it from a gear button in the panel or a shortcut; it is separate from the ⌘K actions menu, which acts on the selected result.
 - [ ] App Intents: a "Search files" action for Shortcuts.
 - [ ] URL scheme: `fsearch://search?q=…`.
 - [ ] Sparkle: archive and export with Developer ID (`xcodebuild -exportArchive`), and script `generate_appcast` (with deltas and release notes from the CHANGELOG) as a local release step.
