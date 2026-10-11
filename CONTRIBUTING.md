@@ -12,7 +12,7 @@ Never commit keys, certificates, provisioning profiles, notary API keys or the S
 
 ### Prerequisites
 
-- **Xcode 16 or later** (Swift 6). The app is tested with Xcode 26.6. FSearchKit is tested with Xcode 16.2 and later. The Makefile and scripts use `DEVELOPER_DIR` if it is set, otherwise the Xcode that `xcode-select -p` reports. Select one with `sudo xcode-select -s /Applications/Xcode.app`, or `export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
+- **Xcode 16 or later** (Swift 6). The app and FSearchKit are tested with Xcode 26.6. The Makefile and scripts use `DEVELOPER_DIR` if it is set, otherwise the Xcode that `xcode-select -p` reports. Select one with `sudo xcode-select -s /Applications/Xcode.app`, or `export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
 - **Rust** through [rustup](https://rustup.rs), with both macOS targets: `rustup target add aarch64-apple-darwin x86_64-apple-darwin`.
 - **XcodeGen**: `scripts/install-xcodegen.sh ~/.local/share/xcodegen` installs the pinned, checksum-verified release that CI uses (it empties that folder first) and prints its `bin` folder; add that folder to your `PATH`. `brew install xcodegen` (what `make install` runs) also works, but its version floats.
 - **python3**, which `scripts/check-links.sh` uses. macOS and Xcode's command-line tools provide it.
@@ -58,7 +58,7 @@ Two modes keep tests away from your real setup. **Test mode** starts when you pa
 
 | Tier | Run it | Safe to run while you work? | In CI? |
 |---|---|---|---|
-| FSearchKit unit and integration tests, against a real daemon in a temporary `HOME` | `make test` | Yes | Yes, on macOS 14 and macOS 26 |
+| FSearchKit unit and integration tests, against a real daemon in a temporary `HOME` | `make test` | Yes | Yes, on macOS 26 |
 | AppTests, the app's unit tests, in an inert host with fakes | `make apptest` or `scripts/coverage.sh --unit-only` | Yes. The host shows nothing and takes no focus. | Yes, with an 80% coverage gate |
 | UI and end-to-end tests (AppUITests) | `make ui` | No. It synthesizes keystrokes. Use a hands-off GUI session. | No |
 | Benchmarks | `scripts/bench.sh --report-only --skip-daemon` (or `make bench` for the full run) | Yes | Report-only |

@@ -21,17 +21,12 @@ env:
 # Coverage: the kit job gates FSearchKit at 90%; the app job gates AppTests-only coverage at 80%.
 jobs:
   kit:
-    # macos-14 is the deployment target (macOS 14): its newest Xcode with Swift 6 is
-    # 16.2 (Swift 6.0.3, satisfies swift-tools-version 6.0), per macos-14-arm64 Readme,
-    # image 20260831. That image is deprecated (unsupported 2026-11-02); then drop the leg.
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: macos-26
             xcode: '26.6'
-          - os: macos-14
-            xcode: '16.2'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: false

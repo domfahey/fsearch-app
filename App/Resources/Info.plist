@@ -8,7 +8,7 @@
   <key>CFBundleShortVersionString</key><string>$(MARKETING_VERSION)</string>
   <key>CFBundleVersion</key><string>$(CURRENT_PROJECT_VERSION)</string>
   <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
-  <key>LSMinimumSystemVersion</key><string>14.0</string>
+  <key>LSMinimumSystemVersion</key><string>15.0</string>
   <key>LSUIElement</key><true/>
   <key>NSHumanReadableCopyright</key><string>© 2026 Dominic Fahey. MIT License. Built on fsearch by Noah Dunnagan (MIT).</string>
   <key>SUFeedURL</key><string>https://domfahey.github.io/fsearch-app/appcast.xml</string>

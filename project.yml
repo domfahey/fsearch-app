@@ -1,7 +1,7 @@
 name: FSearch
 options:
   bundleIdPrefix: com.domfahey
-  deploymentTarget: { macOS: "14.0" }
+  deploymentTarget: { macOS: "15.0" }
 packages:
   FSearchKit: { path: Packages/FSearchKit }
   KeyboardShortcuts: { url: https://github.com/sindresorhus/KeyboardShortcuts, exactVersion: "2.4.0" }
