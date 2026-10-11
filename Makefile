@@ -154,9 +154,9 @@ type: project ## Warnings-as-errors package build, plus app warnings check
 
 check: lint type test ## lint, type, test
 
-ci: check ## Run locally what CI runs: check plus the 90% kit and 80% app unit coverage gates
+ci: check ## Run locally what CI runs: check plus the 90% kit and app unit coverage gates
 	$(Q)scripts/coverage.sh --kit-only --min 90
-	$(Q)scripts/coverage.sh --unit-only --min 80
+	$(Q)scripts/coverage.sh --unit-only --min 90
 
 hooks: ## Install the repo git hooks (secret checks)
 	$(Q)git config core.hooksPath scripts/hooks
