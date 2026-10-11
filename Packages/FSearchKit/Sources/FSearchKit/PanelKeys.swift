@@ -22,6 +22,8 @@ public enum PanelKey: Equatable, Sendable {
     case escape
     /// Backspace in an empty field: leaves content/symbols mode.
     case backspaceOnEmpty
+    /// Opens or closes the FSearch menu (⌘/); the panel's rows never see it.
+    case appMenu
 
     /// The ⌘-letter bindings, matched ignoring case: Caps Lock or Shift change the character.
     ///
@@ -57,7 +59,7 @@ public enum PanelKey: Equatable, Sendable {
     public var actsOnResults: Bool {
         switch self {
         case .enter, .cmdEnter, .cmdY, .cmdShiftC, .cmdDigit, .cmdK: true
-        case .up, .down, .escape, .backspaceOnEmpty: false
+        case .up, .down, .escape, .backspaceOnEmpty, .appMenu: false
         }
     }
 }
@@ -152,6 +154,8 @@ extension PanelState {
             guard self.query.isEmpty else { return .none }
             self.mode = .names
             return .none
+        // The view opens the FSearch menu; the rows don't change.
+        case .appMenu: return .none
         }
     }
 }
