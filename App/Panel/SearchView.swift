@@ -96,6 +96,7 @@ struct SearchView: View {
                                 ResultRow(item: item, query: highlightQuery, selected: i == state.selection)
                                     .id(item.id)
                                     .onPanelFrame { geometry.rows[item.id] = $0 }
+                                    .onDisappear { geometry.rows[item.id] = nil }
                                     .onTapGesture(count: 2) { onEffect(.open(i), shown) }
                                     .onTapGesture { state.selection = i }
                                     .draggable(URL(fileURLWithPath: item.path))
@@ -169,10 +170,16 @@ struct SearchView: View {
         .onChange(of: model.mode) { held.key.cancel() }
         // The results for the query in the box arrived: run a key held for them.
         .onChange(of: PanelInput.answer(model)) { old, new in
-            geometry.answerChanged(from: old, to: new)
+            geometry.rowsChanged(keeping: Set(shown.map(\.id)))
             let k = PanelInput.rowsChanged(
                 from: old, to: new, selection: &state.selection, held: &held.key, model: model, visible: isVisible())
-            if let k { act(k) }
+            guard let k else { return }
+            if PanelInput.replaysAfterLayout(k) {
+                // Unless the panel was hidden in the meantime.
+                DispatchQueue.main.async { if isVisible() { act(k) } }
+            } else {
+                act(k)
+            }
         }
         // .repeat: holding ↓/↑ keeps moving (PanelInput ignores other repeats).
         .onKeyPress(phases: [.down, .repeat]) { press in handle(press) }

@@ -102,11 +102,10 @@ final class PanelGeometry {
     /// The search field's row; the menu opens under it when no row is in view.
     var field = CGRect(x: 0, y: 0, width: 680, height: 50)
 
-    /// Rows for another query: drop the old rows' frames, so a key held for
-    /// the new rows never anchors at an old row's place (the new ones report
-    /// theirs once laid out). This also keeps `rows` small.
-    func answerChanged(from old: PanelInput.Answer, to new: PanelInput.Answer) {
-        if old.query != new.query || old.mode != new.mode { rows = [:] }
+    /// New rows arrived: keep the frames of rows still shown (one that didn't
+    /// move never reports again) and drop the rest, so `rows` stays small.
+    func rowsChanged(keeping ids: Set<String>) {
+        rows = rows.filter { ids.contains($0.key) }
     }
 
     /// Where the menu for a row opens, from the panel's top left.

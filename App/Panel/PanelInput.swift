@@ -96,6 +96,10 @@ enum PanelInput {
         return p.command && firstKey(for: bare, queryIsEmpty: false) != nil
     }
 
+    /// A held ⌘K replays a main-actor turn later, so its menu opens where the
+    /// new rows have been laid out, not where the old ones were.
+    static func replaysAfterLayout(_ k: PanelKey) -> Bool { k == .cmdK }
+
     /// The file Quick Look follows to when row `i` is selected; nil on a command or fallback row.
     static func previewPath(at i: Int, shown: [ResultItem], rows: PanelRows) -> String? {
         guard case let .result(f)? = rows.row(at: i), shown.indices.contains(f) else { return nil }

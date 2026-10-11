@@ -266,6 +266,14 @@ extension AppTests {
             }
         }
 
+        /// A held ⌘K replays a turn later, once the new rows have reported where they are.
+        @Test func onlyAHeldMenuKeyReplaysLater() {
+            #expect(PanelInput.replaysAfterLayout(.cmdK))
+            for k in [PanelKey.enter, .cmdEnter, .cmdY, .cmdShiftC, .cmdDigit(1), .up, .down, .escape] {
+                #expect(!PanelInput.replaysAfterLayout(k))
+            }
+        }
+
         /// Quick Look follows the selection onto file rows only.
         @Test func previewPathsForTheSelection() {
             let shown: [ResultItem] = [.file(Wire.hit("/p/a")), .line(path: "/p/b", match: Match(line: 3, text: "x"))]

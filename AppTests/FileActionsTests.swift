@@ -449,22 +449,19 @@ extension AppTests {
             #expect(g.menuAnchor(rowID: "/p/other") == CGPoint(x: i, y: 50))
         }
 
-        /// New rows for another query drop the old row frames, so a ⌘K held for
-        /// them opens under the field rather than at a row's old place; the same
-        /// query refreshed keeps them.
-        @Test func newRowsDropOldRowFrames() {
+        /// New rows keep the frames of rows still shown (a row that didn't move
+        /// never reports again) and drop the rest, so the map stays small.
+        @Test func newRowsKeepFramesOfRowsStillShown() {
             let g = PanelGeometry()
             g.list = CGRect(x: 0, y: 60, width: 680, height: 360)
-            g.rows["/p/x.txt"] = CGRect(x: 4, y: 100, width: 672, height: 34)
-            let a = PanelInput.Answer(query: "x", mode: .names, current: false)
-            g.answerChanged(from: a, to: PanelInput.Answer(query: "x", mode: .names, current: true))
-            #expect(g.rows.count == 1)
-            g.answerChanged(from: a, to: PanelInput.Answer(query: "x", mode: .content, current: true))
-            #expect(g.rows.isEmpty)
-            g.rows["/p/x.txt"] = CGRect(x: 4, y: 100, width: 672, height: 34)
-            g.answerChanged(from: a, to: PanelInput.Answer(query: "xy", mode: .names, current: true))
-            #expect(g.rows.isEmpty)
-            #expect(g.menuAnchor(rowID: "/p/x.txt") == CGPoint(x: PanelGeometry.inset, y: 50))
+            let top = CGRect(x: 4, y: 100, width: 672, height: 34)
+            g.rows = ["/p/plover.txt": top, "/p/plum.txt": CGRect(x: 4, y: 134, width: 672, height: 34)]
+            g.rowsChanged(keeping: ["/p/plover.txt", "/p/new.txt"])
+            #expect(g.rows == ["/p/plover.txt": top])
+            #expect(g.menuAnchor(rowID: "/p/plover.txt") == CGPoint(x: 4 + PanelGeometry.inset, y: 134))
+            // The dropped row (and one not laid out yet) opens under the field.
+            #expect(g.menuAnchor(rowID: "/p/plum.txt") == CGPoint(x: PanelGeometry.inset, y: 50))
+            #expect(g.menuAnchor(rowID: "/p/new.txt") == CGPoint(x: PanelGeometry.inset, y: 50))
         }
 
         /// The anchor is measured from the top left; an unflipped view counts from the bottom.
