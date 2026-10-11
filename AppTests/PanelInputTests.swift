@@ -74,6 +74,15 @@ extension AppTests {
             #expect(key(P(key: .delete, command: true), empty: true) == nil)
         }
 
+        /// Backspace arrives as DEL or BS depending on the source (a keyboard,
+        /// a synthesized event), and always as key code 51.
+        @Test func backspaceInEveryForm() {
+            #expect(key(P(key: KeyEquivalent("\u{7F}")), empty: true) == .backspaceOnEmpty)
+            #expect(key(P(key: KeyEquivalent("\u{08}")), empty: true) == .backspaceOnEmpty)
+            #expect(key(P(key: KeyEquivalent("x"), keyCode: 51), empty: true) == .backspaceOnEmpty)
+            #expect(key(P(key: KeyEquivalent("\u{7F}")), empty: false) == nil)
+        }
+
         @Test func digitsOnlyWithCommand() {
             #expect(key(P(key: "3", characters: "3", command: true)) == .cmdDigit(3))
             #expect(key(P(key: "3", characters: "3")) == nil)

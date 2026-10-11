@@ -54,12 +54,17 @@ enum PanelInput {
         // ⌘Y, ⌘K, ⌘⇧C ignoring case (Shift or Caps Lock change the character),
         // or by key code on a non-Latin layout.
         case (_, true, _, _) where commandLetter(p) != nil: return commandLetter(p)
-        case (.delete, false, _, _) where queryIsEmpty: return .backspaceOnEmpty
+        // Backspace: SwiftUI's .delete is BS, a keyboard sends DEL; key code 51 either way.
+        case (_, false, _, _) where queryIsEmpty && isBackspace(p): return .backspaceOnEmpty
         default:
             // ⌘1–9 only; a plain digit is typed into the field.
             guard p.command, let n = p.characters.first?.wholeNumberValue else { return nil }
             return .cmdDigit(n)
         }
+    }
+
+    private static func isBackspace(_ p: Press) -> Bool {
+        p.key == .delete || p.key.character == "\u{7F}" || p.keyCode == 51
     }
 
     private static func commandLetter(_ p: Press) -> PanelKey? {
