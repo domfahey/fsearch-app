@@ -30,7 +30,7 @@ struct AppMenuOverlay: View {
     let menu: AppMenuState
     let run: (PanelMenuAction) -> Void
 
-    /// Leaves the footer (and its gear) uncovered, so the card sits just above it.
+    /// The card sits this far up, just above the footer and its gear (the click-catching layer still covers them).
     static let footerHeight: CGFloat = 36
 
     var body: some View {
@@ -146,6 +146,7 @@ struct AppMenuView: View {
         .accessibilityValue(selected ? "selected" : "")
         .accessibilityAddTraits(selected ? .isSelected : [])
         .accessibilityIdentifier("appMenu-\(item.id)")
+        .accessibilityHint(item.shortcut.isEmpty ? "" : "Shortcut \(item.shortcut.joined())")
     }
 }
 

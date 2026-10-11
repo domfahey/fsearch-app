@@ -31,8 +31,8 @@ final class PanelController: PanelHost {
     let keys = PanelKeyFeed()
     /// Where the view laid out its rows, so ⌘K's menu opens at the selected one.
     let geometry = PanelGeometry()
-    /// The FSearch menu (⌘/); hiding the panel closes it.
-    let menu = AppMenuState()
+    /// The FSearch menu (⌘/); hiding the panel closes it, and opening it drops the held key.
+    private(set) lazy var menu = AppMenuState(held: held)
 
     /// The panel window: key only outside the unit-test host, hides on resign, and hosts the Quick Look controller.
     final class Panel: NSPanel {

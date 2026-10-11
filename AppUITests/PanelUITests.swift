@@ -178,6 +178,10 @@ final class PanelUITests: PanelUITestCase {
         try pressInApp(.escape)
         XCTAssertTrue(element("appMenu-Changelog").waitForNonExistence(timeout: 5))
         XCTAssertTrue(field.exists, "the panel stays up")
+        // The search field has the keyboard again: typing edits the query.
+        waitUntil(5, "search field focused") { self.field.value(forKey: "hasKeyboardFocus") as? Bool == true }
+        try type("h")
+        waitUntil(5, "typed into the search") { (self.field.value as? String ?? "") == "h" }
     }
 
     func testQuestionMarkShowsTheCheatSheet() throws {

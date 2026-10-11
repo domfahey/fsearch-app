@@ -9,9 +9,24 @@ import SwiftUI
 @MainActor @Observable
 final class AppMenuState {
     /// Rows, filter, selection and whether the menu is open.
-    var model = PanelMenuModel()
+    var model = PanelMenuModel() {
+        didSet { syncOpen() }
+    }
 
-    var isOpen: Bool { model.isOpen }
+    /// Open or closed, kept apart from ``model`` so the panel redraws only when this changes, not on every keystroke in
+    /// the filter.
+    private(set) var isOpen = false
+
+    /// The panel's held result key, dropped when the menu opens so it never runs behind the menu.
+    @ObservationIgnored private let held: HeldKeyBox?
+
+    init(held: HeldKeyBox? = nil) { self.held = held }
+
+    private func syncOpen() {
+        guard model.isOpen != isOpen else { return }
+        isOpen = model.isOpen
+        if isOpen { held?.key.cancel() }
+    }
 
     /// ⌘/ or the gear: opens a closed menu, closes an open one.
     func toggle() { model.toggle() }
@@ -30,6 +45,8 @@ final class AppMenuState {
             model.open()
             return .handled
         }
+        // Tab would move the keyboard to the search field behind the menu.
+        if p.key == .tab || p.key.character == "\u{19}" { return .handled }
         guard let key else { return .ignored }
         perform(model.handle(key), run)
         return .handled

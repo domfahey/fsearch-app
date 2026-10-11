@@ -1,6 +1,7 @@
 import AppKit
 import FSearchKit
 import Foundation
+import Observation
 import SwiftUI
 import Testing
 
@@ -154,7 +155,7 @@ extension AppTests {
             pc.hide(returnFocus: false)
         }
 
-        @Test func openingTheMenuNeverPopsUpTheActionsMenu() async {
+        @Test func theMenuDrawsInsideTheFixedPanelWithoutTheActionsMenu() async {
             let env = TestEnv()
             defer { env.tearDown() }
             var popped = 0
@@ -177,10 +178,73 @@ extension AppTests {
         }
 
         @Test func versionHeaderReadsTheBundle() {
-            let (version, build) = AppMenuActions.version()
+            let version = AppMenuActions.version().version
             #expect(!version.isEmpty)
             #expect(AppMenuActions.header().hasPrefix("FSearch v\(version)"))
-            _ = build
+        }
+
+        /// ↵ held for a slow search, then the menu opens (⌘/ or the gear): the key never runs behind the menu.
+        @Test func openingTheMenuDropsAHeldKey() async {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            env.daemon.onSearch = { q in SearchReply(tookUs: 1, hits: [Wire.hit("/p/\(q).txt")]) }
+            let pc = PanelController()
+            pc.show(app: env.app)
+            defer { pc.hide(returnFocus: false) }
+            env.app.search.query = "slow"  // its search hasn't answered
+            #expect(PanelInput.gate(.enter, held: &pc.held.key, model: env.app.search) == nil)
+            #expect(pc.held.key.held == .enter)
+            #expect(pc.menu.handle(slash, run: { _ in }) == .handled)  // ⌘/
+            #expect(pc.held.key.held == nil)
+            // The results land: nothing to replay.
+            await env.app.search.refresh()
+            #expect(await eventually { PanelInput.rowsAreCurrent(env.app.search) })
+            #expect(PanelInput.replay(held: &pc.held.key, model: env.app.search, visible: true) == nil)
+            #expect(env.workspace.opened.isEmpty)
+
+            // The gear takes the same path.
+            pc.menu.close()
+            env.app.search.query = "slower"
+            #expect(PanelInput.gate(.cmdK, held: &pc.held.key, model: env.app.search) == nil)
+            pc.menu.toggle()
+            #expect(pc.held.key.held == nil)
+        }
+
+        /// Tab would move the keyboard to the search field behind the menu.
+        @Test func tabStaysInTheOpenMenu() {
+            let menu = AppMenuState()
+            #expect(menu.handle(P(key: .tab), run: { _ in }) == nil)  // closed: the panel's
+            menu.toggle()
+            #expect(menu.handle(P(key: .tab), run: { _ in }) == .handled)
+            #expect(menu.handle(P(key: .tab, shift: true), run: { _ in }) == .handled)
+            #expect(menu.isOpen)
+        }
+
+        /// The panel watches only open/closed, so typing in the filter or hovering never redraws the whole panel.
+        @Test func isOpenChangesOnlyOnOpenAndClose() {
+            let menu = AppMenuState()
+            final class Count: @unchecked Sendable { var n = 0 }
+            let count = Count()
+            var changes: Int { count.n }
+            func watch() {
+                withObservationTracking {
+                    _ = menu.isOpen
+                } onChange: {
+                    count.n += 1
+                }
+            }
+            watch()
+            menu.toggle()
+            #expect(changes == 1 && menu.isOpen)
+            watch()
+            menu.model.filter = "chan"
+            menu.model.select(.changelog)
+            _ = menu.handle(P(key: .downArrow), run: { _ in })
+            #expect(changes == 1)
+            _ = menu.handle(P(key: .escape), run: { _ in })  // clears the filter only
+            #expect(changes == 1)
+            _ = menu.handle(P(key: .escape), run: { _ in })
+            #expect(changes == 2 && !menu.isOpen)
         }
 
         /// Render smoke test: the menu open, filtered, and empty, plus the gear (for coverage).

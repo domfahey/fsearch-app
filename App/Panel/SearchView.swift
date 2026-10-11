@@ -178,11 +178,11 @@ struct SearchView: View {
         .onChange(of: PanelInput.answer(model)) { old, new in
             geometry.rowsChanged(keeping: Set(shown.map(\.id)))
             let k = PanelInput.rowsChanged(
-                from: old, to: new, selection: &state.selection, held: &held.key, model: model, visible: isVisible())
+                from: old, to: new, selection: &state.selection, held: &held.key, model: model, visible: isVisible() && !menu.isOpen)
             guard let k else { return }
             if PanelInput.replaysAfterLayout(k) {
-                // Unless the panel was hidden in the meantime.
-                DispatchQueue.main.async { if isVisible() { act(k) } }
+                // Unless the panel was hidden or the menu opened in the meantime.
+                DispatchQueue.main.async { if isVisible() && !menu.isOpen { act(k) } }
             } else {
                 act(k)
             }
