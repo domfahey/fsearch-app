@@ -8,10 +8,14 @@ import os
 enum FileActions {
     /// Where actions go: the real workspace; in test mode one that only records
     /// (UI tests can press ↵ safely); a fake in unit tests.
-    static var workspace: Workspace =
-        LaunchOptions.current.testMode
-        ? TestModeWorkspace(log: TestModeWorkspace.logFile(socketPath: LaunchOptions.current.socketPath))
-        : SystemWorkspace()
+    static var workspace: Workspace = {
+        #if DEBUG
+            if LaunchOptions.current.testMode {
+                return TestModeWorkspace(log: TestModeWorkspace.logFile(socketPath: LaunchOptions.current.socketPath))
+            }
+        #endif
+        return SystemWorkspace()
+    }()
     /// ⌘⇧C and "Copy File" write here: the general pasteboard, or a private one under test.
     static var pasteboard: NSPasteboard = defaultPasteboard(for: .current)
 

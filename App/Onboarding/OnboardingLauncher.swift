@@ -59,11 +59,13 @@ enum OnboardingLauncher {
     /// Closes the onboarding window if it is open.
     static func close() { window?.close() }
 
-    /// Forgets a closed window's run, so a test can start over.
-    static func reset() {
-        close()
-        startedDaemon = false
-    }
+    #if DEBUG
+        /// Forgets a closed window's run, so a test can start over.
+        static func reset() {
+            close()
+            startedDaemon = false
+        }
+    #endif
 
     private static func show(app: AppState) {
         if let window {

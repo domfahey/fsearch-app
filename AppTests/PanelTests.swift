@@ -57,6 +57,29 @@ extension AppTests {
             #expect(pc.held.key.held == nil)
         }
 
+        /// `-UITestShowPanel` is read from the app's own options, not the process's.
+        @Test func thePanelFollowsTheAppsShowPanelOption() {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let plain = PanelController()
+            plain.install(app: env.app)
+            #expect(!plain.isVisible)
+            var options = env.app.options
+            options.showPanel = true
+            let app = AppState(
+                options: options, defaults: env.defaults, helper: nil,
+                names: env.daemon, content: env.daemon, control: env.daemon, clock: env.clock.clock,
+                cliAgentInstalled: { false })
+            app.panel = env.panel
+            let pc = PanelController()
+            pc.install(app: app)
+            defer { pc.hide(returnFocus: false) }
+            #expect(pc.isVisible)
+            // It stays up when it loses key, as UI tests need.
+            pc.panel?.resignKey()
+            #expect(pc.isVisible)
+        }
+
         @Test func effectsRunTheirActions() async {
             let env = TestEnv()
             defer { env.tearDown() }
