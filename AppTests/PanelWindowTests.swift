@@ -14,7 +14,7 @@ extension AppTests {
         /// The shared controller, shown for `env`; the overrides below talk to it.
         func showShared(_ env: TestEnv) throws -> PanelController.Panel {
             PanelController.shared.show(app: env.app)
-            return try #require(PanelController.shared.panel as? PanelController.Panel)
+            return try #require(PanelController.shared.panel)
         }
 
         /// Clicking another app takes key from the launcher: it hides.

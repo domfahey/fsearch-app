@@ -253,7 +253,8 @@ extension AppTests {
 
         func view(_ env: TestEnv, _ r: Recorder, held: HeldKeyBox = HeldKeyBox()) -> some View {
             SearchView(
-                model: env.app.search, state: PanelState(), held: held, isVisible: { true },
+                model: env.app.search, state: PanelState(), held: held, keys: PanelKeyFeed(), geometry: PanelGeometry(),
+                menu: AppMenuState(held: held), isVisible: { true },
                 onEffect: { e, items in r.effects.append((e, items.map(\.path))) },
                 onSelect: { r.selections.append($0) }, onCommand: { r.commands.append($0) }
             ).environmentObject(env.app)
