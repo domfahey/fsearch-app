@@ -63,6 +63,7 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
 
 ### Fixed
 
+- Opening the panel with the global shortcut gives the search field keyboard focus, so typing works without clicking it first.
 - Removing the background helper suspends automatic recovery across launches and waits for pending restarts, so the helper and index stay removed until setup runs again. Coming back to the app does not reinstall it.
 - A failed helper replacement keeps the previous version marker. If the old helper is still answering after it was unregistered, the login item is put back without recording the update, so a later launch retries.
 - Socket replies must finish within the request timeout, even when partial data keeps arriving.
