@@ -162,7 +162,7 @@ struct SearchView: View {
         .frame(width: 680, height: 460)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
         .coordinateSpace(.named(PanelGeometry.space))
-        .onAppear { focused = true }
+        .onAppear { DispatchQueue.main.async { focused = true } }
         .onChange(of: state.selection) { onSelect(state.selection) }
         // An open preview follows the selected file: a new selection, or new rows under the same one.
         .onChange(of: PanelInput.previewPath(at: state.selection, shown: shown, rows: rows)) { _, path in

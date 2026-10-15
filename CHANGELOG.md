@@ -63,6 +63,7 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
 
 ### Fixed
 
+- Opening the panel with the global shortcut gives the search field keyboard focus, so typing works without clicking it first.
 - The ⌘K actions menu opens under the selected row, or under the search field when that row is out of view, instead of at a fixed spot.
 - ⌘Y, ⌘K, ⌘⇧C, ⌘1–9, ⌘↵ and ↵ no longer fire with ⌃ or ⌥ held too, so ⌘⌃Y no longer opens Quick Look.
 - In Quick Look, ↑ and ↓ move the panel's selection and the preview follows it.
