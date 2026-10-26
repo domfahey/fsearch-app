@@ -63,6 +63,10 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
 
 ### Fixed
 
+- Removing the background helper suspends automatic recovery and waits for pending restarts, so the helper and index stay removed until setup runs again.
+- A failed helper replacement keeps the previous version marker, so a later launch retries the update.
+- Socket replies must finish within the request timeout, even when partial data keeps arriving.
+- A file refused by its default app shows an error and keeps the panel open without adding a recent; a failed editor fallback also reports the error.
 - The ⌘K actions menu opens under the selected row, or under the search field when that row is out of view, instead of at a fixed spot.
 - ⌘Y, ⌘K, ⌘⇧C, ⌘1–9, ⌘↵ and ↵ no longer fire with ⌃ or ⌥ held too, so ⌘⌃Y no longer opens Quick Look.
 - In Quick Look, ↑ and ↓ move the panel's selection and the preview follows it.

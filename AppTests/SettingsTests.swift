@@ -71,6 +71,54 @@ extension AppTests {
             env.defaults.set("keep", forKey: "other")
         }
 
+        @Test func removalPreventsDisconnectedSearchFromReinstallingTheHelper() async {
+            let helper = FakeHelper(.enabled)
+            let env = TestEnv(helper: helper)
+            defer { env.tearDown() }
+            env.daemon.onPing = { _ in false }
+            let u = make(env, helper: helper, login: nil)
+            await u.run(ownership: .ours, daemon: env.app.daemon)
+            env.app.searchSettled(.failed(.disconnected))
+            // Drain any recovery already scheduled by the search observer.
+            await env.app.daemon.restart()
+            await env.app.daemon.start()
+            #expect(helper.registered == 0)
+            #expect(helper.status == .notRegistered)
+            #expect(env.workspace.trashed.contains(data))
+            // The user's explicit setup step can install the helper again.
+            await env.app.daemon.start(resumingAfterRemoval: true)
+            #expect(helper.registered == 1)
+            #expect(helper.status == .enabled)
+        }
+
+        @Test func removalWaitsForAnInFlightRestartBeforeTrashingData() async {
+            let helper = FakeHelper(.enabled)
+            let env = TestEnv(helper: helper)
+            defer { env.tearDown() }
+            env.daemon.onPing = { _ in false }
+            var release: CheckedContinuation<Void, Never>?
+            helper.onUnregister = {
+                if helper.unregistered == 1 {
+                    await withCheckedContinuation { release = $0 }
+                }
+            }
+            let restart = Task { await env.app.daemon.restart() }
+            #expect(await eventually { release != nil })
+            let u = make(env, helper: helper, login: nil)
+            let removal = Task { await u.run(ownership: .ours, daemon: env.app.daemon) }
+            #expect(await eventually { u.phase != .idle })
+            // A suspended unregister cannot be cancelled out of SMAppService; removal must await it.
+            for _ in 0..<20 { await Task.yield() }
+            #expect(env.workspace.trashed.isEmpty)
+            await env.app.daemon.start(resumingAfterRemoval: true)
+            #expect(helper.registered == 0, "setup must wait until removal finishes")
+            release?.resume()
+            await restart.value
+            await removal.value
+            #expect(helper.registered == 0)
+            #expect(env.workspace.trashed.contains(data))
+        }
+
         @Test func ownedHelperRemovesEverything() async {
             let env = TestEnv()
             defer { env.tearDown() }

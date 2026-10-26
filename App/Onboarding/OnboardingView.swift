@@ -83,7 +83,7 @@ final class OnboardingFlow: ObservableObject {
         busy = true
         return Task {
             await cancelPollRefresh()
-            await app.daemon.start()
+            await app.daemon.start(resumingAfterRemoval: true)
             busy = false
             apply()
         }

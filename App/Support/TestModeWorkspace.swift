@@ -40,7 +40,10 @@ import Foundation
             }
         }
 
-        func open(_ url: URL) { record("open \(url.isFileURL ? url.path : url.absoluteString)") }
+        @discardableResult func open(_ url: URL) -> Bool {
+            record("open \(url.isFileURL ? url.path : url.absoluteString)")
+            return true
+        }
 
         func open(_ urls: [URL], withApplicationAt app: URL, completion: (@Sendable (Error?) -> Void)?) {
             record("openWith \(app.lastPathComponent) \(urls.map(\.path).joined(separator: " "))")

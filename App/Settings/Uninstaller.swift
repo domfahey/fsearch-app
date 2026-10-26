@@ -104,9 +104,11 @@ final class Uninstaller: ObservableObject {
     /// The helper is unregistered whenever it is registered at all (enabled or
     /// awaiting approval); the data folder is trashed only when this app's
     /// helper held it, the helper is gone, and no CLI login agent shares the folder.
-    func run(ownership: DataOwnership) async {
+    func run(ownership: DataOwnership, daemon: DaemonManager? = nil) async {
         guard phase != .running else { return }
         phase = .running
+        await daemon?.suspendForRemoval()
+        defer { daemon?.finishRemoval() }
         var r = Report()
         var helperGone = true
 
