@@ -80,11 +80,14 @@ final class LineSocket {
             out.append(UInt8(ascii: "\n"))
             let sent = out.withUnsafeBytes { write(fd, $0.baseAddress, out.count) }
             guard sent == out.count else { throw DaemonError.disconnected }
-            let deadline = Date().addingTimeInterval(timeout)
+            let deadline = DispatchTime.now() + timeout
             while true {
-                let reply = try readLine()
-                if accepts(reply) { return reply }
-                if Date() >= deadline { throw DaemonError.timeout }
+                let reply = try readLine(deadline: deadline)
+                let accepted = accepts(reply)
+                guard DispatchTime.now().uptimeNanoseconds < deadline.uptimeNanoseconds else {
+                    throw DaemonError.timeout
+                }
+                if accepted { return reply }
             }
         } catch {
             close()
@@ -93,17 +96,34 @@ final class LineSocket {
     }
 
     /// Returns the next buffered line, reading from the socket as needed. Bytes after the newline stay buffered for the next call.
-    private func readLine() throws -> Data {
+    private func readLine(deadline: DispatchTime) throws -> Data {
         var chunk = [UInt8](repeating: 0, count: 64 * 1024)
         while true {
+            let now = DispatchTime.now().uptimeNanoseconds
+            guard now < deadline.uptimeNanoseconds else { throw DaemonError.timeout }
             if let nl = buffer.firstIndex(of: UInt8(ascii: "\n")) {
                 let line = buffer[buffer.startIndex..<nl]
                 buffer.removeSubrange(buffer.startIndex...nl)
                 return Data(line)
             }
+            let remaining = deadline.uptimeNanoseconds - now
+            let roundedMilliseconds = remaining / 1_000_000 + (remaining % 1_000_000 == 0 ? 0 : 1)
+            let milliseconds = Int32(min(UInt64(Int32.max), max(1, roundedMilliseconds)))
+            var ready = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
+            let polled = poll(&ready, 1, milliseconds)
+            if polled == 0 { continue }
+            if polled < 0 {
+                if errno == EINTR { continue }
+                throw DaemonError.disconnected
+            }
+            guard DispatchTime.now().uptimeNanoseconds < deadline.uptimeNanoseconds else { throw DaemonError.timeout }
+            guard ready.revents & Int16(POLLIN | POLLHUP | POLLERR) != 0 else { continue }
             let n = read(fd, &chunk, chunk.count)
             if n > 0 { buffer.append(contentsOf: chunk[0..<n]); continue }
-            if n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK) { throw DaemonError.timeout }
+            if n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK) {
+                if DispatchTime.now().uptimeNanoseconds >= deadline.uptimeNanoseconds { throw DaemonError.timeout }
+                continue
+            }
             throw DaemonError.disconnected
         }
     }

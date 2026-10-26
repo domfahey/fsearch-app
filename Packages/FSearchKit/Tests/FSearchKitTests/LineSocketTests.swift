@@ -179,6 +179,40 @@ final class RawServer: @unchecked Sendable {
         #expect(String(decoding: line, as: UTF8.self) == "{\"ok\":true}")
     }
 
+    @Test func dripReplyCannotExceedTotalTimeout() {
+        let srv = RawServer { fd, _ in
+            _ = RawServer.readLine(fd)
+            RawServer.send(fd, "part")
+            Thread.sleep(forTimeInterval: 0.12)
+            RawServer.send(fd, "ial")
+            Thread.sleep(forTimeInterval: 0.12)
+            RawServer.send(fd, "\n")
+            close(fd)
+        }
+        defer { srv.stop() }
+        let socket = LineSocket(path: srv.path, timeout: 0.18)
+        #expect(throws: DaemonError.timeout) { try socket.roundTrip(req()) }
+        #expect(srv.accepted == 1)
+    }
+
+    @Test func staleCompleteReplyDoesNotResetTimeout() {
+        let srv = RawServer { fd, _ in
+            _ = RawServer.readLine(fd)
+            Thread.sleep(forTimeInterval: 0.22)
+            RawServer.send(fd, "stale\n")
+            Thread.sleep(forTimeInterval: 0.3)
+            close(fd)
+        }
+        defer { srv.stop() }
+        let socket = LineSocket(path: srv.path, timeout: 0.3)
+        let started = DispatchTime.now().uptimeNanoseconds
+        #expect(throws: DaemonError.timeout) {
+            try socket.roundTrip(req(), accepts: { _ in false })
+        }
+        let elapsed = Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000_000
+        #expect(elapsed < 0.45, "a stale complete line shares the original deadline")
+    }
+
     @Test func oversizedLineBiggerThanTheReadChunkIsReturnedWhole() throws {
         let big = String(repeating: "x", count: 600_000)
         let srv = RawServer { fd, _ in

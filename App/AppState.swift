@@ -134,6 +134,7 @@ final class AppState: ObservableObject {
     ///
     /// - Parameter phase: How the search ended.
     func searchSettled(_ phase: SearchPhase) {
+        guard !daemon.recoverySuspended else { return }
         switch phase {
         case .results:
             status.restartBudget.reset()
@@ -153,7 +154,9 @@ final class AppState: ObservableObject {
             // Out of restarts: say the helper isn't answering, not "Starting search…".
             guard status.restartBudget.spend() else { daemon.markUnresponsive(); return }
             Task {
-                await daemon.restart(); await search.refresh()
+                await daemon.restart()
+                guard !daemon.recoverySuspended else { return }
+                await search.refresh()
             }
         case .failed(.timeout):
             daemon.markUnresponsive()

@@ -358,13 +358,74 @@ extension AppTests {
             defer { _ = TestEnv.emptySuite(TestEnv.unitSuite) }
             defaults.set("1:10:5", forKey: DaemonManager.helperIdentityKey)
             let h = FakeHelper(.enabled)
-            let m = manager(h, holder: { .ours }, defaults: defaults, identity: { "2:11:6" })
+            let d = StubDaemon()
+            d.onPing = { $0 == 1 || $0 > 2 }
+            let m = manager(h, d, holder: { .ours }, defaults: defaults, identity: { "2:11:6" })
             await m.start()
             #expect(h.unregistered == 1)
             #expect(h.registered == 1)
             #expect(defaults.string(forKey: DaemonManager.helperIdentityKey) == "2:11:6")
             await m.start()
             #expect(h.unregistered == 1, "only once")
+        }
+
+        @Test func anUnresponsiveOwnedHelperIsStillReplacedAfterAnUpdate() async {
+            let defaults = TestEnv.emptySuite(TestEnv.unitSuite)
+            defer { _ = TestEnv.emptySuite(TestEnv.unitSuite) }
+            defaults.set("old", forKey: DaemonManager.helperIdentityKey)
+            let h = FakeHelper(.enabled)
+            let d = StubDaemon()
+            d.onPing = { $0 == 1 }
+            d.onStatus = { n in
+                if n <= 50 { throw DaemonError.timeout }
+                return Wire.status(entries: 91)
+            }
+            let m = manager(h, d, holder: { .ours }, defaults: defaults, identity: { "new" })
+            await m.start()
+            #expect(h.unregistered == 1 && h.registered == 1)
+            #expect(m.state == .running(Wire.status(entries: 91)))
+            #expect(defaults.string(forKey: DaemonManager.helperIdentityKey) == "new")
+        }
+
+        @Test func failedHelperUpdateKeepsTheOldIdentityAndRetries() async {
+            let defaults = TestEnv.emptySuite(TestEnv.unitSuite)
+            defer { _ = TestEnv.emptySuite(TestEnv.unitSuite) }
+            defaults.set("old", forKey: DaemonManager.helperIdentityKey)
+            let h = FakeHelper(.enabled)
+            h.registerError = TestError("still old")
+            h.statusOnFailure = .enabled
+            let d = StubDaemon()
+            d.onPing = { n in n == 1 || n > 2 }
+            let m = manager(h, d, holder: { .ours }, defaults: defaults, identity: { "new" })
+            await m.start()
+            #expect(defaults.string(forKey: DaemonManager.helperIdentityKey) == "old")
+            await m.start()
+            #expect(h.unregistered == 2, "a failed replacement must remain eligible for retry")
+        }
+
+        @Test func failedUnregisterDoesNotRecordTheNewHelperIdentity() async {
+            let defaults = TestEnv.emptySuite(TestEnv.unitSuite)
+            defer { _ = TestEnv.emptySuite(TestEnv.unitSuite) }
+            defaults.set("old", forKey: DaemonManager.helperIdentityKey)
+            let h = FakeHelper(.enabled)
+            h.onUnregister = { throw TestError("old helper still running") }
+            let m = manager(h, holder: { .ours }, defaults: defaults, identity: { "new" })
+            await m.start()
+            #expect(defaults.string(forKey: DaemonManager.helperIdentityKey) == "old")
+            #expect(h.registered == 0)
+            await m.start()
+            #expect(h.unregistered == 2)
+        }
+
+        @Test func anOldHelperThatNeverStopsIsNotRecordedAsUpdated() async {
+            let defaults = TestEnv.emptySuite(TestEnv.unitSuite)
+            defer { _ = TestEnv.emptySuite(TestEnv.unitSuite) }
+            defaults.set("old", forKey: DaemonManager.helperIdentityKey)
+            let h = FakeHelper(.enabled)
+            let m = manager(h, holder: { .ours }, defaults: defaults, identity: { "new" })
+            await m.start()
+            #expect(defaults.string(forKey: DaemonManager.helperIdentityKey) == "old")
+            #expect(h.registered == 0, "the existing process still answers on the socket")
         }
 
         @Test func anUpdateNeverRestartsSomeoneElsesDaemon() async {

@@ -56,7 +56,11 @@ final class DaemonManager: ObservableObject {
     private let helperIdentity: () -> String?
     /// The one restart in flight; other callers wait for it instead of
     /// interleaving unregister/register with it.
-    private var restartTask: Task<Void, Never>?
+    private var restartTask: Task<Bool, Never>?
+    /// Removal keeps automatic recovery off until the user explicitly sets up again.
+    private(set) var recoverySuspended = false
+    private var removalInProgress = false
+    private var mayManageHelper: Bool { !recoverySuspended && !Task.isCancelled }
     /// Set when the menu sent the user to turn on Full Disk Access for our helper.
     private(set) var fullDiskAccessRestartArmed = false
     /// Whether FSearch has Full Disk Access now (injected for tests).
@@ -115,12 +119,35 @@ final class DaemonManager: ObservableObject {
     /// before the bundled helper is registered. Returns early, without changing state, if the
     /// task is cancelled during that wait. Afterwards, a helper of ours left running across an
     /// app update is restarted once.
-    func start() async { await start(checkingForUpdate: true) }
+    func start(resumingAfterRemoval: Bool = false) async {
+        guard !removalInProgress else { return }
+        if resumingAfterRemoval { recoverySuspended = false }
+        await start(checkingForUpdate: true)
+    }
+
+    /// Stops recovery before unregistering or deleting anything. An unregister
+    /// already in flight must finish before removal can proceed.
+    func suspendForRemoval() async {
+        removalInProgress = true
+        recoverySuspended = true
+        fullDiskAccessRestartArmed = false
+        let poll = fullDiskAccessPoll
+        fullDiskAccessPoll?.cancel()
+        let restart = restartTask
+        restart?.cancel()
+        _ = await restart?.value
+        await poll?.value
+    }
+
+    /// Allows explicit setup again; automatic recovery remains suspended.
+    func finishRemoval() { removalInProgress = false }
 
     /// `checkingForUpdate` is false inside a restart, which must not restart again.
     private func start(checkingForUpdate: Bool) async {
+        guard mayManageHelper else { return }
         guard let service else { await refresh(); return }
         let existing = await answers()
+        guard mayManageHelper else { return }
         let cli = cliAgentInstalled()
         var plan = DaemonPlan.decide(existingAnswers: existing, ownStatus: service.status, cliAgentInstalled: cli)
         Log.daemon.info(
@@ -137,6 +164,7 @@ final class DaemonManager: ObservableObject {
             plan = DaemonPlan.afterRecheck(existingAnswers: answered, ownStatus: service.status)
             Log.daemon.info("recheck: answered \(answered, privacy: .public), plan \(String(describing: plan), privacy: .public)")
         }
+        guard mayManageHelper else { return }
         var justRegistered = false
         if plan == .registerBundled {
             plan = register(service)
@@ -154,14 +182,18 @@ final class DaemonManager: ObservableObject {
     /// An app update replaces the helper binary, but launchd keeps the old one
     /// running: restart our own helper once when its identity changed.
     private func restartIfUpdated(justRegistered: Bool) async {
+        guard mayManageHelper else { return }
         let current = helperIdentity()
         let stored = defaults.string(forKey: Self.helperIdentityKey)
         let action = DaemonPlan.helperUpdate(owns: ownsDaemon, justRegistered: justRegistered, stored: stored, current: current)
         guard action != .nothing else { return }
         if action == .restartThenStore {
             Log.daemon.info("the bundled helper changed: restarting it once")
-            await restart()
+            guard await restartSuccessfully() else { return }
+        } else {
+            guard helperIsReady else { return }
         }
+        guard mayManageHelper else { return }
         defaults.set(current, forKey: Self.helperIdentityKey)
     }
 
@@ -227,44 +259,62 @@ final class DaemonManager: ObservableObject {
     /// Only an owned helper is unregistered and registered again. A daemon the app didn't start (the CLI's, a test daemon)
     /// may be in use by other tools, so it is never stopped, and "restart" means "look again". With nothing answering and
     /// nothing ours, it starts one as launch does. One restart runs at a time: a caller arriving meanwhile waits for it.
-    func restart() async {
-        if let restartTask { await restartTask.value; return }
-        let t = Task { @MainActor in
-            await performRestart()
-            restartTask = nil
+    func restart() async { _ = await restartSuccessfully() }
+
+    private var helperIsReady: Bool {
+        switch state {
+        case .running, .indexing: true
+        default: false
         }
-        restartTask = t
-        await t.value
     }
 
-    private func performRestart() async {
-        guard let service else { await refresh(); return }
+    private func restartSuccessfully() async -> Bool {
+        guard mayManageHelper else { return false }
+        if let restartTask { return await restartTask.value }
+        let t = Task { @MainActor in
+            let success = await performRestart()
+            restartTask = nil
+            return success
+        }
+        restartTask = t
+        return await t.value
+    }
+
+    private func performRestart() async -> Bool {
+        guard mayManageHelper else { return false }
+        guard let service else { await refresh(); return false }
         let owns = ownsDaemon
         let answering = owns ? true : await answers()
+        guard mayManageHelper else { return false }
         switch DaemonPlan.restartAction(owns: owns, answers: answering) {
-        case .refreshOnly: await refresh(); return
+        case .refreshOnly: await refresh(); return false
         case .start:
             Log.daemon.info("restart: nothing answers and nothing is ours: starting")
-            await start(checkingForUpdate: false); return
+            await start(checkingForUpdate: false)
+            return mayManageHelper && ownsDaemon && helperIsReady
         case .reregister: break
         }
         Log.daemon.info("restart: re-registering")
         do { try await service.unregister() } catch {
             Log.daemon.error("unregister failed: \(error.localizedDescription, privacy: .private)")
+            return false
         }
-        // Wait (up to 3 s) for the old daemon to stop answering before registering the new one, so the new one doesn't find the
-        // old one still on the socket.
+        // Verify that the old process stopped before treating the replacement as current.
+        var stopped = false
         for _ in 0..<30 {
-            if !(await answers()) { break }
-            try? await clock.sleep(.milliseconds(100))
+            guard mayManageHelper else { return false }
+            if !(await answers()) { stopped = true; break }
+            do { try await clock.sleep(.milliseconds(100)) } catch { return false }
         }
+        guard mayManageHelper, stopped else { return false }
         switch register(service) {
-        case .needsApproval: setState(.needsApproval)
-        case .registerBundled: break  // failed; state already says why
+        case .needsApproval: setState(.needsApproval); return false
+        case .registerBundled: return false
         default:
-            // The new process runs the bundled binary as it is now.
-            if let id = helperIdentity() { defaults.set(id, forKey: Self.helperIdentityKey) }
             await refresh()
+            guard mayManageHelper, ownsDaemon, helperIsReady else { return false }
+            if let id = helperIdentity() { defaults.set(id, forKey: Self.helperIdentityKey) }
+            return true
         }
     }
 
@@ -296,6 +346,7 @@ final class DaemonManager: ObservableObject {
     /// panel next opens, in the middle of a search. Instead look for the grant
     /// every 2 s for up to 2 minutes; activation still restarts it after that.
     func armFullDiskAccessRestart() {
+        guard !recoverySuspended else { return }
         fullDiskAccessRestartArmed = true
         fullDiskAccessPoll?.cancel()
         fullDiskAccessPoll = Task { [weak self] in await self?.pollForFullDiskAccess() }
