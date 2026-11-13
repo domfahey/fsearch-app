@@ -71,6 +71,34 @@ extension AppTests {
             env.defaults.set("keep", forKey: "other")
         }
 
+        @Test func removalSuspensionSurvivesRelaunchUntilExplicitSetup() async {
+            let helper = FakeHelper(.enabled)
+            let env = TestEnv(helper: helper)
+            defer { env.tearDown() }
+            env.daemon.onPing = { _ in false }
+            let u = make(env, helper: helper, login: nil)
+            await u.run(ownership: .ours, daemon: env.app.daemon)
+            #expect(!Uninstaller.defaultsKeys.contains("helperRecoverySuspended"))
+            #expect(env.defaults.bool(forKey: "helperRecoverySuspended"))
+
+            let reopened = AppState(
+                options: env.app.options, defaults: env.defaults, helper: helper,
+                names: env.daemon, content: env.daemon, control: env.daemon, clock: env.clock.clock,
+                cliAgentInstalled: { false })
+            #expect(reopened.daemon.recoverySuspended)
+            // A disconnected search restarts; closing onboarding calls start() without resuming.
+            await reopened.daemon.restart()
+            await OnboardingLauncher.startDaemon(app: reopened).value
+            #expect(helper.registered == 0)
+            #expect(helper.status == .notRegistered)
+
+            await reopened.daemon.start(resumingAfterRemoval: true)
+            #expect(helper.registered == 1)
+            #expect(helper.status == .enabled)
+            #expect(!reopened.daemon.recoverySuspended)
+            #expect(!env.defaults.bool(forKey: "helperRecoverySuspended"))
+        }
+
         @Test func removalPreventsDisconnectedSearchFromReinstallingTheHelper() async {
             let helper = FakeHelper(.enabled)
             let env = TestEnv(helper: helper)

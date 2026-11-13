@@ -425,7 +425,14 @@ extension AppTests {
             let m = manager(h, holder: { .ours }, defaults: defaults, identity: { "new" })
             await m.start()
             #expect(defaults.string(forKey: DaemonManager.helperIdentityKey) == "old")
-            #expect(h.registered == 0, "the existing process still answers on the socket")
+            #expect(h.unregistered == 1)
+            // The login item has to come back, or the next start no longer owns the helper and skips the retry.
+            #expect(h.registered == 1)
+            #expect(h.status == .enabled)
+            await m.start()
+            #expect(h.unregistered == 2, "a later start retries the replacement")
+            #expect(h.registered == 2)
+            #expect(defaults.string(forKey: DaemonManager.helperIdentityKey) == "old")
         }
 
         @Test func anUpdateNeverRestartsSomeoneElsesDaemon() async {
