@@ -72,7 +72,7 @@ struct SettingsView: View {
                 .confirmationDialog("Remove FSearch's background helper and data?", isPresented: $confirming) {
                     Button("Remove", role: .destructive) {
                         let ownership = app.daemon.dataOwnership
-                        Task { await uninstaller.run(ownership: ownership) }
+                        Task { await uninstaller.run(ownership: ownership, daemon: app.daemon) }
                     }
                     Button("Cancel", role: .cancel) {}
                 } message: {

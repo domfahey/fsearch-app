@@ -37,6 +37,8 @@ final class Uninstaller: ObservableObject {
     }
 
     /// The app's UserDefaults keys; the shortcut is reset separately.
+    /// `DaemonManager.recoverySuspendedKey` is left out on purpose: removal sets it, and wiping
+    /// these keys must not turn automatic recovery back on.
     static let defaultsKeys = [
         "editor", "debugMode", "onboarded", "skippedFullDiskAccess", "dismissedFullDiskAccessReminder", "recentPaths",
         "helperIdentity", "updateReminderVisible",
@@ -104,9 +106,11 @@ final class Uninstaller: ObservableObject {
     /// The helper is unregistered whenever it is registered at all (enabled or
     /// awaiting approval); the data folder is trashed only when this app's
     /// helper held it, the helper is gone, and no CLI login agent shares the folder.
-    func run(ownership: DataOwnership) async {
+    func run(ownership: DataOwnership, daemon: DaemonManager? = nil) async {
         guard phase != .running else { return }
         phase = .running
+        await daemon?.suspendForRemoval()
+        defer { daemon?.finishRemoval() }
         var r = Report()
         var helperGone = true
 

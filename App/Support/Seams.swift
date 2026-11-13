@@ -67,7 +67,7 @@ struct FileInfo: Equatable, Sendable {
 @MainActor
 protocol Workspace: AnyObject {
     /// Opens a file or URL in its default app.
-    func open(_ url: URL)
+    @discardableResult func open(_ url: URL) -> Bool
     /// `completion` gets the launch error, if any.
     func open(_ urls: [URL], withApplicationAt app: URL, completion: (@Sendable (Error?) -> Void)?)
     /// Reveals the files in Finder.

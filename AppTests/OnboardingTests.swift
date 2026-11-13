@@ -153,6 +153,28 @@ extension AppTests {
             #expect(!flow.daemonRunning)
         }
 
+        @Test func activationDoesNotReinstallARemovedHelper() async throws {
+            let h = FakeHelper(.requiresApproval)
+            let env = TestEnv(helper: h)
+            defer { env.tearDown() }
+            env.daemon.onPing = { _ in false }
+            let flow = OnboardingFlow(app: env.app, defaults: env.defaults, step: .helper)
+            await env.app.daemon.start()
+            #expect(env.app.daemon.state == .needsApproval)
+            await env.app.daemon.suspendForRemoval()
+            try await h.unregister()
+            env.app.daemon.finishRemoval()
+            #expect(env.app.daemon.recoverySuspended)
+            await flow.returnedFromSettings()
+            #expect(h.registered == 0)
+            #expect(env.app.daemon.recoverySuspended)
+            #expect(env.app.daemon.state == .needsApproval)
+            // The helper step is the explicit setup action and still resumes.
+            await flow.startDaemon().value
+            #expect(h.registered == 1)
+            #expect(!env.app.daemon.recoverySuspended)
+        }
+
         @Test func backFromSettingsRetriesApproval() async {
             let h = FakeHelper(.requiresApproval)
             let env = TestEnv(helper: h)

@@ -70,14 +70,24 @@ enum FileActions {
         guard exists(item.path, onError) else { return false }
         let file = url(item.path)
         guard let target = editorTarget(for: item, editor: editor) else {
-            workspace.open(file)
-            return true
+            return openInDefaultApp(file, onError: onError)
         }
         // The editor may fail to take the URL (no handler, editor damaged): fall back to the default app.
         workspace.open([target.url], withApplicationAt: target.app) { error in
             guard let error else { return }
             Log.actions.error("editor open failed: \(error.localizedDescription, privacy: .private); falling back to the default app")
-            Task { @MainActor in FileActions.workspace.open(file) }
+            Task { @MainActor in _ = FileActions.openInDefaultApp(file, onError: onError) }
+        }
+        return true
+    }
+
+    /// Reports a refused LaunchServices request. `NSWorkspace.open` has no error value to pass along.
+    private static func openInDefaultApp(_ file: URL, onError: @escaping @MainActor (String) -> Void) -> Bool {
+        guard workspace.open(file) else {
+            let message = "Couldn't open “\(file.lastPathComponent)”"
+            Log.actions.error("default app refused to open file: \(file.path, privacy: .private)")
+            onError(message)
+            return false
         }
         return true
     }

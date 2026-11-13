@@ -137,6 +137,7 @@ final class FakeHelper: HelperService {
     var registerError: Error?
     var statusOnFailure: DaemonPlan.ServiceStatus?
     var statusAfterRegister: DaemonPlan.ServiceStatus = .enabled
+    var onUnregister: (() async throws -> Void)?
     private(set) var registered = 0, unregistered = 0, openedSettings = 0
 
     init(_ status: DaemonPlan.ServiceStatus = .notRegistered) { self.status = status }
@@ -153,6 +154,7 @@ final class FakeHelper: HelperService {
     /// Like SMAppService, unregistering takes a while: callers suspend here.
     func unregister() async throws {
         unregistered += 1
+        try await onUnregister?()
         await Task.yield()
         status = .notRegistered
     }
@@ -192,6 +194,7 @@ final class FakeWorkspace: Workspace {
     /// The apps registered for a URL scheme (`vscode`), which urlsForApplications(toOpen:) returns for such a URL.
     var schemeHandlers: [String: [URL]] = [:]
     var openWithError: Error?
+    var defaultOpenSucceeds = true
     /// Paths that don't exist. Any other path that isn't on disk either is a
     /// plain file, so tests can use made-up paths like /p/x.txt.
     var missing: Set<String> = []
@@ -206,7 +209,10 @@ final class FakeWorkspace: Workspace {
     /// LaunchServices lookups by bundle id.
     private(set) var appLookups = 0
 
-    func open(_ url: URL) { opened.append(url) }
+    @discardableResult func open(_ url: URL) -> Bool {
+        opened.append(url)
+        return defaultOpenSucceeds
+    }
 
     /// Like NSWorkspace, the completion runs off the main thread.
     func open(_ urls: [URL], withApplicationAt app: URL, completion: (@Sendable (Error?) -> Void)?) {

@@ -42,6 +42,17 @@ extension AppTests {
             #expect(env.workspace.openedWith.isEmpty)
         }
 
+        @Test func defaultOpenRefusalReportsAnErrorAndReturnsFalse() {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            env.workspace.defaultOpenSucceeds = false
+            var errors: [String] = []
+
+            #expect(!FileActions.open(file, editor: nil) { errors.append($0) })
+            #expect(errors == ["Couldn't open “readme.md”"])
+            #expect(env.workspace.opened == [URL(fileURLWithPath: "/p/readme.md")])
+        }
+
         /// A-H1: the editor is opened by LaunchServices with its URL, so it
         /// never runs as FSearch's child (with FSearch's Full Disk Access).
         @Test func openLineInEditorThroughLaunchServices() throws {
@@ -98,6 +109,19 @@ extension AppTests {
             env.workspace.openWithError = TestError("no handler")
             #expect(FileActions.open(line, editor: .vscode, onError: noErrors))
             #expect(await eventually { env.workspace.opened == [URL(fileURLWithPath: "/p/main.swift")] })
+        }
+
+        @Test func editorFallbackRefusalReportsAnError() async throws {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            env.workspace.apps[Editor.vscode.bundleId] = vscodeApp
+            env.workspace.openWithError = TestError("no handler")
+            env.workspace.defaultOpenSucceeds = false
+            var errors: [String] = []
+
+            #expect(FileActions.open(line, editor: .vscode) { errors.append($0) })
+            #expect(await eventually { errors == ["Couldn't open “main.swift”"] })
+            #expect(env.workspace.opened == [URL(fileURLWithPath: "/p/main.swift")])
         }
 
         /// Item 9: a result that is gone says so, and opens nothing.

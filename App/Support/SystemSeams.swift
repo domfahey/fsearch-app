@@ -52,7 +52,7 @@ final class SMAppLoginItemService: LoginItemService {
 final class SystemWorkspace: Workspace {
     private var ws: NSWorkspace { .shared }
 
-    func open(_ url: URL) { ws.open(url) }
+    func open(_ url: URL) -> Bool { ws.open(url) }
 
     func open(_ urls: [URL], withApplicationAt app: URL, completion: (@Sendable (Error?) -> Void)?) {
         ws.open(urls, withApplicationAt: app, configuration: NSWorkspace.OpenConfiguration()) { _, error in completion?(error) }

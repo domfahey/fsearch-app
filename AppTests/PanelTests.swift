@@ -144,6 +144,25 @@ extension AppTests {
             #expect(env.workspace.opened.isEmpty && env.workspace.revealed.isEmpty)
         }
 
+        @Test func refusedDefaultOpenKeepsTheLauncherUpAndDoesNotRecordARecent() {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let pc = PanelController()
+            let path = env.file("refused.txt")
+            env.workspace.defaultOpenSucceeds = false
+            let items: [ResultItem] = [.file(Wire.hit(path))]
+            pc.show(app: env.app)
+            defer { pc.hide(returnFocus: false) }
+            let generation = env.app.recentsGeneration
+
+            pc.perform(.open(0), items)
+
+            #expect(env.app.actionError == "Couldn't open “refused.txt”")
+            #expect(pc.isVisible)
+            #expect(env.app.recentsGeneration == generation)
+            #expect(env.app.recents.paths.isEmpty)
+        }
+
         /// A-M2: ↵ on an app reveals it in Finder instead of launching it.
         @Test func returnOnALaunchableFileReveals() {
             let env = TestEnv()
