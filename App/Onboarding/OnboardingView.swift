@@ -77,13 +77,16 @@ final class OnboardingFlow: ObservableObject {
     }
 
     /// Not tied to the view, so closing the window mid-start doesn't cancel it.
+    ///
+    /// `resumingAfterRemoval` is true for an explicit setup action (the helper step, Try Again).
+    /// Activation passes false: returning to the app must not undo a removal.
     @discardableResult
-    func startDaemon() -> Task<Void, Never> {
+    func startDaemon(resumingAfterRemoval: Bool = true) -> Task<Void, Never> {
         OnboardingLauncher.noteDaemonStarted()
         busy = true
         return Task {
             await cancelPollRefresh()
-            await app.daemon.start(resumingAfterRemoval: true)
+            await app.daemon.start(resumingAfterRemoval: resumingAfterRemoval)
             busy = false
             apply()
         }
@@ -156,7 +159,7 @@ final class OnboardingFlow: ObservableObject {
     func returnedFromSettings() async {
         guard step != .welcome, !busy else { return }
         Log.onboarding.info("returned from System Settings at step \(String(describing: self.step), privacy: .public)")
-        if app.daemon.state == .needsApproval { await startDaemon().value; return }
+        if app.daemon.state == .needsApproval { await startDaemon(resumingAfterRemoval: false).value; return }
         if step == .fullDiskAccess,
             Onboarding.restartAfterSettings(pressedTurnOn: pressedTurnOn, owns: app.daemon.ownsDaemon, fullDiskAccess: facts.fullDiskAccess)
         {

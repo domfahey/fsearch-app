@@ -40,6 +40,9 @@ final class DaemonManager: ObservableObject {
     nonisolated static let unresponsiveMessage = "The search helper stopped answering."
     /// Defaults key: the bundled helper's identity when it was last seen running.
     static let helperIdentityKey = "helperIdentity"
+    /// Defaults key: removal turned automatic recovery off. Not one of
+    /// `Uninstaller.defaultsKeys`, so wiping the app's settings does not clear it.
+    static let recoverySuspendedKey = "helperRecoverySuspended"
 
     /// The daemon's state; updated only through `setState`.
     @Published private(set) var state: State = .checking
@@ -58,6 +61,7 @@ final class DaemonManager: ObservableObject {
     /// interleaving unregister/register with it.
     private var restartTask: Task<Bool, Never>?
     /// Removal keeps automatic recovery off until the user explicitly sets up again.
+    /// Loaded from ``recoverySuspendedKey``, so a relaunch does not turn it back on.
     private(set) var recoverySuspended = false
     private var removalInProgress = false
     private var mayManageHelper: Bool { !recoverySuspended && !Task.isCancelled }
@@ -96,6 +100,7 @@ final class DaemonManager: ObservableObject {
         self.socketHolder = socketHolder
         self.defaults = defaults
         self.helperIdentity = helperIdentity
+        recoverySuspended = defaults.bool(forKey: Self.recoverySuspendedKey)
     }
 
     /// True only when our login item is enabled and no other daemon holds the
@@ -119,9 +124,12 @@ final class DaemonManager: ObservableObject {
     /// before the bundled helper is registered. Returns early, without changing state, if the
     /// task is cancelled during that wait. Afterwards, a helper of ours left running across an
     /// app update is restarted once.
+    ///
+    /// `resumingAfterRemoval` is an explicit setup action: it clears the suspension kept in
+    /// defaults. Every other caller leaves a removed helper alone, including after a relaunch.
     func start(resumingAfterRemoval: Bool = false) async {
         guard !removalInProgress else { return }
-        if resumingAfterRemoval { recoverySuspended = false }
+        if resumingAfterRemoval { setRecoverySuspended(false) }
         await start(checkingForUpdate: true)
     }
 
@@ -129,7 +137,7 @@ final class DaemonManager: ObservableObject {
     /// already in flight must finish before removal can proceed.
     func suspendForRemoval() async {
         removalInProgress = true
-        recoverySuspended = true
+        setRecoverySuspended(true)
         fullDiskAccessRestartArmed = false
         let poll = fullDiskAccessPoll
         fullDiskAccessPoll?.cancel()
@@ -141,6 +149,16 @@ final class DaemonManager: ObservableObject {
 
     /// Allows explicit setup again; automatic recovery remains suspended.
     func finishRemoval() { removalInProgress = false }
+
+    /// Writes the suspension where the next process's manager will read it.
+    private func setRecoverySuspended(_ suspended: Bool) {
+        recoverySuspended = suspended
+        if suspended {
+            defaults.set(true, forKey: Self.recoverySuspendedKey)
+        } else {
+            defaults.removeObject(forKey: Self.recoverySuspendedKey)
+        }
+    }
 
     /// `checkingForUpdate` is false inside a restart, which must not restart again.
     private func start(checkingForUpdate: Bool) async {
@@ -306,7 +324,16 @@ final class DaemonManager: ObservableObject {
             if !(await answers()) { stopped = true; break }
             do { try await clock.sleep(.milliseconds(100)) } catch { return false }
         }
-        guard mayManageHelper, stopped else { return false }
+        guard mayManageHelper else { return false }
+        guard stopped else {
+            // Unregister succeeded, but the old process still holds the socket, so this
+            // helper is no longer ours and a later start would keep using it. Register
+            // again without storing the new identity: the replacement did not succeed,
+            // and the next start still owns the helper and retries.
+            Log.daemon.error("restart: the old helper kept the socket; registered again so the update can be retried")
+            _ = register(service)
+            return false
+        }
         switch register(service) {
         case .needsApproval: setState(.needsApproval); return false
         case .registerBundled: return false

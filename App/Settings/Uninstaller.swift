@@ -37,6 +37,8 @@ final class Uninstaller: ObservableObject {
     }
 
     /// The app's UserDefaults keys; the shortcut is reset separately.
+    /// `DaemonManager.recoverySuspendedKey` is left out on purpose: removal sets it, and wiping
+    /// these keys must not turn automatic recovery back on.
     static let defaultsKeys = [
         "editor", "debugMode", "onboarded", "skippedFullDiskAccess", "dismissedFullDiskAccessReminder", "recentPaths",
         "helperIdentity", "updateReminderVisible",

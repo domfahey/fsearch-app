@@ -78,8 +78,8 @@ extension AppTests {
             env.daemon.onPing = { _ in false }
             let u = make(env, helper: helper, login: nil)
             await u.run(ownership: .ours, daemon: env.app.daemon)
-            #expect(!Uninstaller.defaultsKeys.contains("helperRecoverySuspended"))
-            #expect(env.defaults.bool(forKey: "helperRecoverySuspended"))
+            #expect(!Uninstaller.defaultsKeys.contains(DaemonManager.recoverySuspendedKey))
+            #expect(env.defaults.bool(forKey: DaemonManager.recoverySuspendedKey))
 
             let reopened = AppState(
                 options: env.app.options, defaults: env.defaults, helper: helper,
@@ -96,7 +96,7 @@ extension AppTests {
             #expect(helper.registered == 1)
             #expect(helper.status == .enabled)
             #expect(!reopened.daemon.recoverySuspended)
-            #expect(!env.defaults.bool(forKey: "helperRecoverySuspended"))
+            #expect(!env.defaults.bool(forKey: DaemonManager.recoverySuspendedKey))
         }
 
         @Test func removalPreventsDisconnectedSearchFromReinstallingTheHelper() async {
