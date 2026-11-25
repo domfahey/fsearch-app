@@ -63,5 +63,6 @@ open 'fsearch://search?q=SearchModel&mode=symbols'
 ## See also
 
 - [Query syntax](query-syntax.md)
+- [Shortcuts (App Intents)](shortcuts.md)
 - [Keyboard shortcuts](keyboard-shortcuts.md)
 - [Settings](settings.md)

@@ -170,6 +170,7 @@ File names are different. Name search covers every file the index holds, whateve
 
 - [Keyboard shortcuts](keyboard-shortcuts.md)
 - [URL scheme](url-scheme.md)
+- [Shortcuts (App Intents)](shortcuts.md)
 - [Tutorial: your first search](../tutorial-first-search.md)
 - [Known limitations](limitations.md)
 - [Troubleshooting](troubleshooting.md)
