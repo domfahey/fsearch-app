@@ -8,6 +8,8 @@ struct IndexDetailsView: View {
     @EnvironmentObject var app: AppState
     @State private var skipped: [String] = []
     @State private var logTail = ""
+    @State private var skippedStamp: DebugFormat.FileStamp?
+    @State private var logStamp: DebugFormat.FileStamp?
     /// The running daemon's folder (a temp folder in test mode).
     private var dataDir: URL { DebugFormat.dataDir(socketPath: app.options.socketPath) }
 
@@ -37,8 +39,8 @@ struct IndexDetailsView: View {
                     Log.debug.info("Restart Daemon pressed"); Task { await app.daemon.restart() }
                 }
                 Button("Copy All") {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(report(), forType: .string)
+                    FileActions.pasteboard.clearContents()
+                    FileActions.pasteboard.setString(report(), forType: .string)
                 }
             }
         }
@@ -46,24 +48,32 @@ struct IndexDetailsView: View {
         // Runs only while this window's view is on screen; cancelled when it goes away.
         .task {
             while !Task.isCancelled {
-                await app.daemon.refresh()
                 await load()
+                await app.daemon.refresh()
                 try? await Task.sleep(for: .seconds(1))
             }
         }
     }
 
-    /// Reads the skipped list and the log tail off the main actor.
+    /// Reads the skipped list and the log tail off the main actor, skipping unchanged files.
     private func load() async {
         let dir = dataDir
-        let (s, t) = await Task.detached {
-            (
-                DebugFormat.lines((try? String(contentsOf: dir.appendingPathComponent("skipped"), encoding: .utf8)) ?? ""),
-                DebugFormat.tail(of: dir.appendingPathComponent("daemon.log"), lines: 30)
-            )
+        let prevSkipped = skippedStamp, prevLog = logStamp
+        let result = await Task.detached {
+            let skippedURL = dir.appendingPathComponent("skipped")
+            let logURL = dir.appendingPathComponent("daemon.log")
+            let nextSkipped = DebugFormat.FileStamp(of: skippedURL)
+            let nextLog = DebugFormat.FileStamp(of: logURL)
+            let newSkipped: [String]? =
+                nextSkipped == prevSkipped
+                ? nil : DebugFormat.lines((try? String(contentsOf: skippedURL, encoding: .utf8)) ?? "")
+            let newLog: String? = nextLog == prevLog ? nil : DebugFormat.tail(of: logURL, lines: 30)
+            return (nextSkipped, newSkipped, nextLog, newLog)
         }.value
-        skipped = s
-        logTail = t
+        skippedStamp = result.0
+        if let s = result.1 { skipped = s }
+        logStamp = result.2
+        if let t = result.3 { logTail = t }
     }
 
     /// Shown instead of an empty log: the bundled helper can't write one.

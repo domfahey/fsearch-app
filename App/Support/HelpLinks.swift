@@ -1,4 +1,3 @@
-import AppKit
 import FSearchKit
 import Foundation
 

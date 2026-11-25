@@ -1,5 +1,7 @@
 # FSearch for Mac v1 (launcher panel) Implementation Plan
 
+> **Historical note:** This is the original v1 implementation plan written on 2026-10-10 and is preserved for context. Some details (such as the macOS 14 target and early daemon wiring) have since evolved; see the codebase, `docs/adr/`, and `CHANGELOG.md` for current behavior.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A signed, notarized Mac app whose global-hotkey launcher panel searches the whole disk by name and inside files, through a bundled fsearch daemon, with first-run onboarding and a debug mode.

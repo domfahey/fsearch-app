@@ -28,7 +28,9 @@ extension AppTests {
         @Test func socketFlagWithoutAPath() {
             let o = LaunchOptions.parse(arguments: ["FSearch", "-FSEARCH_SOCKET"], environment: [:], defaultSocket: "/real.sock")
             #expect(o.testMode)
-            #expect(o.socketPath == "/real.sock")
+            #expect(o.socketPath != "/real.sock")
+            #expect(o.socketPath.hasPrefix(NSTemporaryDirectory()))
+            #expect(o.searchLogFile.path.hasPrefix(NSTemporaryDirectory()))
         }
 
         @Test(arguments: ["XCTestConfigurationFilePath", "XCTestBundlePath", "XCTestSessionIdentifier"])

@@ -20,7 +20,7 @@ No. It is a separate launcher with its own hotkey. It searches file names, and t
 
 ## Does it launch apps?
 
-Apps are files too. Typing "chrome" finds Google Chrome.app, and Return opens it. There is no separate app launcher.
+Apps are files too. Typing "chrome" finds Google Chrome.app; Return reveals it in Finder so a typo never launches an app by accident, and ⌘K → Open launches it. There is no separate app launcher.
 
 ## Why does it need Full Disk Access?
 

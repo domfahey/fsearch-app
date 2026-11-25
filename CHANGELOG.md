@@ -47,7 +47,7 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
   - The CI release job runs in the protected `release` environment, only for tags on main, after the kit, app and lint jobs, with a 60-minute timeout. It publishes a draft GitHub release with the DMG, checksum and build-provenance attestation (verify with `gh attestation verify`).
   - Pre-commit scans staged blobs and pre-push scans every unpushed commit for GitHub tokens and EdDSA-style keys. Key and certificate file types are git-ignored.
   - Every public FSearchKit API has a doc comment.
-  - Documentation: limitations and update pages, an FAQ glossary, the content-search scope, ADRs 0007–0010, test tiers in the contributing guide, and, in the security policy, known limitations (same-user access to the daemon and its index), scope, a 90-day disclosure target, how to verify a download and a key-compromise process.
+  - Documentation: limitations and update pages, an FAQ glossary, the content-search scope, ADRs 0007–0011, test tiers in the contributing guide, and, in the security policy, known limitations (same-user access to the daemon and its index), scope, a 90-day disclosure target, how to verify a download and a key-compromise process.
   - Repository settings: CodeQL for Swift and the workflows, private vulnerability reporting, a protected `main` (required checks on up-to-date branches, linear history, squash merges), a protected release environment and tags, and an Actions allow list that requires SHA pins.
   - Open-source project files: contributing guide, security policy, code of conduct, architecture overview, issue and pull request templates, CODEOWNERS, and Dependabot for GitHub Actions.
 
@@ -67,6 +67,12 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
 - A failed helper replacement keeps the previous version marker. If the old helper is still answering after it was unregistered, the login item is put back without recording the update, so a later launch retries.
 - Socket replies must finish within the request timeout, even when partial data keeps arriving.
 - A file refused by its default app shows an error and keeps the panel open without adding a recent; a failed editor fallback also reports the error.
+- Opening or reopening the panel (including with the global shortcut) defers search-field focus until after activation and presentation so typing works immediately without clicking first.
+- Copy File, Open Folder in Terminal, and Quick Look check whether a file still exists before acting and report a missing-file error instead of failing silently; Quick Look still closes when a preview is already open.
+- The footer shows `Open at line` when the chosen editor handles open-at-line links, Settings keeps an uninstalled editor selection visible in its picker and refreshes login-item status after uninstalling, and onboarding automatically detects a Full Disk Access grant while open.
+- Disconnect-driven helper restarts and recovery refreshes coalesce across rapid failures so they don't burn extra restart budget tokens, `DaemonManager.start()` waits for any in-flight restart, and uninstalling waits for the unregistered helper to stop and clears Sparkle defaults.
+- Socket transport caps incoming reply lines at 64 MiB, retries partial writes and `EINTR`, rejects embedded NUL bytes in socket paths, and handles invalid timeouts without trapping; query parsing, search debouncing, recents caching, and search-log rotation/truncation edge cases are hardened.
+- Build, coverage, link-check, benchmark, credit-generation, release, and hook scripts plus docs and benchmarks are fixed and kept in sync with macOS 15+.
 - The ⌘K actions menu opens under the selected row, or under the search field when that row is out of view, instead of at a fixed spot.
 - ⌘Y, ⌘K, ⌘⇧C, ⌘1–9, ⌘↵ and ↵ no longer fire with ⌃ or ⌥ held too, so ⌘⌃Y no longer opens Quick Look.
 - In Quick Look, ↑ and ↓ move the panel's selection and the preview follows it.

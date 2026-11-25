@@ -10,8 +10,8 @@ Open **Settings…** from the menu-bar icon.
 |---|---|---|---|
 | Shortcut | Any key combination | ⌥Space | The global hotkey that shows and hides the panel. |
 | Open content results in | Default app, or an installed editor | Default app | The editor that opens a matching line at its line number. See [Open results in your editor](../how-to/open-results-in-your-editor.md). |
-| Open FSearch at login | On or off | Off | Opens the app when you log in, using a Login Item. Shows the real status: on, waiting for approval (with a button that opens Login Items), or off. A failure appears under the switch. |
 | Debug mode | On or off | Off | Shows the debug dot, timings, Index Details and Search Log. Turning it off deletes the search log. See [Turn on debug mode](../how-to/turn-on-debug-mode.md). |
+| Open FSearch at login | On or off | Off | Opens the app when you log in, using a Login Item. Shows the real status: on, waiting for approval (with a button that opens Login Items), or off. A failure appears under the switch. |
 
 ### Updates
 
@@ -40,6 +40,8 @@ The app keeps its settings in its standard preferences file, `~/Library/Preferen
 | `skippedFullDiskAccess` | Bool | Whether you pressed **Skip for now** on the Full Disk Access step. |
 | `dismissedFullDiskAccessReminder` | Bool | Whether you chose **Don't Remind Me** on the menu-bar Full Disk Access reminder shown after skipping. |
 | `recentPaths` | List of strings | The files you opened from the panel, newest first. Up to 16 are kept. The empty panel shows up to 8 that still exist. |
+| `helperIdentity` | String | The build, size and modification time of the bundled helper last seen running, used to restart it once after an app update. |
+| `updateReminderVisible` | Bool | Whether a scheduled update reminder was showing in the menu bar, so a relaunch checks again in the background. |
 
 The shortcut is stored by the [KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts) library under its own key.
 

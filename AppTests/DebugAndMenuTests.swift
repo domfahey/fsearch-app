@@ -1,6 +1,8 @@
 import AppKit
 import FSearchKit
 import Foundation
+import Observation
+import Sparkle
 import SwiftUI
 import Testing
 
@@ -17,6 +19,7 @@ extension AppTests {
             #expect(app.debugMode)
             app.search.query = "q"
             await app.search.refresh()
+            app.log.flush()
             #expect(FileManager.default.fileExists(atPath: app.log.file.path))
             DebugMode.set(false, app: app, dismiss: nil)
             #expect(!app.debugMode)
@@ -71,9 +74,10 @@ extension AppTests {
             _ = status.icon(for: env.app)
             await env.app.daemon.refresh()
             #expect(await eventually { env.app.daemon.state == .running(Wire.status(fullDiskAccess: false)) })
-            // Not skipped: the plain "Full Disk Access is off" line, no reminder buttons.
+            // Not skipped: revoked FDA keeps the exclamation icon, offers the action button, and cannot be dismissed.
             #expect(await eventually { status.warning != nil })
-            #expect(status.warning?.offersFullDiskAccess == false)
+            #expect(status.warning?.offersFullDiskAccess == true)
+            #expect(status.warning?.symbol == "exclamationmark.magnifyingglass")
             let suite = env.suite
             await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
                 DispatchQueue.global().async {
@@ -83,13 +87,13 @@ extension AppTests {
                     done.resume()
                 }
             }
-            #expect(await eventually { status.warning?.offersFullDiskAccess == true })
+            #expect(await eventually { status.warning?.symbol == "magnifyingglass.circle" })
         }
 
         @Test func approvalWarning() async {
             let env = TestEnv(helper: FakeHelper(.requiresApproval))
             defer { env.tearDown() }
-            let status = MenuBarStatus()
+            let status = MenuBarStatus(defaults: env.defaults)
             _ = status.icon(for: env.app)
             env.daemon.onPing = { _ in false }
             await env.app.daemon.start()
@@ -145,16 +149,59 @@ extension AppTests {
             let w = await render(CheckForUpdatesItem(), size: NSSize(width: 200, height: 40))
             w.close()
         }
+
+        @Test func controllerIsObservableWhenInstalledLater() async {
+            defer { Updater.setController(nil) }
+            let changed = AsyncGate()
+            withObservationTracking {
+                _ = Updater.controller
+            } onChange: {
+                changed.release()
+            }
+            let c = SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: nil, userDriverDelegate: nil)
+            Updater.setController(c)
+            await changed.wait()
+            #expect(Updater.controller === c)
+            let state = AutoCheckState(updater: c.updater)
+            #expect(state.canCheck == c.updater.canCheckForUpdates)
+        }
     }
 
     @Suite @MainActor
     struct ViewTests {
         @Test func iconCache() {
             let c = IconCache()
+            #expect(c.typeCountLimit > 0 && c.pathCountLimit > 0)
             let a = c.icon(for: "/p/a.swift")
             #expect(c.icon(for: "/p/b.swift") === a)  // cached by type
-            #expect(c.icon(for: "/Applications/Safari.app").size.width > 0)
-            #expect(c.icon(for: NSTemporaryDirectory()).size.width > 0)
+            let app1 = c.icon(for: "/Applications/Safari.app")
+            #expect(app1.size.width > 0)
+            #expect(c.icon(for: "/Applications/Safari.app") === app1)  // cached by path
+            let dir1 = c.icon(for: NSTemporaryDirectory(), isDirectory: true)
+            #expect(dir1.size.width > 0)
+            #expect(c.icon(for: NSTemporaryDirectory(), isDirectory: true) === dir1)  // cached by path
+        }
+
+        @Test func resultRowHighlightsFilenameOrMatchLine() {
+            func hasHighlight(_ s: AttributedString) -> Bool {
+                s.runs.contains { $0.backgroundColor != nil }
+            }
+            let fileItem = ResultItem.file(Wire.hit("/p/heron.txt"))
+            #expect(hasHighlight(ResultRow.nameText(for: fileItem, query: "HER")))
+            #expect(!hasHighlight(ResultRow.detailText(for: fileItem, query: "p")))
+
+            // Content hits highlight the matching line text (not the filename or line number).
+            let lineItem = ResultItem.line(path: "/p/heron.swift", match: Match(line: 42, text: "  let needle = 42"))
+            #expect(!hasHighlight(ResultRow.nameText(for: lineItem, query: "heron")))
+            let detail = ResultRow.detailText(for: lineItem, query: "NEEDLE")
+            #expect(hasHighlight(detail))
+            // Query matching the line number prefix highlights only inside the match text, not the prefix.
+            let numDetail = ResultRow.detailText(for: lineItem, query: "42")
+            let highlightedRuns = numDetail.runs.filter { $0.backgroundColor != nil }.map { String(numDetail[$0.range].characters) }
+            #expect(highlightedRuns == ["42"])
+            let firstRun = numDetail.runs.first.map { String(numDetail[$0.range].characters) }
+            #expect(firstRun?.hasPrefix("42 · ") == true)
+            #expect(numDetail.runs.first?.backgroundColor == nil)
         }
 
         /// Render smoke test (coverage only): SwiftUI's text isn't readable in-process.
@@ -176,11 +223,12 @@ extension AppTests {
                 let env = TestEnv()
                 defer { env.tearDown() }
                 env.app.debugMode = debug
+                let status = MenuBarStatus(defaults: env.defaults)
                 let w = await render(
                     VStack {
-                        MenuBarFixItem(app: env.app)
+                        MenuBarFixItem(app: env.app, status: status)
                         MenuContent(app: env.app)
-                        MenuBarLabel(app: env.app)
+                        MenuBarLabel(app: env.app, status: status)
                     })
                 w.close()
             }

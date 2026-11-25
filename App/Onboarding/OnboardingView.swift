@@ -114,6 +114,22 @@ final class OnboardingFlow: ObservableObject {
     func poll() async {
         // Nothing talks to the daemon before the helper step: step 1 is only the shortcut.
         guard step != .welcome, !busy else { return }
+        // On step 3, if the user toggled Full Disk Access while keeping onboarding open,
+        // restart our own helper automatically without waiting for app activation.
+        if step == .fullDiskAccess,
+            Onboarding.restartAfterSettings(
+                pressedTurnOn: pressedTurnOn, owns: app.daemon.ownsDaemon, fullDiskAccess: facts.fullDiskAccess),
+            app.daemon.hasFullDiskAccessGrant
+        {
+            Log.onboarding.info("Full Disk Access grant detected during poll: restarting the helper")
+            pressedTurnOn = false
+            busy = true
+            await cancelPollRefresh()
+            await app.daemon.restart()
+            busy = false
+            apply()
+            return
+        }
         // A pending approval is re-checked when the app becomes active again.
         if app.daemon.state != .needsApproval {
             let t = Task { await app.daemon.refresh() }
@@ -146,9 +162,9 @@ final class OnboardingFlow: ObservableObject {
             facts.fullDiskAccess = s.fullDiskAccess
         case .indexing:
             facts.helperEnabled = true
-        case .needsApproval:
+        case .needsApproval, .failed:
             facts.helperEnabled = false
-        case .checking, .failed:
+        case .checking:
             break
         }
     }
@@ -196,9 +212,14 @@ struct OnboardingView: View {
             case .helper: helper
             case .fullDiskAccess: fullDiskAccess
             case .indexing:
-                Text("Indexing your disk").font(.title3.bold())
-                ProgressView().progressViewStyle(.linear)
-                Text(Onboarding.indexingLine(entries: flow.entries)).foregroundStyle(.secondary)
+                if flow.facts.indexReady {
+                    Label("Ready to search", systemImage: "checkmark.circle.fill").font(.title3.bold()).foregroundStyle(.green)
+                    Text("\(flow.entries.formatted()) files indexed.").foregroundStyle(.secondary)
+                } else {
+                    Text("Indexing your disk").font(.title3.bold())
+                    ProgressView().progressViewStyle(.linear)
+                    Text(Onboarding.indexingLine(entries: flow.entries)).foregroundStyle(.secondary)
+                }
                 Text(Onboarding.tryItLine(shortcut: shortcut?.description))
             }
             Spacer()
@@ -244,7 +265,9 @@ struct OnboardingView: View {
             Text("A small background helper keeps the index up to date as files change, so results are instant. It starts when you log in.")
             if flow.facts.helperEnabled {
                 Label("Allowed in Login Items", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
-            } else if case let .failed(message) = daemon.state, !flow.busy {
+            } else if flow.busy || daemon.state == .checking {
+                ProgressView("Starting background helper…").controlSize(.small)
+            } else if case let .failed(message) = daemon.state {
                 Text(message).foregroundStyle(.red).font(.callout)
                 Button("Try Again") { flow.startDaemon() }
             } else {

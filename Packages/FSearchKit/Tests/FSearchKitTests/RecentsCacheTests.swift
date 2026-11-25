@@ -33,7 +33,12 @@ final class TestClock: @unchecked Sendable {
         return UserDefaults(suiteName: Self.suiteName)!
     }
 
+    func clear() {
+        UserDefaults(suiteName: Self.suiteName)?.removePersistentDomain(forName: Self.suiteName)
+    }
+
     @Test func repeatedReadsCheckOnce() {
+        defer { clear() }
         let probe = ExistsProbe(), clock = TestClock()
         let r = Recents(defaults: fresh(), exists: probe.exists, now: { clock.now })
         for i in 1...3 { r.opened("/f\(i)") }
@@ -44,6 +49,7 @@ final class TestClock: @unchecked Sendable {
     }
 
     @Test func openingRechecks() {
+        defer { clear() }
         let probe = ExistsProbe(), clock = TestClock()
         let r = Recents(defaults: fresh(), exists: probe.exists, now: { clock.now })
         r.opened("/a")
@@ -53,6 +59,7 @@ final class TestClock: @unchecked Sendable {
     }
 
     @Test func invalidateRechecks() {
+        defer { clear() }
         let probe = ExistsProbe(), clock = TestClock()
         let r = Recents(defaults: fresh(), exists: probe.exists, now: { clock.now })
         r.opened("/a"); r.opened("/b")
@@ -64,6 +71,7 @@ final class TestClock: @unchecked Sendable {
     }
 
     @Test func staleCacheIsRechecked() {
+        defer { clear() }
         let probe = ExistsProbe(), clock = TestClock()
         let r = Recents(defaults: fresh(), exists: probe.exists, now: { clock.now })
         r.opened("/a"); r.opened("/b")
@@ -71,5 +79,35 @@ final class TestClock: @unchecked Sendable {
         probe.remove("/a")
         clock.advance(Recents.recheckAfter + 0.1)
         #expect(r.paths == ["/b"])
+    }
+
+    @Test func invalidateDuringInFlightProbeDoesNotCacheStaleResult() {
+        defer { clear() }
+        let clock = TestClock()
+        let entered = DispatchSemaphore(value: 0)
+        let proceed = DispatchSemaphore(value: 0)
+        let probe = ExistsProbe()
+        let recents = Recents(
+            defaults: fresh(),
+            exists: { path in
+                if probe.checks == 0 {
+                    entered.signal()
+                    _ = proceed.wait(timeout: .now() + 2)
+                }
+                return probe.exists(path)
+            }, now: { clock.now })
+        recents.opened("/a")
+        let done = DispatchSemaphore(value: 0)
+        DispatchQueue.global().async {
+            _ = recents.paths
+            done.signal()
+        }
+        #expect(entered.wait(timeout: .now() + 2) == .success)
+        probe.remove("/a")
+        recents.invalidate()
+        proceed.signal()
+        #expect(done.wait(timeout: .now() + 2) == .success)
+        // The stale probe must not have poisoned the cache: the next read re-probes and sees /a gone.
+        #expect(recents.paths.isEmpty)
     }
 }

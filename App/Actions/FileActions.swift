@@ -50,6 +50,29 @@ enum FileActions {
         return (lineURL, appURL)
     }
 
+    /// What ↵ does on `item`: reveals launchables, or opens content hits at a line when the chosen editor supports it.
+    /// Does at most one LaunchServices app lookup for both answers.
+    static func returnBehavior(_ item: ResultItem, editor: Editor?) -> (reveals: Bool, opensAtLine: Bool) {
+        if case let .line(path, match) = item, let e = editor, let appURL = workspace.urlForApplication(withBundleIdentifier: e.bundleId) {
+            let lineJump =
+                if let lineURL = e.openURL(path: path, line: match.line) {
+                    workspace.urlsForApplications(toOpen: lineURL).contains(where: { $0.path == appURL.path })
+                } else {
+                    false
+                }
+            return (reveals: false, opensAtLine: lineJump)
+        }
+        let info = Launchable.needsFileCheck(item.path) ? workspace.fileInfo(atPath: item.path) : nil
+        let reveals = Launchable.revealsOnReturn(
+            path: item.path, isDirectory: info?.isDirectory ?? false, isExecutable: info?.isExecutable ?? false)
+        return (reveals: reveals, opensAtLine: false)
+    }
+
+    /// True when opening `item` with `editor` will jump directly to a line via the editor's URL scheme.
+    static func opensAtLine(_ item: ResultItem, editor: Editor?) -> Bool {
+        returnBehavior(item, editor: editor).opensAtLine
+    }
+
     /// The footer line for a result that is no longer on disk.
     static func missingMessage(_ path: String) -> String {
         "“\((path as NSString).lastPathComponent)” is gone: moved or deleted"
@@ -64,7 +87,7 @@ enum FileActions {
     }
 
     /// Default app; content hits open at their line in the chosen editor if it
-    /// is installed. False (reported through `onError`) if the file is gone.
+    /// is installed. False (reported through `onError`) if the file is gone or couldn't be opened.
     @discardableResult
     static func open(_ item: ResultItem, editor: Editor?, onError: @escaping @MainActor (String) -> Void) -> Bool {
         guard exists(item.path, onError) else { return false }
@@ -117,10 +140,13 @@ enum FileActions {
         pasteboard.setString(path, forType: .string)
     }
 
-    /// Puts the file itself on the pasteboard, so Finder can paste it.
-    static func copyFile(_ path: String) {
+    /// Puts the file itself on the pasteboard, so Finder can paste it. False (reported via `onError`) if gone.
+    @discardableResult
+    static func copyFile(_ path: String, onError: @MainActor (String) -> Void = { _ in }) -> Bool {
+        guard exists(path, onError) else { return false }
         pasteboard.clearContents()
         pasteboard.writeObjects([url(path) as NSURL])
+        return true
     }
 
     /// Opens the file in a chosen app; a missing file or a launch error goes to `onError`.
@@ -146,8 +172,9 @@ enum FileActions {
     ///
     /// - Parameters:
     ///   - path: A result's path.
-    ///   - onError: Called on the main actor with a message if Terminal is missing or can't open it.
+    ///   - onError: Called on the main actor with a message if the file is gone, Terminal is missing or can't open it.
     static func openTerminal(at path: String, onError: @escaping @MainActor (String) -> Void) {
+        guard exists(path, onError) else { return }
         let folder = terminalFolder(for: path)
         guard let terminal = workspace.urlForApplication(withBundleIdentifier: "com.apple.Terminal") else {
             Log.actions.error("Terminal not found")
@@ -172,9 +199,16 @@ enum FileActions {
         }
     }
 
-    /// ⌘Y: show the preview, or close it if it is already up.
-    static func quickLook(_ path: String) {
+    /// ⌘Y: show the preview, or close it if it is already up. Reports missing files when opening a preview.
+    @discardableResult
+    static func quickLook(_ path: String, onError: @MainActor (String) -> Void = { _ in }) -> Bool {
+        if QuickLookSource.shared.isPreviewing {
+            QuickLookSource.shared.close()
+            return true
+        }
+        guard exists(path, onError) else { return false }
         QuickLookSource.shared.toggle(url(path))
+        return true
     }
 }
 
@@ -241,6 +275,11 @@ final class QuickLookSource: NSObject, @preconcurrency QLPreviewPanelDataSource 
         }
     }
 
+    /// Holding ⌘Y must not open and immediately close the preview; holding ↑/↓ keeps moving.
+    nonisolated static func shouldHandle(_ key: PreviewKey, isRepeat: Bool) -> Bool {
+        !isRepeat || key != .close
+    }
+
     /// Moves the launcher's selection (↑/↓ in the preview); tests replace it.
     var move: @MainActor (PanelKey) -> Void = { PanelController.shared.keys.send($0) }
 
@@ -265,11 +304,13 @@ final class QuickLookSource: NSObject, @preconcurrency QLPreviewPanelDataSource 
         // The preview is key while it is up, so its keys (⌘Y, ↑/↓) go to it, not the launcher's key handling: handle them here.
         keyMonitor =
             keyMonitor
-            ?? NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            ?? NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
                 let key = Self.previewKey(
                     characters: event.charactersIgnoringModifiers ?? "", modifiers: event.modifierFlags, keyCode: event.keyCode)
                 guard let key, event.window is QLPreviewPanel else { return event }
-                MainActor.assumeIsolated { QuickLookSource.shared.handle(key) }
+                if Self.shouldHandle(key, isRepeat: event.isARepeat) {
+                    MainActor.assumeIsolated { self?.handle(key) }
+                }
                 return nil
             }
     }
@@ -287,13 +328,22 @@ final class QuickLookSource: NSObject, @preconcurrency QLPreviewPanelDataSource 
 @MainActor
 final class RevealCache {
     private var key: (id: String, editor: Editor?)?
-    private var value = false
+    private var value = (reveals: false, opensAtLine: false)
+
+    private func compute(_ item: ResultItem, editor: Editor?) -> (reveals: Bool, opensAtLine: Bool) {
+        if let key, key.id == item.id, key.editor == editor { return value }
+        value = FileActions.returnBehavior(item, editor: editor)
+        key = (item.id, editor)
+        return value
+    }
 
     /// ``FileActions/revealsOnReturn(_:editor:)``, remembered for the last row and editor asked about.
     func revealsOnReturn(_ item: ResultItem, editor: Editor?) -> Bool {
-        if let key, key.id == item.id, key.editor == editor { return value }
-        value = FileActions.revealsOnReturn(item, editor: editor)
-        key = (item.id, editor)
-        return value
+        compute(item, editor: editor).reveals
+    }
+
+    /// ``FileActions/opensAtLine(_:editor:)``, remembered for the last row and editor asked about.
+    func opensAtLine(_ item: ResultItem, editor: Editor?) -> Bool {
+        compute(item, editor: editor).opensAtLine
     }
 }

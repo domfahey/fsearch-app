@@ -60,7 +60,7 @@ struct LaunchOptions: Equatable, Sendable {
         let hosting =
             !explicitTest
             && (env["XCTestConfigurationFilePath"] != nil || env["XCTestBundlePath"] != nil || env["XCTestSessionIdentifier"] != nil)
-        if hosting && socket == nil {
+        if (explicitTest || hosting) && socket == nil {
             socket = NSTemporaryDirectory() + "fsearch-unit-host-\(getpid())/no-daemon.sock"
         }
         return LaunchOptions(

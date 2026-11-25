@@ -27,3 +27,7 @@ The daemon answers each connection in order. If name and content searches shared
 - Stale answers are dropped. The list never shows results for an older query.
 - The panel shows "Starting search…" if the daemon does not answer, and recovers by itself when it does.
 - There is a little more state to manage. The key logic is a pure function of state and key, so it can be tested without any UI.
+
+## Update note
+
+A third long-lived control connection (`control` in `AppState.live`) was later added for status polling and **Save Now**, so status checks never queue behind active name or content searches.

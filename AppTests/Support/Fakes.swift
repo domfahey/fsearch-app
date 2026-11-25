@@ -11,29 +11,49 @@ struct TestError: Error, LocalizedError {
     var errorDescription: String? { message }
 }
 
-/// DaemonStatus and GrepReply have no public init: build them the way the wire does.
+/// Convenience builders for wire replies in tests.
 enum Wire {
     static func status(entries: Int = 42, fullDiskAccess: Bool = true, owner: Bool = true) -> DaemonStatus {
-        let json = """
-            {"ok":true,"entries":\(entries),"dirs":3,"overlay":1,"removed":0,"event_id":7,"index_bytes":2048,\
-            "content_docs":5,"content_segments":1,"content_bytes":4096,"content_pending":0,\
-            "full_disk_access":\(fullDiskAccess),"owner":\(owner)}
-            """
-        return try! DaemonClient.decodeReply(Data(json.utf8), as: DaemonStatus.self)
+        DaemonStatus(
+            entries: entries, dirs: 3, overlay: 1, removed: 0, eventId: 7, indexBytes: 2048,
+            contentDocs: 5, contentSegments: 1, contentBytes: 4096, contentPending: 0,
+            fullDiskAccess: fullDiskAccess, owner: owner)
     }
 
     static func grep(_ files: [(String, [(Int, String)])], tookUs: UInt64 = 900) -> GrepReply {
-        let fs = files.map { path, ms in
-            ["path": path, "matches": ms.map { ["line": $0.0, "text": $0.1] }] as [String: Any]
-        }
-        let o: [String: Any] = [
-            "ok": true, "took_us": tookUs, "source": "index", "candidates": files.count,
-            "read": files.count, "complete": true, "files": fs,
-        ]
-        return try! DaemonClient.decodeReply(try! JSONSerialization.data(withJSONObject: o), as: GrepReply.self)
+        let fm = files.map { path, ms in FileMatches(path: path, matches: ms.map { Match(line: $0.0, text: $0.1) }) }
+        return GrepReply(tookUs: tookUs, source: "index", candidates: files.count, read: files.count, complete: true, files: fm)
     }
 
     static func hit(_ path: String) -> Hit { Hit(path: path, kind: "file", size: 1, mtime: 0, score: 1) }
+}
+
+/// One-shot async barrier for tests, without blocking a Swift concurrency pool thread.
+final class AsyncGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var released = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func wait() async {
+        await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+            let resumeNow = lock.withLock { () -> Bool in
+                if released { return true }
+                waiters.append(c)
+                return false
+            }
+            if resumeNow { c.resume() }
+        }
+    }
+
+    func release() {
+        let pending = lock.withLock { () -> [CheckedContinuation<Void, Never>] in
+            released = true
+            let w = waiters
+            waiters.removeAll()
+            return w
+        }
+        for c in pending { c.resume() }
+    }
 }
 
 /// A scripted daemon connection. Handlers get the 1-based call number.
@@ -42,6 +62,7 @@ final class StubDaemon: DaemonControl, @unchecked Sendable {
     private var _onPing: @Sendable (Int) -> Bool = { _ in true }
     private var _onStatus: @Sendable (Int) throws -> DaemonStatus = { _ in Wire.status() }
     private var _onSearch: @Sendable (String) throws -> SearchReply = { _ in SearchReply(tookUs: 1000, hits: []) }
+    private var _onSearchAsync: (@Sendable (String) async throws -> SearchReply)?
     private var _onGrep: @Sendable (String, String, GrepMode) throws -> GrepReply = { _, _, _ in Wire.grep([]) }
     private var _pings = 0, _statuses = 0, _saves = 0
     private var _searches: [String] = []
@@ -60,6 +81,10 @@ final class StubDaemon: DaemonControl, @unchecked Sendable {
     var onSearch: @Sendable (String) throws -> SearchReply {
         get { locked { _onSearch } }
         set { locked { _onSearch = newValue } }
+    }
+    var onSearchAsync: (@Sendable (String) async throws -> SearchReply)? {
+        get { locked { _onSearchAsync } }
+        set { locked { _onSearchAsync = newValue } }
     }
     var onGrep: @Sendable (String, String, GrepMode) throws -> GrepReply {
         get { locked { _onGrep } }
@@ -88,9 +113,10 @@ final class StubDaemon: DaemonControl, @unchecked Sendable {
     func save() async throws { locked { _saves += 1 } }
 
     func search(_ q: String, limit: Int) async throws -> SearchReply {
-        let f = locked {
-            _searches.append(q); return _onSearch
+        let (f, fa) = locked {
+            _searches.append(q); return (_onSearch, _onSearchAsync)
         }
+        if let fa { return try await fa(q) }
         return try f(q)
     }
 
@@ -198,8 +224,6 @@ final class FakeWorkspace: Workspace {
     /// Paths that don't exist. Any other path that isn't on disk either is a
     /// plain file, so tests can use made-up paths like /p/x.txt.
     var missing: Set<String> = []
-    /// What fileInfo says for a path, before the disk is asked.
-    var files: [String: FileInfo] = [:]
     var trashError: Error?
 
     private(set) var opened: [URL] = []
@@ -232,7 +256,7 @@ final class FakeWorkspace: Workspace {
 
     func fileInfo(atPath path: String) -> FileInfo? {
         if missing.contains(path) { return nil }
-        return files[path] ?? FileInfo.onDisk(path) ?? FileInfo()
+        return FileInfo.onDisk(path) ?? FileInfo()
     }
 
     func trash(_ url: URL) throws {
@@ -284,6 +308,7 @@ final class TestEnv {
             cliAgentInstalled: { false })  // never the real ~/Library/LaunchAgents
         precondition(app.log.file.path.hasPrefix(dir.path), "TestEnv's search log escaped its temp folder")
         app.panel = panel
+        app.status = MenuBarStatus(defaults: defaults)
         app.actionErrorDuration = .milliseconds(20)
         FileActions.workspace = workspace
         FileActions.pasteboard = pasteboard
@@ -361,7 +386,7 @@ let offscreenOrigin = NSPoint(x: -20_000, y: -20_000)
 /// keyboard: off screen, fully transparent, deaf to the mouse, never key.
 /// Close the returned window when done.
 @MainActor
-func render<V: View>(_ view: V, size: NSSize = NSSize(width: 680, height: 460), settle: Duration = .milliseconds(150)) async -> NSWindow {
+func render<V: View>(_ view: V, size: NSSize = NSSize(width: 680, height: 460), settle: Duration = .milliseconds(40)) async -> NSWindow {
     let w = HostSafeWindow(
         contentRect: NSRect(origin: offscreenOrigin, size: size), styleMask: [.borderless], backing: .buffered, defer: false)
     w.isReleasedWhenClosed = false

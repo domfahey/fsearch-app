@@ -4,22 +4,18 @@ Open work, by priority. "You" items need the maintainer: a decision, credentials
 
 Detail for the bug-audit items is in `.superpowers/audit-round2.md`, and for the final-review fixes in `.superpowers/final-fix-brief.md`. Both are local working notes, not committed.
 
-## P1: bugs from audit round 2
-
-All fixed; see the CHANGELOG.
-
 ## P2: smaller bugs and polish
 
 - [ ] One empty `com.domfahey.fsearch.apptests.unit.plist` stays in ~/Library/Preferences after a full AppTests run (cfprefsd writes it back); it is swept on the next run.
 - [ ] CI benchmark baseline: add a `ci-macos-26` entry from a CI artifact, so the bench job can gate.
-- [ ] Accessibility: VoiceOver labels, keyboard navigation in Settings and onboarding, Reduce Motion and Transparency, Increase Contrast.
+- [ ] Accessibility: keyboard navigation in Settings and onboarding, Reduce Motion and Transparency, Increase Contrast.
 - [ ] Localization readiness: a String Catalog, English only for now.
 - [ ] Query docs depth: ranking, typo tolerance, how words combine, `limit:`. Check each against the daemon first.
 
 ## Docs follow-ups
 
 - [ ] Switch the Help menu links (`HelpLinks.base`, `blob/main`) to tag-pinned links after 0.1.0.
-- [ ] ADR 0003 says taking over from a stray daemon is future work, but fsearch ba100f4 does it for the CLI's agent. Add a superseding note or a new ADR (don't edit an accepted ADR).
+- [x] ADR 0003 says taking over from a stray daemon is future work, but fsearch ba100f4 does it for the CLI's agent. Add a superseding note (don't edit an accepted ADR).
 - [ ] Confirm the GitHub Pages location for the appcast (the runbook assumes a `gh-pages` branch with `appcast.xml` at its root).
 - [ ] Check external drives (`/Volumes`); the docs currently say "untested, probably not indexed".
 

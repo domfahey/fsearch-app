@@ -22,6 +22,7 @@ final class LoginItemModel: ObservableObject {
     /// The last failure to change the item, shown inline.
     @Published private(set) var error: String?
     private let service: LoginItemService?
+    private var busy = false
 
     /// nil service (test mode): the toggle is shown but disabled.
     init(service: LoginItemService?) {
@@ -54,7 +55,9 @@ final class LoginItemModel: ObservableObject {
 
     /// Registers or unregisters the item, then re-reads its status.
     func set(_ on: Bool) async {
-        guard let service else { return }
+        guard let service, !busy else { return }
+        busy = true
+        defer { busy = false }
         error = nil
         do {
             if on { try service.register() } else { try await service.unregister() }

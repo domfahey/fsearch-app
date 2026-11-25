@@ -36,6 +36,21 @@ extension AppTests {
             item.registerError = nil
             await m.set(true)
             #expect(m.error == nil)
+            item.unregisterError = TestError("locked")
+            await m.set(false)
+            #expect(m.display == .on && m.error?.contains("locked") == true)
+        }
+
+        @Test func overlappingToggleCallsAreIgnored() async {
+            let gate = AsyncGate()
+            let item = SlowLoginItem(gate: gate)
+            let m = LoginItemModel(service: item)
+            let first = Task { await m.set(false) }
+            await Task.yield()
+            await m.set(true)
+            gate.release()
+            await first.value
+            #expect(item.unregistered == 1 && item.registered == 0 && m.display == .off)
         }
 
         @Test func approvalIsNotAnError() async {
@@ -230,7 +245,10 @@ extension AppTests {
         @Test func sparkleDefaultsAreRemovedToo() async {
             let env = TestEnv()
             defer { env.tearDown() }
-            let sparkle = ["SUEnableAutomaticChecks", "SUHasLaunchedBefore", "SULastCheckTime", "SUSendProfileInfo"]
+            let sparkle = [
+                "SUEnableAutomaticChecks", "SUHasLaunchedBefore", "SULastCheckTime", "SUSendProfileInfo",
+                "SUAutomaticallyUpdate", "SUScheduledCheckInterval", "SUSkippedVersion",
+            ]
             for k in sparkle { env.defaults.set(true, forKey: k) }
             await make(env, helper: nil, login: nil).run(ownership: .helperOff)
             for k in sparkle { #expect(env.defaults.object(forKey: k) == nil, "\(k)") }
@@ -263,6 +281,11 @@ extension AppTests {
             env.workspace.trashError = nil
             await u2.run(ownership: .ours)
             #expect(env.workspace.trashed.isEmpty)
+            // When the data folder doesn't exist at all, don't report that it was "left alone".
+            let u3 = make(env, helper: nil, login: nil, exists: { _ in false })
+            await u3.run(ownership: .helperOff)
+            guard case let .done(r3) = u3.phase else { Issue.record("not done"); return }
+            #expect(r3.kept.isEmpty)
         }
 
         @Test func opensFullDiskAccess() {
@@ -270,6 +293,32 @@ extension AppTests {
             defer { env.tearDown() }
             make(env, helper: nil, login: nil).openFullDiskAccess()
             #expect(env.workspace.opened == [Uninstaller.fullDiskAccessURL])
+        }
+
+        @Test func waitsForUnregisteredHelperBeforeTrashingData() async {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let helper = FakeHelper(.enabled)
+            var events: [String] = []
+            let u = Uninstaller(
+                helper: helper, loginItem: nil, workspace: env.workspace, defaults: env.defaults,
+                dataFolder: data, logFolder: logs, exists: { _ in true }, cliAgentInstalled: { false },
+                resetShortcut: {},
+                waitUntilStopped: {
+                    events.append("waited:unreg=\(helper.unregistered):trashed=\(env.workspace.trashed.count)")
+                })
+            await u.run(ownership: .ours)
+            #expect(events == ["waited:unreg=1:trashed=0"])
+            #expect(env.workspace.trashed.contains(data))
+        }
+
+        @Test func editorOptionsIncludeUninstalledSelectedEditor() {
+            let installed: [Editor] = [.vscode]
+            #expect(SettingsView.editorOptions(selected: nil, installed: installed).map(\.tag) == ["", "vscode"])
+            #expect(SettingsView.editorOptions(selected: .vscode, installed: installed).map(\.tag) == ["", "vscode"])
+            let opts = SettingsView.editorOptions(selected: .bbedit, installed: installed)
+            #expect(opts.map(\.tag) == ["", "vscode", "bbedit"])
+            #expect(opts.last?.label == "BBEdit (not installed)")
         }
     }
 }
@@ -279,5 +328,20 @@ private final class FailingHelper: HelperService {
     var status: DaemonPlan.ServiceStatus = .enabled
     func register() throws {}
     func unregister() async throws { throw TestError("busy") }
+    func openSystemSettingsLoginItems() {}
+}
+
+@MainActor
+private final class SlowLoginItem: LoginItemService {
+    let gate: AsyncGate
+    var status: DaemonPlan.ServiceStatus = .enabled
+    private(set) var registered = 0, unregistered = 0
+    init(gate: AsyncGate) { self.gate = gate }
+    func register() throws { registered += 1; status = .enabled }
+    func unregister() async throws {
+        unregistered += 1
+        await gate.wait()
+        status = .notRegistered
+    }
     func openSystemSettingsLoginItems() {}
 }

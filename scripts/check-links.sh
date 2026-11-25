@@ -13,7 +13,7 @@ exec python3 -I - <<'PY'
 import os, re, sys
 from urllib.parse import unquote
 
-SKIP = {"build", ".build", ".superpowers", "node_modules", "Vendor", ".git", "DerivedData"}
+SKIP = {"build", ".build", ".superpowers", "Vendor", ".git", "DerivedData"}
 SKIP_PATHS = {os.path.join("docs", "superpowers")}
 
 def skipped(rel):
@@ -22,13 +22,19 @@ def skipped(rel):
 files = []
 for dp, dns, fns in os.walk("."):
     rel_dir = os.path.relpath(dp, ".")
-    dns[:] = [d for d in dns if d not in SKIP and not skipped(os.path.normpath(os.path.join(rel_dir, d)))]
+    dns[:] = [
+        d for d in dns
+        if d not in SKIP and not d.startswith(".worktrees") and not skipped(os.path.normpath(os.path.join(rel_dir, d)))
+    ]
     files += [os.path.normpath(os.path.join(dp, f)) for f in fns if f.endswith(".md")]
+
+# Drop fenced code blocks (shared by heading extraction and link scanning).
+def strip_fences(text):
+    return re.sub(r"^(```|~~~).*?^\1[ \t]*$", "", text, flags=re.S | re.M)
 
 # Drop fenced and inline code first: links in examples are not real links.
 def strip_code(text):
-    text = re.sub(r"^(```|~~~).*?^\1[ \t]*$", "", text, flags=re.S | re.M)
-    return re.sub(r"`[^`\n]*`", "", text)
+    return re.sub(r"`[^`\n]*`", "", strip_fences(text))
 
 # GitHub's heading anchor: lowercase, punctuation dropped, spaces to hyphens.
 def slug(h):
@@ -43,7 +49,7 @@ def anchors_of(path):
     if path not in anchors:
         seen, out = {}, set()
         with open(path, encoding="utf-8") as fh:
-            for h in re.findall(r"^#{1,6}\s+(.*?)\s*#*\s*$", strip_code(fh.read()), flags=re.M):
+            for h in re.findall(r"^#{1,6}\s+(.*?)\s*#*\s*$", strip_fences(fh.read()), flags=re.M):
                 s = slug(h)
                 n = seen.get(s, 0)
                 seen[s] = n + 1

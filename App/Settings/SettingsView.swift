@@ -6,31 +6,54 @@ import SwiftUI
 /// The Settings window: shortcut, editor, login item, updates, debug mode and uninstall.
 struct SettingsView: View {
     @EnvironmentObject var app: AppState
-    /// Editor.rawValue, "" = none: the same key as AppState.editorRaw (read as AppState.editor).
-    @AppStorage("editor", store: AppDefaults.store) private var editor = ""
     @Environment(\.dismissWindow) private var dismissWindow
     @StateObject private var loginItem = LoginItemModel(
         service: LaunchOptions.current.testMode ? nil : SMAppLoginItemService())
     @StateObject private var uninstaller = Uninstaller.live(options: .current)
     @State private var confirming = false
+    @State private var shortcut = KeyboardShortcuts.getShortcut(for: .togglePanel)
+    private let runningBundleIds: () -> Set<String>
 
-    init() {}
+    init() {
+        runningBundleIds = { Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier)) }
+    }
 
     #if DEBUG
-        /// Tests pass the login item and uninstaller, with fakes behind them.
-        init(loginItem: LoginItemModel, uninstaller: Uninstaller) {
+        /// Tests pass the login item, uninstaller and optional running apps list, with fakes behind them.
+        init(
+            loginItem: LoginItemModel, uninstaller: Uninstaller,
+            runningBundleIds: @escaping () -> Set<String> = { Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier)) }
+        ) {
             _loginItem = StateObject(wrappedValue: loginItem)
             _uninstaller = StateObject(wrappedValue: uninstaller)
+            self.runningBundleIds = runningBundleIds
         }
     #endif
 
+    /// Picker entries for the content-results editor: Default app, installed editors, and any previously
+    /// chosen editor that is no longer installed so SwiftUI's Picker never holds an unlisted tag.
+    static func editorOptions(selected: Editor?, installed: [Editor]) -> [(tag: String, label: String)] {
+        var rows: [(String, String)] = [("", "Default app")]
+        for e in installed { rows.append((e.rawValue, e.displayName)) }
+        if let selected, !installed.contains(selected) {
+            rows.append((selected.rawValue, "\(selected.displayName) (not installed)"))
+        }
+        return rows
+    }
+
     var body: some View {
+        let installedEditors = Editor.installed { FileActions.workspace.urlForApplication(withBundleIdentifier: $0) }.map(\.0)
+        let editorRows = Self.editorOptions(selected: app.editor, installed: installedEditors)
         Form {
-            KeyboardShortcuts.Recorder("Shortcut:", name: .togglePanel)
-            Picker("Open content results in:", selection: $editor) {
-                Text("Default app").tag("")
-                ForEach(Editor.installed { FileActions.workspace.urlForApplication(withBundleIdentifier: $0) }, id: \.0) { e, _ in
-                    Text(e.displayName).tag(e.rawValue)
+            KeyboardShortcuts.Recorder("Shortcut:", name: .togglePanel) { shortcut = $0 }
+            if let w = Onboarding.hotkeyWarning(
+                defaultIsOptionSpace: shortcut == .init(.space, modifiers: [.option]), runningBundleIds: runningBundleIds())
+            {
+                Text("⚠ " + w).foregroundStyle(.orange).font(.callout)
+            }
+            Picker("Open content results in:", selection: $app.editorRaw) {
+                ForEach(editorRows, id: \.tag) { row in
+                    Text(row.label).tag(row.tag)
                 }
             }
             Toggle("Debug mode", isOn: debugBinding)
@@ -72,7 +95,10 @@ struct SettingsView: View {
                 .confirmationDialog("Remove FSearch's background helper and data?", isPresented: $confirming) {
                     Button("Remove", role: .destructive) {
                         let ownership = app.daemon.dataOwnership
-                        Task { await uninstaller.run(ownership: ownership, daemon: app.daemon) }
+                        Task {
+                            await uninstaller.run(ownership: ownership, daemon: app.daemon)
+                            loginItem.refresh()
+                        }
                     }
                     Button("Cancel", role: .cancel) {}
                 } message: {

@@ -16,17 +16,22 @@ while read -r _ local_sha _ _; do
     [ -n "$c" ] || continue
     rm -rf "$tmp"
     tmp=$(mktemp -d) || { echo "secret check: cannot create a scratch directory" >&2; exit 1; }
-    # Added, copied or modified files in this commit (merges and the root commit included).
-    while IFS=' ' read -r _ mode _ blob _ path; do
+    # Added, modified or type-changed files in this commit (merges and the root commit included).
+    check=()
+    while IFS= read -r -d '' meta && IFS= read -r -d '' path; do
+      read -r _ mode _ blob _ <<<"$meta"
       [ -n "$path" ] || continue
       [ "$mode" = 160000 ] && continue  # a submodule commit, not a file
       case "$seen" in *$'\n'"$blob:$path"$'\n'*) continue ;; esac
       seen+="$blob:$path"$'\n'
-      if ! { mkdir -p "$tmp/$(dirname "$path")" && git cat-file blob "$blob" > "$tmp/$path"; }; then
+      if ! { mkdir -p "$tmp/$(dirname -- "$path")" && git cat-file blob "$blob" > "$tmp/$path"; }; then
         echo "secret check: could not write $path (commit ${c:0:10}) to check it" >&2; fail=1; continue
       fi
-      (cd "$tmp" && "$root/scripts/hooks/check-secrets.sh" "$path") || { fail=1; echo "  (in commit ${c:0:10})" >&2; }
-    done < <(git -c core.quotepath=off diff-tree -r -m --root --no-commit-id --diff-filter=ACMR "$c" | sed -E 's/^:([0-9]+) ([0-9]+) ([0-9a-f]+) ([0-9a-f]+) ([A-Z])[0-9]*\t/:\1 \2 \3 \4 \5 /')
+      check+=("$path")
+    done < <(git diff-tree -r -m --root --no-commit-id -z --diff-filter=AMT "$c")
+    if [ ${#check[@]} -gt 0 ]; then
+      (cd "$tmp" && "$root/scripts/hooks/check-secrets.sh" "${check[@]}") || { fail=1; echo "  (in commit ${c:0:10})" >&2; }
+    fi
   done < <(git rev-list "$local_sha" --not --remotes)
 done
 exit $fail

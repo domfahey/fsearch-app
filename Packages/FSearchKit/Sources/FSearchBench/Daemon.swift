@@ -26,11 +26,19 @@ enum FixtureTree {
         func touch(_ path: String, _ body: String?) throws {
             let fd = open(path, O_CREAT | O_WRONLY | O_TRUNC, 0o644)
             guard fd >= 0 else { throw BenchError("create \(path): errno \(errno)") }
-            if let body {
-                let n = body.utf8CString.count - 1
-                _ = body.withCString { write(fd, $0, n) }
+            defer { close(fd) }
+            if var body {
+                try body.withUTF8 { buf in
+                    guard let base = buf.baseAddress else { return }
+                    var off = 0
+                    while off < buf.count {
+                        let w = write(fd, base + off, buf.count - off)
+                        if w > 0 { off += w; continue }
+                        if w < 0 && errno == EINTR { continue }
+                        throw BenchError("write \(path): errno \(errno)")
+                    }
+                }
             }
-            close(fd)
         }
 
         // Name corpus: 10 × 10 × 10 leaf folders, 50 empty files each.
@@ -106,12 +114,14 @@ final class DaemonRun: @unchecked Sendable {
 
     /// Terminate, wait up to 5 s, then SIGKILL.
     func stop() {
+        defer {
+            Cleanup.shared.daemonPid = nil
+            try? FileManager.default.removeItem(at: pidFile)
+        }
         guard process.isRunning else { return }
         process.terminate()
         for _ in 0..<50 where process.isRunning { usleep(100_000) }
         if process.isRunning { kill(process.processIdentifier, SIGKILL); process.waitUntilExit() }
-        Cleanup.shared.daemonPid = nil
-        try? FileManager.default.removeItem(at: pidFile)
     }
 }
 
@@ -135,7 +145,7 @@ final class Cleanup: @unchecked Sendable {
         if let pid {
             kill(pid, SIGTERM)
             for _ in 0..<50 { if kill(pid, 0) != 0 { break }; usleep(100_000) }
-            kill(pid, SIGKILL)
+            if kill(pid, 0) == 0 { kill(pid, SIGKILL) }
         }
         for d in dirs { try? FileManager.default.removeItem(at: d) }
     }
@@ -220,6 +230,9 @@ final class Cleanup: @unchecked Sendable {
     var contentStatus: DaemonStatus?
     var lastLog = now()
     while now() < deadline {
+        guard d.process.isRunning else {
+            throw BenchError("daemon exited during content indexing (status \(d.process.terminationStatus))")
+        }
         let s = try? await client.status()
         let g = try? await client.grep(q: "", pattern: "quantum lattice", mode: .literal)
         if let s, s.contentPending == 0, s.contentDocs >= FixtureTree.textFiles, let g, g.complete, !g.files.isEmpty {

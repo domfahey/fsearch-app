@@ -37,7 +37,7 @@ External drives are untested. The daemon treats `/Volumes` as a guarded folder a
 
 ## Editors
 
-Opening a result at a line works with VS Code, Cursor and Xcode on a real Mac. Zed, Sublime Text and BBEdit are untested. If one fails, FSearch opens the file in its default app. See [Open results in your editor](../how-to/open-results-in-your-editor.md).
+Opening a result at a line works with VS Code and Cursor on a real Mac; Xcode opens the file without jumping to the line. Zed, Sublime Text and BBEdit are untested. If an editor fails, FSearch opens the file in its default app. See [Open results in your editor](../how-to/open-results-in-your-editor.md).
 
 ## Full Disk Access and the helper
 

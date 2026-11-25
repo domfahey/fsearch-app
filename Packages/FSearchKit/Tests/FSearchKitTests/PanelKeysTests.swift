@@ -57,6 +57,24 @@ import Testing
         session.hidden(state("report", .content, sel: 3), at: t)
         #expect(session.opened(at: t.addingTimeInterval(60)) == state("report", .content, sel: 3))
         #expect(session.opened(at: t.addingTimeInterval(60.001)) == PanelState())
+        #expect(session.opened(at: t.addingTimeInterval(-1)) == PanelState(), "backward clock jump does not resume")
+    }
+
+    @Test func heldKeyCancelResetsInternalStateAndNegativeFilesClamp() {
+        var held = HeldKey()
+        _ = held.press(.enter, current: false, query: "heron", mode: .content)
+        held.cancel()
+        #expect(held == HeldKey())
+
+        let rows = PanelRows(files: -3, query: "heron", mode: .names)
+        #expect(rows.files == 0 && rows.count == 2)
+
+        var check = RecoveryCheck(interval: 5)
+        let t = Date(timeIntervalSince1970: 1000)
+        let first = check.shouldRefresh(daemonUnhealthy: true, now: t)
+        let within = check.shouldRefresh(daemonUnhealthy: true, now: t.addingTimeInterval(2))
+        let backward = check.shouldRefresh(daemonUnhealthy: true, now: t.addingTimeInterval(-1))
+        #expect(first && !within && backward, "backward clock jump does not stall recovery")
     }
 
     @Test func hidingAgainReplacesTheEarlierState() {

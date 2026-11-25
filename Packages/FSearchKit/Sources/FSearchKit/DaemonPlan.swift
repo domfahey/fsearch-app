@@ -32,9 +32,9 @@ public enum DaemonPlan: Equatable, Sendable {
     }
 
     /// How long to keep pinging before registering (a CLI daemon restarting).
-    public static let recheckWindow: Duration = .seconds(3)
+    static let recheckWindow: Duration = .seconds(3)
     /// With a CLI login agent installed, its daemon gets longer to come back.
-    public static let cliRecheckWindow: Duration = .seconds(10)
+    static let cliRecheckWindow: Duration = .seconds(10)
 
     /// The recheck window: longer when a CLI login agent is installed.
     public static func recheckWindow(cliAgentInstalled: Bool) -> Duration {
@@ -197,7 +197,10 @@ public struct RecoveryCheck: Equatable, Sendable {
     ///   - now: The current time (injectable for tests).
     public mutating func shouldRefresh(daemonUnhealthy: Bool, now: Date = Date()) -> Bool {
         guard daemonUnhealthy else { return false }
-        if let last, now.timeIntervalSince(last) < interval { return false }
+        if let last {
+            let dt = now.timeIntervalSince(last)
+            if dt >= 0 && dt < interval { return false }
+        }
         last = now
         return true
     }

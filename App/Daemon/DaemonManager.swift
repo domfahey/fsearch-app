@@ -115,6 +115,12 @@ final class DaemonManager: ObservableObject {
     /// After timeouts, or a disconnect with no restarts left.
     var isUnresponsive: Bool { state == .failed(Self.unresponsiveMessage) }
 
+    /// Whether a restart is currently in flight.
+    var isRestarting: Bool { restartTask != nil }
+
+    /// Whether FSearch has Full Disk Access right now, checked through the injected probe.
+    var hasFullDiskAccessGrant: Bool { fullDiskAccessGranted() }
+
     /// Whether the daemon answers a ping now.
     private func answers() async -> Bool { (try? await client.ping()) != nil }
 
@@ -130,6 +136,11 @@ final class DaemonManager: ObservableObject {
     func start(resumingAfterRemoval: Bool = false) async {
         guard !removalInProgress else { return }
         if resumingAfterRemoval { setRecoverySuspended(false) }
+        // Never interleave with an in-flight restart (which already unregisters, registers, and refreshes).
+        if let restartTask {
+            _ = await restartTask.value
+            return
+        }
         await start(checkingForUpdate: true)
     }
 
@@ -203,13 +214,13 @@ final class DaemonManager: ObservableObject {
         guard mayManageHelper else { return }
         let current = helperIdentity()
         let stored = defaults.string(forKey: Self.helperIdentityKey)
-        let action = DaemonPlan.helperUpdate(owns: ownsDaemon, justRegistered: justRegistered, stored: stored, current: current)
-        guard action != .nothing else { return }
-        if action == .restartThenStore {
+        switch DaemonPlan.helperUpdate(owns: ownsDaemon, justRegistered: justRegistered, stored: stored, current: current) {
+        case .nothing: return
+        case .store:
+            guard helperIsReady else { return }
+        case .restartThenStore:
             Log.daemon.info("the bundled helper changed: restarting it once")
             guard await restartSuccessfully() else { return }
-        } else {
-            guard helperIsReady else { return }
         }
         guard mayManageHelper else { return }
         defaults.set(current, forKey: Self.helperIdentityKey)
@@ -383,7 +394,7 @@ final class DaemonManager: ObservableObject {
         for _ in 0..<60 {
             do { try await clock.sleep(.seconds(2)) } catch { return }
             guard fullDiskAccessRestartArmed else { return }
-            if fullDiskAccessGranted() {
+            if fullDiskAccessGranted(), case .running = state {
                 await restartForFullDiskAccess()
                 return
             }
@@ -391,18 +402,20 @@ final class DaemonManager: ObservableObject {
     }
 
     /// The app is active again: if armed, and our helper still runs without
-    /// Full Disk Access, restart it once so a grant takes effect.
+    /// Full Disk Access, restart it once so a grant takes effect. If status isn't
+    /// known yet (`.checking` or `.indexing`), stay armed so a later check or poll catches it.
     func appBecameActive() async {
+        guard fullDiskAccessRestartArmed else { return }
+        guard case .running = state else { return }
         fullDiskAccessPoll?.cancel()
         await restartForFullDiskAccess()
     }
 
     private func restartForFullDiskAccess() async {
         guard fullDiskAccessRestartArmed else { return }
+        guard case let .running(s) = state else { return }
         fullDiskAccessRestartArmed = false
-        let fullDiskAccess: Bool
-        if case let .running(s) = state { fullDiskAccess = s.fullDiskAccess } else { return }
-        guard Onboarding.restartAfterSettings(pressedTurnOn: true, owns: ownsDaemon, fullDiskAccess: fullDiskAccess) else { return }
+        guard Onboarding.restartAfterSettings(pressedTurnOn: true, owns: ownsDaemon, fullDiskAccess: s.fullDiskAccess) else { return }
         Log.daemon.info("restarting the helper to pick up Full Disk Access")
         await restart()
     }

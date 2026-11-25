@@ -148,6 +148,29 @@ import Testing
         #expect(other == .other)
         let gone = SocketHolder.read(dataDir: dir, bundlePath: bundle, path: { _ in nil }, signedAsHelper: { _ in false })
         #expect(gone == SocketHolder.none)
+
+        // Signature checks are skipped when the path already decides ownership.
+        var sigChecks = 0, appChecks = 0
+        let inBundle = SocketHolder.read(
+            dataDir: dir, bundlePath: bundle + "///", path: { _ in bundle + "/Contents/Helpers/fsearch" },
+            signedAsHelper: { _ in
+                sigChecks += 1; return false
+            },
+            appTeamSigned: {
+                appChecks += 1; return true
+            })
+        #expect(inBundle == .ours && sigChecks == 0 && appChecks == 0)
+        let cli = SocketHolder.read(
+            dataDir: dir, bundlePath: bundle, path: { _ in "/opt/homebrew/bin/fsearch" },
+            signedAsHelper: { _ in
+                sigChecks += 1; return false
+            },
+            appTeamSigned: {
+                appChecks += 1; return true
+            })
+        #expect(cli == .other && sigChecks == 0 && appChecks == 0)
+        // Root "/" is not a bundle path matching arbitrary binaries.
+        #expect(SocketHolder.classify(pid: 99, path: "/Contents/Helpers/fsearch", bundlePath: "/") == .other)
     }
 
     @Test func checksARunningProcessAgainstARequirement() throws {

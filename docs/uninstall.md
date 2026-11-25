@@ -25,7 +25,7 @@ Use these if the app won't open, or to check the result.
 
 ### 1. Quit FSearch
 
-Click the FSearch icon in the menu bar and choose **Quit**.
+Click the FSearch icon in the menu bar and choose **Quit FSearch**.
 
 Quitting the app does not stop the background helper. Do step 2 to stop it, or use the in-app button first.
 
@@ -52,7 +52,7 @@ If you use the fsearch CLI, keep its entry. It is not part of this app.
 
 Delete these folders:
 
-- `~/Library/Application Support/FSearch` holds the index, the socket, and the daemon's log.
+- `~/Library/Application Support/FSearch` holds the index, the socket, and (when using the CLI daemon) `daemon.log`.
 - `~/Library/Logs/FSearch` holds the debug search log.
 
 If you use the fsearch CLI, skip the `Application Support` line below (see step 6).

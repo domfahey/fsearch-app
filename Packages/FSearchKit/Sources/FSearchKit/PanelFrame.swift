@@ -3,7 +3,7 @@ import CoreGraphics
 /// Where the launcher panel goes on a screen.
 public enum PanelFrame {
     /// The gap kept between the panel and the visible frame's edges.
-    public static let margin: CGFloat = 24
+    static let margin: CGFloat = 24
 
     /// The panel's origin in `visible` (a screen's visibleFrame, so the menu bar
     /// and Dock are already left out): centred horizontally, a sixth of the

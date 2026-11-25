@@ -11,14 +11,14 @@ FSearch for Mac is a menu-bar launcher (`LSUIElement`, no Dock icon) in front of
 3. **The socket**, `~/Library/Application Support/FSearch/fsearch.sock`. One JSON object per line in each direction, over a Unix stream socket. Requests are `search` (the default op), `grep`, `status`, `ping` and `save`; every reply carries `ok`, and `{"ok": false, "error": ...}` becomes a `DaemonError` ([`Wire.swift`](../Packages/FSearchKit/Sources/FSearchKit/Wire.swift)).
 
 ```text
- +-------------------------- FSearch.app ---------------------------+
- |  SearchView -> SearchModel (generation, cancel)                   |
- |                  |                  |                             |
- |        names: DaemonClient   content: DaemonClient   (own sockets)|
- |                  |  LineSocket  |                                 |
- +------------------|--------------|---------------------------------+
-                    v              v
-        ~/Library/Application Support/FSearch/fsearch.sock
+ +---------------------------------- FSearch.app -----------------------------------+
+ |  SearchView -> SearchModel (generation, cancel)          DaemonManager           |
+ |                  |                    |                        |                 |
+ |        names: DaemonClient   content: DaemonClient   control: DaemonClient       |
+ |                  |             LineSocket                      |  (own sockets)  |
+ +------------------|--------------------|------------------------|-----------------+
+                    v                    v                        v
+               ~/Library/Application Support/FSearch/fsearch.sock
                     |  JSON lines: {"id":1,"q":"..."} <-> {"ok":true,...}
                     v
           fsearch serve  (bundled helper, or a CLI daemon already there)
@@ -31,13 +31,13 @@ The app logs through `os.Logger` (subsystem `com.domfahey.fsearch`, see `App/Sup
 
 ## FSearchKit and the App target
 
-[`Packages/FSearchKit`](../Packages/FSearchKit) holds everything that can be tested without a UI: the wire types and `DaemonClient.decodeReply`, `LineSocket`, `DaemonClient`, `SearchModel`, `QuerySplit`/`QuerySyntax`, `DaemonPlan`, `RestartBudget`, `MenuBarWarning`, onboarding rules, `Recents`, `SearchLog`, key handling (`PanelKeys`) and row layout (`PanelRows`). It has no dependencies. The `FSearch` target in [`project.yml`](../project.yml) is the glue: windows, `SMAppService`, Sparkle, the global shortcut, and file actions. Put new logic in the package and keep the App code thin.
+[`Packages/FSearchKit`](../Packages/FSearchKit) holds everything that can be tested without a UI: the wire types and `DaemonClient.decodeReply`, `LineSocket`, `DaemonClient`, `SearchModel`, `QuerySplit`/`QuerySyntax`, `DaemonPlan`, `RestartBudget`, `MenuBarWarning`, onboarding rules, `Recents`, `SearchLog`, key handling (`PanelKey`, `PanelState`, `PanelSession`, `HeldKey` in `PanelKeys.swift`) and row layout (`PanelRows`). It has no dependencies. The `FSearch` target in [`project.yml`](../project.yml) is the glue: windows, `SMAppService`, Sparkle, the global shortcut, and file actions. Put new logic in the package and keep the App code thin.
 
 ## One keystroke
 
 1. [`SearchView`](../App/Panel/SearchView.swift) changes `model.query`; `.onChange` calls `SearchModel.refresh()`. A mode change calls it directly.
 2. `refresh()` bumps a generation counter and cancels the previous in-flight task. Only the newest generation may publish, so a slow old answer is dropped. A blank query, the `?` cheat sheet, a half-typed filter, or a `grep:`/`sym:` with no value yet sends nothing. Published results are tagged with the query and mode they answer; `resultsAreCurrent` is false until they match the box, so the panel doesn't act on a stale row.
-3. `run` picks a backend. Plain name queries go to `names.search(q, limit: 50)`; the request leaves the JSON limit out when the query has its own `limit:`. A query with an accented letter also searches its other Unicode normal form, and the hits are merged by path. A query with `grep:`, `regex:` or `sym:` in names mode, and the content and symbol modes, go to `content.grep(...)`. [`AppState`](../App/AppState.swift) creates two `DaemonClient`s, each with its own `LineSocket`, so a slow content search never queues behind name searches.
+3. `run` picks a backend. Plain name queries go to `names.search(q, limit: 50)`; the request leaves the JSON limit out when the query has its own `limit:`. A query with an accented letter also searches its other Unicode normal form, and the hits are merged by path. A query with `grep:`, `regex:` or `sym:` in names mode, and the content and symbol modes, go to `content.grep(...)`. [`AppState`](../App/AppState.swift) creates three `DaemonClient`s (`names`, `content` and `control` for status/ping/save), each with its own `LineSocket`, so a slow content search never queues behind name searches or status checks.
 4. `DaemonClient` sends requests one at a time on a serial queue. Each request carries a fresh integer `id`, and the daemon echoes it in its reply. A call cancelled while queued never touches the socket. `LineSocket` writes the line and reads lines back until `replyIsFor(id, line)` accepts one: a line with a different id is a stale leftover and is dropped, while a line with no id or a null id is accepted so that decoding reports it properly. All of this happens within one timeout (5 s by default); a call that sees only stale lines fails with `.timeout` and closes the connection. If a reused connection was dropped it dials again once and resends; timeouts are not retried.
 5. `DaemonClient.decodeReply` turns the line into a `SearchReply` or `GrepReply`, and `SearchModel` publishes `items` and a `SearchPhase` (`results`, `indexing`, `failed`). A `failed` phase carries a `DaemonError`, and `UserMessage` turns it into the short text the panel shows (see [Troubleshooting](reference/troubleshooting.md)).
 
@@ -55,7 +55,7 @@ The app never stops, replaces or takes over a daemon it didn't start. It owns th
 
 Restart (`DaemonPlan.restartAction`) re-registers only a daemon the app owns: unregister, wait for the old daemon to stop answering, register. It leaves any other daemon that answers running and just refreshes status. When nothing answers and nothing is ours, it runs `start()` again, which rechecks first. One restart runs at a time, and callers arriving meanwhile wait for it. The panel spends at most 3 restarts per outage (`RestartBudget`), refilled when results arrive. Once they are spent, or a search times out, the state says the helper stopped answering, and the menu bar and panel show that instead of "Starting search…".
 
-Our helper is also restarted once in two cases. After an app update, launchd keeps running the old helper binary, so the app compares the bundled helper's identity (build, size and modification time, stored as `helperIdentity`) with the one last seen running. After the menu's "Turn On Full Disk Access…", the daemon fixes its skip list at start, so the next time the app becomes active it restarts the helper if Full Disk Access is still off.
+Our helper is also restarted once in two cases. After an app update, launchd keeps running the old helper binary, so the app compares the bundled helper's identity (build, size and modification time, stored as `helperIdentity`) with the one last seen running. After the menu's "Turn On Full Disk Access…", the daemon fixes its skip list at start, so the app polls for the grant every 2 seconds for up to 2 minutes (and also checks when the app becomes active) and restarts the helper once if Full Disk Access is still off.
 
 The plist uses `KeepAlive` with `SuccessfulExit` false. launchd relaunches the daemon after a crash, but not after a clean exit 0, which is how it quits when another daemon already holds the socket.
 
@@ -67,7 +67,7 @@ At launch, a second running copy of the app hands over to the first and quits. A
 
 [`OnboardingLauncher`](../App/Onboarding/OnboardingLauncher.swift) shows a four-step window (welcome, helper, Full Disk Access, indexing; `OnboardingStep`) until `onboarded` is set, and starts the helper itself if the window is closed early. Each step checks a fact from the system or daemon (`Onboarding.canContinue`), not a button press. Full Disk Access can be skipped (`skippedFullDiskAccess`).
 
-`DaemonManager.state` is `checking`, `running`, `indexing`, `needsApproval` or `failed`. [`MenuBarStatus`](../App/Errors/MenuBarStatus.swift) maps it, plus the skip flag, through `MenuBarWarning.evaluate` to the menu-bar symbol and a message. Failure and approval offer "Fix…", which opens Index Details; missing Full Disk Access is only a reminder. [`DaemonMessageLine`](../App/Errors/DaemonMessageLine.swift) shows the same problems in the panel and drives recovery checks and restarts.
+`DaemonManager.state` is `checking`, `running`, `indexing`, `needsApproval` or `failed`. [`MenuBarStatus`](../App/Errors/MenuBarStatus.swift) maps it, plus the skip flag, through `MenuBarWarning.evaluate` to the menu-bar symbol and a message. Failure and approval offer "Fix…", which opens Index Details; missing Full Disk Access is only a reminder. In the panel, [`DaemonMessageLine`](../App/Errors/DaemonMessageLine.swift) shows daemon query errors and drives the indexing auto-refresh poll, `PhaseMessage` shows phase messages, and [`AppState.searchSettled`](../App/AppState.swift) drives recovery checks and restarts.
 
 ## Security notes
 
@@ -79,13 +79,13 @@ The daemon runs with the Full Disk Access you grant it and answers over a local 
 
 ## Test mode
 
-Launch a Debug build with `-FSEARCH_SOCKET <path>` and `AppState.socketPath` uses that socket. Release builds ignore this flag and the XCTest environment variables (`LaunchOptions.testHooksCompiledIn`). In this mode the app never calls `SMAppService` (`ownStatus` is nil, `ownsDaemon` is false), never restarts anything, and skips onboarding. Tests supply the daemon themselves with a temporary `HOME` and `FSEARCH_ROOT`, so the real index, login items and `~/Library/Application Support/FSearch` are never touched.
+Launch a Debug build with `-FSEARCH_SOCKET <path>` and `LaunchOptions.current.socketPath` (`app.options.socketPath`) uses that socket. Release builds ignore this flag and the XCTest environment variables (`LaunchOptions.testHooksCompiledIn`). In this mode the app never calls `SMAppService` (`service` is nil, `ownsDaemon` is false), never restarts anything, and skips onboarding. Tests supply the daemon themselves with a temporary `HOME` and `FSEARCH_ROOT`, so the real index, login items and `~/Library/Application Support/FSearch` are never touched.
 
 ## Tests and benchmarks
 
 - **FSearchKit unit and integration tests**, [`Packages/FSearchKit/Tests/FSearchKitTests`](../Packages/FSearchKit/Tests/FSearchKitTests): `FakeDaemon` is a scripted socket server; `RealDaemon` runs `Vendor/fsearch serve` with a temp `HOME` and `FSEARCH_ROOT` ([`IntegrationTests.swift`](../Packages/FSearchKit/Tests/FSearchKitTests/IntegrationTests.swift)). `RealDaemon` has a watchdog: the daemon runs under a small `sh` wrapper that blocks on a pipe held by the test process, so when the test process exits or crashes, the wrapper stops the daemon and deletes the temp directory. At the start of a run it also sweeps orphaned fixture daemons left by hard-killed runs (see [ADR 0005](adr/0005-tests-never-touch-the-real-index.md)). Run `make test`, or `swift test` in the package.
-- **App unit tests**, [`AppTests/`](../AppTests): hosted tests for the app's own logic (DaemonManager, AppState, onboarding, panel input, file actions, menus). System side effects (SMAppService, NSWorkspace, Process, Trash) sit behind small seams in [`App/Support/`](../App/Support), which the tests replace with fakes; the test host starts nothing (no helper, hotkey, onboarding or updater).
-- **End-to-end UI tests**, [`AppUITests/PanelUITests.swift`](../AppUITests/PanelUITests.swift), run by [`scripts/ui-smoke.sh`](../scripts/ui-smoke.sh). The script starts a throwaway daemon in a temporary `HOME` and passes its socket to the app as `FSEARCH_SOCKET`. Every synthesized keystroke first checks that FSearch is frontmost and the search field has focus. They need a GUI session and don't run in CI.
+- **App unit tests**, [`AppTests/`](../AppTests): hosted tests for the app's own logic (DaemonManager, AppState, onboarding, panel input, file actions, menus). System side effects (SMAppService, NSWorkspace, Trash) sit behind small seams in [`App/Support/`](../App/Support), which the tests replace with fakes; the test host starts nothing (no helper, hotkey, onboarding or updater).
+- **End-to-end UI tests**, [`AppUITests/PanelUITests.swift`](../AppUITests/PanelUITests.swift), run by [`scripts/ui-smoke.sh`](../scripts/ui-smoke.sh). The script starts a throwaway daemon in a temporary `HOME` and passes its socket to the test runner via `TEST_RUNNER_FSEARCH_SOCKET`, which launches the app with `-FSEARCH_SOCKET <path>`. Every synthesized keystroke first checks that FSearch is frontmost and the search field has focus. They need a GUI session and don't run in CI.
 - **Coverage**: [`scripts/coverage.sh`](../scripts/coverage.sh) runs both suites and merges the results.
 - **Benchmarks**, `FSearchBench` in the package, run by [`scripts/bench.sh`](../scripts/bench.sh) against a temporary daemon; see [`bench/README.md`](../bench/README.md).
 

@@ -93,4 +93,35 @@ import Testing
         #expect(!raw.contains("\n\n"))
         #expect(raw.split(separator: "\n", omittingEmptySubsequences: false).count == 4)
     }
+
+    @Test func negativeCapAndExternalDeleteAreHandledCleanly() throws {
+        let s = sandbox(); defer { try? FileManager.default.removeItem(at: s.dir) }
+        let zero = SearchLog(file: s.file, cap: -5)
+        zero.append(e, at: Date())
+        #expect(zero.entries().isEmpty)
+
+        let log = SearchLog(file: s.file, cap: 2)
+        for i in 0..<3 {
+            log.append(
+                SearchModel.LogEntry(query: "q\(i)", mode: .names, resultCount: 0, tookUs: nil, roundTripMs: 0, error: nil), at: Date())
+        }
+        try FileManager.default.removeItem(at: s.file)
+        log.append(
+            SearchModel.LogEntry(query: "after-delete", mode: .names, resultCount: 0, tookUs: nil, roundTripMs: 0, error: nil), at: Date())
+        #expect(log.entries().map(\.query) == ["after-delete"])
+    }
+
+    @Test func appendAsyncFlushesBeforeEntriesAndClear() {
+        let s = sandbox(); defer { try? FileManager.default.removeItem(at: s.dir) }
+        let log = SearchLog(file: s.file)
+        for i in 0..<5 {
+            log.appendAsync(
+                SearchModel.LogEntry(query: "a\(i)", mode: .names, resultCount: i, tookUs: nil, roundTripMs: 0, error: nil), at: Date())
+        }
+        #expect(log.entries().map(\.query) == ["a0", "a1", "a2", "a3", "a4"])
+        log.appendAsync(e, at: Date())
+        log.clear()
+        log.flush()
+        #expect(log.entries().isEmpty)
+    }
 }

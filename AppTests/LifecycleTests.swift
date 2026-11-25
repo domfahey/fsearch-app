@@ -47,6 +47,60 @@ extension AppTests {
             #expect(env.app.daemon.isUnresponsive)
         }
 
+        @Test func rapidDisconnectsWhileRestartingSpendOneBudgetToken() async {
+            let gate = AsyncGate()
+            let h = FakeHelper(.enabled)
+            let d = StubDaemon()
+            d.onPing = { _ in false }
+            let clock = DaemonClock(
+                now: { ContinuousClock.now },
+                sleep: { _ in await gate.wait() })
+            let env = TestEnv(helper: h, daemon: d)
+            defer { env.tearDown() }
+            let app = AppState(
+                options: env.app.options, defaults: env.defaults, helper: h,
+                names: d, content: d, control: d, clock: clock,
+                cliAgentInstalled: { false }, socketHolder: { .ours })
+            app.status = MenuBarStatus(defaults: env.defaults)
+            // First disconnect starts a restart; two more while it's in flight spend no extra tokens.
+            d.onStatus = { _ in throw DaemonError.disconnected }
+            app.searchSettled(.failed(.disconnected))
+            app.searchSettled(.failed(.disconnected))
+            app.searchSettled(.failed(.disconnected))
+            #expect(app.status.restartBudget.used == 1)
+            d.onStatus = { _ in Wire.status() }
+            gate.release()
+            #expect(await eventually { h.registered == 1 })
+        }
+
+        @Test func rapidResultsWhileUnresponsiveCoalesceRecoveryRefresh() async {
+            let gate = AsyncGate()
+            let d = StubDaemon()
+            let env = TestEnv(daemon: d)
+            defer { env.tearDown() }
+            let clock = DaemonClock(
+                now: { ContinuousClock.now },
+                sleep: { _ in await gate.wait() })
+            let app = AppState(
+                options: env.app.options, defaults: env.defaults, helper: nil,
+                names: d, content: d, control: d, clock: clock, cliAgentInstalled: { false })
+            app.status = MenuBarStatus(defaults: env.defaults)
+            app.daemon.markUnresponsive()
+            // First attempt fails so refresh() suspends on sleep(gate), keeping the refresh in flight.
+            d.onStatus = { n in
+                if n == 1 { throw DaemonError.timeout }
+                return Wire.status()
+            }
+            app.searchSettled(.results)
+            #expect(await eventually { d.statuses == 1 })
+            app.searchSettled(.results)
+            app.searchSettled(.results)
+            try? await Task.sleep(for: .milliseconds(40))
+            #expect(d.statuses == 1, "coalesced into one recovery refresh")
+            gate.release()
+            #expect(await eventually { !app.daemon.isUnresponsive })
+        }
+
         // MARK: A-L3
 
         @Test func releaseBuildsIgnoreTheTestHooks() {
@@ -155,15 +209,18 @@ extension AppTests {
             let marker = dir.appendingPathComponent("opened")
             let quitting = Process()  // stands in for this app while it quits
             quitting.executableURL = URL(fileURLWithPath: "/bin/sleep")
-            quitting.arguments = ["1.5"]
+            quitting.arguments = ["30"]
             try quitting.run()
+            defer { if quitting.isRunning { quitting.terminate(); quitting.waitUntilExit() } }
             let relaunch = Process()
             relaunch.executableURL = URL(fileURLWithPath: "/bin/sh")
             relaunch.arguments = InstallMover.relaunchArguments(
                 app: marker, waitingFor: quitting.processIdentifier, open: "/usr/bin/touch")
             try relaunch.run()
+            defer { if relaunch.isRunning { relaunch.terminate(); relaunch.waitUntilExit() } }
             try await Task.sleep(for: .milliseconds(1100))  // longer than the old fixed second
             #expect(!FileManager.default.fileExists(atPath: marker.path), "opened while the app was still running")
+            quitting.terminate()
             quitting.waitUntilExit()
             #expect(await eventually { FileManager.default.fileExists(atPath: marker.path) })
             relaunch.waitUntilExit()
@@ -180,6 +237,29 @@ extension AppTests {
                 LaunchGuards.installProblem(
                     options: real, bundleURL: URL(fileURLWithPath: NSTemporaryDirectory() + "AppTranslocation/x/FSearch.app"))
                     == .translocated)
+        }
+
+        @Test func secondLaunchReopenNotificationShowsThePanel() {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let center = NotificationCenter()
+            LaunchGuards.observeReopen(panel: env.panel, app: env.app, center: center)
+            defer { LaunchGuards.stopObservingReopen(center: center) }
+            #expect(env.panel.shows == 0)
+            LaunchGuards.notifyOtherInstance(center: center)
+            #expect(env.panel.shows == 1 && env.panel.isVisible)
+            // Already visible: don't re-show.
+            LaunchGuards.notifyOtherInstance(center: center)
+            #expect(env.panel.shows == 1)
+        }
+
+        @Test func testModeWorkspaceLogsNonFileURLsWithScheme() {
+            let log = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("fsa-tmw-\(UUID().uuidString.prefix(8)).log")
+            defer { try? FileManager.default.removeItem(at: log) }
+            let ws = TestModeWorkspace(log: log)
+            let url = URL(string: "vscode://file/p/main.swift:42")!
+            ws.open([url], withApplicationAt: URL(fileURLWithPath: "/Applications/Visual Studio Code.app"), completion: nil)
+            #expect(ws.actions == ["openWith Visual Studio Code.app vscode://file/p/main.swift:42"])
         }
     }
 }

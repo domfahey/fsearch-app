@@ -49,7 +49,7 @@ public enum PanelKey: Equatable, Sendable {
     /// menus do.
     public static func commandLetter(_ character: String, shift: Bool, keyCode: UInt16?) -> PanelKey? {
         let isLatinLetter = character.count == 1 && character.unicodeScalars.allSatisfy { $0.isASCII && $0.properties.isAlphabetic }
-        if isLatinLetter || character.isEmpty && keyCode == nil { return commandLetter(character, shift: shift) }
+        if isLatinLetter { return commandLetter(character, shift: shift) }
         guard let code = keyCode, let letter = letterKeyCodes[code] else { return nil }
         return commandLetter(letter, shift: shift)
     }
@@ -165,7 +165,7 @@ extension PanelState {
 /// A longer gap, or no earlier hide, starts from an empty panel.
 public struct PanelSession: Sendable {
     /// Seconds after hiding in which reopening restores the old state.
-    public static let resumeWindow: TimeInterval = 60
+    static let resumeWindow: TimeInterval = 60
     private var last: (PanelState, Date)?
     /// Creates a session with nothing to resume.
     public init() {}
@@ -180,7 +180,10 @@ public struct PanelSession: Sendable {
     /// - Parameter t: When the panel opens.
     /// - Returns: The remembered state if the panel was hidden at most ``resumeWindow`` seconds ago, else an empty state.
     public func opened(at t: Date) -> PanelState {
-        if let (s, at) = last, t.timeIntervalSince(at) <= Self.resumeWindow { return s }
+        if let (s, at) = last {
+            let dt = t.timeIntervalSince(at)
+            if dt >= 0 && dt <= Self.resumeWindow { return s }
+        }
         return PanelState()
     }
 }
@@ -212,5 +215,5 @@ public struct HeldKey: Equatable, Sendable {
         return query == self.query && mode == self.mode ? held : nil
     }
 
-    public mutating func cancel() { held = nil }
+    public mutating func cancel() { (held, query, mode) = (nil, "", .names) }
 }

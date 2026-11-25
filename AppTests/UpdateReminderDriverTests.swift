@@ -23,6 +23,10 @@ extension AppTests {
 
         @Test func attentionAndSessionEndClearTheSharedIndicator() {
             let model = UpdateReminderModel.shared
+            defer {
+                model.update { $0.sessionWillFinish() }
+                model.clearPersisted()
+            }
             let driver = UpdateReminderDriver()
             let item = SUAppcastItem.empty()
             model.update { $0.willShow(bySparkle: false, userInitiated: false) }

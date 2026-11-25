@@ -55,7 +55,8 @@ struct FileInfo: Equatable, Sendable {
         var isDir: ObjCBool = false
         guard FileManager.default.fileExists(atPath: path, isDirectory: &isDir) else { return nil }
         return FileInfo(
-            isDirectory: isDir.boolValue, isExecutable: FileManager.default.isExecutableFile(atPath: path),
+            isDirectory: isDir.boolValue,
+            isExecutable: !isDir.boolValue && FileManager.default.isExecutableFile(atPath: path),
             isPackage: isDir.boolValue && NSWorkspace.shared.isFilePackage(atPath: path))
     }
 }
@@ -66,7 +67,7 @@ struct FileInfo: Equatable, Sendable {
 /// `TestModeWorkspace`, which records instead of acting.
 @MainActor
 protocol Workspace: AnyObject {
-    /// Opens a file or URL in its default app.
+    /// Opens a file or URL in its default app; returns false if LaunchServices refused it.
     @discardableResult func open(_ url: URL) -> Bool
     /// `completion` gets the launch error, if any.
     func open(_ urls: [URL], withApplicationAt app: URL, completion: (@Sendable (Error?) -> Void)?)
@@ -95,7 +96,7 @@ struct DaemonClock: Sendable {
 
 /// The panel as AppState sees it: an action error brings it back.
 @MainActor
-protocol PanelHost: AnyObject {
+protocol PanelHost: AnyObject, Sendable {
     /// Whether the panel is on screen.
     var isVisible: Bool { get }
     /// Shows the panel, resuming the recent query.

@@ -72,7 +72,7 @@ final class AppState: ObservableObject {
         AppState(
             options: options, defaults: options.testMode ? AppDefaults.store : .standard,
             helper: options.testMode ? nil : SMAppHelperService(),
-            // Two connections: names and content never wait on each other.
+            // Three connections: names, content, and control never wait on each other.
             names: DaemonClient(socketPath: options.socketPath),
             content: DaemonClient(socketPath: options.socketPath),
             control: DaemonClient(socketPath: options.socketPath),
@@ -118,13 +118,17 @@ final class AppState: ObservableObject {
         _editorRaw = AppStorage(wrappedValue: "", "editor", store: defaults)
         search.onSearched = { [weak self] e in
             guard let self, self.debugMode else { return }
-            self.log.append(e, at: Date())
+            self.log.appendAsync(e, at: Date())
         }
         search.onSettled = { [weak self] phase in self?.searchSettled(phase) }
     }
 
     /// The restart budget and recovery check (shared by every panel open).
     var status: MenuBarStatus = .shared
+    /// Coalesces disconnect-driven restarts so rapid failures don't burn extra budget tokens.
+    private var disconnectRestartTask: Task<Void, Never>?
+    /// Coalesces recovery refreshes while `daemon.isUnresponsive`.
+    private var recoveryRefreshTask: Task<Void, Never>?
 
     /// Handles every finished search; wired to ``SearchModel/onSettled``.
     ///
@@ -140,23 +144,29 @@ final class AppState: ObservableObject {
             status.restartBudget.reset()
             // Searches work, so a "failed" or "needs approval" warning is
             // stale (e.g. the daemon came back): re-check, at most every 5 s.
-            // "Isn't answering" is plainly wrong now: re-check at once.
+            // "Isn't answering" is plainly wrong now: re-check at once (coalesced).
             let unhealthy =
                 switch daemon.state {
                 case .failed, .needsApproval: true
                 default: false
                 }
-            if daemon.isUnresponsive || status.recoveryCheck.shouldRefresh(daemonUnhealthy: unhealthy) {
-                Task { await daemon.refresh() }
+            if recoveryRefreshTask == nil, daemon.isUnresponsive || status.recoveryCheck.shouldRefresh(daemonUnhealthy: unhealthy) {
+                recoveryRefreshTask = Task { [weak self] in
+                    defer { self?.recoveryRefreshTask = nil }
+                    await self?.daemon.refresh()
+                }
             }
         case .failed(.disconnected):
+            // A restart is already running (and will refresh the search when it finishes): don't burn another token.
+            if daemon.isRestarting || disconnectRestartTask != nil { return }
             // `restart()` re-registers only a daemon the app owns; a CLI daemon is just re-checked.
             // Out of restarts: say the helper isn't answering, not "Starting search…".
             guard status.restartBudget.spend() else { daemon.markUnresponsive(); return }
-            Task {
-                await daemon.restart()
-                guard !daemon.recoverySuspended else { return }
-                await search.refresh()
+            disconnectRestartTask = Task { [weak self] in
+                await self?.daemon.restart()
+                self?.disconnectRestartTask = nil
+                guard let self, !self.daemon.recoverySuspended else { return }
+                await self.search.refresh()
             }
         case .failed(.timeout):
             daemon.markUnresponsive()

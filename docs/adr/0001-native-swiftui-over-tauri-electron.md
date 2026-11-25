@@ -24,3 +24,7 @@ The app targets macOS 14 and later, on Apple silicon and Intel.
 - The app runs only on macOS. That is acceptable: it is a Mac app by name and purpose.
 - Parts that need AppKit add some code beside the SwiftUI views.
 - Tauri was rejected because a web UI is weakest in exactly those native areas. Electron was rejected for slow start and heavy memory.
+
+## Update note
+
+The minimum deployment target was later raised from macOS 14 to macOS 15 (Sequoia) across both `FSearchKit` and the app target (`project.yml`, `Package.swift`).

@@ -45,9 +45,10 @@ final class AppMenuState {
             model.open()
             return .handled
         }
-        // Tab would move the keyboard to the search field behind the menu.
-        if p.key == .tab || p.key.character == "\u{19}" { return .handled }
-        guard let key else { return .ignored }
+        // Tab / Shift-Tab would move the keyboard to the search field behind the menu;
+        // U+0019 is NSBackTabCharacter, but ⌃Y also arrives as ASCII EM (0x19).
+        if p.key == .tab || (p.key.character == "\u{19}" && !p.control) { return .handled }
+        guard let key else { return PanelInput.swallows(p) ? .handled : .ignored }
         perform(model.handle(key), run)
         return .handled
     }

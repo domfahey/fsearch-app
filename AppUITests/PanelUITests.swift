@@ -22,22 +22,22 @@ final class PanelUITests: PanelUITestCase {
         waitFor(text("plover-two.txt"))
         // The copied path follows the selection.
         try press("c", [.command, .shift])
-        let first = try XCTUnwrap(clipboard)
+        let first = try waitForClipboard(matching: { $0.hasSuffix("plover-one.txt") || $0.hasSuffix("plover-two.txt") })
         try press(.downArrow)
         try press("c", [.command, .shift])
-        let second = try XCTUnwrap(clipboard)
+        let second = try waitForClipboard(matching: { $0 != first && ($0.hasSuffix("plover-one.txt") || $0.hasSuffix("plover-two.txt")) })
         XCTAssertNotEqual(first, second)
         XCTAssertEqual(Set([first, second].map { ($0 as NSString).lastPathComponent }), ["plover-one.txt", "plover-two.txt"])
         try press(.upArrow)
         try press("c", [.command, .shift])
-        XCTAssertEqual(clipboard, first)
+        _ = try waitForClipboard(matching: { $0 == first })
         // ⌃N / ⌃P move it too.
         try press("n", .control)
         try press("c", [.command, .shift])
-        XCTAssertEqual(clipboard, second)
+        _ = try waitForClipboard(matching: { $0 == second })
         try press("p", .control)
         try press("c", [.command, .shift])
-        XCTAssertEqual(clipboard, first)
+        _ = try waitForClipboard(matching: { $0 == first })
     }
 
     func testSearchInsideFilesByKeyboard() throws {
@@ -46,7 +46,8 @@ final class PanelUITests: PanelUITestCase {
         waitFor(text("notes.md"))
         waitFor(text(containing: "the quokkaneedle line"))
         XCTAssertTrue(text(containing: "2 ·").exists, "the line number is shown")
-        XCTAssertTrue(text("Open at line").exists)
+        // Default app is chosen in test mode (no line-jumping editor), so the footer says "Open".
+        XCTAssertTrue(text("Open").exists)
     }
 
     func testFindDefinitions() throws {
@@ -89,12 +90,12 @@ final class PanelUITests: PanelUITestCase {
         try search("heronfile")
         waitFor(text("heronfile.txt"))
         try press("c", [.command, .shift])
-        XCTAssertEqual(clipboard?.hasSuffix("/proj/heronfile.txt"), true)
+        _ = try waitForClipboard(matching: { $0.hasSuffix("/proj/heronfile.txt") })
         // A query only the emoji file matches.
         try search("zq wv")
         waitFor(text("🏡 zq wv.txt"))
         try press("c", [.command, .shift])
-        XCTAssertEqual(clipboard?.hasSuffix("/proj/🏡 zq wv.txt"), true)
+        _ = try waitForClipboard(matching: { $0.hasSuffix("/proj/🏡 zq wv.txt") })
     }
 
     func testQuickLookOpensAndCloses() throws {
@@ -119,7 +120,7 @@ final class PanelUITests: PanelUITestCase {
         waitFor(text("plover-one.txt"))
         waitFor(text("plover-two.txt"))
         try press("c", [.command, .shift])
-        let first = try XCTUnwrap(clipboard)
+        let first = try waitForClipboard(matching: { $0.hasSuffix("plover-one.txt") || $0.hasSuffix("plover-two.txt") })
         let preview = app.windows["Quick Look"]
         try press("y", .command)
         waitFor(preview, 10)
@@ -129,7 +130,7 @@ final class PanelUITests: PanelUITestCase {
         waitUntil(5, "field focused") { self.field.value(forKey: "hasKeyboardFocus") as? Bool == true }
         // The selection moved while the preview was up.
         try press("c", [.command, .shift])
-        let second = try XCTUnwrap(clipboard)
+        let second = try waitForClipboard(matching: { $0 != first && ($0.hasSuffix("plover-one.txt") || $0.hasSuffix("plover-two.txt")) })
         XCTAssertNotEqual(first, second)
         XCTAssertEqual(Set([first, second].map { ($0 as NSString).lastPathComponent }), ["plover-one.txt", "plover-two.txt"])
     }

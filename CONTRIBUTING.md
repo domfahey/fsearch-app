@@ -74,7 +74,7 @@ Two modes keep tests away from your real setup. **Test mode** starts when you pa
 | Lint, type and test together | `make check` | |
 | Everything CI runs, with the coverage gates | `make ci` | |
 | Coverage of FSearchKit only | `make coverage-kit` | `scripts/coverage.sh --kit-only` |
-| Coverage of both app suites plus FSearchKit | `make coverage` | `scripts/coverage.sh` |
+| Coverage of both app suites (plus FSearchKit when `--min` / `COVERAGE_MIN` is set) | `make coverage` | `scripts/coverage.sh` |
 | Check developer prerequisites | `make doctor` | |
 | Install developer prerequisites (not the app) | `make install` | `brew install xcodegen`, `rustup target add aarch64-apple-darwin x86_64-apple-darwin`, `make hooks` |
 | Remove build outputs / also the daemon and generated project | `make clean` / `make distclean` | |
@@ -140,7 +140,7 @@ Use the issue templates. For a bug, include the Index Details output from debug 
 ## Updating dependencies
 
 - GitHub Actions are pinned to full commit SHAs, each with a version comment. Dependabot updates them weekly. Only pin a release that is at least two weeks old.
-- The app's Swift packages (KeyboardShortcuts and Sparkle) are declared in `project.yml` for XcodeGen. Dependabot cannot read that file. Bump `exactVersion` there by hand, again choosing a release at least two weeks old, and update [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) to match. Then run `scripts/gen-credits.sh` to rebuild the About window credits, which `make lint` checks.
+- The app's Swift packages (KeyboardShortcuts and Sparkle) are declared in `project.yml` for XcodeGen. Dependabot cannot read that file. Bump `exactVersion` there by hand, again choosing a release at least two weeks old, resolve packages to update the committed `Package.resolved` (CI and release builds pass `-onlyUsePackageVersionsFromResolvedFile`), and update [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) to match. Then run `scripts/gen-credits.sh` to rebuild the About window credits, which `make lint` checks.
 - `Packages/FSearchKit` has no dependencies.
 
 ### Bumping the daemon pin

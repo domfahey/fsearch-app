@@ -72,6 +72,13 @@ public final class SearchModel {
         public let roundTripMs: Double
         /// The error's text, or nil.
         public let error: String?
+
+        /// Creates a log entry (used by tests and benchmarks).
+        public init(query: String, mode: SearchMode, resultCount: Int, tookUs: UInt64?, roundTripMs: Double, error: String?) {
+            (self.query, self.mode, self.resultCount, self.tookUs, self.roundTripMs, self.error) = (
+                query, mode, resultCount, tookUs, roundTripMs, error
+            )
+        }
     }
 
     /// The text in the search box; set it, then call ``refresh()``.
@@ -112,7 +119,7 @@ public final class SearchModel {
 
     /// The most rows the panel shows, however many the daemon sends back
     /// (`limit:100000` asks for that many).
-    public nonisolated static let shownLimit = 1000
+    nonisolated static let shownLimit = 1000
 
     /// Creates a model.
     ///
@@ -156,11 +163,16 @@ public final class SearchModel {
             return
         }
         phase = .loading
-        let started = Date()
+        let started = ContinuousClock.now
         let task = Task { try await self.run(q, mode) }
         inflight = task
+        defer { if gen == generation { inflight = nil } }
         do {
-            let (all, took) = try await task.value
+            let (all, took) = try await withTaskCancellationHandler {
+                try await task.value
+            } onCancel: {
+                task.cancel()
+            }
             let found = Array(all.prefix(Self.shownLimit))
             guard gen == generation else { return }
             (items, phase, lastTookUs, answered) = (found, .results, took, (q, mode))
@@ -188,7 +200,7 @@ public final class SearchModel {
     /// A query with nothing but spaces searches nothing.
     ///
     /// - Parameter q: The typed query.
-    public nonisolated static func isBlank(_ q: String) -> Bool {
+    nonisolated static func isBlank(_ q: String) -> Bool {
         q.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
@@ -210,9 +222,11 @@ public final class SearchModel {
             var hits: [Hit] = [], took: UInt64 = 0
             for form in forms {
                 let r = try await names.search(form, limit: 50)
-                (hits, took) = (hits + r.hits, took + r.tookUs)
+                hits.append(contentsOf: r.hits)
+                took = took &+ r.tookUs
             }
-            return (Self.merged(hits, limit: QuerySplit.limit(q) ?? 50).map(ResultItem.file), took)
+            let limit = min(QuerySplit.limit(q) ?? 50, Self.shownLimit)
+            return (Self.merged(hits, limit: limit).map(ResultItem.file), took)
         case .content, .symbols:
             let (pattern, filters) = QuerySplit.split(q)
             let r = try await content.grep(q: filters, pattern: pattern, mode: mode == .symbols ? .symbol : .literal)
@@ -249,9 +263,10 @@ public final class SearchModel {
     }
 
     /// Tells the observers a search finished; `phase` is already updated.
-    private func report(_ q: String, _ mode: SearchMode, _ n: Int, _ took: UInt64?, _ started: Date, _ err: String?) {
-        onSearched?(
-            LogEntry(query: q, mode: mode, resultCount: n, tookUs: took, roundTripMs: Date().timeIntervalSince(started) * 1000, error: err))
+    private func report(_ q: String, _ mode: SearchMode, _ n: Int, _ took: UInt64?, _ started: ContinuousClock.Instant, _ err: String?) {
+        let elapsed = started.duration(to: .now)
+        let ms = Double(elapsed.components.seconds) * 1000 + Double(elapsed.components.attoseconds) / 1e15
+        onSearched?(LogEntry(query: q, mode: mode, resultCount: n, tookUs: took, roundTripMs: ms, error: err))
         onSettled?(phase)
     }
 }

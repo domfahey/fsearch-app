@@ -23,8 +23,8 @@ func sysctlString(_ name: String) -> String {
 func machineKey() -> String {
     if let k = ProcessInfo.processInfo.environment["BENCH_MACHINE"], !k.isEmpty { return k }
     let chip = sysctlString("machdep.cpu.brand_string").lowercased()
-        .map { $0.isLetter || $0.isNumber ? $0 : "-" }
-    return "\(sysctlString("hw.model"))-\(String(chip))".replacingOccurrences(of: "--", with: "-")
+        .split { !$0.isLetter && !$0.isNumber }.joined(separator: "-")
+    return "\(sysctlString("hw.model"))-\(chip)"
 }
 
 /// The daemon client timeout in seconds: `$FSEARCH_BENCH_TIMEOUT` when it is a
@@ -101,7 +101,10 @@ case "run":
     var config = BenchConfig()
     if let f = args.opts["filter"] { config.filter = f.split(separator: ",").map(String.init) }
     if args.flags.contains("self-test") { config.slowdown = 2 }
-    if let s = args.opts["samples"], let n = Int(s) { config.samples = n; config.daemonSamples = n }
+    if let s = args.opts["samples"] {
+        guard let n = Int(s), n > 0 else { fail("--samples must be a positive integer (got '\(s)')") }
+        config.samples = n; config.daemonSamples = n; config.samplesOverride = n
+    }
 
     let key = args.opts["machine"] ?? machineKey()
     var load = [Double](repeating: 0, count: 3)
@@ -142,7 +145,8 @@ case "run":
     do { try await benchClient(bench, work: work) } catch { failure = error }
 
     let daemonWanted =
-        config.filter.isEmpty || config.filter.contains { "daemon.".hasPrefix($0) || $0.hasPrefix("daemon") || $0.hasPrefix("index") }
+        config.filter.isEmpty
+        || config.filter.contains { "daemon.".hasPrefix($0) || "index.".hasPrefix($0) || $0.hasPrefix("daemon") || $0.hasPrefix("index") }
     if failure == nil, daemonWanted, !args.flags.contains("skip-daemon") {
         let bin = args.opts["daemon"].map { URL(fileURLWithPath: $0) }
         if let bin, FileManager.default.isExecutableFile(atPath: bin.path) {

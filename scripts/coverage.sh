@@ -18,7 +18,7 @@
 # Output goes to build/coverage/ (COVERAGE_OUT overrides).
 #
 # "Excluding system adapters" leaves out the functions in EXCLUDE below:
-# thin pass-throughs to SMAppService, NSWorkspace/Process/Trash, app
+# thin pass-throughs to SMAppService, NSWorkspace/Trash, app
 # activation and Sparkle, which tests replace with fakes and never run for real.
 #
 # Prerequisites: Xcode, and `xcodegen generate` run once (FSearch.xcodeproj);
@@ -36,27 +36,31 @@ OUT=${COVERAGE_OUT:-build/coverage}
 mode=both
 UNIT="$OUT/unit.xcresult" UI="$OUT/ui.xcresult"
 MIN=${COVERAGE_MIN:-}
+usage() { echo "usage: $0 [--unit-only | --kit-only | --reuse UNIT.xcresult [UI.xcresult]] [--min PERCENT]" >&2; exit 2; }
 args=()
 while [ $# -gt 0 ]; do
   case "$1" in
-    --min) MIN=${2:?--min needs a percentage}; shift 2 ;;
+    --min) [ $# -ge 2 ] || usage; MIN=$2; shift 2 ;;
     --min=*) MIN=${1#--min=}; shift ;;
     *) args+=("$1"); shift ;;
   esac
 done
-# --min must be a plain decimal number (no sign, one dot at most).
-case "$MIN" in "" | *[!0-9.]* | *.*.*) [ -z "$MIN" ] || { echo "coverage: --min must be a number, got '$MIN'" >&2; exit 2; } ;; esac
+# --min must be a plain decimal number (no sign, one dot at most, not a bare dot).
+case "$MIN" in
+  "") ;;
+  *[!0-9.]* | *.*.* | ".") echo "coverage: --min must be a number, got '$MIN'" >&2; exit 2 ;;
+esac
 # Re-set the positional parameters to what remains after removing --min; ${args[@]+...} is safe when empty under `set -u`.
 set -- ${args[@]+"${args[@]}"}
-usage() { echo "usage: $0 [--unit-only | --kit-only | --reuse UNIT.xcresult [UI.xcresult]] [--min PERCENT]" >&2; exit 2; }
 case "${1:-}" in
-  --unit-only) mode=unit ;;
-  --kit-only) mode=kit ;;
-  --reuse) mode=reuse; UNIT=${2:?--reuse needs a unit .xcresult}; UI=${3:-} ;;
+  --unit-only) [ $# -eq 1 ] || usage; mode=unit ;;
+  --kit-only) [ $# -eq 1 ] || usage; mode=kit ;;
+  --reuse) [ $# -ge 2 ] && [ $# -le 3 ] || usage; mode=reuse; UNIT=$2; UI=${3:-} ;;
   "") ;;
   *) usage ;;
 esac
 mkdir -p "$OUT"
+OUT_ABS=$(cd "$OUT" && pwd)
 rc=0
 # Throwaway defaults suites the tests leave behind (TestEnv, AppDefaults.testSuiteName);
 # never the real com.domfahey.fsearch.plist.
@@ -67,7 +71,7 @@ trap sweep_test_defaults EXIT
 # FSearchKit line coverage from SwiftPM (llvm-cov), gated by --min.
 kit_coverage() {
   echo "== FSearchKit (swift test --enable-code-coverage)"
-  ( cd Packages/FSearchKit && swift test --enable-code-coverage > "../../$OUT/kit.log" 2>&1 ) || { tail -20 "$OUT/kit.log"; echo "coverage: FSearchKit tests failed" >&2; return 1; }
+  ( cd Packages/FSearchKit && swift test --enable-code-coverage > "$OUT_ABS/kit.log" 2>&1 ) || { tail -20 "$OUT_ABS/kit.log"; echo "coverage: FSearchKit tests failed" >&2; return 1; }
   local pkg=Packages/FSearchKit bin prof
   bin=$(find "$pkg/.build" -name FSearchKitPackageTests.xctest -path '*debug*' | head -1)
   prof=$pkg/.build/debug/codecov/default.profdata
@@ -86,7 +90,7 @@ PY
 }
 
 if [ "$mode" = kit ]; then kit_coverage; exit $?; fi
-if [ "$mode" = both ] && [ -n "$MIN" ]; then kit_coverage || rc=1; fi
+if [ "$mode" = both ]; then kit_coverage || rc=1; fi
 
 if [ "$mode" != reuse ]; then
   rm -rf "$UNIT"
@@ -99,7 +103,7 @@ if [ "$mode" != reuse ]; then
   if [ "$mode" = both ]; then
     rm -rf "$UI"
     echo "== AppUITests (end to end)"
-    bash scripts/ui-smoke.sh -enableCodeCoverage YES -resultBundlePath "$PWD/$UI" || rc=1
+    bash scripts/ui-smoke.sh -enableCodeCoverage YES -resultBundlePath "$OUT_ABS/ui.xcresult" || rc=1
   else
     UI=
   fi
@@ -120,12 +124,15 @@ for b in "${BUNDLES[@]}"; do
   echo "== $(basename "$b")"
   xcrun xccov view --report --only-targets "$b" | grep -E 'FSearch.app|FSearchKit|Name'
 done
-echo "== combined ($(basename "$REPORT"))"
-xcrun xccov view --report --only-targets "$REPORT"
+if [ ${#BUNDLES[@]} -gt 1 ]; then
+  echo "== combined ($(basename "$REPORT"))"
+  xcrun xccov view --report --only-targets "$REPORT"
+fi
 
-xcrun xccov view --report --json "$REPORT" > "$OUT/report.json"
+xcrun xccov view --report --json "$REPORT" > "$OUT/report.json" \
+  || { echo "coverage: xccov failed to read $REPORT" >&2; exit 1; }
 python3 -I - "$OUT/report.json" "$MIN" <<'PY' || rc=1
-import json, re, sys
+import json, sys
 # file name -> the functions (exact xccov names) of system adapters left out
 # of the second number. Listed one by one, so a new function in these files is
 # counted unless someone decides it is an adapter too.
@@ -153,8 +160,9 @@ EXCLUDE = {
 d = json.load(open(sys.argv[1]))
 app = next(t for t in d["targets"] if t["name"] == "FSearch.app")
 cov = exe = xcov = xexe = 0
-rows, excluded, problems = [], [], []
+rows, excluded, problems, seen_files = [], [], [], set()
 for f in app["files"]:
+    seen_files.add(f["name"])
     fc, fe = f["coveredLines"], f["executableLines"]
     names = EXCLUDE.get(f["name"], [])
     ec = ee = 0
@@ -170,18 +178,22 @@ for f in app["files"]:
         problems.append(f"{f['name']}: excludes {ee} lines of {fe} executable")
     cov += fc; exe += fe; xcov += fc - ec; xexe += fe - ee
     rows.append((f["name"], fc, fe))
+for missing_file in sorted(set(EXCLUDE) - seen_files):
+    problems.append(f"{missing_file}: excluded file not in the report (renamed?)")
 print("\n== FSearch.app per file")
 for name, c, e in sorted(rows, key=lambda r: r[1] / max(r[2], 1)):
     print(f"  {100 * c / max(e, 1):6.2f}%  {c:4d}/{e:<4d}  {name}")
 print("\n== excluded system adapters (covered/executable lines)")
 for fname, fn, c, e in excluded:
     print(f"  {c:3d}/{e:<3d}  {fname}: {fn}")
-print(f"\nFSearch.app raw:                        {100 * cov / exe:.2f}% ({cov}/{exe})")
-print(f"FSearch.app excluding system adapters:  {100 * xcov / xexe:.2f}% ({xcov}/{xexe})")
+raw_pct = 100 * cov / exe if exe else 0.0
+excl_pct = 100 * xcov / xexe if xexe else 0.0
+print(f"\nFSearch.app raw:                        {raw_pct:.2f}% ({cov}/{exe})")
+print(f"FSearch.app excluding system adapters:  {excl_pct:.2f}% ({xcov}/{xexe})")
 for p in problems: print(f"coverage: {p}", file=sys.stderr)
-bad = bool(problems)
-if len(sys.argv) > 2 and sys.argv[2] and 100 * xcov / xexe < float(sys.argv[2]):
-    print(f"coverage: FSearch.app excluding system adapters {100 * xcov / xexe:.2f}% is below the minimum {sys.argv[2]}%", file=sys.stderr)
+bad = bool(problems) or not xexe
+if len(sys.argv) > 2 and sys.argv[2] and excl_pct < float(sys.argv[2]):
+    print(f"coverage: FSearch.app excluding system adapters {excl_pct:.2f}% is below the minimum {sys.argv[2]}%", file=sys.stderr)
     bad = True
 sys.exit(1 if bad else 0)
 PY

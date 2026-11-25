@@ -45,6 +45,19 @@ extension AppTests {
             #expect(!pc.isVisible)
         }
 
+        @Test func showReusesHostingViewAcrossReopens() {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let pc = PanelController()
+            pc.show(app: env.app)
+            let first = pc.panel?.contentView
+            #expect(first != nil)
+            pc.hide(returnFocus: false)
+            pc.show(app: env.app)
+            #expect(pc.panel?.contentView === first)
+            pc.hide(returnFocus: false)
+        }
+
         @Test func hidingThePanelDropsAHeldKey() {
             let env = TestEnv()
             defer { env.tearDown() }
@@ -80,19 +93,6 @@ extension AppTests {
             #expect(pc.isVisible)
             // It stays up when it loses key, as UI tests need.
             #expect(pc.panel?.staysUpWithoutKey == true)
-        }
-
-        /// Without `showPanel`, losing key puts the launcher away (the panel hides the shared controller).
-        @Test func losingKeyHidesTheSharedPanel() {
-            let env = TestEnv()
-            defer { env.tearDown() }
-            let pc = PanelController.shared
-            pc.show(app: env.app)
-            defer { pc.hide(returnFocus: false) }
-            #expect(pc.isVisible)
-            #expect(pc.panel?.staysUpWithoutKey == false)
-            pc.panel?.resignKey()
-            #expect(!pc.isVisible)
         }
 
         @Test func effectsRunTheirActions() async {

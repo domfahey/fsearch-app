@@ -11,7 +11,7 @@ The app cannot reach the search daemon. It restarts the daemon it registered its
 1. Wait a few seconds. A restarting daemon usually answers soon.
 2. Look at the menu-bar icon. If it shows a warning, open the menu and choose **Fix…** to open Index Details.
 3. Check **Login Items**: System Settings, General, Login Items & Extensions. FSearch should be on.
-4. In Index Details, press **Restart Daemon**, and read the end of `daemon.log`.
+4. In Index Details, press **Restart Daemon**, and check `daemon.log` (if using the CLI daemon) or the unified log below (the bundled helper does not write `daemon.log`).
 5. If you use the CLI daemon, restart it from the CLI.
 
 ## "Indexing your disk… results will appear shortly"
@@ -27,8 +27,9 @@ The icon changes to a magnifying glass with an exclamation mark. Open the menu t
 | Message | What to do |
 |---|---|
 | The search helper isn't running | Choose **Fix…**, then **Restart Daemon**. |
+| The search helper isn't answering | Choose **Fix…**, then **Restart Daemon**. |
 | The search helper needs your approval | Choose **Fix…**, then **Open Login Items Settings** and turn FSearch on. See below. |
-| Full Disk Access is off, so some files won't be found | See [Grant Full Disk Access](../how-to/grant-full-disk-access.md). This one has no **Fix…** button. If you skipped the Full Disk Access step, the menu-bar icon is a quieter magnifying glass in a circle, and the menu offers **Turn On Full Disk Access…** (**Grant Full Disk Access to fsearch…** when the app is using your CLI daemon) and **Don't Remind Me**. |
+| Full Disk Access is off, so some files won't be found | See [Grant Full Disk Access](../how-to/grant-full-disk-access.md). This one has no **Fix…** button; the menu offers **Turn On Full Disk Access…** (**Grant Full Disk Access to fsearch…** when using your CLI daemon). If you skipped the Full Disk Access step during onboarding, the menu-bar icon is a quieter magnifying glass in a circle and the menu also offers **Don't Remind Me**. |
 
 ## Files in Desktop, Documents, Downloads, Mail or iCloud Drive are missing
 
@@ -65,7 +66,8 @@ These are the exact texts the panel shows when a search cannot return results.
 
 | You see | Meaning | What to do |
 |---|---|---|
-| Starting search… | The app cannot reach the daemon yet, or it did not answer in time. | See ["Starting search…" does not go away](#starting-search-does-not-go-away). |
+| Starting search… | The app cannot reach the daemon yet and is trying to reconnect or restart it. | See ["Starting search…" does not go away](#starting-search-does-not-go-away). |
+| The search helper isn't answering | A search timed out, or the app spent its restarts without reaching the daemon. | See ["Starting search…" does not go away](#starting-search-does-not-go-away) and check Index Details. |
 | Indexing your disk… results will appear shortly | The first index is still being built. | Wait. See [Indexing](#indexing-your-disk-results-will-appear-shortly). |
 | Unexpected reply from the search daemon: *detail* | The daemon answered with something the app does not understand, for example `reply has no "hits"`. This usually means the app and the daemon are different versions. | Quit and reopen FSearch. If it persists, [report it](../../.github/SUPPORT.md) with the detail text. |
 | *The daemon's own message* (in red) | The daemon rejected the query. | Fix the query. |
@@ -109,7 +111,7 @@ FSearch writes to the macOS unified log under the subsystem `com.domfahey.fsearc
 log stream --predicate 'subsystem == "com.domfahey.fsearch"' --level debug
 ```
 
-In Console.app, choose your Mac, then search for `subsystem:com.domfahey.fsearch`. Turn on Action > Include Debug Messages to see routine polls.
+In Console.app, choose your Mac, then search for `subsystem:com.domfahey.fsearch`. Turn on Action > Include Info Messages to see state changes (routine polls stay quiet).
 
 File paths, queries and file names are never logged in the clear. They show as `<private>` unless private data is enabled for logging on your Mac.
 

@@ -13,8 +13,8 @@ fail=0
 check=()
 for f in "${files[@]}"; do
   # A submodule entry (mode 160000) is a commit, not a file.
-  case "$(git ls-files -s -- "$f")" in 160000\ *) continue ;; esac
-  if ! { mkdir -p "$tmp/$(dirname "$f")" && git show ":$f" > "$tmp/$f"; }; then
+  case "$(git ls-files -s -- ":(literal)$f")" in 160000\ *) continue ;; esac
+  if ! { mkdir -p "$tmp/$(dirname -- "$f")" && git show ":$f" > "$tmp/$f"; }; then
     echo "secret check: could not write the staged $f to check it" >&2; fail=1; continue
   fi
   check+=("$f")

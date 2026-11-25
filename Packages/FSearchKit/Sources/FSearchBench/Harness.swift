@@ -76,6 +76,8 @@ struct BenchConfig: Sendable {
     var sampleTargetNs: UInt64 = 2_000_000
     var daemonWarmup = 10
     var daemonSamples = 100
+    /// Explicit `--samples N` override, applied to async benchmarks too.
+    var samplesOverride: Int? = nil
     /// `--self-test`: every measured operation runs this many times, a real
     /// N-fold slowdown that the regression check must catch.
     var slowdown = 1
@@ -162,6 +164,8 @@ func stats(
         info: (() -> [String: String]?)? = nil, _ body: () async throws -> Void
     ) async throws {
         guard config.wants(name) else { return }
+        let sampleCount = config.samplesOverride ?? samples
+        let warmupCount = config.samplesOverride.map { Swift.min(warmup, $0) } ?? warmup
         let factor = config.slowdown
         func once() async throws {
             do { try await body() } catch DaemonError.timeout {
@@ -170,9 +174,9 @@ func stats(
             }
         }
         do {
-            for _ in 0..<warmup { try await once() }
+            for _ in 0..<warmupCount { try await once() }
             var perOp: [Double] = []
-            for _ in 0..<samples {
+            for _ in 0..<sampleCount {
                 let t0 = now()
                 for _ in 0..<factor { try await once() }
                 perOp.append(Double(now() - t0))

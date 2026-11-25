@@ -5,9 +5,15 @@
 #
 # Usage: scripts/gen-credits.sh [--check]
 # Prerequisites: none beyond the macOS base tools. Writes only App/Resources/Credits.html.
-# Exit codes: 0 ok; 1 with --check when Credits.html differs from a fresh build.
+# Exit codes: 0 ok; 1 with --check when Credits.html differs from a fresh build; 2 bad usage.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+CHECK=0
+case "${1:-}" in
+  "") ;;
+  --check) [ $# -eq 1 ] || { echo "usage: $0 [--check]" >&2; exit 2; }; CHECK=1 ;;
+  *) echo "usage: $0 [--check]" >&2; exit 2 ;;
+esac
 out=App/Resources/Credits.html
 # Build into a temp file first so --check can compare and a failure never leaves a half-written Credits.html.
 tmp=$(mktemp)
@@ -32,7 +38,7 @@ EOF
   sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' THIRD_PARTY_NOTICES.md
   printf '</pre>\n</body></html>\n'
 } > "$tmp"
-if [ "${1:-}" = "--check" ]; then
+if [ "$CHECK" = 1 ]; then
   cmp -s "$tmp" "$out" || { echo "gen-credits: $out is out of date; run scripts/gen-credits.sh" >&2; exit 1; }
 else
   cp "$tmp" "$out"

@@ -15,9 +15,11 @@ import Testing
         #expect(MenuBarWarning.evaluate(.needsApproval, skippedFullDiskAccess: false)?.offersFix == true)
     }
 
-    @Test func revokedFullDiskAccessIsAGentleReminder() {
+    @Test func revokedFullDiskAccessOffersActionWithoutDismiss() {
         let w = MenuBarWarning.evaluate(.running(fullDiskAccess: false), skippedFullDiskAccess: false)
         #expect(w?.offersFix == false)
+        #expect(w?.offersFullDiskAccess == true)
+        #expect(w?.symbol == "exclamationmark.magnifyingglass")
         #expect(w?.message.contains("Full Disk Access") == true)
     }
 
@@ -41,7 +43,7 @@ import Testing
     @Test func neverSkippedKeepsTheFailureStyleReminder() {
         let w = MenuBarWarning.evaluate(.running(fullDiskAccess: false), skippedFullDiskAccess: false, dismissedReminder: true)
         #expect(w?.symbol == "exclamationmark.magnifyingglass")
-        #expect(w?.offersFullDiskAccess == false)
+        #expect(w?.offersFullDiskAccess == true)
     }
 
     @Test func failureStillWinsOverTheReminder() {

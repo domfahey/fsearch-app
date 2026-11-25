@@ -53,6 +53,20 @@ extension AppTests {
             #expect(env.workspace.opened == [URL(fileURLWithPath: "/p/readme.md")])
         }
 
+        @Test func opensAtLineReflectsEditorSchemeSupport() {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            #expect(!FileActions.opensAtLine(file, editor: .vscode))
+            #expect(!FileActions.opensAtLine(line, editor: nil))
+            #expect(!FileActions.opensAtLine(line, editor: .vscode))  // not installed
+            env.workspace.apps[Editor.xcode.bundleId] = URL(fileURLWithPath: "/Applications/Xcode.app")
+            #expect(!FileActions.opensAtLine(line, editor: .xcode))
+            env.workspace.apps[Editor.vscode.bundleId] = vscodeApp
+            #expect(!FileActions.opensAtLine(line, editor: .vscode))  // scheme not registered
+            env.workspace.schemeHandlers["vscode"] = [vscodeApp]
+            #expect(FileActions.opensAtLine(line, editor: .vscode))
+        }
+
         /// A-H1: the editor is opened by LaunchServices with its URL, so it
         /// never runs as FSearch's child (with FSearch's Full Disk Access).
         @Test func openLineInEditorThroughLaunchServices() throws {
@@ -397,6 +411,18 @@ extension AppTests {
             run(menu.item(withTitle: "Reveal in Finder"))
             #expect(env.workspace.revealed.isEmpty)
             #expect(env.panel.hides == 0)
+            env.app.actionError = nil
+            run(menu.item(withTitle: "Copy File"))
+            #expect(env.app.actionError == "“gone.txt” is gone: moved or deleted")
+            #expect((env.pasteboard.readObjects(forClasses: [NSURL.self]) ?? []).isEmpty)
+            env.app.actionError = nil
+            run(menu.item(withTitle: "Quick Look"))
+            #expect(env.app.actionError == "“gone.txt” is gone: moved or deleted")
+            env.app.actionError = nil
+            env.workspace.apps["com.apple.Terminal"] = URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app")
+            run(menu.item(withTitle: "Open Folder in Terminal"))
+            #expect(env.app.actionError == "“gone.txt” is gone: moved or deleted")
+            #expect(env.workspace.openedWith.isEmpty)
         }
 
         /// Item 10: an Open With launch error reaches the footer.

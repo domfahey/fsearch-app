@@ -11,7 +11,7 @@ Follow the sections in order. Do the setup once, then repeat "Cut a release" for
 - [ ] Install a Developer ID Application certificate, then `export DEVELOPER_ID="Developer ID Application: Your Name (TEAMID)"`.
 - [ ] Store notary credentials: `xcrun notarytool store-credentials fsearch-notary`.
 - [ ] Set up the GitHub Pages site behind `SUFeedURL` (`https://domfahey.github.io/fsearch-app/appcast.xml`). Serve it from the root of a `gh-pages` branch, so `appcast.xml` sits at the top level.
-- [ ] For tag builds in CI, add these repository secrets: `DEVELOPER_ID`, `DEVELOPER_ID_CERT_P12_BASE64`, `DEVELOPER_ID_CERT_PASSWORD`, `KEYCHAIN_PASSWORD`, `NOTARY_API_KEY_P8_BASE64` (the `.p8` file, base64), `NOTARY_API_KEY_ID` and `NOTARY_API_ISSUER_ID`.
+- [ ] For tag builds in CI, add these secrets to the `release` environment: `DEVELOPER_ID`, `DEVELOPER_ID_CERT_P12_BASE64`, `DEVELOPER_ID_CERT_PASSWORD`, `KEYCHAIN_PASSWORD`, `NOTARY_API_KEY_P8_BASE64` (the `.p8` file, base64), `NOTARY_API_KEY_ID` and `NOTARY_API_ISSUER_ID`.
 
 ## Cut a release
 
@@ -30,7 +30,7 @@ Follow the sections in order. Do the setup once, then repeat "Cut a release" for
 
 ### 3. Build the release
 
-CI's tag build is the release of record. Pushing a `v*` tag runs the `release` job, which waits for the `kit`, `app` and `lint` jobs, then runs `scripts/release.sh` in two phases (see [CI release job](#ci-release-job-environment-approval-provenance)). That script builds, signs, notarizes and staples the app and DMG, verifies both, and writes the SHA-256 checksum. If the repository protects the job with an environment that needs approval, approve the run.
+CI's tag build is the release of record. Pushing a `v[0-9]*` tag runs the `release` job, which waits for the `kit`, `app` and `lint` jobs, then runs `scripts/release.sh` in two phases (see [CI release job](#ci-release-job-environment-approval-provenance)). That script builds and signs the app, notarizes and staples the app first (so the copy inside the DMG carries its own ticket for offline Gatekeeper checks), packages and signs the DMG, notarizes and staples the DMG, verifies both, and writes the SHA-256 checksum. If the repository protects the job with an environment that needs approval, approve the run.
 
 - [ ] Watch the run finish. Download the `FSearch-dmg` artifact from the run. It holds the DMG, its `.sha256` checksum and the `.intoto.jsonl` provenance attestation.
 
@@ -62,8 +62,8 @@ CI does not run the UI tests (hosted runners have no GUI session). Run them loca
 
 ### 5. Publish the GitHub release
 
-- [ ] Create a draft release for the tag. Paste the version's CHANGELOG section as the notes.
-- [ ] Attach `FSearch-X.Y.Z.dmg` and `FSearch-X.Y.Z.dmg.sha256`.
+- [ ] Open the draft release CI created for the tag (or, if using the local fallback, create a draft release for the tag and attach `FSearch-X.Y.Z.dmg` and `FSearch-X.Y.Z.dmg.sha256`).
+- [ ] Replace the placeholder notes with the version's CHANGELOG section.
 - [ ] Publish the release once the appcast is ready (next step).
 
 ### 6. Update the appcast
@@ -72,7 +72,7 @@ The app requires a signed feed (`SURequireSignedFeed`). Never edit `appcast.xml`
 
 - [ ] Check out the `gh-pages` branch into a folder. It holds the current `appcast.xml`.
 - [ ] Copy `FSearch-X.Y.Z.dmg` into that folder.
-- [ ] Run `build/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_appcast <that folder>`. It reads the EdDSA private key from your Keychain and adds the new entry.
+- [ ] Run `build/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_appcast --download-url-prefix https://github.com/domfahey/fsearch-app/releases/download/vX.Y.Z/ <that folder>` (omit `--download-url-prefix` only if hosting the DMG directly on `gh-pages`). It reads the EdDSA private key from your Keychain and adds the new entry.
 - [ ] Commit `appcast.xml` and push the `gh-pages` branch.
 - [ ] Check that an older build sees the update. Run the update test from step 4 if you have not.
 

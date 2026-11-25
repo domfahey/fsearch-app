@@ -11,7 +11,7 @@ public enum PanelRow: Equatable, Sendable {
     /// The "find definitions" fallback.
     case findDefinitions
 
-    /// The mode a fallback row switches to; nil for results.
+    /// The mode a fallback row switches to; nil for results and commands.
     public var mode: SearchMode? {
         switch self {
         case .result, .command: nil
@@ -51,6 +51,7 @@ public struct PanelRows: Sendable {
     ///   - query: The typed query.
     ///   - mode: The current search mode.
     public init(files: Int, query: String, mode: SearchMode) {
+        let files = max(0, files)
         self.files = files
         commands = mode == .names ? AppCommand.matches(query) : []
         hasFallbacks = Self.hasFallbacks(query: query, mode: mode)

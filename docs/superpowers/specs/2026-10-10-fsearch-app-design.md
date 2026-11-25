@@ -1,5 +1,7 @@
 # FSearch for Mac: design
 
+> **Historical note:** This is the initial v1 design spec written on 2026-10-10 and is preserved for historical context. Current architecture and decisions live in the codebase, `docs/adr/`, and `docs/reference/`.
+
 Date: 2026-10-10
 Status: draft for review
 
