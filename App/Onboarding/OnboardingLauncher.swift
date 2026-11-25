@@ -76,7 +76,7 @@ enum OnboardingLauncher {
         }
         let flow = OnboardingFlow(app: app, defaults: defaults)
         let w = HostSafeWindow(contentViewController: NSHostingController(rootView: OnboardingView(flow: flow)))
-        w.title = "Welcome to FSearch"
+        w.title = String(localized: "Welcome to FSearch")
         w.styleMask = [.titled, .closable]
         w.isReleasedWhenClosed = false
         w.center()

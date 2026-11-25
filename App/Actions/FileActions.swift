@@ -75,7 +75,7 @@ enum FileActions {
 
     /// The footer line for a result that is no longer on disk.
     static func missingMessage(_ path: String) -> String {
-        "“\((path as NSString).lastPathComponent)” is gone: moved or deleted"
+        String(localized: "“\((path as NSString).lastPathComponent)” is gone: moved or deleted")
     }
 
     /// False, after reporting it, if `path` is gone (moved or deleted since the search).
@@ -107,7 +107,7 @@ enum FileActions {
     /// Reports a refused LaunchServices request. `NSWorkspace.open` has no error value to pass along.
     private static func openInDefaultApp(_ file: URL, onError: @escaping @MainActor (String) -> Void) -> Bool {
         guard workspace.open(file) else {
-            let message = "Couldn't open “\(file.lastPathComponent)”"
+            let message = String(localized: "Couldn't open “\(file.lastPathComponent)”")
             Log.actions.error("default app refused to open file: \(file.path, privacy: .private)")
             onError(message)
             return false
@@ -156,7 +156,7 @@ enum FileActions {
         workspace.open([url(path)], withApplicationAt: app) { error in
             guard let error else { return }
             Log.actions.error("Open With failed: \(error.localizedDescription, privacy: .private)")
-            let message = "Couldn't open with \(name): \(error.localizedDescription)"
+            let message = String(localized: "Couldn't open with \(name): \(error.localizedDescription)")
             Task { @MainActor in onError(message) }
         }
     }
@@ -178,13 +178,13 @@ enum FileActions {
         let folder = terminalFolder(for: path)
         guard let terminal = workspace.urlForApplication(withBundleIdentifier: "com.apple.Terminal") else {
             Log.actions.error("Terminal not found")
-            onError("Couldn't find Terminal")
+            onError(String(localized: "Couldn't find Terminal"))
             return
         }
         workspace.open([url(folder)], withApplicationAt: terminal) { error in
             guard let error else { return }
             Log.actions.error("open Terminal failed: \(error.localizedDescription, privacy: .private)")
-            let message = "Couldn't open Terminal: \(error.localizedDescription)"
+            let message = String(localized: "Couldn't open Terminal: \(error.localizedDescription)")
             Task { @MainActor in onError(message) }
         }
     }
