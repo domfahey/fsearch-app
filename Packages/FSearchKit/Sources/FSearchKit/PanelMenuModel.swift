@@ -20,8 +20,20 @@ public struct PanelMenuItem: Equatable, Identifiable, Sendable {
     /// More words the filter matches besides the title.
     public let keywords: [String]
 
-    /// The title without its ellipsis, for accessibility identifiers (`appMenu-Settings`).
-    public var id: String { title.replacingOccurrences(of: "…", with: "") }
+    /// Stable English identifier used for accessibility ids (`appMenu-Settings`), independent of localization.
+    public var id: String {
+        switch action {
+        case .sendFeedback: "Send Feedback"
+        case .manual: "Manual"
+        case .keyboardShortcuts: "Keyboard Shortcuts"
+        case .changelog: "Changelog"
+        case .about: "About FSearch"
+        case .settings: "Settings"
+        case .github: "GitHub"
+        case .discussions: "Discussions"
+        case .quit: "Quit FSearch"
+        }
+    }
 
     /// Whether the filter text `q` (already trimmed and lowercased) matches the title or a keyword.
     func matches(_ q: String) -> Bool {
@@ -55,22 +67,38 @@ public struct PanelMenuModel: Equatable, Sendable {
         PanelMenuSection(
             title: nil,
             items: [
-                item(.sendFeedback, "Send Feedback", "bubble.left", keywords: ["bug", "issue", "feedback", "problem"]),
-                item(.manual, "Manual", "questionmark.circle", keywords: ["help", "docs", "documentation", "guide"]),
-                item(.keyboardShortcuts, "Keyboard Shortcuts", "keyboard", keywords: ["keys", "hotkeys"]),
-                item(.changelog, "Changelog", "doc.text", keywords: ["release notes", "what's new", "version"]),
-                item(.about, "About FSearch", "info.circle", keywords: ["version", "info"]),
-                item(.settings, "Settings…", "gearshape", shortcut: ["⌘", ","], keywords: ["preferences", "prefs"]),
+                item(
+                    .sendFeedback, String(localized: "Send Feedback", bundle: .module), "bubble.left",
+                    keywords: ["bug", "issue", "feedback", "problem"]),
+                item(
+                    .manual, String(localized: "Manual", bundle: .module), "questionmark.circle",
+                    keywords: ["help", "docs", "documentation", "guide"]),
+                item(
+                    .keyboardShortcuts, String(localized: "Keyboard Shortcuts", bundle: .module), "keyboard",
+                    keywords: ["keys", "hotkeys"]),
+                item(
+                    .changelog, String(localized: "Changelog", bundle: .module), "doc.text",
+                    keywords: ["release notes", "what's new", "version"]),
+                item(
+                    .about, String(localized: "About FSearch", bundle: .module), "info.circle",
+                    keywords: ["version", "info"]),
+                item(
+                    .settings, String(localized: "Settings…", bundle: .module), "gearshape", shortcut: ["⌘", ","],
+                    keywords: ["preferences", "prefs"]),
             ]),
         PanelMenuSection(
-            title: "Community",
+            title: String(localized: "Community", bundle: .module),
             items: [
                 item(
                     .github, "GitHub", "chevron.left.forwardslash.chevron.right", detail: "domfahey/fsearch-app",
                     keywords: ["repository", "source", "code"]),
-                item(.discussions, "Discussions", "bubble.left.and.bubble.right", keywords: ["community", "forum", "questions"]),
+                item(
+                    .discussions, String(localized: "Discussions", bundle: .module), "bubble.left.and.bubble.right",
+                    keywords: ["community", "forum", "questions"]),
             ]),
-        PanelMenuSection(title: nil, items: [item(.quit, "Quit FSearch", "power", shortcut: ["⌘", "Q"], keywords: ["exit"])]),
+        PanelMenuSection(
+            title: nil,
+            items: [item(.quit, String(localized: "Quit FSearch", bundle: .module), "power", shortcut: ["⌘", "Q"], keywords: ["exit"])]),
     ]
 
     private static func item(
@@ -87,7 +115,9 @@ public struct PanelMenuModel: Equatable, Sendable {
 
     /// The header as VoiceOver reads it: "FSearch version 0.1.0 (42)".
     public static func headerLabel(version: String, build: String) -> String {
-        build.isEmpty ? "FSearch version \(version)" : "FSearch version \(version) (\(build))"
+        build.isEmpty
+            ? String(localized: "FSearch version \(version)", bundle: .module)
+            : String(localized: "FSearch version \(version) (\(build))", bundle: .module)
     }
 
     /// Whether the menu is showing.

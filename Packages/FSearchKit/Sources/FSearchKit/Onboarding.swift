@@ -1,3 +1,5 @@
+import Foundation
+
 /// The onboarding pages, in order.
 public enum OnboardingStep: Int, CaseIterable, Sendable {
     /// Introduction.
@@ -51,9 +53,11 @@ public enum Onboarding {
     /// - Returns: A warning, or nil when there is no known clash.
     public static func hotkeyWarning(defaultIsOptionSpace: Bool, runningBundleIds: Set<String>) -> String? {
         guard defaultIsOptionSpace else { return nil }
-        if runningBundleIds.contains("com.raycast.macos") { return "Raycast uses ⌥ Space. Pick another shortcut, or turn Raycast's off." }
+        if runningBundleIds.contains("com.raycast.macos") {
+            return String(localized: "Raycast uses ⌥ Space. Pick another shortcut, or turn Raycast's off.", bundle: .module)
+        }
         if runningBundleIds.contains("com.runningwithcrayons.Alfred") {
-            return "Alfred may use ⌥ Space. Pick another shortcut, or change Alfred's."
+            return String(localized: "Alfred may use ⌥ Space. Pick another shortcut, or change Alfred's.", bundle: .module)
         }
         return nil
     }

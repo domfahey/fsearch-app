@@ -9,7 +9,7 @@ public enum AppCommand: Equatable, Sendable, CaseIterable {
     /// The row title shown in the panel.
     public var title: String {
         switch self {
-        case .settings: "FSearch Settings"
+        case .settings: String(localized: "FSearch Settings", bundle: .module)
         }
     }
 

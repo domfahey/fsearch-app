@@ -8,29 +8,39 @@ enum HelpLinks {
     static let base = repo + "/blob/main/"
 
     /// A Help menu entry.
-    struct Item: Equatable { let title: String; let url: URL }
+    struct Item: Equatable {
+        /// Stable identifier used for internal lookup independent of localization.
+        let id: String
+        let title: String
+        let url: URL
+    }
 
     /// The Help menu entries, in menu order.
     static let items: [Item] = [
-        ("FSearch Help", "docs/README.md"),
-        ("Keyboard Shortcuts", "docs/reference/keyboard-shortcuts.md"),
-        ("Query Syntax", "docs/reference/query-syntax.md"),
-        ("Changelog", "CHANGELOG.md"),
-        ("Privacy", "docs/privacy.md"),
-    ].map { Item(title: $0.0, url: URL(string: base + $0.1)!) }
+        Item(id: "FSearch Help", title: String(localized: "FSearch Help"), url: URL(string: base + "docs/README.md")!),
+        Item(
+            id: "Keyboard Shortcuts", title: String(localized: "Keyboard Shortcuts"),
+            url: URL(string: base + "docs/reference/keyboard-shortcuts.md")!),
+        Item(
+            id: "Query Syntax", title: String(localized: "Query Syntax"),
+            url: URL(string: base + "docs/reference/query-syntax.md")!),
+        Item(id: "Changelog", title: String(localized: "Changelog"), url: URL(string: base + "CHANGELOG.md")!),
+        Item(id: "Privacy", title: String(localized: "Privacy"), url: URL(string: base + "docs/privacy.md")!),
+    ]
 
     /// The project's own pages on GitHub, below the Help pages.
     static let community: [Item] = [
-        ("GitHub", repo), ("Discussions", repo + "/discussions"),
-    ].map { Item(title: $0.0, url: URL(string: $0.1)!) }
+        Item(id: "GitHub", title: "GitHub", url: URL(string: repo)!),
+        Item(id: "Discussions", title: String(localized: "Discussions"), url: URL(string: repo + "/discussions")!),
+    ]
 
-    /// The entry with this title, so the panel's FSearch menu opens the same pages as the menu bar.
-    static func item(_ title: String) -> Item? {
-        (items + community).first { $0.title == title }
+    /// The entry with this stable id (or display title), so the panel's FSearch menu opens the same pages as the menu bar.
+    static func item(_ key: String) -> Item? {
+        (items + community).first { $0.id == key || $0.title == key }
     }
 
     /// The title of the menu item that opens the pre-filled bug report.
-    static let reportTitle = "Report an Issue…"
+    static let reportTitle = String(localized: "Report an Issue…")
 
     /// The facts for the report. Nothing private: versions, chip, daemon kind and state.
     @MainActor

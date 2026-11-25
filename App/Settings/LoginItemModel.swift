@@ -46,10 +46,10 @@ final class LoginItemModel: ObservableObject {
     /// The line under the toggle.
     var statusText: String {
         switch display {
-        case .unavailable: "Not available in this build."
-        case .off: "FSearch won't open when you log in."
-        case .on: "FSearch opens when you log in."
-        case .needsApproval: "Waiting for your approval in Login Items."
+        case .unavailable: String(localized: "Not available in this build.")
+        case .off: String(localized: "FSearch won't open when you log in.")
+        case .on: String(localized: "FSearch opens when you log in.")
+        case .needsApproval: String(localized: "Waiting for your approval in Login Items.")
         }
     }
 
@@ -64,7 +64,10 @@ final class LoginItemModel: ObservableObject {
         } catch {
             // Registering can fail yet leave "requires approval"; the status says which.
             if !(on && service.status == .requiresApproval) {
-                self.error = "Couldn't \(on ? "turn on" : "turn off") Open at login: \(error.localizedDescription)"
+                self.error =
+                    on
+                    ? String(localized: "Couldn't turn on Open at login: \(error.localizedDescription)")
+                    : String(localized: "Couldn't turn off Open at login: \(error.localizedDescription)")
             }
         }
         refresh()

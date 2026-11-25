@@ -1,0 +1,466 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "%@ files so far… usually under a minute.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ files so far… usually under a minute."
+          }
+        }
+      }
+    },
+    "About FSearch": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "About FSearch"
+          }
+        }
+      }
+    },
+    "Alfred may use ⌥ Space. Pick another shortcut, or change Alfred's.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alfred may use ⌥ Space. Pick another shortcut, or change Alfred's."
+          }
+        }
+      }
+    },
+    "Can't reach the search daemon": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can't reach the search daemon"
+          }
+        }
+      }
+    },
+    "Changelog": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changelog"
+          }
+        }
+      }
+    },
+    "Community": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Community"
+          }
+        }
+      }
+    },
+    "Discussions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discussions"
+          }
+        }
+      }
+    },
+    "FSearch Settings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FSearch Settings"
+          }
+        }
+      }
+    },
+    "FSearch is running from a temporary location macOS made for it. Move FSearch to your Applications folder, then open it from there.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FSearch is running from a temporary location macOS made for it. Move FSearch to your Applications folder, then open it from there."
+          }
+        }
+      }
+    },
+    "FSearch is running from the disk image. Move FSearch to your Applications folder, then open it from there.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FSearch is running from the disk image. Move FSearch to your Applications folder, then open it from there."
+          }
+        }
+      }
+    },
+    "FSearch version %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FSearch version %@"
+          }
+        }
+      }
+    },
+    "FSearch version %@ (%@)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FSearch version %1$@ (%2$@)"
+          }
+        }
+      }
+    },
+    "Full Disk Access is off, so some files won't be found": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Full Disk Access is off, so some files won't be found"
+          }
+        }
+      }
+    },
+    "Grant Full Disk Access to fsearch…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grant Full Disk Access to fsearch…"
+          }
+        }
+      }
+    },
+    "Indexing your disk…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indexing your disk…"
+          }
+        }
+      }
+    },
+    "Indexing your disk… results will appear shortly": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indexing your disk… results will appear shortly"
+          }
+        }
+      }
+    },
+    "Keyboard Shortcuts": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keyboard Shortcuts"
+          }
+        }
+      }
+    },
+    "Manual": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manual"
+          }
+        }
+      }
+    },
+    "Quit FSearch": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quit FSearch"
+          }
+        }
+      }
+    },
+    "Raycast uses ⌥ Space. Pick another shortcut, or turn Raycast's off.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raycast uses ⌥ Space. Pick another shortcut, or turn Raycast's off."
+          }
+        }
+      }
+    },
+    "Send Feedback": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send Feedback"
+          }
+        }
+      }
+    },
+    "Settings…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings…"
+          }
+        }
+      }
+    },
+    "Starting search…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Starting search…"
+          }
+        }
+      }
+    },
+    "The search daemon didn't answer in time": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The search daemon didn't answer in time"
+          }
+        }
+      }
+    },
+    "The search daemon reported an error": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The search daemon reported an error"
+          }
+        }
+      }
+    },
+    "The search helper isn't answering": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The search helper isn't answering"
+          }
+        }
+      }
+    },
+    "The search helper isn't running": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The search helper isn't running"
+          }
+        }
+      }
+    },
+    "The search helper needs your approval": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The search helper needs your approval"
+          }
+        }
+      }
+    },
+    "The search index is still being built": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The search index is still being built"
+          }
+        }
+      }
+    },
+    "Try it now: press %@ and type part of any file name.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try it now: press %@ and type part of any file name."
+          }
+        }
+      }
+    },
+    "Try it now: set a shortcut in Settings, then type part of any file name.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try it now: set a shortcut in Settings, then type part of any file name."
+          }
+        }
+      }
+    },
+    "Turn On Full Disk Access…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn On Full Disk Access…"
+          }
+        }
+      }
+    },
+    "Unexpected reply from the search daemon: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unexpected reply from the search daemon: %@"
+          }
+        }
+      }
+    },
+    "a kind of file: code, doc, image, video, audio, archive, font, app": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "a kind of file: code, doc, image, video, audio, archive, font, app"
+          }
+        }
+      }
+    },
+    "file, dir or link": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "file, dir or link"
+          }
+        }
+      }
+    },
+    "files with these extensions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "files with these extensions"
+          }
+        }
+      }
+    },
+    "how a plain word matches": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "how a plain word matches"
+          }
+        }
+      }
+    },
+    "how many results (the panel shows up to 1000)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "how many results (the panel shows up to 1000)"
+          }
+        }
+      }
+    },
+    "inside files: wrap a filter word in quotes to search for it as text": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "inside files: wrap a filter word in quotes to search for it as text"
+          }
+        }
+      }
+    },
+    "modified in the last 7 days (m, h, d, w, mo, y)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "modified in the last 7 days (m, h, d, w, mo, y)"
+          }
+        }
+      }
+    },
+    "only under this folder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "only under this folder"
+          }
+        }
+      }
+    },
+    "quote a value that has spaces": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "quote a value that has spaces"
+          }
+        }
+      }
+    },
+    "regex on the file name": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "regex on the file name"
+          }
+        }
+      }
+    },
+    "regex on the full path": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "regex on the full path"
+          }
+        }
+      }
+    },
+    "search inside files (also regex:, sym:)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "search inside files (also regex:, sym:)"
+          }
+        }
+      }
+    },
+    "size range: <, >, or 1mb..5mb": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "size range: <, >, or 1mb..5mb"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

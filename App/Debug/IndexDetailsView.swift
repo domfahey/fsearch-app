@@ -23,7 +23,7 @@ struct IndexDetailsView: View {
                 if skipped.isEmpty {
                     Text("None").foregroundStyle(.secondary)
                 } else {
-                    ForEach(skipped, id: \.self) { Text($0).font(.system(.caption, design: .monospaced)) }
+                    ForEach(skipped, id: \.self) { Text(verbatim: $0).font(.system(.caption, design: .monospaced)) }
                 }
             }
             Section("daemon.log (last 30 lines)") {
@@ -80,8 +80,10 @@ struct IndexDetailsView: View {
     }
 
     /// Shown instead of an empty log: the bundled helper can't write one.
-    static let noLogNote =
-        "No daemon.log. FSearch's own background helper doesn't write one: its launchd plist is fixed inside the app and can't name a log file in your home folder. A daemon started by the fsearch command-line tool writes its log here."
+    static let noLogNote = String(
+        localized:
+            "No daemon.log. FSearch's own background helper doesn't write one: its launchd plist is fixed inside the app and can't name a log file in your home folder. A daemon started by the fsearch command-line tool writes its log here."
+    )
 
     static func logText(_ tail: String) -> String { tail.isEmpty ? noLogNote : tail }
 
@@ -100,11 +102,11 @@ private struct IndexStatsSections: View {
             Section("Index") {
                 row("Entries", s.entries.formatted())
                 row("Folders", s.dirs.formatted())
-                row("Pending changes", "\(s.overlay.formatted()) added, \(s.removed.formatted()) removed")
+                row("Pending changes", String(localized: "\(s.overlay.formatted()) added, \(s.removed.formatted()) removed"))
                 row("Last FSEvents id", "\(s.eventId)")
                 row("Index size", DebugFormat.bytes(s.indexBytes))
-                row("Full Disk Access", s.fullDiskAccess ? "On" : "Off")
-                row("Role", s.owner ? "Owner (writes the index)" : "Follower")
+                row("Full Disk Access", s.fullDiskAccess ? String(localized: "On") : String(localized: "Off"))
+                row("Role", s.owner ? String(localized: "Owner (writes the index)") : String(localized: "Follower"))
             }
             Section("Content index") {
                 row("Files", s.contentDocs.formatted())
@@ -129,5 +131,5 @@ private struct IndexStatsSections: View {
         }
     }
 
-    private func row(_ k: String, _ v: String) -> some View { LabeledContent(k, value: v) }
+    private func row(_ k: LocalizedStringKey, _ v: String) -> some View { LabeledContent(k, value: v) }
 }

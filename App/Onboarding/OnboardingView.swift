@@ -10,12 +10,14 @@ import os
 /// - "Add FSearch's helper": the user must add FSearch.app/Contents/Helpers/fsearch by hand.
 enum FDACopy {
     /// The button that opens Privacy settings.
-    static let buttonLabel = "Turn on FSearch"
+    static let buttonLabel = String(localized: "Turn on FSearch")
     /// What to do in Privacy settings.
-    static let help = "In Privacy Settings, find FSearch in the list and turn it on."
+    static let help = String(localized: "In Privacy Settings, find FSearch in the list and turn it on.")
     /// A daemon started from the CLI is a different binary with its own grant.
-    static let existingDaemonHelp =
-        "Full Disk Access belongs to the fsearch daemon that's already running. Grant it to your fsearch binary in Privacy Settings and restart that daemon, or skip for now."
+    static let existingDaemonHelp = String(
+        localized:
+            "Full Disk Access belongs to the fsearch daemon that's already running. Grant it to your fsearch binary in Privacy Settings and restart that daemon, or skip for now."
+    )
     /// Privacy settings' Full Disk Access list.
     static let settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!
 }

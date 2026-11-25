@@ -30,8 +30,8 @@ struct ResultRow: View {
         .contentShape(Rectangle())
         // Container keeps child Text nodes findable while exposing selection and a combined label to VoiceOver.
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("\(name), \(detail)")
-        .accessibilityValue(selected ? "selected" : "")
+        .accessibilityLabel(Text(verbatim: "\(name), \(detail)"))
+        .accessibilityValue(Text(verbatim: selected ? "selected" : ""))
         .accessibilityAddTraits(selected ? .isSelected : [])
         .accessibilityAction(.default) { onActivate?() }
         .accessibilityIdentifier("result-\(item.id)")

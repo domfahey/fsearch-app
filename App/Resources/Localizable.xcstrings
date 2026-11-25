@@ -1,8 +1,25 @@
 {
   "sourceLanguage": "en",
   "strings": {
-    "": {
-      "shouldTranslate": false
+    "%@ (not installed)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ (not installed)"
+          }
+        }
+      }
+    },
+    "%@ added, %@ removed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ added, %2$@ removed"
+          }
+        }
+      }
     },
     "%@ files indexed.": {
       "localizations": {
@@ -14,11 +31,25 @@
         }
       }
     },
-    "%@, %@": {
-      "shouldTranslate": false
+    "%@ ms · %lld results": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ ms · %2$lld results"
+          }
+        }
+      }
     },
-    "%lld": {
-      "shouldTranslate": false
+    "%@, moved to the Trash": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, moved to the Trash"
+          }
+        }
+      }
     },
     "A small background helper keeps the index up to date as files change, so results are instant. It starts when you log in.": {
       "localizations": {
@@ -36,6 +67,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "About FSearch"
+          }
+        }
+      }
+    },
+    "Actions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actions"
           }
         }
       }
@@ -66,6 +107,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cancel"
+          }
+        }
+      }
+    },
+    "Changelog": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changelog"
           }
         }
       }
@@ -170,6 +221,16 @@
         }
       }
     },
+    "Couldn't move %@ to the Trash: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't move %1$@ to the Trash: %2$@"
+          }
+        }
+      }
+    },
     "Couldn't move to Trash: %@": {
       "localizations": {
         "en": {
@@ -206,6 +267,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "Couldn't open “%@”"
+          }
+        }
+      }
+    },
+    "Couldn't remove the background helper: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't remove the background helper: %@"
+          }
+        }
+      }
+    },
+    "Couldn't start the search helper: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't start the search helper: %@"
+          }
+        }
+      }
+    },
+    "Couldn't turn off Open at login: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't turn off Open at login: %@"
+          }
+        }
+      }
+    },
+    "Couldn't turn on Open at login: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't turn on Open at login: %@"
           }
         }
       }
@@ -250,12 +351,32 @@
         }
       }
     },
+    "Default app": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default app"
+          }
+        }
+      }
+    },
     "Definitions": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "Definitions"
+          }
+        }
+      }
+    },
+    "Discussions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discussions"
           }
         }
       }
@@ -280,12 +401,32 @@
         }
       }
     },
+    "Entries": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entries"
+          }
+        }
+      }
+    },
     "Error": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "Error"
+          }
+        }
+      }
+    },
+    "Export failed: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export failed: %@"
           }
         }
       }
@@ -300,8 +441,25 @@
         }
       }
     },
-    "FSearch": {
-      "shouldTranslate": false
+    "FSearch Help": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FSearch Help"
+          }
+        }
+      }
+    },
+    "FSearch couldn't confirm that the daemon using it is this app's helper. If nothing else uses it, move it to the Trash yourself.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FSearch couldn't confirm that the daemon using it is this app's helper. If nothing else uses it, move it to the Trash yourself."
+          }
+        }
+      }
     },
     "FSearch menu": {
       "localizations": {
@@ -323,12 +481,62 @@
         }
       }
     },
+    "FSearch opens when you log in.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FSearch opens when you log in."
+          }
+        }
+      }
+    },
+    "FSearch won't open when you log in.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FSearch won't open when you log in."
+          }
+        }
+      }
+    },
+    "FSearch: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FSearch: %@"
+          }
+        }
+      }
+    },
+    "FSearch: Update available": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FSearch: Update available"
+          }
+        }
+      }
+    },
     "File Names": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "File Names"
+          }
+        }
+      }
+    },
+    "Files": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Files"
           }
         }
       }
@@ -363,6 +571,16 @@
         }
       }
     },
+    "Find definitions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Find definitions"
+          }
+        }
+      }
+    },
     "Find symbol definitions in code": {
       "localizations": {
         "en": {
@@ -393,12 +611,52 @@
         }
       }
     },
+    "Folders": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Folders"
+          }
+        }
+      }
+    },
     "Folders the index lacks (skipped)": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "Folders the index lacks (skipped)"
+          }
+        }
+      }
+    },
+    "Follower": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Follower"
+          }
+        }
+      }
+    },
+    "Full Disk Access": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Full Disk Access"
+          }
+        }
+      }
+    },
+    "Full Disk Access belongs to the fsearch daemon that's already running. Grant it to your fsearch binary in Privacy Settings and restart that daemon, or skip for now.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Full Disk Access belongs to the fsearch daemon that's already running. Grant it to your fsearch binary in Privacy Settings and restart that daemon, or skip for now."
           }
         }
       }
@@ -433,6 +691,16 @@
         }
       }
     },
+    "In Privacy Settings, find FSearch in the list and turn it on.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In Privacy Settings, find FSearch in the list and turn it on."
+          }
+        }
+      }
+    },
     "Index": {
       "localizations": {
         "en": {
@@ -459,6 +727,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Index Details…"
+          }
+        }
+      }
+    },
+    "Index size": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Index size"
           }
         }
       }
@@ -493,12 +771,42 @@
         }
       }
     },
+    "Inside files": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inside files"
+          }
+        }
+      }
+    },
     "Keep search ready in the background": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "Keep search ready in the background"
+          }
+        }
+      }
+    },
+    "Keyboard Shortcuts": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keyboard Shortcuts"
+          }
+        }
+      }
+    },
+    "Last FSEvents id": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last FSEvents id"
           }
         }
       }
@@ -573,6 +881,16 @@
         }
       }
     },
+    "No daemon.log. FSearch's own background helper doesn't write one: its launchd plist is fixed inside the app and can't name a log file in your home folder. A daemon started by the fsearch command-line tool writes its log here.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No daemon.log. FSearch's own background helper doesn't write one: its launchd plist is fixed inside the app and can't name a log file in your home folder. A daemon started by the fsearch command-line tool writes its log here."
+          }
+        }
+      }
+    },
     "No matching actions": {
       "localizations": {
         "en": {
@@ -593,12 +911,42 @@
         }
       }
     },
+    "Not available in this build.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not available in this build."
+          }
+        }
+      }
+    },
     "Not reachable: %@": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "Not reachable: %@"
+          }
+        }
+      }
+    },
+    "Off": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Off"
+          }
+        }
+      }
+    },
+    "On": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On"
           }
         }
       }
@@ -683,12 +1031,42 @@
         }
       }
     },
+    "Open at line": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open at line"
+          }
+        }
+      }
+    },
     "Open content results in:": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "Open content results in:"
+          }
+        }
+      }
+    },
+    "Owner (writes the index)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Owner (writes the index)"
+          }
+        }
+      }
+    },
+    "Pending changes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pending changes"
           }
         }
       }
@@ -713,12 +1091,42 @@
         }
       }
     },
+    "Privacy": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy"
+          }
+        }
+      }
+    },
     "Query": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "Query"
+          }
+        }
+      }
+    },
+    "Query Syntax": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Query Syntax"
+          }
+        }
+      }
+    },
+    "Query syntax": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Query syntax"
           }
         }
       }
@@ -763,6 +1171,16 @@
         }
       }
     },
+    "Recent": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recent"
+          }
+        }
+      }
+    },
     "Remove": {
       "localizations": {
         "en": {
@@ -803,6 +1221,16 @@
         }
       }
     },
+    "Report an Issue…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Report an Issue…"
+          }
+        }
+      }
+    },
     "Restart Daemon": {
       "localizations": {
         "en": {
@@ -839,6 +1267,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Reveal in Finder"
+          }
+        }
+      }
+    },
+    "Role": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Role"
           }
         }
       }
@@ -973,6 +1411,16 @@
         }
       }
     },
+    "Search inside files": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search inside files"
+          }
+        }
+      }
+    },
     "Search mode: %@": {
       "localizations": {
         "en": {
@@ -1003,6 +1451,16 @@
         }
       }
     },
+    "Segments": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Segments"
+          }
+        }
+      }
+    },
     "Settings…": {
       "localizations": {
         "en": {
@@ -1029,6 +1487,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Shortcut:"
+          }
+        }
+      }
+    },
+    "Size": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Size"
           }
         }
       }
@@ -1069,6 +1537,96 @@
           "stringUnit": {
             "state": "translated",
             "value": "Text or FSearch filters such as ext:pdf, in:~/Developer, or mtime:<7d."
+          }
+        }
+      }
+    },
+    "The app's settings and recent files": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The app's settings and recent files"
+          }
+        }
+      }
+    },
+    "The background helper (search index service)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The background helper (search index service)"
+          }
+        }
+      }
+    },
+    "The data folder (%@) was left alone: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The data folder (%1$@) was left alone: %2$@"
+          }
+        }
+      }
+    },
+    "The data folder (%@) was left alone: the fsearch command-line tool's login agent (mt.nd.fsearch) is installed and its daemon uses the same index.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The data folder (%@) was left alone: the fsearch command-line tool's login agent (mt.nd.fsearch) is installed and its daemon uses the same index."
+          }
+        }
+      }
+    },
+    "The data folder was left in place because the helper is still registered.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The data folder was left in place because the helper is still registered."
+          }
+        }
+      }
+    },
+    "The debug search log": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The debug search log"
+          }
+        }
+      }
+    },
+    "The index and data folder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The index and data folder"
+          }
+        }
+      }
+    },
+    "The search helper isn't answering.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The search helper isn't answering."
+          }
+        }
+      }
+    },
+    "The search helper stopped answering.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The search helper stopped answering."
           }
         }
       }
@@ -1123,6 +1681,16 @@
         }
       }
     },
+    "Turn on FSearch": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn on FSearch"
+          }
+        }
+      }
+    },
     "Update Available…": {
       "localizations": {
         "en": {
@@ -1143,6 +1711,16 @@
         }
       }
     },
+    "Use “%@” with…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use “%@” with…"
+          }
+        }
+      }
+    },
     "Using the fsearch daemon that's already running": {
       "localizations": {
         "en": {
@@ -1159,6 +1737,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Waiting for approval in Login Items."
+          }
+        }
+      }
+    },
+    "Waiting for your approval in Login Items.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for your approval in Login Items."
+          }
+        }
+      }
+    },
+    "Waiting to be indexed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting to be indexed"
           }
         }
       }
@@ -1213,6 +1811,16 @@
         }
       }
     },
+    "another fsearch daemon, not this app's helper, is using the index there.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "another fsearch daemon, not this app's helper, is using the index there."
+          }
+        }
+      }
+    },
     "daemon.log (last 30 lines)": {
       "localizations": {
         "en": {
@@ -1222,9 +1830,6 @@
           }
         }
       }
-    },
-    "done": {
-      "shouldTranslate": false
     },
     "files": {
       "localizations": {
@@ -1259,18 +1864,22 @@
         }
       }
     },
-    "searching": {
-      "shouldTranslate": false
-    },
-    "selected": {
-      "shouldTranslate": false
-    },
     "symbols": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "symbols"
+          }
+        }
+      }
+    },
+    "this app's background helper wasn't enabled, so the index there wasn't the app's to remove.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "this app's background helper wasn't enabled, so the index there wasn't the app's to remove."
           }
         }
       }
