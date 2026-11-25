@@ -102,7 +102,6 @@ final class PanelController: PanelHost {
         selection = resumed.selection
         viewState.resume(resumed)
         held.key.cancel()
-        geometry.rows = [:]
         let p = panel ?? Panel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         p.staysUpWithoutKey = app.options.showPanel
         p.isFloatingPanel = true
@@ -112,6 +111,7 @@ final class PanelController: PanelHost {
         p.hasShadow = true
         p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         if p.contentView == nil || hostedApp !== app {
+            geometry.rows = [:]
             let view = SearchView(
                 model: app.search, viewState: viewState, held: held, keys: keys, geometry: geometry, menu: menu,
                 isVisible: { [weak self] in self?.isVisible == true },

@@ -154,6 +154,28 @@ extension AppTests {
             await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in DispatchQueue.main.async { c.resume() } }
             #expect(!pc.isVisible)
         }
+
+        /// Reusing the hosting view keeps cached row frames so ⌘K still anchors to unchanged rows; rebuilding clears them.
+        @Test func reopeningWithSameAppPreservesRowGeometryAndSwitchingAppClearsIt() {
+            let env1 = TestEnv()
+            defer { env1.tearDown() }
+            let env2 = TestEnv()
+            defer { env2.tearDown() }
+            let pc = PanelController()
+            defer { pc.hide(returnFocus: false) }
+
+            let rowRect = CGRect(x: 0, y: 100, width: 680, height: 40)
+            pc.show(app: env1.app)
+            pc.geometry.rows["file:/p/a.txt"] = rowRect
+            pc.hide(returnFocus: false)
+
+            pc.show(app: env1.app)
+            #expect(pc.geometry.rows["file:/p/a.txt"] == rowRect, "reused hosting view must keep row frames for ⌘K")
+
+            pc.hide(returnFocus: false)
+            pc.show(app: env2.app)
+            #expect(pc.geometry.rows["file:/p/a.txt"] == nil, "rebuilding contentView clears stale row frames")
+        }
     }
 }
 
