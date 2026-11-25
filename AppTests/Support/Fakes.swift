@@ -269,7 +269,13 @@ final class FakeWorkspace: Workspace {
 final class FakePanel: PanelHost {
     var isVisible = false
     private(set) var shows = 0, hides = 0
+    private(set) var openedSearches: [SearchURL] = []
     func show(app: AppState) { shows += 1; isVisible = true }
+    func show(app: AppState, search: SearchURL) {
+        shows += 1
+        isVisible = true
+        openedSearches.append(search)
+    }
     func hide(returnFocus: Bool) { hides += 1; isVisible = false }
 }
 

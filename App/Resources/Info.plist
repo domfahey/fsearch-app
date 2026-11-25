@@ -10,6 +10,17 @@
   <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
   <key>LSMinimumSystemVersion</key><string>15.0</string>
   <key>LSUIElement</key><true/>
+  <key>CFBundleURLTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeRole</key><string>Viewer</string>
+      <key>CFBundleURLName</key><string>com.domfahey.fsearch.search</string>
+      <key>CFBundleURLSchemes</key>
+      <array>
+        <string>fsearch</string>
+      </array>
+    </dict>
+  </array>
   <key>NSHumanReadableCopyright</key><string>© 2026 Dominic Fahey. MIT License. Built on fsearch by Noah Dunnagan (MIT).</string>
   <key>SUFeedURL</key><string>https://domfahey.github.io/fsearch-app/appcast.xml</string>
   <key>SURequireSignedFeed</key><true/>

@@ -101,6 +101,8 @@ protocol PanelHost: AnyObject, Sendable {
     var isVisible: Bool { get }
     /// Shows the panel, resuming the recent query.
     func show(app: AppState)
+    /// Shows the panel pre-filled with a `fsearch://` search, replacing any resumed session state.
+    func show(app: AppState, search: SearchURL)
     /// Hides the panel; `returnFocus` is false when the user already moved to another app.
     func hide(returnFocus: Bool)
 }
