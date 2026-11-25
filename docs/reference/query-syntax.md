@@ -134,7 +134,7 @@ You can type one in the normal search field, or pick **Search inside files** or 
 
 In content and definition searches, filters pick which files are searched, and the rest of the text is the pattern. So `TODO ext:swift in:~/Developer` searches for `TODO` inside Swift files under `~/Developer`. If you use a `grep:` key more than once, the last one wins. A content key with nothing after the colon does not search yet.
 
-In the **Inside files** and **Definitions** modes, a word is a filter only when it has a value right after the colon. A bare key is text, so `kind: Deployment` or `limit: 10` searches for that text. To search for text that looks like a filter, such as `ext:rs`, put a double quote at the start of the word: `"ext:rs"`.
+In the **Inside files** and **Definitions** modes, a word is a filter only when it has a value right after the colon. A bare key is text, so `kind: Deployment` or `limit: 10` searches for that text. To search for text that looks like a filter, such as `ext:rs`, wrap the word in double quotes: `"ext:rs"`.
 
 Content searches have a time budget of 250 ms. If it runs out, you may see partial results.
 

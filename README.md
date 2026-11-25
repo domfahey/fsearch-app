@@ -19,7 +19,9 @@ Press a hotkey, type, and find any file by name, or search inside text and code 
 - Recent files when the query is empty. Reopen the panel within 60 seconds to resume.
 - Actions: open, open at a line in your editor, reveal, Quick Look, copy, open with, move to Trash, and drag a result out.
 - Four-step onboarding, with a warning if another launcher holds your hotkey.
-- App commands in the panel: type `settings` (or `prefs`) to get to Settings.
+- App commands in the panel: type `settings` (or `prefs`) to get to Settings, or press `⌘/` for the FSearch menu.
+- Automation: `fsearch://search?q=…` URL scheme and a **Search Files** action for Apple Shortcuts.
+- Accessibility: adapts to Reduce Motion, Reduce Transparency and Increase Contrast, with VoiceOver labels and keyboard defaults.
 - Settings for the hotkey, the editor for content results, Open FSearch at login, and an in-app uninstall ("Remove Background Helper and Data…").
 - A quiet menu-bar reminder when Full Disk Access is off, and a Help menu with Report an Issue… (a pre-filled GitHub report without paths or queries).
 - Debug mode with Index Details, a local Search Log and timings.
@@ -50,7 +52,7 @@ For a guided walk, see [Tutorial: your first search](docs/tutorial-first-search.
 The [documentation hub](docs/README.md) links everything. Common starting points:
 
 - [Tutorial: your first search](docs/tutorial-first-search.md)
-- [Query syntax](docs/reference/query-syntax.md) and [Keyboard shortcuts](docs/reference/keyboard-shortcuts.md)
+- [Query syntax](docs/reference/query-syntax.md), [Keyboard shortcuts](docs/reference/keyboard-shortcuts.md), [URL scheme](docs/reference/url-scheme.md) and [Shortcuts](docs/reference/shortcuts.md)
 - [Troubleshooting](docs/reference/troubleshooting.md), the [FAQ](docs/reference/faq.md) and [Known limitations](docs/reference/limitations.md)
 - [Update FSearch for Mac](docs/how-to/update.md)
 - [Architecture](docs/architecture.md) and [Architecture Decision Records](docs/adr/README.md)

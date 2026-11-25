@@ -16,13 +16,13 @@ You can also click the menu-bar icon and choose **Search…**.
 
 ## 2. Find a file by name
 
-Type part of a file name, for example `invoice`. Results appear as you type. Each row shows the file icon, the name with your letters highlighted, and the folder in grey.
+Type part of a file name, for example `invoice`. Results appear as you type. Each row shows the file icon, the name with your first word highlighted, and the folder in grey.
 
 Matching is forgiving. You do not need the exact name or every letter.
 
 Use the up and down arrow keys to move the selection. Press Return (↵) to open the selected file in its default app. The panel hides when the file opens.
 
-Press the hotkey again. The file you just opened is now under "Recent" when the field is empty.
+Press the hotkey again and press Escape once to clear `invoice` (within 60 seconds the panel resumes your last query). The file you just opened is now under "Recent".
 
 ## 3. Reveal, preview and open by number
 
@@ -79,6 +79,8 @@ Press Escape until the panel hides, or click outside it. If you reopen it within
 
 ## Where to go next
 
+- Press `⌘/` (or click the **FSearch** gear in the footer) to open the FSearch menu inside the panel.
 - [Keyboard shortcuts](reference/keyboard-shortcuts.md)
 - [Query syntax](reference/query-syntax.md)
+- [URL scheme](reference/url-scheme.md) and [Shortcuts (App Intents)](reference/shortcuts.md)
 - [Troubleshooting](reference/troubleshooting.md)

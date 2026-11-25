@@ -43,9 +43,9 @@ Opening a result at a line works with VS Code and Cursor on a real Mac; Xcode op
 
 Which program macOS lists for the bundled helper (the app or the helper itself) is not yet confirmed. Follow the on-screen steps in setup, and see [Grant Full Disk Access](../how-to/grant-full-disk-access.md) if protected folders are missing.
 
-## Accessibility and localization
+## Localization
 
-FSearch has not had an accessibility pass, so VoiceOver labels and keyboard navigation in Settings are incomplete. The app is in English only.
+The app is in English only for now. Both `FSearch.app` and `FSearchKit` use String Catalogs ready for translations, so additional languages can be added without code changes.
 
 ## See also
 

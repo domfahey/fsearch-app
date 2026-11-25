@@ -194,10 +194,12 @@ public struct PanelSession: Sendable {
 /// mode arrive. A newer result key replaces it; a different query or mode, or
 /// Escape, drops it.
 public struct HeldKey: Equatable, Sendable {
+    /// The result key waiting for current results, or nil when none is held.
     public private(set) var held: PanelKey?
     private var query = ""
     private var mode: SearchMode = .names
 
+    /// Creates an empty held-key state.
     public init() {}
 
     /// The key to act on now, or nil if it is held. `current` says whether the
@@ -215,5 +217,6 @@ public struct HeldKey: Equatable, Sendable {
         return query == self.query && mode == self.mode ? held : nil
     }
 
+    /// Drops any held key and clears its associated query and mode.
     public mutating func cancel() { (held, query, mode) = (nil, "", .names) }
 }

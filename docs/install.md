@@ -18,7 +18,7 @@ If macOS says it cannot verify FSearch, do not open the app. Download the DMG ag
 
 FSearch opens a four-step setup window the first time you run it.
 
-1. **Shortcut.** Choose the shortcut that opens the panel. The default is ⌥Space. If another app already uses it, FSearch shows a warning.
+1. **Shortcut.** Choose the shortcut that opens the panel. The default is ⌥Space. If Raycast or Alfred is running while the shortcut is still ⌥Space, FSearch shows a warning (other apps can hold a shortcut without a warning).
 2. **Background helper.** FSearch registers a small helper that keeps the index up to date. It starts when you log in. macOS may ask you to allow it. Turn it on in **System Settings**, under **General**, then **Login Items & Extensions**. FSearch waits until it is allowed.
 3. **Full Disk Access.** This lets the helper index Desktop, Documents, Downloads, Mail, Messages and iCloud Drive. Choose **Turn on FSearch** to open the settings pane and turn it on there, or choose **Skip for now**. Skipping still gives you search, but not in those folders. You can turn it on later in Privacy & Security.
 4. **First index.** FSearch shows the progress of the first index. This usually takes under a minute. When it is done, press your shortcut and type part of any file name.

@@ -6,7 +6,7 @@ You can have the [fsearch](https://github.com/noahdunnagan/fsearch) command-line
 
 - If a daemon already answers on the socket, the app uses it. This is the case when you installed the CLI and ran its login agent (`fsearch install --login`).
 - The app never stops or replaces a daemon it did not start.
-- If the CLI's login agent is installed (the app only checks that the file `~/Library/LaunchAgents/mt.nd.fsearch.plist` exists) but its daemon is briefly down, the app waits for it. It does not register a second daemon.
+- If the CLI's login agent is installed (the app only checks that the file `~/Library/LaunchAgents/mt.nd.fsearch.plist` exists) and our helper is not already enabled, the app waits up to 10 seconds for the CLI daemon to answer. If it answers in time, the app uses it without registering a second daemon; if nothing answers after 10 seconds (for example, a stale plist or stopped daemon), the app falls back to registering its own bundled helper.
 - Only when no daemon is around does the app register its own bundled helper as a login item.
 - The app and the CLI use the same data folder, `~/Library/Application Support/FSearch`, and the same index and socket.
 
@@ -27,7 +27,7 @@ Say you already use FSearch, then install the CLI and run `fsearch install --log
 
 ## Restarting
 
-Restart Daemon in debug mode's Index Details window restarts only a daemon the app registered. For a CLI daemon it just checks again. Restart a CLI daemon from the CLI.
+Restart Daemon in debug mode's Index Details window restarts only a daemon FSearch owns (when its bundled helper holds the socket). While a CLI daemon is answering it just checks again; if nothing answers, it runs startup again (waiting up to 10 seconds when `mt.nd.fsearch.plist` exists before registering the bundled helper). Restart a CLI daemon from the CLI.
 
 ## Switching to the app's helper
 

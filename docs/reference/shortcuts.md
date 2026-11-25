@@ -23,7 +23,7 @@ Returns a list of **Files** in FSearch's ranked order (deduplicated). You can co
 
 - **Runs in the background:** **Search Files** does not open the launcher panel or steal focus. If you want to open the interactive launcher pre-filled with a query from Shortcuts, use the **Open URLs** action with the [URL scheme](url-scheme.md) (`fsearch://search?q=…`).
 - **Query rules:** Blank queries and content searches with no text pattern return an empty list. Line breaks and tabs are turned into spaces and control characters are removed. Accented file names match both composed (NFC) and decomposed (NFD) forms.
-- **Daemon errors:** If the `fsearch` daemon is not running, is still building its initial index, or rejects a filter, the action fails with the same plain-English error message shown in the panel.
+- **Daemon errors:** If the `fsearch` daemon is not running, times out, is still building its initial index, or rejects a filter, the action fails with a plain-English error message (the daemon's own message for rejected filters, or the same short error text recorded in the debug Search Log).
 
 ## See also
 

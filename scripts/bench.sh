@@ -4,7 +4,7 @@
 #   scripts/bench.sh                 build (release), run, compare to this machine's baseline
 #   scripts/bench.sh --record        run and rewrite this machine's baseline entry
 #   scripts/bench.sh --record --provisional   same, marked provisional (noisy machine)
-#   scripts/bench.sh --report-only   run and compare, never fail (CI)
+#   scripts/bench.sh --report-only   run and compare, never fail
 #   scripts/bench.sh --self-test     simulate a 2x slowdown; the check must fail (exit 1)
 #   scripts/bench.sh --skip-daemon   in-process metrics only
 #   scripts/bench.sh --filter a,b    only metrics whose names start with a or b

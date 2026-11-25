@@ -41,6 +41,7 @@ The app keeps its settings in its standard preferences file, `~/Library/Preferen
 | `dismissedFullDiskAccessReminder` | Bool | Whether you chose **Don't Remind Me** on the menu-bar Full Disk Access reminder shown after skipping. |
 | `recentPaths` | List of strings | The files you opened from the panel, newest first. Up to 16 are kept. The empty panel shows up to 8 that still exist. |
 | `helperIdentity` | String | The build, size and modification time of the bundled helper last seen running, used to restart it once after an app update. |
+| `helperRecoverySuspended` | Bool | Set by **Remove Background Helper and Data…** so automatic recovery stays off across relaunches until explicit setup runs again. |
 | `updateReminderVisible` | Bool | Whether a scheduled update reminder was showing in the menu bar, so a relaunch checks again in the background. |
 
 The shortcut is stored by the [KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts) library under its own key.

@@ -29,7 +29,7 @@ Buttons:
 
 - **Reveal Data Folder** opens the daemon's data folder in Finder.
 - **Save Now** asks the daemon to save its index.
-- **Restart Daemon** restarts the daemon if the app registered it. For any other daemon it only checks again.
+- **Restart Daemon** restarts the daemon if FSearch owns it (its bundled helper holds the socket). While another daemon is answering it only checks again; if nothing answers, it runs startup again.
 - **Copy All** copies the report to the clipboard, which is handy for a bug report.
 
 The menu-bar **Fix…** item also opens this window. See [Troubleshooting](../reference/troubleshooting.md).
@@ -40,7 +40,7 @@ Open **Search Log…** from the menu. It lists each search this app makes: time,
 
 ## Privacy
 
-- The log records only searches made in this app. It does not see searches from the CLI or other tools.
+- The log records only searches made in the panel (including `fsearch://search`). It does not see searches from the CLI, background Shortcuts (**Search Files**) runs, or other tools.
 - It is saved on your Mac in `~/Library/Logs/FSearch/searches.jsonl` and never sent anywhere.
 - It keeps the last 10,000 searches.
 - Turning debug mode off deletes the log and closes the debug windows.

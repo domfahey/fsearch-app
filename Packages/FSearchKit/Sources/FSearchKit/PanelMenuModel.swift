@@ -8,6 +8,7 @@ public enum PanelMenuAction: CaseIterable, Hashable, Sendable {
 
 /// One row of the FSearch menu.
 public struct PanelMenuItem: Equatable, Identifiable, Sendable {
+    /// The action performed when this row is chosen.
     public let action: PanelMenuAction
     /// The row title.
     public let title: String
@@ -45,6 +46,7 @@ public struct PanelMenuItem: Equatable, Identifiable, Sendable {
 public struct PanelMenuSection: Equatable, Sendable {
     /// The header ("Community"), or nil for none.
     public let title: String?
+    /// The rows in this section, in display order.
     public let items: [PanelMenuItem]
 }
 
@@ -129,6 +131,7 @@ public struct PanelMenuModel: Equatable, Sendable {
     /// The selected row among ``visibleItems``; read through ``selected``, which clamps it.
     public var selection = 0
 
+    /// Creates a closed menu with an empty filter and default selection.
     public init() {}
 
     /// The sections with a row matching the filter, holding only those rows.

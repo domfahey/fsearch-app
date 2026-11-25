@@ -58,10 +58,10 @@ Two modes keep tests away from your real setup. **Test mode** starts when you pa
 
 | Tier | Run it | Safe to run while you work? | In CI? |
 |---|---|---|---|
-| FSearchKit unit and integration tests, against a real daemon in a temporary `HOME` | `make test` | Yes | Yes, on macOS 26 |
+| FSearchKit unit and integration tests, against a real daemon in a temporary `HOME` | `make test` | Yes | Yes, on macOS 26 with a 95% coverage gate |
 | AppTests, the app's unit tests, in an inert host with fakes | `make apptest` or `scripts/coverage.sh --unit-only` | Yes. The host shows nothing and takes no focus. | Yes, with a 95% coverage gate |
 | UI and end-to-end tests (AppUITests) | `make ui` | No. It synthesizes keystrokes. Use a hands-off GUI session. | No |
-| Benchmarks | `scripts/bench.sh --report-only --skip-daemon` (or `make bench` for the full run) | Yes | Report-only |
+| Benchmarks | `scripts/bench.sh --report-only --skip-daemon` (or `make bench` for the full run) | Yes | Yes, gated against `ci-macos-26` (warns on busy runner) |
 
 **Focus-safety rule.** AppTests must never show a window, take the keyboard or bring FSearch to the front, because you may be working at the Mac. A test that needs real focus or keystrokes belongs in AppUITests. While AppUITests run, leave the Mac alone.
 
@@ -70,11 +70,11 @@ Two modes keep tests away from your real setup. **Test mode** starts when you pa
 | Task | Command | Raw equivalent |
 |---|---|---|
 | Lint (swift-format, links, credits, shell scripts, workflows) | `make lint` | see the `lint` target in the [Makefile](Makefile) |
-| Warnings as errors | `make type` | `swift build --build-tests -Xswiftc -warnings-as-errors` in the package, plus a warnings check of the app build |
+| Warnings as errors | `make type` | `swift build --build-tests -Xswiftc -warnings-as-errors` and `swift build --product FSearchBench -Xswiftc -warnings-as-errors` in the package, plus a warnings check of the app build |
 | Lint, type and test together | `make check` | |
-| Everything CI runs, with the coverage gates | `make ci` | |
+| Lint, type, test and both 95% coverage gates (excludes `bench`) | `make ci` | |
 | Coverage of FSearchKit only | `make coverage-kit` | `scripts/coverage.sh --kit-only` |
-| Coverage of both app suites (plus FSearchKit when `--min` / `COVERAGE_MIN` is set) | `make coverage` | `scripts/coverage.sh` |
+| Coverage of FSearchKit and both app suites | `make coverage` | `scripts/coverage.sh` |
 | Check developer prerequisites | `make doctor` | |
 | Sync App and FSearchKit String Catalogs | `make strings` | `scripts/sync-strings.sh` |
 | Install developer prerequisites (not the app) | `make install` | `brew install xcodegen`, `rustup target add aarch64-apple-darwin x86_64-apple-darwin`, `make hooks` |

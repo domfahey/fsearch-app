@@ -80,7 +80,7 @@ The app requires a signed feed (`SURequireSignedFeed`). Never edit `appcast.xml`
 
 Sparkle never downgrades an install, so the fix for a bad release is a newer one.
 
-1. Remove the bad version's entry from the feed. Delete its DMG from the `gh-pages` folder, run `generate_appcast` on the folder again, and push `appcast.xml`. New update checks stop offering it.
+1. Remove the bad version's entry from the feed. Delete its DMG (and any `.delta` files for it) from your local archives folder (for example `release/archives/`), re-run `scripts/appcast.sh` against the previous good version to regenerate and re-sign `appcast.xml`, copy only `appcast.xml` into `gh-pages`, and push. New update checks stop offering it.
 2. Mark the GitHub release as a pre-release or delete it, and say why in the notes. Do not reuse its version number or build number.
 3. Fix the problem and release the next version through this runbook. Installs of the bad version update to it.
 
