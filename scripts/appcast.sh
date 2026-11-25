@@ -14,24 +14,27 @@
 #   --full-release-notes-url URL Full release notes URL (default: GitHub tag v<VERSION>)
 #   --link URL                   Application homepage URL (default: GitHub repository)
 #   --maximum-deltas N           Maximum binary deltas to generate (default: 5)
-#   --account NAME               Keychain EdDSA account passed to generate_appcast
-#   --ed-key-file FILE           Private EdDSA key file (or '-' for stdin) passed to generate_appcast
+#   --account NAME               Keychain EdDSA account passed to generate_appcast / sign_update
+#   --ed-key-file FILE           Private EdDSA key file (or '-' for stdin)
 #   --extract-notes VERSION      Print extracted Markdown notes for VERSION to stdout and exit
 #   -h, --help                   Show this help
 #
 # Environment:
 #   GENERATE_APPCAST             Path to Sparkle's generate_appcast binary (auto-detected under build/)
+#   SIGN_UPDATE                  Path to Sparkle's sign_update binary (defaults beside generate_appcast)
 #
 # Keep prior FSearch-*.dmg releases in <ARCHIVES_DIR> so Sparkle can build binary
-# .delta files against them. Upload the DMG and any newly generated .delta files to
-# the GitHub release, and publish only appcast.xml to gh-pages.
+# .delta files against them. Existing releases keep their original download URLs
+# (and are re-signed with sign_update when restored). Upload the new DMG and any
+# newly generated .delta files to the GitHub release, and publish only appcast.xml
+# to gh-pages.
 #
 # Exit codes: 0 success; 1 missing tool/input or invalid CHANGELOG section; 2 bad usage.
 set -euo pipefail
 REPO_ROOT=$(cd "$(dirname "$0")/.." && pwd)
 
 usage() {
-  sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,32p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 fail() { echo "appcast.sh: $*" >&2; exit 1; }
@@ -81,6 +84,112 @@ print("\n".join(body))
 PY
 }
 
+# Restores original download URLs for retained older releases in appcast.xml.
+# Sparkle's --download-url-prefix rewrites enclosure URLs for every archive in
+# <ARCHIVES_DIR>; for GitHub Releases each version lives under its own tag URL.
+# Exits 10 if appcast.xml was modified (so the caller re-signs it), 0 if unchanged.
+preserve_existing_urls() {
+  local prev_appcast=$1 new_appcast=$2 current_version=$3 default_repo_url=$4 use_github_default=$5
+  python3 -I - "$prev_appcast" "$new_appcast" "$current_version" "$default_repo_url" "$use_github_default" <<'PY'
+import os, re, sys, xml.etree.ElementTree as ET
+
+prev_path, new_path, current_ver, repo_url, use_gh_default = sys.argv[1:6]
+NS = {"sparkle": "http://www.andymatuschak.org/xml-namespaces/sparkle"}
+
+def parse_existing(path):
+    """Map sparkle:version -> (main_url, {deltaFrom: url}) from an existing appcast."""
+    out = {}
+    if not path or not os.path.isfile(path):
+        return out
+    try:
+        root = ET.parse(path).getroot()
+    except ET.ParseError:
+        return out
+    for item in root.findall("./channel/item"):
+        ver_el = item.find("sparkle:version", NS)
+        enc_el = item.find("enclosure")
+        if ver_el is None or not (ver_el.text or "").strip() or enc_el is None:
+            continue
+        ver = ver_el.text.strip()
+        main_url = enc_el.attrib.get("url")
+        deltas = {}
+        for d in item.findall("sparkle:deltas/enclosure", NS):
+            df = d.attrib.get(f"{{{NS['sparkle']}}}deltaFrom")
+            du = d.attrib.get("url")
+            if df and du:
+                deltas[df] = du
+        if main_url:
+            out[ver] = (main_url, deltas)
+    return out
+
+saved = parse_existing(prev_path)
+
+with open(new_path, encoding="utf-8") as fh:
+    xml_text = fh.read()
+
+changed = False
+item_re = re.compile(r"<item\b[^>]*>.*?</item>", re.S)
+ver_re = re.compile(r"<sparkle:version>([^<]+)</sparkle:version>")
+short_re = re.compile(r"<sparkle:shortVersionString>([^<]+)</sparkle:shortVersionString>")
+enc_re = re.compile(r"<enclosure\b[^>]*>")
+url_re = re.compile(r'(\burl=")([^"]*)(")')
+delta_from_re = re.compile(r'\bsparkle:deltaFrom="([^"]*)"')
+
+def replace_url(tag, new_url):
+    global changed
+    m = url_re.search(tag)
+    if not m or m.group(2) == new_url:
+        return tag
+    changed = True
+    return tag[:m.start(2)] + new_url + tag[m.end(2):]
+
+def rewrite_item(match):
+    block = match.group(0)
+    vm = ver_re.search(block)
+    sm = short_re.search(block)
+    ver = vm.group(1).strip() if vm else None
+    short = sm.group(1).strip() if sm else None
+    if short == current_ver:
+        return block
+
+    if ver and ver in saved:
+        old_main, old_deltas = saved[ver]
+        def fix_enc(em):
+            tag = em.group(0)
+            dm = delta_from_re.search(tag)
+            if dm:
+                df = dm.group(1)
+                return replace_url(tag, old_deltas[df]) if df in old_deltas else tag
+            return replace_url(tag, old_main)
+        return enc_re.sub(fix_enc, block)
+
+    # Rebuilt from scratch without an existing appcast under default GitHub Releases layout:
+    # map older release assets from v<current_ver>/ to v<short>/.
+    if use_gh_default == "1" and short:
+        old_prefix = f"{repo_url}/releases/download/v{current_ver}/"
+        target_prefix = f"{repo_url}/releases/download/v{short}/"
+        def fix_default_enc(em):
+            tag = em.group(0)
+            um = url_re.search(tag)
+            if not um:
+                return tag
+            u = um.group(2)
+            if u.startswith(old_prefix):
+                filename = u[len(old_prefix):]
+                return replace_url(tag, target_prefix + filename)
+            return tag
+        return enc_re.sub(fix_default_enc, block)
+
+    return block
+
+updated = item_re.sub(rewrite_item, xml_text)
+if changed:
+    with open(new_path, "w", encoding="utf-8") as fh:
+        fh.write(updated)
+    sys.exit(10)
+PY
+}
+
 find_generate_appcast() {
   if [ -n "${GENERATE_APPCAST:-}" ]; then
     [ -x "$GENERATE_APPCAST" ] || fail "GENERATE_APPCAST is not executable: $GENERATE_APPCAST"
@@ -102,6 +211,26 @@ find_generate_appcast() {
     return
   fi
   fail "Sparkle's generate_appcast not found (run 'make build' first, or set GENERATE_APPCAST)"
+}
+
+find_sign_update() {
+  local gen_bin=$1
+  if [ -n "${SIGN_UPDATE:-}" ]; then
+    [ -x "$SIGN_UPDATE" ] || fail "SIGN_UPDATE is not executable: $SIGN_UPDATE"
+    printf '%s\n' "$SIGN_UPDATE"
+    return
+  fi
+  local sibling
+  sibling="$(dirname "$gen_bin")/sign_update"
+  if [ -x "$sibling" ]; then
+    printf '%s\n' "$sibling"
+    return
+  fi
+  if command -v sign_update >/dev/null 2>&1; then
+    command -v sign_update
+    return
+  fi
+  fail "Sparkle's sign_update not found beside $gen_bin (set SIGN_UPDATE)"
 }
 
 DMG_SRC=""
@@ -160,16 +289,38 @@ if [ -n "$DMG_SRC" ]; then
 fi
 [ -f "$TARGET_DMG" ] || fail "expected DMG at $TARGET_DMG (pass --dmg PATH or copy it there first)"
 
+TMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TMP_DIR"' EXIT
+
 NOTES_FILE="$ARCHIVES_DIR/FSearch-$VERSION.md"
-NOTES_TMP=$(mktemp)
-trap 'rm -f "$NOTES_TMP"' EXIT
+NOTES_TMP="$TMP_DIR/notes.md"
 extract_notes "$VERSION" "$CHANGELOG" > "$NOTES_TMP"
 mv "$NOTES_TMP" "$NOTES_FILE"
 
 GEN=$(find_generate_appcast)
-[ -n "$DOWNLOAD_PREFIX" ] || DOWNLOAD_PREFIX="https://github.com/domfahey/fsearch-app/releases/download/v$VERSION/"
+USE_GITHUB_DEFAULT=0
+if [ -z "$DOWNLOAD_PREFIX" ]; then
+  USE_GITHUB_DEFAULT=1
+  DOWNLOAD_PREFIX="https://github.com/domfahey/fsearch-app/releases/download/v$VERSION/"
+fi
 [ -n "$FULL_NOTES_URL" ] || FULL_NOTES_URL="https://github.com/domfahey/fsearch-app/releases/tag/v$VERSION"
 [ -n "$OUTPUT" ] || OUTPUT="$ARCHIVES_DIR/appcast.xml"
+
+# Snapshot any existing appcast before generate_appcast runs so retained older
+# releases keep their original per-version asset URLs.
+PREV_APPCAST=""
+if [ -f "$OUTPUT" ]; then
+  PREV_APPCAST="$TMP_DIR/prev-appcast.xml"
+  cp "$OUTPUT" "$PREV_APPCAST"
+fi
+
+# If reading the EdDSA key from stdin ('-'), buffer it once into a 0600 temp file
+# so both generate_appcast and sign_update can read it.
+KEY_FILE_ARG="$ED_KEY_FILE"
+if [ "$ED_KEY_FILE" = "-" ]; then
+  KEY_FILE_ARG="$TMP_DIR/eddsa.key"
+  ( umask 077; cat > "$KEY_FILE_ARG" )
+fi
 
 ARGS=(
   --download-url-prefix "$DOWNLOAD_PREFIX"
@@ -180,10 +331,22 @@ ARGS=(
   -o "$OUTPUT"
 )
 [ -n "$ACCOUNT" ] && ARGS+=(--account "$ACCOUNT")
-[ -n "$ED_KEY_FILE" ] && ARGS+=(--ed-key-file "$ED_KEY_FILE")
+[ -n "$KEY_FILE_ARG" ] && ARGS+=(--ed-key-file "$KEY_FILE_ARG")
 
 echo "Generating appcast for FSearch $VERSION -> $OUTPUT"
 "$GEN" "${ARGS[@]}" "$ARCHIVES_DIR"
+
+RESTORE_RC=0
+preserve_existing_urls "$PREV_APPCAST" "$OUTPUT" "$VERSION" "https://github.com/domfahey/fsearch-app" "$USE_GITHUB_DEFAULT" || RESTORE_RC=$?
+if [ "$RESTORE_RC" -eq 10 ]; then
+  SIGN=$(find_sign_update "$GEN")
+  SIGN_ARGS=()
+  [ -n "$ACCOUNT" ] && SIGN_ARGS+=(--account "$ACCOUNT")
+  [ -n "$KEY_FILE_ARG" ] && SIGN_ARGS+=(--ed-key-file "$KEY_FILE_ARG")
+  "$SIGN" ${SIGN_ARGS[@]+"${SIGN_ARGS[@]}"} "$OUTPUT"
+elif [ "$RESTORE_RC" -ne 0 ]; then
+  fail "failed to preserve existing release URLs in $OUTPUT"
+fi
 
 DELTAS=()
 while IFS= read -r d; do
