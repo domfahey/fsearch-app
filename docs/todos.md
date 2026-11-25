@@ -24,7 +24,7 @@ Detail for the bug-audit items is in `.superpowers/audit-round2.md`, and for the
 - [ ] Everything-style search window (v2): sortable table, status bar, match toggles, filter chips, saved searches, preview pane. Needs a design pass and daemon paging. See [roadmap](roadmap.md).
 - [x] App Intents: a "Search files" action for Shortcuts.
 - [x] URL scheme: `fsearch://search?q=…`.
-- [ ] Sparkle: archive and export with Developer ID (`xcodebuild -exportArchive`), and script `generate_appcast` (with deltas and release notes from the CHANGELOG) as a local release step.
+- [x] Sparkle: release signing (`scripts/release.sh`, inside-out Developer ID signing per ADR 0008) and scripted `generate_appcast` (`scripts/appcast.sh`, with deltas and CHANGELOG release notes) as a local release step.
 
 ## Upstream (fsearch)
 

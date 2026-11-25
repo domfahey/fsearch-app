@@ -68,12 +68,12 @@ CI does not run the UI tests (hosted runners have no GUI session). Run them loca
 
 ### 6. Update the appcast
 
-The app requires a signed feed (`SURequireSignedFeed`). Never edit `appcast.xml` by hand. Run `generate_appcast` again so the feed signature is regenerated.
+The app requires a signed feed (`SURequireSignedFeed`). Never edit `appcast.xml` by hand. Run `scripts/appcast.sh` so the feed signature, embedded release notes and binary deltas are regenerated together.
 
-- [ ] Check out the `gh-pages` branch into a folder. It holds the current `appcast.xml`.
-- [ ] Copy `FSearch-X.Y.Z.dmg` into that folder.
-- [ ] Run `build/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_appcast --download-url-prefix https://github.com/domfahey/fsearch-app/releases/download/vX.Y.Z/ <that folder>` (omit `--download-url-prefix` only if hosting the DMG directly on `gh-pages`). It reads the EdDSA private key from your Keychain and adds the new entry.
-- [ ] Commit `appcast.xml` and push the `gh-pages` branch.
+- [ ] Keep a local archives folder (for example `release/archives/`, which is git-ignored) holding the previous release DMGs alongside the current `appcast.xml`, so Sparkle can generate `.delta` updates against older versions.
+- [ ] Run `scripts/appcast.sh --dmg build/release/FSearch-X.Y.Z.dmg X.Y.Z release/archives` (or pass `-o <gh-pages-dir>/appcast.xml` to write straight into a `gh-pages` checkout). It extracts the `## [X.Y.Z]` section from [CHANGELOG.md](../CHANGELOG.md) into `FSearch-X.Y.Z.md`, embeds those release notes in the signed feed, generates binary `.delta` files against older DMGs in the folder, and signs `appcast.xml` using the EdDSA private key in your Keychain.
+- [ ] If any `.delta` files were generated, attach them to the GitHub release `vX.Y.Z` alongside `FSearch-X.Y.Z.dmg` and `FSearch-X.Y.Z.dmg.sha256` (they share the same download URL prefix).
+- [ ] Copy only `appcast.xml` into the `gh-pages` branch, commit and push `gh-pages`. Do not commit `.dmg` or `.delta` files to `gh-pages`.
 - [ ] Check that an older build sees the update. Run the update test from step 4 if you have not.
 
 ## Roll back or yank a release
