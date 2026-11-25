@@ -187,10 +187,10 @@ enum LaunchGuards {
         Log.daemon.info("launched from a bad location: \(String(describing: problem), privacy: .public)")
         AppActivation.activate()
         let alert = NSAlert()
-        alert.messageText = "Move FSearch to Applications"
+        alert.messageText = String(localized: "Move FSearch to Applications")
         alert.informativeText = problem.message
-        alert.addButton(withTitle: "Move to Applications")
-        alert.addButton(withTitle: "Quit")
+        alert.addButton(withTitle: String(localized: "Move to Applications"))
+        alert.addButton(withTitle: String(localized: "Quit"))
         if alert.runModal() == .alertFirstButtonReturn {
             InstallMover.moveToApplications(from: Bundle.main.bundleURL)
         }

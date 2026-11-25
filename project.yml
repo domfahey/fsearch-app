@@ -2,6 +2,7 @@ name: FSearch
 options:
   bundleIdPrefix: com.domfahey
   deploymentTarget: { macOS: "15.0" }
+  developmentLanguage: en
 packages:
   FSearchKit: { path: Packages/FSearchKit }
   KeyboardShortcuts: { url: https://github.com/sindresorhus/KeyboardShortcuts, exactVersion: "2.4.0" }
@@ -23,6 +24,9 @@ targets:
         CODE_SIGN_ENTITLEMENTS: App/Resources/FSearch.entitlements
         CODE_SIGN_IDENTITY: "-"
         ENABLE_HARDENED_RUNTIME: YES
+        LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+        SWIFT_EMIT_LOC_STRINGS: YES
+        STRING_CATALOG_GENERATE_SYMBOLS: NO
         SWIFT_VERSION: "6.0"
         ARCHS: "arm64 x86_64"
         ONLY_ACTIVE_ARCH: NO

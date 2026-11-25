@@ -39,8 +39,8 @@ enum ActionsMenu {
             i.representedObject = t  // the item keeps its target alive
             return i
         }
-        menu.addItem(entry("Open", .open) { FileActions.open(item, editor: app.editor, onError: app.showActionError) })
-        let with = NSMenuItem(title: "Open With", action: nil, keyEquivalent: "")
+        menu.addItem(entry(String(localized: "Open"), .open) { FileActions.open(item, editor: app.editor, onError: app.showActionError) })
+        let with = NSMenuItem(title: String(localized: "Open With"), action: nil, keyEquivalent: "")
         // Capped at 12 so the submenu stays short.
         let apps = FileActions.workspace.urlsForApplications(toOpen: FileActions.url(path)).prefix(12)
         if apps.isEmpty {
@@ -56,23 +56,23 @@ enum ActionsMenu {
             with.submenu = sub
         }
         menu.addItem(with)
-        menu.addItem(entry("Reveal in Finder", .reveal) { FileActions.reveal(path, onError: app.showActionError) })
-        menu.addItem(entry("Quick Look", .quickLook) { FileActions.quickLook(path, onError: app.showActionError) })
-        menu.addItem(entry("Copy Path", .copyPath) { FileActions.copyPath(path) })
-        menu.addItem(entry("Copy File", .copyFile) { FileActions.copyFile(path, onError: app.showActionError) })
+        menu.addItem(entry(String(localized: "Reveal in Finder"), .reveal) { FileActions.reveal(path, onError: app.showActionError) })
+        menu.addItem(entry(String(localized: "Quick Look"), .quickLook) { FileActions.quickLook(path, onError: app.showActionError) })
+        menu.addItem(entry(String(localized: "Copy Path"), .copyPath) { FileActions.copyPath(path) })
+        menu.addItem(entry(String(localized: "Copy File"), .copyFile) { FileActions.copyFile(path, onError: app.showActionError) })
         menu.addItem(
-            entry("Open Folder in Terminal", .openTerminal) {
+            entry(String(localized: "Open Folder in Terminal"), .openTerminal) {
                 FileActions.openTerminal(at: path) { app.showActionError($0) }
             })
         menu.addItem(.separator())
         menu.addItem(
-            entry("Move to Trash", .trash) {
+            entry(String(localized: "Move to Trash"), .trash) {
                 do {
                     try FileActions.trash(path)
                     app.recentsChanged()  // an empty query shows Recents: drop the trashed row
                     Task { await app.search.refresh() }
                 } catch {
-                    app.showActionError("Couldn't move to Trash: \(error.localizedDescription)")
+                    app.showActionError(String(localized: "Couldn't move to Trash: \(error.localizedDescription)"))
                 }
             })
         return menu

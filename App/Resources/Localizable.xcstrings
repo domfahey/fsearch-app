@@ -1,0 +1,1300 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "": {
+      "shouldTranslate": false
+    },
+    "%@ files indexed.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ files indexed."
+          }
+        }
+      }
+    },
+    "%@, %@": {
+      "shouldTranslate": false
+    },
+    "%lld": {
+      "shouldTranslate": false
+    },
+    "A small background helper keeps the index up to date as files change, so results are instant. It starts when you log in.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A small background helper keeps the index up to date as files change, so results are instant. It starts when you log in."
+          }
+        }
+      }
+    },
+    "About FSearch": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "About FSearch"
+          }
+        }
+      }
+    },
+    "Allowed in Login Items": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allowed in Login Items"
+          }
+        }
+      }
+    },
+    "Automatically check for updates": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatically check for updates"
+          }
+        }
+      }
+    },
+    "Cancel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        }
+      }
+    },
+    "Check Now": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check Now"
+          }
+        }
+      }
+    },
+    "Check for Updates…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check for Updates…"
+          }
+        }
+      }
+    },
+    "Checking…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking…"
+          }
+        }
+      }
+    },
+    "Clear Log": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear Log"
+          }
+        }
+      }
+    },
+    "Content index": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Content index"
+          }
+        }
+      }
+    },
+    "Continue": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue"
+          }
+        }
+      }
+    },
+    "Copy All": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy All"
+          }
+        }
+      }
+    },
+    "Copy File": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy File"
+          }
+        }
+      }
+    },
+    "Copy Path": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy Path"
+          }
+        }
+      }
+    },
+    "Couldn't find Terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't find Terminal"
+          }
+        }
+      }
+    },
+    "Couldn't move to Trash: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't move to Trash: %@"
+          }
+        }
+      }
+    },
+    "Couldn't open Terminal: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't open Terminal: %@"
+          }
+        }
+      }
+    },
+    "Couldn't open with %@: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't open with %1$@: %2$@"
+          }
+        }
+      }
+    },
+    "Couldn't open “%@”": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't open “%@”"
+          }
+        }
+      }
+    },
+    "Daemon": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Daemon"
+          }
+        }
+      }
+    },
+    "Debug mode": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Debug mode"
+          }
+        }
+      }
+    },
+    "Debug mode active": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Debug mode active"
+          }
+        }
+      }
+    },
+    "Debug mode shows index details and records searches on this Mac only (last 10,000).": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Debug mode shows index details and records searches on this Mac only (last 10,000)."
+          }
+        }
+      }
+    },
+    "Definitions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Definitions"
+          }
+        }
+      }
+    },
+    "Don't Remind Me": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Don't Remind Me"
+          }
+        }
+      }
+    },
+    "Done": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        }
+      }
+    },
+    "Error": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Error"
+          }
+        }
+      }
+    },
+    "Export…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export…"
+          }
+        }
+      }
+    },
+    "FSearch": {
+      "shouldTranslate": false
+    },
+    "FSearch menu": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FSearch menu"
+          }
+        }
+      }
+    },
+    "FSearch menu ⌘/": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FSearch menu ⌘/"
+          }
+        }
+      }
+    },
+    "File Names": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "File Names"
+          }
+        }
+      }
+    },
+    "Filter": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filter"
+          }
+        }
+      }
+    },
+    "Filter search log": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filter search log"
+          }
+        }
+      }
+    },
+    "Find anything on your Mac": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Find anything on your Mac"
+          }
+        }
+      }
+    },
+    "Find symbol definitions in code": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Find symbol definitions in code"
+          }
+        }
+      }
+    },
+    "Finish Setup…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finish Setup…"
+          }
+        }
+      }
+    },
+    "Fix…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fix…"
+          }
+        }
+      }
+    },
+    "Folders the index lacks (skipped)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Folders the index lacks (skipped)"
+          }
+        }
+      }
+    },
+    "Full Disk Access can't be removed by an app. Remove FSearch from the list by hand, then quit and delete FSearch.app.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Full Disk Access can't be removed by an app. Remove FSearch from the list by hand, then quit and delete FSearch.app."
+          }
+        }
+      }
+    },
+    "Full Disk Access is on": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Full Disk Access is on"
+          }
+        }
+      }
+    },
+    "Help": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Help"
+          }
+        }
+      }
+    },
+    "Index": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Index"
+          }
+        }
+      }
+    },
+    "Index Details": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Index Details"
+          }
+        }
+      }
+    },
+    "Index Details…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Index Details…"
+          }
+        }
+      }
+    },
+    "Indexing your disk": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indexing your disk"
+          }
+        }
+      }
+    },
+    "Indexing…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indexing…"
+          }
+        }
+      }
+    },
+    "Inside Files": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inside Files"
+          }
+        }
+      }
+    },
+    "Keep search ready in the background": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep search ready in the background"
+          }
+        }
+      }
+    },
+    "Let FSearch see all your files": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Let FSearch see all your files"
+          }
+        }
+      }
+    },
+    "Limit": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Limit"
+          }
+        }
+      }
+    },
+    "Match file and folder names": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Match file and folder names"
+          }
+        }
+      }
+    },
+    "Mode": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mode"
+          }
+        }
+      }
+    },
+    "Move FSearch to Applications": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move FSearch to Applications"
+          }
+        }
+      }
+    },
+    "Move to Applications": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move to Applications"
+          }
+        }
+      }
+    },
+    "Move to Trash": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move to Trash"
+          }
+        }
+      }
+    },
+    "No matching actions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No matching actions"
+          }
+        }
+      }
+    },
+    "None": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "None"
+          }
+        }
+      }
+    },
+    "Not reachable: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not reachable: %@"
+          }
+        }
+      }
+    },
+    "Open": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open"
+          }
+        }
+      }
+    },
+    "Open FSearch at login": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open FSearch at login"
+          }
+        }
+      }
+    },
+    "Open Folder in Terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Folder in Terminal"
+          }
+        }
+      }
+    },
+    "Open Full Disk Access…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Full Disk Access…"
+          }
+        }
+      }
+    },
+    "Open Login Items Settings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Login Items Settings"
+          }
+        }
+      }
+    },
+    "Open Login Items…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Login Items…"
+          }
+        }
+      }
+    },
+    "Open Privacy Settings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Privacy Settings"
+          }
+        }
+      }
+    },
+    "Open With": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open With"
+          }
+        }
+      }
+    },
+    "Open content results in:": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open content results in:"
+          }
+        }
+      }
+    },
+    "Press Backspace in an empty search field to clear": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Press Backspace in an empty search field to clear"
+          }
+        }
+      }
+    },
+    "Press your shortcut from anywhere, type a few letters, and every file on your disk shows up as you type. Even inside files.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Press your shortcut from anywhere, type a few letters, and every file on your disk shows up as you type. Even inside files."
+          }
+        }
+      }
+    },
+    "Query": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Query"
+          }
+        }
+      }
+    },
+    "Quick Look": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quick Look"
+          }
+        }
+      }
+    },
+    "Quit": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quit"
+          }
+        }
+      }
+    },
+    "Quit FSearch": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quit FSearch"
+          }
+        }
+      }
+    },
+    "Ready to search": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready to search"
+          }
+        }
+      }
+    },
+    "Remove": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove"
+          }
+        }
+      }
+    },
+    "Remove Background Helper and Data…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove Background Helper and Data…"
+          }
+        }
+      }
+    },
+    "Remove FSearch's background helper and data?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove FSearch's background helper and data?"
+          }
+        }
+      }
+    },
+    "Removing…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Removing…"
+          }
+        }
+      }
+    },
+    "Restart Daemon": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restart Daemon"
+          }
+        }
+      }
+    },
+    "Results": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Results"
+          }
+        }
+      }
+    },
+    "Reveal Data Folder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reveal Data Folder"
+          }
+        }
+      }
+    },
+    "Reveal in Finder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reveal in Finder"
+          }
+        }
+      }
+    },
+    "Round trip": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Round trip"
+          }
+        }
+      }
+    },
+    "Save Now": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save Now"
+          }
+        }
+      }
+    },
+    "Search": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search"
+          }
+        }
+      }
+    },
+    "Search ${mode} for ${query}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search ${mode} for ${query}"
+          }
+        }
+      }
+    },
+    "Search Files": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search Files"
+          }
+        }
+      }
+    },
+    "Search In": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search In"
+          }
+        }
+      }
+    },
+    "Search Log": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search Log"
+          }
+        }
+      }
+    },
+    "Search Log…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search Log…"
+          }
+        }
+      }
+    },
+    "Search Mode": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search Mode"
+          }
+        }
+      }
+    },
+    "Search files": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search files"
+          }
+        }
+      }
+    },
+    "Search for actions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search for actions"
+          }
+        }
+      }
+    },
+    "Search for actions…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search for actions…"
+          }
+        }
+      }
+    },
+    "Search indexed files on your Mac by name, file contents, or symbol definitions using FSearch.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search indexed files on your Mac by name, file contents, or symbol definitions using FSearch."
+          }
+        }
+      }
+    },
+    "Search mode: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search mode: %@"
+          }
+        }
+      }
+    },
+    "Search text inside files": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search text inside files"
+          }
+        }
+      }
+    },
+    "Search…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search…"
+          }
+        }
+      }
+    },
+    "Settings…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings…"
+          }
+        }
+      }
+    },
+    "Shortcut %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shortcut %@"
+          }
+        }
+      }
+    },
+    "Shortcut:": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shortcut:"
+          }
+        }
+      }
+    },
+    "Skip for now": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skip for now"
+          }
+        }
+      }
+    },
+    "Starting background helper…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Starting background helper…"
+          }
+        }
+      }
+    },
+    "Step %lld of 4": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Step %lld of 4"
+          }
+        }
+      }
+    },
+    "Text or FSearch filters such as ext:pdf, in:~/Developer, or mtime:<7d.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Text or FSearch filters such as ext:pdf, in:~/Developer, or mtime:<7d."
+          }
+        }
+      }
+    },
+    "This turns off FSearch's background helper and moves its logs and settings to the Trash, and its index too when only this app's helper uses it. A separately installed fsearch command-line tool is left alone. You can undo it from the Trash.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This turns off FSearch's background helper and moves its logs and settings to the Trash, and its index too when only this app's helper uses it. A separately installed fsearch command-line tool is left alone. You can undo it from the Trash."
+          }
+        }
+      }
+    },
+    "Time": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Time"
+          }
+        }
+      }
+    },
+    "Try Again": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try Again"
+          }
+        }
+      }
+    },
+    "Turn Off Debug Mode": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn Off Debug Mode"
+          }
+        }
+      }
+    },
+    "Turn On Debug Mode": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn On Debug Mode"
+          }
+        }
+      }
+    },
+    "Update Available…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update Available…"
+          }
+        }
+      }
+    },
+    "Updates": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Updates"
+          }
+        }
+      }
+    },
+    "Using the fsearch daemon that's already running": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Using the fsearch daemon that's already running"
+          }
+        }
+      }
+    },
+    "Waiting for approval in Login Items.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for approval in Login Items."
+          }
+        }
+      }
+    },
+    "Warning: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Warning: %@"
+          }
+        }
+      }
+    },
+    "Welcome to FSearch": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Welcome to FSearch"
+          }
+        }
+      }
+    },
+    "What files do you want to search for?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What files do you want to search for?"
+          }
+        }
+      }
+    },
+    "Without Full Disk Access, macOS hides Desktop, Documents, Downloads, Mail, Messages and iCloud Drive from every app. Nothing leaves your Mac: the index stays on this computer.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Without Full Disk Access, macOS hides Desktop, Documents, Downloads, Mail, Messages and iCloud Drive from every app. Nothing leaves your Mac: the index stays on this computer."
+          }
+        }
+      }
+    },
+    "Your shortcut:": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your shortcut:"
+          }
+        }
+      }
+    },
+    "daemon.log (last 30 lines)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "daemon.log (last 30 lines)"
+          }
+        }
+      }
+    },
+    "done": {
+      "shouldTranslate": false
+    },
+    "files": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "files"
+          }
+        }
+      }
+    },
+    "find": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "find"
+          }
+        }
+      }
+    },
+    "fsearch": {
+      "shouldTranslate": false
+    },
+    "grep": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "grep"
+          }
+        }
+      }
+    },
+    "searching": {
+      "shouldTranslate": false
+    },
+    "selected": {
+      "shouldTranslate": false
+    },
+    "symbols": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "symbols"
+          }
+        }
+      }
+    },
+    "“%@” is gone: moved or deleted": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” is gone: moved or deleted"
+          }
+        }
+      }
+    },
+    "⌘K → Open to launch": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⌘K → Open to launch"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}
