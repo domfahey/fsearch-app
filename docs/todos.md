@@ -10,7 +10,7 @@ Detail for the bug-audit items is in `.superpowers/audit-round2.md`, and for the
 - [x] CI benchmark baseline: add a `ci-macos-26` entry from a CI artifact, so the bench job can gate.
 - [x] Accessibility: keyboard navigation in Settings and onboarding, Reduce Motion and Transparency, Increase Contrast.
 - [ ] Localization readiness: a String Catalog, English only for now.
-- [ ] Query docs depth: ranking, typo tolerance, how words combine, `limit:`. Check each against the daemon first.
+- [x] Query docs depth: ranking, typo tolerance, how words combine, `limit:`. Check each against the daemon first.
 
 ## Docs follow-ups
 
