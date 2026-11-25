@@ -18,6 +18,10 @@ final class PanelViewState {
 
     func resume(_ resumed: PanelState) {
         state = resumed
+    }
+
+    /// Requests search-field focus after the panel has been activated and presented.
+    func requestFocus() {
         focusTrigger += 1
     }
 }
@@ -218,8 +222,8 @@ struct SearchView: View {
         .frame(width: 680, height: 460)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
         .coordinateSpace(.named(PanelGeometry.space))
-        .onAppear { focused = true }
-        .onChange(of: viewState.focusTrigger) { focused = true }
+        .onAppear { focusSearchField() }
+        .onChange(of: viewState.focusTrigger) { focusSearchField() }
         .onChange(of: viewState.state.selection) { onSelect(viewState.state.selection) }
         // An open preview follows the selected file: a new selection, or new rows under the same one.
         .onChange(of: PanelInput.previewPath(at: selection, shown: shown, rows: rows)) { _, path in
@@ -293,6 +297,15 @@ struct SearchView: View {
     private func hint(_ t: String, _ k: String) -> some View {
         HStack(spacing: 4) {
             Text(t); Text(k).padding(.horizontal, 5).overlay(RoundedRectangle(cornerRadius: 4).stroke(.secondary.opacity(0.5)))
+        }
+    }
+
+    /// Defers text-field focus to the next main-queue turn so synchronous panel
+    /// activation and presentation finish first (e.g. when opened by the global
+    /// shortcut). Skips if the panel hid or the FSearch menu opened meanwhile.
+    private func focusSearchField() {
+        DispatchQueue.main.async {
+            if isVisible() && !menu.isOpen { focused = true }
         }
     }
 

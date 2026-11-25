@@ -21,7 +21,7 @@ final class PanelController: PanelHost {
     /// The app whose `SearchView` is currently hosted in `panel.contentView`.
     private weak var hostedApp: AppState?
     /// Observable state box shared with the hosted `SearchView` so `show()` reuses the view hierarchy.
-    private let viewState = PanelViewState()
+    private(set) var viewState = PanelViewState()
     /// Remembers the state at hide, so a quick reopen resumes.
     private var session = PanelSession()
     private weak var app: AppState?
@@ -135,6 +135,7 @@ final class PanelController: PanelHost {
         previousApp = front == NSRunningApplication.current ? nil : front
         AppActivation.activate()
         Presentation.present(p)
+        viewState.requestFocus()
         Task { await app.search.refresh() }
     }
 

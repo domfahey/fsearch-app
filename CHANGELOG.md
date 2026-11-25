@@ -67,6 +67,7 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
 - A failed helper replacement keeps the previous version marker. If the old helper is still answering after it was unregistered, the login item is put back without recording the update, so a later launch retries.
 - Socket replies must finish within the request timeout, even when partial data keeps arriving.
 - A file refused by its default app shows an error and keeps the panel open without adding a recent; a failed editor fallback also reports the error.
+- Opening or reopening the panel (including with the global shortcut) defers search-field focus until after activation and presentation so typing works immediately without clicking first.
 - Copy File, Open Folder in Terminal, and Quick Look check whether a file still exists before acting and report a missing-file error instead of failing silently; Quick Look still closes when a preview is already open.
 - The footer shows `Open at line` when the chosen editor handles open-at-line links, Settings keeps an uninstalled editor selection visible in its picker and refreshes login-item status after uninstalling, and onboarding automatically detects a Full Disk Access grant while open.
 - Disconnect-driven helper restarts and recovery refreshes coalesce across rapid failures so they don't burn extra restart budget tokens, `DaemonManager.start()` waits for any in-flight restart, and uninstalling waits for the unregistered helper to stop and clears Sparkle defaults.

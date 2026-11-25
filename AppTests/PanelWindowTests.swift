@@ -128,6 +128,32 @@ extension AppTests {
             pc.perform(.copyPath(0), items)
             #expect(env.pasteboard.string(forType: .string) == "/p/a b.txt")
         }
+
+        /// Focus is requested only after activation and presentation, on both first open and reused-view reopens.
+        @Test func focusIsRequestedAfterActivationAndOnReopen() async {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let pc = PanelController()
+            defer { pc.hide(returnFocus: false) }
+            var triggerDuringActivate: [Int] = []
+            let saved = AppActivation.activate
+            AppActivation.activate = { triggerDuringActivate.append(pc.viewState.focusTrigger) }
+            defer { AppActivation.activate = saved }
+
+            pc.show(app: env.app)
+            #expect(triggerDuringActivate == [0], "focusTrigger must not bump before activation")
+            #expect(pc.viewState.focusTrigger == 1)
+            await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in DispatchQueue.main.async { c.resume() } }
+
+            pc.hide(returnFocus: false)
+            pc.show(app: env.app)
+            #expect(triggerDuringActivate == [0, 1], "reopen must also wait until after activation")
+            #expect(pc.viewState.focusTrigger == 2)
+            // Hiding before the deferred focus turn runs must not crash or disturb state.
+            pc.hide(returnFocus: false)
+            await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in DispatchQueue.main.async { c.resume() } }
+            #expect(!pc.isVisible)
+        }
     }
 }
 
