@@ -97,7 +97,7 @@ public struct SearchURL: Equatable, Sendable {
     }
 
     /// Replaces line/tab separators with spaces, drops control characters, and caps length at grapheme boundaries.
-    private static func sanitize(_ raw: String) -> String {
+    static func sanitize(_ raw: String) -> String {
         let bufferLimit = maxQueryLength + 32
         var normalized = ""
         normalized.reserveCapacity(min(raw.utf8.count, maxQueryLength))

@@ -28,6 +28,7 @@ Facts to look up.
 - [Keyboard shortcuts](reference/keyboard-shortcuts.md)
 - [Query syntax](reference/query-syntax.md)
 - [URL scheme](reference/url-scheme.md)
+- [Shortcuts (App Intents)](reference/shortcuts.md)
 - [Settings](reference/settings.md)
 - [Files and locations](reference/files-and-locations.md)
 - [Troubleshooting](reference/troubleshooting.md)
