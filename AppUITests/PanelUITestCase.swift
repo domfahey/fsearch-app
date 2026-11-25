@@ -219,6 +219,15 @@ class PanelUITestCase: XCTestCase {
         return s
     }
 
+    /// Waits for the general pasteboard's string to satisfy `match` and returns it.
+    func waitForClipboard(
+        _ timeout: TimeInterval = 5, _ what: String = "clipboard updated",
+        matching match: @escaping (String) -> Bool, file: StaticString = #filePath, line: UInt = #line
+    ) throws -> String {
+        waitUntil(timeout, what, { self.clipboard.map(match) == true }, file: file, line: line)
+        return try XCTUnwrap(clipboard, file: file, line: line)
+    }
+
     func waitFor(_ e: XCUIElement, _ timeout: TimeInterval = 20, _ file: StaticString = #filePath, _ line: UInt = #line) {
         let ok = e.waitForExistence(timeout: timeout)
         XCTAssertTrue(ok, "never appeared: \(e)\n" + tree(), file: file, line: line)

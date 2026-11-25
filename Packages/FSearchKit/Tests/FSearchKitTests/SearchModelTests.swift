@@ -198,6 +198,17 @@ private func waitUntilStarted(_ b: some StartSignal) async throws {
         #expect(m.items.map(\.path) == ["/r/new"] && m.phase == .results)
         #expect(log.map(\.query) == ["new"], "the late reply to the old query is not reported")
     }
+
+    @Test func cancellingCallerTaskCancelsInFlightBackendCall() async throws {
+        let b = HangingBackend(hangingQuery: "slow")
+        let m = SearchModel(names: b, content: ScriptedBackend())
+        m.query = "slow"
+        let caller = Task { await m.refresh() }
+        try await waitUntilStarted(b)
+        caller.cancel()
+        await caller.value
+        #expect(b.cancelled, "cancelling refresh()'s caller cancels the backend call")
+    }
 }
 
 /// Records every call so tests can check what reached the daemon.

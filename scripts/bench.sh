@@ -33,7 +33,7 @@
 # metric regressed twice; 64 bad usage; 75 inconclusive (busy machine or slow
 # daemon); anything else is passed through from the benchmark binary.
 #
-# (--help prints only lines 2-21 of this header, so keep new text below them.)
+# (--help prints only lines 2-22 of this header, so keep new text below them.)
 # -e and pipefail stop at the first failing step; the places that expect a
 # non-zero status (compare, the benchmark run) capture it with `|| rc=$?`.
 set -euo pipefail
@@ -44,7 +44,7 @@ BASELINE="$ROOT/bench/baseline.json"
 RESULTS="$ROOT/bench/results"
 
 # Flags for this script; everything in PASS is forwarded to the benchmark binary.
-RECORD=0 PROVISIONAL=0 REPORT_ONLY=0 SELF_TEST=0
+RECORD=0 PROVISIONAL=0 REPORT_ONLY=0 SELF_TEST=0 PARTIAL=0
 PASS=()
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -52,9 +52,14 @@ while [ $# -gt 0 ]; do
     --provisional) PROVISIONAL=1 ;;
     --report-only) REPORT_ONLY=1; PASS+=(--report-only) ;;
     --self-test) SELF_TEST=1 ;;
-    --skip-daemon) PASS+=(--skip-daemon) ;;
-    --filter|--samples) PASS+=("$1" "$2"); shift ;;
-    -h|--help) sed -n '2,21p' "$0"; exit 0 ;;
+    --skip-daemon) PARTIAL=1; PASS+=(--skip-daemon) ;;
+    --filter)
+      [ $# -ge 2 ] || { echo "bench.sh: --filter needs a value" >&2; exit 64; }
+      PARTIAL=1; PASS+=("$1" "$2"); shift ;;
+    --samples)
+      [ $# -ge 2 ] || { echo "bench.sh: --samples needs a value" >&2; exit 64; }
+      PASS+=("$1" "$2"); shift ;;
+    -h|--help) sed -n '2,22p' "$0"; exit 0 ;;
     *) echo "bench.sh: unknown option $1" >&2; exit 64 ;;
   esac
   shift
@@ -84,22 +89,33 @@ trap cleanup EXIT
 trap 'exit 130' INT TERM
 
 echo "==> building FSearchBench (release)"
-(cd "$PKG" && swift build -c release --product FSearchBench 2>&1 | grep -vE '^\[[0-9]+/[0-9]+\]' || true)
+BUILD_LOG="$WORK/build.log"
+if ! (cd "$PKG" && swift build -c release --product FSearchBench > "$BUILD_LOG" 2>&1); then
+  cat "$BUILD_LOG" >&2
+  echo "bench.sh: build failed" >&2
+  exit 1
+fi
+grep -vE '^\[[0-9]+/[0-9]+\]' "$BUILD_LOG" || true
 BIN="$(cd "$PKG" && swift build -c release --show-bin-path)/FSearchBench"
 [ -x "$BIN" ] || { echo "bench.sh: build failed" >&2; exit 1; }
 
 MACHINE=${BENCH_MACHINE:-$("$BIN" machine-key)}
 DAEMON=${FSEARCH_DAEMON:-$ROOT/Vendor/fsearch}
 
-# Daemon revision: Vendor/fsearch.rev (written by build-daemon.sh), else the
-# .rev next to a symlinked binary, else the pin in build-daemon.sh.
+# Daemon revision: the .rev next to $DAEMON (or its symlink target), else Vendor/fsearch.rev,
+# else the pin in build-daemon.sh.
 daemon_rev() {
-  local rev="" target
-  if [ -f "$ROOT/Vendor/fsearch.rev" ]; then
-    rev=$(cat "$ROOT/Vendor/fsearch.rev")
-  elif [ -L "$DAEMON" ]; then
+  local rev="" dir target
+  dir=$(cd "$(dirname "$DAEMON")" 2>/dev/null && pwd -P || true)
+  if [ -L "$DAEMON" ]; then
     target=$(readlink "$DAEMON")
-    [ -f "$(dirname "$target")/fsearch.rev" ] && rev="$(cat "$(dirname "$target")/fsearch.rev")"
+    case "$target" in /*) ;; *) target="$dir/$target" ;; esac
+    [ -f "$(dirname "$target")/fsearch.rev" ] && rev=$(cat "$(dirname "$target")/fsearch.rev")
+  fi
+  if [ -z "$rev" ] && [ -n "$dir" ] && [ -f "$dir/fsearch.rev" ]; then
+    rev=$(cat "$dir/fsearch.rev")
+  elif [ -z "$rev" ] && [ "$DAEMON" = "$ROOT/Vendor/fsearch" ] && [ -f "$ROOT/Vendor/fsearch.rev" ]; then
+    rev=$(cat "$ROOT/Vendor/fsearch.rev")
   fi
   if [ -z "$rev" ]; then
     rev="pin:$(sed -nE 's/^REV=\$\{FSEARCH_REV:-([0-9a-f]+)\}.*/\1/p' "$ROOT/scripts/build-daemon.sh")"
@@ -135,6 +151,7 @@ fi
 
 if [ "$RECORD" = 1 ]; then
   [ "$SELF_TEST" = 1 ] && { echo "bench.sh: refusing to record a self-test run" >&2; exit 64; }
+  [ "$PARTIAL" = 1 ] && { echo "bench.sh: refusing to record a partial run (--filter / --skip-daemon)" >&2; exit 64; }
   args=(record --baseline "$BASELINE" --current "$OUT" --machine "$MACHINE")
   [ "$PROVISIONAL" = 1 ] && args+=(--provisional)
   "$BIN" "${args[@]}"
@@ -158,11 +175,20 @@ FILTER=$(paste -sd , "$WORK/regressed.txt")
 for attempt in 1 2 3; do
   echo "==> regressed: $FILTER; re-running those to rule out noise (attempt $attempt)"
   OUT2="$RESULTS/$STAMP-$MACHINE-rerun$attempt.json"
-  run_bench "$OUT2" --filter "$FILTER"
+  run_rc=0
+  run_bench "$OUT2" --filter "$FILTER" || run_rc=$?
+  if [ "$run_rc" != 0 ]; then
+    [ "$REPORT_ONLY" = 1 ] && { echo "==> report-only: re-run ended early (exit $run_rc); not failing"; exit 0; }
+    exit "$run_rc"
+  fi
   rc=0
   "$BIN" compare --baseline "$BASELINE" --current "$OUT2" --machine "$MACHINE" \
     --regressed-out "$WORK/regressed2.txt" --busy-out "$WORK/busy.txt" || rc=$?
-  if [ "$rc" != 1 ]; then echo "==> PASS: the first-run regressions did not reproduce (noise)"; exit 0; fi
+  case $rc in
+    0) echo "==> PASS: the first-run regressions did not reproduce (noise)"; exit 0 ;;
+    1) ;;
+    *) echo "bench.sh: compare failed ($rc)" >&2; exit "$rc" ;;
+  esac
   FILTER=$(paste -sd , "$WORK/regressed2.txt")
   [ -s "$WORK/busy.txt" ] || break
   if [ "$attempt" -lt 3 ]; then echo "==> machine busy (canary.cpu slower than at baseline); waiting 30 s"; sleep 30; fi

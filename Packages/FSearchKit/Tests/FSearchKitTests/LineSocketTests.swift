@@ -24,6 +24,9 @@ final class RawServer: @unchecked Sendable {
         unlink(path)
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         precondition(fd >= 0, "socket: errno \(errno)")
+        var one: Int32 = 1
+        precondition(
+            setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &one, socklen_t(MemoryLayout<Int32>.size)) == 0, "SO_NOSIGPIPE: errno \(errno)")
         precondition(path.utf8.count < MemoryLayout.size(ofValue: sockaddr_un().sun_path), "socket path too long: \(path)")
         precondition(Self.withAddress(path) { bind(fd, $0, $1) } == 0, "bind \(path): errno \(errno)")
         precondition(listen(fd, 8) == 0, "listen: errno \(errno)")
@@ -42,6 +45,8 @@ final class RawServer: @unchecked Sendable {
                     return _accepted
                 }
                 guard let n else { close(c); return }  // stop()'s wake-up dial
+                var noSigPipe: Int32 = 1
+                _ = setsockopt(c, SOL_SOCKET, SO_NOSIGPIPE, &noSigPipe, socklen_t(MemoryLayout<Int32>.size))
                 Thread.detachNewThread { handler(c, n) }
             }
         }
@@ -84,16 +89,18 @@ final class RawServer: @unchecked Sendable {
         }
     }
 
-    static func send(_ fd: Int32, _ s: String) {
+    @discardableResult
+    static func send(_ fd: Int32, _ s: String) -> Bool {
         var one: Int32 = 1
-        setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &one, socklen_t(MemoryLayout<Int32>.size))  // a gone client is not a crash
+        guard setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &one, socklen_t(MemoryLayout<Int32>.size)) == 0 else { return false }
         let d = Array(s.utf8)
         var off = 0
         while off < d.count {
             let n = d.withUnsafeBytes { write(fd, $0.baseAddress! + off, d.count - off) }
-            if n <= 0 { return }
+            if n <= 0 { return false }
             off += n
         }
+        return true
     }
 }
 
@@ -326,6 +333,38 @@ final class RawServer: @unchecked Sendable {
         #expect(String(decoding: try s.roundTrip(req()), as: UTF8.self) == "one")
         s.close()
         #expect(String(decoding: try s.roundTrip(req()), as: UTF8.self) == "two")
+    }
+
+    @Test func embeddedNulInPathIsDisconnected() {
+        let srv = RawServer { fd, _ in
+            while RawServer.readLine(fd) { RawServer.send(fd, "{}\n") }
+            close(fd)
+        }
+        defer { srv.stop() }
+        // A path with an embedded NUL must not truncate onto the real socket before it.
+        #expect(throws: DaemonError.disconnected) { try LineSocket(path: srv.path + "\0extra", timeout: 1).roundTrip(req()) }
+        #expect(srv.accepted == 0)
+    }
+
+    @Test func invalidTimeoutFailsWithoutTrappingAndSlowDribbleRespectsDeadline() {
+        let srv = RawServer { fd, _ in
+            _ = RawServer.readLine(fd)
+            for _ in 0..<200 {
+                if !RawServer.send(fd, "x") { break }
+                Thread.sleep(forTimeInterval: 0.04)
+            }
+            close(fd)
+        }
+        defer { srv.stop() }
+        for bad in [0.0, -1.0, .nan, .infinity] {
+            #expect(throws: DaemonError.timeout) { try LineSocket(path: srv.path, timeout: bad).roundTrip(req()) }
+        }
+        // A tiny positive timeout still sets a non-zero kernel timeout rather than {0, 0} (infinite).
+        #expect(throws: DaemonError.timeout) { try LineSocket(path: srv.path, timeout: 1e-9).roundTrip(req()) }
+        // A peer trickling bytes faster than the timeout without a newline still hits the overall deadline.
+        let t0 = ContinuousClock.now
+        #expect(throws: DaemonError.timeout) { try LineSocket(path: srv.path, timeout: 0.25).roundTrip(req()) }
+        #expect(t0.duration(to: .now) < .seconds(3))
     }
 }
 

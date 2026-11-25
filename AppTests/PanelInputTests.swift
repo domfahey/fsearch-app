@@ -101,6 +101,10 @@ extension AppTests {
             #expect(key(P(key: "/", characters: "/", command: true, shift: true, keyCode: 0x1A)) == .appMenu)
             // On US, ⇧ on that key types "?": ⌘? is Help search, not this menu.
             #expect(key(P(key: "?", characters: "?", command: true, shift: true, keyCode: 0x2C)) == nil)
+            // On Dvorak, key 0x2C is "z": ⌘Z must remain Undo, while ⌘/ on key 0x21 opens the menu.
+            #expect(key(P(key: "z", characters: "z", command: true, keyCode: 0x2C)) == nil)
+            #expect(key(P(key: "Z", characters: "Z", command: true, keyCode: 0x2C)) == nil)
+            #expect(key(P(key: "/", characters: "/", command: true, keyCode: 0x21)) == .appMenu)
             #expect(key(P(key: "/", characters: "/")) == nil)  // typed into the field
             #expect(key(P(key: "/", characters: "/", command: true, isRepeat: true)) == nil)
             #expect(!PanelKey.appMenu.actsOnResults)
@@ -123,9 +127,24 @@ extension AppTests {
 
         @Test func digitsOnlyWithCommand() {
             #expect(key(P(key: "3", characters: "3", command: true)) == .cmdDigit(3))
+            #expect(key(P(key: "0", characters: "0", command: true)) == nil)  // 1-9 only, never clobbers a held key
+            #expect(key(P(key: "٢", characters: "٢", command: true)) == nil)  // ASCII 1-9 only
+            #expect(key(P(key: "1", characters: "12", command: true)) == nil)
             #expect(key(P(key: "3", characters: "3")) == nil)
             #expect(key(P(key: "a", characters: "a", command: true)) == nil)
             #expect(key(P(key: "a", characters: "", command: true)) == nil)
+        }
+
+        /// On AZERTY and similar layouts, the unshifted top row types symbols/accents (&, é, ç) instead of 1–9.
+        @Test func commandDigitsFallBackToPhysicalKeyCodesOnAzerty() {
+            #expect(key(P(key: "&", characters: "&", command: true, keyCode: 0x12)) == .cmdDigit(1))
+            #expect(key(P(key: "é", characters: "é", command: true, keyCode: 0x13)) == .cmdDigit(2))
+            #expect(key(P(key: "ç", characters: "ç", command: true, keyCode: 0x19)) == .cmdDigit(9))
+            // Shifted symbols (⌘⇧1 = ⌘! on US) and key 0 must not trigger ⌘1–9.
+            #expect(key(P(key: "!", characters: "!", command: true, shift: true, keyCode: 0x12)) == nil)
+            #expect(key(P(key: "à", characters: "à", command: true, keyCode: 0x1D)) == nil)
+            // Plain uncommanded AZERTY top-row keys still type into the field.
+            #expect(key(P(key: "&", characters: "&", keyCode: 0x12)) == nil)
         }
 
         @Test func returnOnAFallbackRowSwitchesMode() {
@@ -145,7 +164,7 @@ extension AppTests {
             }
         }
 
-        // "set" with 2 files: row 0 is the command, rows 1-2 the files, 3-4 the fallbacks.
+        // "set" with 2 files: rows 0-1 are the files, row 2 is the command, 3-4 the fallbacks.
         private func commandRows() -> PanelRows { PanelRows(files: 2, query: "set", mode: .names) }
 
         @Test func returnOnTheCommandRowRunsIt() {
@@ -252,12 +271,24 @@ extension AppTests {
             #expect(PanelInput.swallows(P(key: "k", characters: "k", command: true, control: true)))
             #expect(PanelInput.swallows(P(key: "C", characters: "C", command: true, shift: true, option: true)))
             #expect(PanelInput.swallows(P(key: "1", characters: "1", command: true, control: true)))
+            // Option transforms digits on US keyboards (⌥1 -> ¡, ⌥3 -> £): still swallowed by key code.
+            #expect(PanelInput.swallows(P(key: "£", characters: "£", command: true, option: true, keyCode: 0x14)))
+            #expect(PanelInput.swallows(P(key: "¡", characters: "¡", command: true, option: true, keyCode: 0x12)))
+            #expect(!PanelInput.swallows(P(key: "º", characters: "º", command: true, option: true, keyCode: 0x1D)))  // ⌘⌥0
+            // Held non-moving bound keys are swallowed on repeat instead of falling through to the text field.
+            #expect(PanelInput.swallows(P(key: .return, isRepeat: true)))
+            #expect(PanelInput.swallows(P(key: .escape, isRepeat: true)))
+            #expect(PanelInput.swallows(P(key: "k", characters: "k", command: true, isRepeat: true)))
+            #expect(PanelInput.swallows(P(key: "/", characters: "/", command: true, isRepeat: true)))
             // Not shortcuts: the field (and the text system) handle them as before.
             #expect(!PanelInput.swallows(P(key: .return)))
             #expect(!PanelInput.swallows(P(key: "y", characters: "y", command: true)))
             #expect(!PanelInput.swallows(P(key: "a", characters: "å", option: true)))  // ⌥A types å
             #expect(!PanelInput.swallows(P(key: "x", characters: "x", command: true, control: true)))
             #expect(!PanelInput.swallows(P(key: .delete, option: true)))  // ⌥⌫ deletes a word
+            #expect(!PanelInput.swallows(P(key: "a", characters: "a", isRepeat: true)))  // typing repeats
+            #expect(!PanelInput.swallows(P(key: .delete, isRepeat: true)))  // Backspace repeats
+            #expect(!PanelInput.swallows(P(key: .downArrow, isRepeat: true)))  // moving repeats via key(for:)
         }
 
         /// A ⌘ shortcut with ⌃ or ⌥ added that falls through to the field types
@@ -287,6 +318,29 @@ extension AppTests {
             for k in [PanelKey.enter, .cmdEnter, .cmdY, .cmdShiftC, .cmdDigit(1), .up, .down, .escape] {
                 #expect(!PanelInput.replaysAfterLayout(k))
             }
+        }
+
+        /// A deferred ⌘K runs only when the query, mode, results and visibility still match what scheduled it.
+        @Test func deferredReplayChecksTheQueryAndResultsStillMatch() async {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let model = env.app.search
+            env.daemon.onSearch = { q in SearchReply(tookUs: 1, hits: [Wire.hit("/p/\(q).txt")]) }
+            model.query = "heron"
+            await model.refresh()
+            let answer = PanelInput.answer(model)
+            #expect(PanelInput.canReplayDeferred(query: "heron", mode: .names, answer: answer, model: model, visible: true))
+            #expect(!PanelInput.canReplayDeferred(query: "heron", mode: .names, answer: answer, model: model, visible: false))
+            // Query cleared to Recents (even before refresh runs): must not replay.
+            model.query = ""
+            #expect(!PanelInput.canReplayDeferred(query: "heron", mode: .names, answer: answer, model: model, visible: true))
+            // Query extended with another letter: stale, must not replay.
+            model.query = "heronx"
+            #expect(!PanelInput.canReplayDeferred(query: "heron", mode: .names, answer: answer, model: model, visible: true))
+            // Mode switched: must not replay.
+            model.query = "heron"
+            model.mode = .content
+            #expect(!PanelInput.canReplayDeferred(query: "heron", mode: .names, answer: answer, model: model, visible: true))
         }
 
         /// Quick Look follows the selection onto file rows only.
@@ -452,6 +506,23 @@ extension AppTests {
             #expect(PanelInput.menuAction(for: .reveal(0))?.hidesPanel == true)
             #expect(PanelInput.menuAction(for: .quickLook(0))?.hidesPanel == false)
             #expect(PanelInput.menuAction(for: .copyPath(0))?.hidesPanel == false)
+        }
+
+        @Test func footerHintsReflectRowTypeAndEditor() {
+            let shown: [ResultItem] = [.file(Wire.hit("/p/a.txt")), .line(path: "/p/b.swift", match: Match(line: 3, text: "x"))]
+            let rows = PanelRows(files: 2, query: "set", mode: .names)
+            #expect(
+                PanelInput.footerHints(selection: 0, shown: shown, rows: rows, revealsOnReturn: false, opensAtLine: false)
+                    == .file(openAtLine: false))
+            #expect(
+                PanelInput.footerHints(selection: 0, shown: shown, rows: rows, revealsOnReturn: true, opensAtLine: false) == .launchable)
+            #expect(
+                PanelInput.footerHints(selection: 1, shown: shown, rows: rows, revealsOnReturn: false, opensAtLine: true)
+                    == .file(openAtLine: true))
+            #expect(PanelInput.footerHints(selection: 2, shown: shown, rows: rows, revealsOnReturn: false, opensAtLine: false) == .command)
+            #expect(PanelInput.footerHints(selection: 3, shown: shown, rows: rows, revealsOnReturn: false, opensAtLine: false) == .fallback)
+            #expect(PanelInput.footerHints(selection: 4, shown: shown, rows: rows, revealsOnReturn: false, opensAtLine: false) == .fallback)
+            #expect(PanelInput.footerHints(selection: 9, shown: shown, rows: rows, revealsOnReturn: false, opensAtLine: false) == .none)
         }
     }
 }

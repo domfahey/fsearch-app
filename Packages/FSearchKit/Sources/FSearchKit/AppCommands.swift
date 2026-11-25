@@ -28,7 +28,7 @@ public enum AppCommand: Equatable, Sendable, CaseIterable {
     }
 
     /// Fewest characters of a query that can match a command, so one stray letter doesn't surface a command row.
-    public static let minimumQueryLength = 2
+    static let minimumQueryLength = 2
 
     /// The commands whose keywords the whole trimmed query is a case-insensitive prefix of.
     ///

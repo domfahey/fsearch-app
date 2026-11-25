@@ -61,16 +61,48 @@ enum PanelInput {
         // ⌘Y, ⌘K, ⌘⇧C ignoring case (Shift or Caps Lock change the character),
         // or by key code on a non-Latin layout.
         case (_, true, _, _) where commandLetter(p) != nil: return commandLetter(p)
-        // ⌘/ opens the FSearch menu: by the "/" it types, with or without ⇧ (German types it with ⇧7),
-        // or by the US slash key (kVK_ANSI_Slash) without ⇧, where ⇧ types "?" (⌘? is Help search).
-        case (_, true, _, _) where p.characters == "/" || (p.keyCode == 0x2C && !p.shift): return .appMenu
+        // ⌘/ opens the FSearch menu: by "/" (with or without ⇧) or US slash key when not a Latin letter (Dvorak ⌘Z).
+        case (_, true, _, _) where isCommandSlash(p): return .appMenu
         // Backspace: SwiftUI's .delete is BS, a keyboard sends DEL; key code 51 either way.
         case (_, false, _, _) where queryIsEmpty && isBackspace(p): return .backspaceOnEmpty
         default:
             // ⌘1–9 only; a plain digit is typed into the field.
-            guard p.command, let n = p.characters.first?.wholeNumberValue else { return nil }
-            return .cmdDigit(n)
+            guard p.command else { return nil }
+            if let n = asciiDigit1To9(p.characters) { return .cmdDigit(n) }
+            // On AZERTY and similar layouts the unshifted top row types symbols/accents (&, é, ç);
+            // fall back to the physical ANSI digit key when Shift isn't held and the key isn't a Latin letter.
+            if !p.shift, let code = p.keyCode, let n = digitByKeyCode[code],
+                !isLatinLetter(p.characters), !isLatinLetter(String(p.key.character))
+            {
+                return .cmdDigit(n)
+            }
+            return nil
         }
+    }
+
+    /// Carbon ANSI key codes for the top-row digits 1–9 (excluding 0).
+    private static let digitByKeyCode: [UInt16: Int] = [
+        0x12: 1, 0x13: 2, 0x14: 3, 0x15: 4, 0x17: 5, 0x16: 6, 0x1A: 7, 0x1C: 8, 0x19: 9,
+    ]
+
+    private static func isLatinLetter(_ s: String) -> Bool {
+        s.count == 1 && s.unicodeScalars.allSatisfy { $0.isASCII && $0.properties.isAlphabetic }
+    }
+
+    private static func asciiDigit1To9(_ s: String) -> Int? {
+        guard s.count == 1, let v = s.unicodeScalars.first?.value, s.unicodeScalars.count == 1, (0x31...0x39).contains(v) else {
+            return nil
+        }
+        return Int(v - 0x30)
+    }
+
+    /// ⌘/ opens the FSearch menu: by the "/" it types (with or without ⇧: German types it with ⇧7),
+    /// or by the US slash key (kVK_ANSI_Slash) without ⇧ when the layout doesn't map that key to a
+    /// Latin letter (on Dvorak key 0x2C is "z", so ⌘Z stays Undo; on US, ⇧ types "?" for Help search).
+    private static func isCommandSlash(_ p: Press) -> Bool {
+        if p.characters == "/" || p.key.character == "/" { return true }
+        guard p.keyCode == 0x2C, !p.shift else { return false }
+        return !isLatinLetter(p.characters) && !isLatinLetter(String(p.key.character))
     }
 
     private static func isBackspace(_ p: Press) -> Bool {
@@ -88,20 +120,60 @@ enum PanelInput {
         return Character(String(c).lowercased())
     }
 
-    /// A press that is no panel key but must not reach the field either: ⌃↵
-    /// and ⌥↵ would type a line break into the query, and a ⌘ shortcut with
-    /// ⌃ or ⌥ added should do nothing. The view takes these and does nothing.
+    /// A press that is no panel key but must not reach the field either: repeats
+    /// of non-moving bound keys (held ↵, Esc, ⌘/), ⌃↵ and ⌥↵ (which would type
+    /// a line break), and a ⌘ shortcut with ⌃ or ⌥ added. The view takes these
+    /// and does nothing.
     static func swallows(_ p: Press) -> Bool {
+        if p.isRepeat, let k = firstKey(for: p, queryIsEmpty: false), k != .up, k != .down { return true }
         guard p.control || p.option else { return false }
         if p.key == .return { return true }
+        guard p.command else { return false }
         var bare = p
         (bare.control, bare.option) = (false, false)
-        return p.command && firstKey(for: bare, queryIsEmpty: false) != nil
+        if firstKey(for: bare, queryIsEmpty: false) != nil { return true }
+        // Option turns digits into punctuation (⌥1 -> ¡, ⌥3 -> £): catch ⌘⌥1–9 by key or key code.
+        return !p.shift && (asciiDigit1To9(String(p.key.character)) != nil || p.keyCode.map { digitByKeyCode[$0] != nil } == true)
+    }
+
+    /// What action hints the panel footer should display for the currently selected row.
+    enum FooterHints: Equatable {
+        /// Nothing selectable (empty list, cheat sheet, etc.).
+        case none
+        /// An app command row ("FSearch Settings").
+        case command
+        /// A mode-switch fallback row ("Search inside files", "Find definitions").
+        case fallback
+        /// A launchable file where ↵ reveals in Finder and ⌘K → Open launches.
+        case launchable
+        /// A normal file or content hit (`openAtLine` is true only when the chosen editor can jump to a line).
+        case file(openAtLine: Bool)
+    }
+
+    /// Computes the footer hints for `selection` in `rows`.
+    static func footerHints(
+        selection: Int, shown: [ResultItem], rows: PanelRows, revealsOnReturn: Bool, opensAtLine: Bool
+    ) -> FooterHints {
+        switch rows.row(at: selection) {
+        case nil: return .none
+        case .command: return .command
+        case .searchInside, .findDefinitions: return .fallback
+        case let .result(f):
+            guard shown.indices.contains(f) else { return .none }
+            return revealsOnReturn ? .launchable : .file(openAtLine: opensAtLine)
+        }
     }
 
     /// A held ⌘K replays a main-actor turn later, so its menu opens where the
     /// new rows have been laid out, not where the old ones were.
     static func replaysAfterLayout(_ k: PanelKey) -> Bool { k == .cmdK }
+
+    /// Whether a deferred replay (a held ⌘K waiting one turn for layout) still
+    /// matches the query, mode and results it was scheduled for.
+    @MainActor
+    static func canReplayDeferred(query: String, mode: SearchMode, answer expected: Answer, model: SearchModel, visible: Bool) -> Bool {
+        visible && model.phase == .results && model.query == query && model.mode == mode && answer(model) == expected
+    }
 
     /// The file Quick Look follows to when row `i` is selected; nil on a command or fallback row.
     static func previewPath(at i: Int, shown: [ResultItem], rows: PanelRows) -> String? {

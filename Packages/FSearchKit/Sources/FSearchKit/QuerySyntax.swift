@@ -15,7 +15,7 @@ public enum QuerySyntax {
         ("in:\"~/My Stuff\"", "quote a value that has spaces"),
         ("'exact ^prefix suffix$ !not", "how a plain word matches"),
         ("grep:text", "search inside files (also regex:, sym:)"),
-        ("\"ext:rs\"", "inside files: a leading quote makes a filter word text"),
+        ("\"ext:rs\"", "inside files: wrap a filter word in quotes to search for it as text"),
     ]
 
     /// The cheat sheet replaces results when the query is exactly "?".

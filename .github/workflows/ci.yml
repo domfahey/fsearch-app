@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
 env:
   # Pinned Rust toolchain, installed by scripts/setup-rust.sh with the rustup that
   # ships on the runner image. Bump when the daemon needs a newer compiler.
@@ -22,27 +26,24 @@ env:
 jobs:
   kit:
     strategy:
-      fail-fast: false
       matrix:
         include:
           - os: macos-26
             xcode: '26.6'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
-    continue-on-error: false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - run: sudo xcode-select -s /Applications/Xcode_${{ matrix.xcode }}.app
       - run: scripts/setup-rust.sh
-      - run: scripts/build-daemon.sh
+      - run: scripts/build-daemon.sh --host-only
       - run: swift build --build-tests -Xswiftc -warnings-as-errors
         working-directory: Packages/FSearchKit
-      - run: swift test
+      - run: swift build --product FSearchBench -Xswiftc -warnings-as-errors
         working-directory: Packages/FSearchKit
-      - name: FSearchKit coverage gate (90%)
-        if: matrix.os == 'macos-26'
+      - name: FSearchKit tests and coverage gate (90%)
         run: scripts/coverage.sh --kit-only --min 90
 
   app:
@@ -160,7 +161,7 @@ jobs:
         env:
           FSEARCH_PREBUILT: '1'
           FSEARCH_PROJECT_READY: '1'
-        run: scripts/release.sh --prepare
+        run: scripts/release.sh --prepare "${GITHUB_REF_NAME#v}"
       - name: Import signing certificate
         env:
           CERT_P12_BASE64: ${{ secrets.DEVELOPER_ID_CERT_P12_BASE64 }}
@@ -180,7 +181,7 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
           # Add to the user search list (keeping the existing ones) and make it default.
           EXISTING=()
-          while IFS= read -r kc; do [ -n "$kc" ] && EXISTING+=("$kc"); done < <(security list-keychains -d user | tr -d '"')
+          while IFS= read -r kc; do [ -n "$kc" ] && EXISTING+=("$kc"); done < <(security list-keychains -d user | sed 's/^[[:space:]]*"//; s/"$//')
           security list-keychains -d user -s "$KEYCHAIN" ${EXISTING[@]+"${EXISTING[@]}"}
           security default-keychain -d user -s "$KEYCHAIN"
       - name: Store notary credentials (App Store Connect API key)
@@ -200,7 +201,7 @@ jobs:
         env:
           DEVELOPER_ID: ${{ secrets.DEVELOPER_ID }}
         # Signs the archive built above, before the keychain existed; builds nothing.
-        run: scripts/release.sh --sign
+        run: scripts/release.sh --sign "${GITHUB_REF_NAME#v}"
       - name: Attest build provenance
         id: attest
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
@@ -245,7 +246,7 @@ jobs:
           persist-credentials: false
       - run: sudo xcode-select -s /Applications/Xcode_26.6.app
       - run: scripts/setup-rust.sh
-      - run: scripts/build-daemon.sh
+      - run: scripts/build-daemon.sh --host-only
       - run: scripts/bench.sh --report-only
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()

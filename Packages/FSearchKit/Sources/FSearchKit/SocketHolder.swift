@@ -21,16 +21,16 @@ public enum SocketHolder: Equatable, Sendable {
     }
 
     /// The code-signing identifier release.sh gives the bundled helper.
-    public static let helperIdentifier = "com.domfahey.fsearch.daemon"
+    static let helperIdentifier = "com.domfahey.fsearch.daemon"
 
     /// A Developer ID (or other Apple-issued) certificate of our team. The app
     /// satisfies it only in a release build.
-    public static let teamRequirement = #"anchor apple generic and certificate leaf[subject.OU] = "MR3WJZ83MR""#
+    static let teamRequirement = #"anchor apple generic and certificate leaf[subject.OU] = "MR3WJZ83MR""#
 
     /// What a moved helper's signature must satisfy to count as ours: our
     /// identifier on our team's certificate. An identifier alone isn't enough,
     /// since an ad-hoc signature can claim any identifier.
-    public static let helperRequirement = #"identifier "\#(helperIdentifier)" and "# + teamRequirement
+    static let helperRequirement = #"identifier "\#(helperIdentifier)" and "# + teamRequirement
 
     /// Where a helper sits inside its app.
     static let helperPlace = "/Contents/Helpers/fsearch"
@@ -41,7 +41,7 @@ public enum SocketHolder: Equatable, Sendable {
     static let helperSuffix = "/FSearch.app" + helperPlace
 
     /// Whether the running app is signed by our team, checked once.
-    public static let appIsTeamSigned = isAppTeamSigned()
+    static let appIsTeamSigned = isAppTeamSigned()
 
     /// Classifies a live holder.
     ///
@@ -58,20 +58,31 @@ public enum SocketHolder: Equatable, Sendable {
     ///   - signedAsHelper: Whether the pid's signature satisfies ``helperRequirement``.
     ///   - appTeamSigned: Whether the app itself satisfies ``teamRequirement``.
     ///   - bundlePath: The app's bundle.
-    public static func classify(
+    static func classify(
         pid: Int32?, path: String?, signedAsHelper: Bool = false, appTeamSigned: Bool = true, bundlePath: String
     ) -> SocketHolder {
+        classifyLazy(
+            pid: pid, path: path, signedAsHelper: { signedAsHelper }, appTeamSigned: { appTeamSigned }, bundlePath: bundlePath)
+    }
+
+    /// Lazy variant so `read` skips `SecCodeCheckValidity` when the path already decides ownership.
+    private static func classifyLazy(
+        pid: Int32?, path: String?, signedAsHelper: () -> Bool, appTeamSigned: () -> Bool, bundlePath: String
+    ) -> SocketHolder {
         guard pid != nil else { return .none }
-        guard let path else { return signedAsHelper ? .ours : .none }
-        let bundle = bundlePath.hasSuffix("/") ? String(bundlePath.dropLast()) : bundlePath
-        if path.hasPrefix(bundle + "/") { return path == bundle + helperPlace ? .ours : .other }
-        if signedAsHelper && path.hasSuffix(helperPlace) { return .ours }
-        if !appTeamSigned && path.hasSuffix(helperSuffix) { return .ours }
+        guard let path else { return signedAsHelper() ? .ours : .none }
+        var bundle = bundlePath
+        while bundle.count > 1 && bundle.hasSuffix("/") { bundle.removeLast() }
+        if !bundle.isEmpty && bundle != "/" && path.hasPrefix(bundle + "/") {
+            return path == bundle + helperPlace ? .ours : .other
+        }
+        if path.hasSuffix(helperPlace) && signedAsHelper() { return .ours }
+        if path.hasSuffix(helperSuffix) && !appTeamSigned() { return .ours }
         return .other
     }
 
     /// The running process's executable, or nil if there is no such process.
-    public static func executablePath(pid: Int32) -> String? {
+    static func executablePath(pid: Int32) -> String? {
         var buf = [CChar](repeating: 0, count: 4 * Int(MAXPATHLEN))
         let n = proc_pidpath(pid, &buf, UInt32(buf.count))
         guard n > 0 else { return nil }
@@ -85,7 +96,7 @@ public enum SocketHolder: Equatable, Sendable {
     /// - Parameters:
     ///   - pid: The process to check.
     ///   - requirement: A code-signing requirement in text form (tests pass their own).
-    public static func isSignedAsHelper(pid: Int32, requirement: String = helperRequirement) -> Bool {
+    static func isSignedAsHelper(pid: Int32, requirement: String = helperRequirement) -> Bool {
         var req: SecRequirement?
         guard SecRequirementCreateWithString(requirement as CFString, [], &req) == errSecSuccess, let req else { return false }
         var code: SecCode?
@@ -98,7 +109,7 @@ public enum SocketHolder: Equatable, Sendable {
     /// `requirement`. False if it isn't signed or the requirement doesn't parse.
     ///
     /// - Parameter requirement: A code-signing requirement in text form (tests pass their own).
-    public static func isAppTeamSigned(requirement: String = teamRequirement) -> Bool {
+    static func isAppTeamSigned(requirement: String = teamRequirement) -> Bool {
         var req: SecRequirement?
         guard SecRequirementCreateWithString(requirement as CFString, [], &req) == errSecSuccess, let req else { return false }
         var code: SecCode?
@@ -112,18 +123,22 @@ public enum SocketHolder: Equatable, Sendable {
     /// - Parameters:
     ///   - dataDir: The folder holding socket.lock.
     ///   - bundlePath: The app's bundle.
-    ///   - path: A pid's executable (tests inject one).
-    ///   - signedAsHelper: Whether a pid is signed as our helper (tests inject one).
-    ///   - appTeamSigned: Whether the app is signed by our team (tests inject one).
-    public static func read(
+    public static func read(dataDir: URL, bundlePath: String) -> SocketHolder {
+        read(
+            dataDir: dataDir, bundlePath: bundlePath, path: executablePath(pid:),
+            signedAsHelper: { isSignedAsHelper(pid: $0) }, appTeamSigned: { appIsTeamSigned })
+    }
+
+    /// Internal seam allowing tests to inject executable path and signature resolvers.
+    static func read(
         dataDir: URL, bundlePath: String,
-        path: (Int32) -> String? = executablePath(pid:),
+        path: (Int32) -> String?,
         signedAsHelper: (Int32) -> Bool = { isSignedAsHelper(pid: $0) },
         appTeamSigned: () -> Bool = { appIsTeamSigned }
     ) -> SocketHolder {
         let text = try? String(contentsOf: dataDir.appendingPathComponent("socket.lock"), encoding: .utf8)
         guard let pid = text.flatMap(pid(fromLock:)) else { return .none }
-        return classify(
-            pid: pid, path: path(pid), signedAsHelper: signedAsHelper(pid), appTeamSigned: appTeamSigned(), bundlePath: bundlePath)
+        return classifyLazy(
+            pid: pid, path: path(pid), signedAsHelper: { signedAsHelper(pid) }, appTeamSigned: appTeamSigned, bundlePath: bundlePath)
     }
 }

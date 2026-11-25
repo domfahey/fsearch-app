@@ -210,14 +210,119 @@ extension AppTests {
             #expect(pc.held.key.held == nil)
         }
 
-        /// Tab would move the keyboard to the search field behind the menu.
+        /// Tab would move the keyboard to the search field behind the menu; ⌃Y (ASCII EM, also 0x19) is not BackTab.
         @Test func tabStaysInTheOpenMenu() {
             let menu = AppMenuState()
             #expect(menu.handle(P(key: .tab), run: { _ in }) == nil)  // closed: the panel's
             menu.toggle()
             #expect(menu.handle(P(key: .tab), run: { _ in }) == .handled)
             #expect(menu.handle(P(key: .tab, shift: true), run: { _ in }) == .handled)
+            #expect(menu.handle(P(key: KeyEquivalent("\u{19}"), characters: "\u{19}", shift: true), run: { _ in }) == .handled)
+            #expect(menu.handle(P(key: KeyEquivalent("\u{19}"), characters: "\u{19}", control: true), run: { _ in }) == .ignored)
             #expect(menu.isOpen)
+        }
+
+        /// ⌥↵, ⌃↵, rejected modifier combos and held repeats must not reach the filter field.
+        @Test func rejectedShortcutsAndRepeatsAreSwallowedWhileOpen() {
+            let menu = AppMenuState()
+            var ran: [PanelMenuAction] = []
+            let run: (PanelMenuAction) -> Void = { ran.append($0) }
+            menu.toggle()
+            #expect(menu.handle(P(key: .return, option: true), run: run) == .handled)
+            #expect(menu.handle(P(key: .return, control: true), run: run) == .handled)
+            #expect(menu.handle(P(key: "y", characters: "\u{19}", command: true, control: true, keyCode: 0x10), run: run) == .handled)
+            #expect(menu.handle(P(key: "/", characters: "/", command: true, control: true, keyCode: 0x2C), run: run) == .handled)
+            #expect(menu.handle(P(key: .return, isRepeat: true), run: run) == .handled)
+            #expect(menu.handle(P(key: .escape, isRepeat: true), run: run) == .handled)
+            #expect(menu.handle(P(key: "/", characters: "/", command: true, isRepeat: true), run: run) == .handled)
+            #expect(menu.isOpen && ran.isEmpty)
+        }
+
+        /// Clicking non-interactive parts of the menu card (header, padding) must not fall through to the backdrop and close it.
+        @Test func clickingInsideTheMenuCardKeepsItOpen() async throws {
+            final class ClickableHost<V: View>: NSHostingView<V> {
+                override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+            }
+            let menu = AppMenuState()
+            menu.toggle()
+            var ran: [PanelMenuAction] = []
+            let overlay = AppMenuOverlay(menu: menu) { ran.append($0) }.frame(width: 680, height: 460)
+            let w = HostSafeWindow(
+                contentRect: NSRect(origin: offscreenOrigin, size: NSSize(width: 680, height: 460)),
+                styleMask: [.borderless], backing: .buffered, defer: false)
+            w.isReleasedWhenClosed = false
+            w.contentView = ClickableHost(rootView: overlay)
+            w.setFrameOrigin(offscreenOrigin)
+            Presentation.present(w, inert: true)
+            defer { w.close() }
+            let header = try #require(await axWait(id: "appMenuHeader", in: w))
+            let card = try #require(axNode(id: "appMenu", in: w))
+            let field = try #require(axNode(id: "appMenuField", in: w))
+            let community = try #require(axNode("Community", in: w))
+            let changelog = try #require(axNode(id: "appMenu-Changelog", in: w))
+            let bounds = NSRect(x: 0, y: 0, width: 680, height: 460)
+            let headerRect = w.convertFromScreen(header.frame)
+            let cardRect = w.convertFromScreen(card.frame)
+            let fieldRect = w.convertFromScreen(field.frame)
+            let communityRect = w.convertFromScreen(community.frame)
+            let changelogRect = w.convertFromScreen(changelog.frame)
+            #expect(bounds.contains(cardRect), "cardRect \(cardRect) not in window bounds \(bounds)")
+            let insidePoints = [
+                ("header", NSPoint(x: headerRect.midX, y: headerRect.midY)),
+                ("headerRight", NSPoint(x: cardRect.maxX - 10, y: headerRect.midY)),
+                ("community", NSPoint(x: communityRect.midX, y: communityRect.midY)),
+                ("fieldPadding", NSPoint(x: cardRect.minX + 4, y: fieldRect.midY)),
+            ]
+            for (name, pt) in insidePoints {
+                #expect(cardRect.contains(pt), "\(name) \(pt) outside \(cardRect)")
+                try click(at: pt, in: w)
+                try? await Task.sleep(for: .milliseconds(50))
+                #expect(menu.isOpen, "clicking \(name) at \(pt) (card=\(cardRect)) dismissed the menu")
+            }
+
+            // Clicking a row actually runs it (proves clicks land at these coordinates).
+            try click(at: NSPoint(x: changelogRect.midX, y: changelogRect.midY), in: w)
+            #expect(await eventually { ran == [.changelog] && !menu.isOpen })
+
+            // Reopen and verify clicking outside the card closes it.
+            menu.toggle()
+            #expect(await axWait(id: "appMenuHeader", in: w) != nil)
+            let outside = NSPoint(x: 600, y: 400)
+            #expect(!cardRect.contains(outside))
+            try click(at: outside, in: w)
+            #expect(await eventually { !menu.isOpen }, "clicking the backdrop must close the menu")
+        }
+
+        /// GitHub's detail text reaches the row's right edge, aligned with the shortcut keycap box (no phantom trailing spacing).
+        @Test func detailTextAlignsWithShortcutKeycaps() async throws {
+            let items = PanelMenuModel.sections.flatMap(\.items)
+            let github = try #require(items.first { $0.action == .github })
+            let settings = try #require(items.first { $0.action == .settings })
+            let stack = VStack(spacing: 0) {
+                AppMenuRowLabel(item: settings).frame(width: 272, height: 26)
+                AppMenuRowLabel(item: github).frame(width: 272, height: 26)
+            }
+            let w = await render(stack, size: NSSize(width: 272, height: 52))
+            defer { w.close() }
+            let detail = try #require(await axWait("domfahey/fsearch-app", in: w))
+            let keycap = try #require(axNode(",", in: w))
+            // Keycap centers "," inside a 20 pt wide box (minWidth 18 + 1 pt horizontal padding each side).
+            let keycapRightEdge = keycap.frame.midX + 10
+            #expect(abs(detail.frame.maxX - w.frame.maxX) <= 1, "detail=\(detail.frame.maxX) rowRight=\(w.frame.maxX)")
+            #expect(abs(detail.frame.maxX - keycapRightEdge) <= 1, "detail=\(detail.frame.maxX) keycapRight=\(keycapRightEdge)")
+        }
+
+        private func click(at point: NSPoint, in w: NSWindow) throws {
+            let down = try #require(
+                NSEvent.mouseEvent(
+                    with: .leftMouseDown, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                    windowNumber: w.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: 1))
+            let up = try #require(
+                NSEvent.mouseEvent(
+                    with: .leftMouseUp, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime + 0.01,
+                    windowNumber: w.windowNumber, context: nil, eventNumber: 2, clickCount: 1, pressure: 0))
+            w.sendEvent(down)
+            w.sendEvent(up)
         }
 
         /// The panel watches only open/closed, so typing in the filter or hovering never redraws the whole panel.

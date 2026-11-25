@@ -85,10 +85,22 @@ extension AppTests {
             #expect(env.workspace.opened == [FullDiskAccessReminder.settingsURL])
             #expect(!env.app.daemon.fullDiskAccessRestartArmed, "only our own helper is restarted")
 
-            let store = AppDefaults.store
-            defer { store.removeObject(forKey: FullDiskAccessReminder.dismissedKey) }
             try #require(axNode("Don't Remind Me", in: w)).press()
-            #expect(store.bool(forKey: FullDiskAccessReminder.dismissedKey))
+            #expect(env.defaults.bool(forKey: FullDiskAccessReminder.dismissedKey))
+        }
+
+        /// Revoked Full Disk Access (never skipped): offers the action button, but not "Don't Remind Me".
+        @Test func revokedFullDiskAccessOffersActionWithoutDismiss() async throws {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            env.daemon.onStatus = { _ in Wire.status(fullDiskAccess: false) }
+            let s = await status(env) { $0.warning?.offersFullDiskAccess == true }
+            let w = await render(VStack { MenuBarFixItem(app: env.app, status: s) })
+            defer { w.close() }
+            let grant = try #require(await axWait(MenuBarWarning.fullDiskAccessItemTitle(ownsDaemon: false), in: w))
+            #expect(!axTexts(in: w).contains("Don't Remind Me"))
+            grant.press()
+            #expect(env.workspace.opened == [FullDiskAccessReminder.settingsURL])
         }
 
         /// The debug item says what pressing it does, and turning debug mode off clears the log.
@@ -101,6 +113,7 @@ extension AppTests {
             #expect(env.app.debugMode)
             env.app.search.query = "q"
             await env.app.search.refresh()
+            env.app.log.flush()
             #expect(FileManager.default.fileExists(atPath: env.app.log.file.path))
             try #require(await axWait("Turn Off Debug Mode", in: w)).press()
             #expect(!env.app.debugMode)
@@ -221,6 +234,27 @@ extension AppTests {
             try #require(await axWait("Debug mode", in: w)).press()
             #expect(await eventually { env.app.debugMode })
         }
+
+        @Test func uninstalledSavedEditorIsStillShownInSettings() async {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            env.app.editor = .bbedit
+            let w = await show(env, login: LoginItemModel(service: nil), uninstaller: uninstaller(env))
+            defer { w.close() }
+            #expect(await axWait("BBEdit (not installed)", in: w) != nil)
+        }
+
+        @Test func hotkeyConflictWarningShowsInSettings() async {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let view = SettingsView(
+                loginItem: LoginItemModel(service: nil), uninstaller: uninstaller(env),
+                runningBundleIds: { ["com.raycast.macos"] }
+            ).environmentObject(env.app)
+            let w = await render(view, size: NSSize(width: 440, height: 600))
+            defer { w.close() }
+            #expect(await eventually { axTexts(in: w).contains { $0.contains("Raycast") } })
+        }
     }
 
     @Suite @MainActor
@@ -251,10 +285,13 @@ extension AppTests {
             var selections: [Int] = []
         }
 
-        func view(_ env: TestEnv, _ r: Recorder, held: HeldKeyBox = HeldKeyBox()) -> some View {
+        func view(
+            _ env: TestEnv, _ r: Recorder, held: HeldKeyBox = HeldKeyBox(), keys: PanelKeyFeed = PanelKeyFeed(),
+            menu: AppMenuState? = nil
+        ) -> some View {
             SearchView(
-                model: env.app.search, state: PanelState(), held: held, keys: PanelKeyFeed(), geometry: PanelGeometry(),
-                menu: AppMenuState(held: held), isVisible: { true },
+                model: env.app.search, state: PanelState(), held: held, keys: keys, geometry: PanelGeometry(),
+                menu: menu ?? AppMenuState(held: held), isVisible: { true },
                 onEffect: { e, items in r.effects.append((e, items.map(\.path))) },
                 onSelect: { r.selections.append($0) }, onCommand: { r.commands.append($0) }
             ).environmentObject(env.app)
@@ -264,9 +301,9 @@ extension AppTests {
         @Test func aHeldReturnOpensTheTopResultWhenItArrives() async {
             let env = TestEnv()
             defer { env.tearDown() }
-            let gate = DispatchSemaphore(value: 0)
-            env.daemon.onSearch = { q in
-                _ = gate.wait(timeout: .now() + 3)
+            let gate = AsyncGate()
+            env.daemon.onSearchAsync = { q in
+                await gate.wait()
                 return SearchReply(tookUs: 1, hits: [Wire.hit("/p/\(q).txt"), Wire.hit("/p/\(q)2.txt")])
             }
             let r = Recorder(), held = HeldKeyBox()
@@ -276,11 +313,69 @@ extension AppTests {
             #expect(await eventually { env.app.search.phase == .loading })
             #expect(PanelInput.gate(.enter, held: &held.key, model: env.app.search) == nil)
             #expect(held.key.held == .enter)
-            gate.signal()
+            gate.release()
             #expect(await eventually { !r.effects.isEmpty })
             #expect(r.effects.first?.effect == .open(0))
             #expect(r.effects.first?.paths == ["/p/heron.txt", "/p/heron2.txt"])
             #expect(held.key.held == nil)
+        }
+
+        /// Observes `model` inside its own body so `.onChange` runs in the same SwiftUI transaction as `SearchView`.
+        private struct QueryClearingHost<Content: View>: View {
+            @Bindable var model: SearchModel
+            let trigger: String
+            let content: Content
+
+            var body: some View {
+                content.onChange(of: PanelInput.answer(model)) { _, new in
+                    if new.query == trigger && new.current { model.query = "" }
+                }
+            }
+        }
+
+        /// A held ⌘K waits one turn for layout; if the query clears before that turn runs, it must not open on Recents.
+        @Test func aDeferredMenuKeyIsDroppedWhenTheQueryChangesBeforeReplay() async {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let gate = AsyncGate()
+            env.daemon.onSearchAsync = { q in
+                await gate.wait()
+                return SearchReply(tookUs: 1, hits: [Wire.hit("/p/\(q).txt")])
+            }
+            env.app.openedRecent(env.file("recent.txt"))
+            let r = Recorder(), held = HeldKeyBox()
+            let wrapped = QueryClearingHost(model: env.app.search, trigger: "heron", content: view(env, r, held: held))
+            let w = await render(wrapped)
+            defer { w.close() }
+            env.app.search.query = "heron"
+            #expect(await eventually { env.app.search.phase == .loading })
+            #expect(PanelInput.gate(.cmdK, held: &held.key, model: env.app.search) == nil)
+            gate.release()
+            #expect(await eventually { env.app.search.query.isEmpty && held.key.held == nil })
+            // Let the deferred main-queue block run.
+            await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in DispatchQueue.main.async { c.resume() } }
+            try? await Task.sleep(for: .milliseconds(50))
+            #expect(r.effects.isEmpty, "deferred ⌘K fired after query cleared: \(r.effects)")
+        }
+
+        /// Quick Look ↑/↓ must not move the launcher's selection behind an open FSearch menu.
+        @Test func quickLookArrowsAreIgnoredWhileTheAppMenuIsOpen() async {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            env.daemon.onSearch = { q in SearchReply(tookUs: 1, hits: [Wire.hit("/p/\(q)1.txt"), Wire.hit("/p/\(q)2.txt")]) }
+            let r = Recorder(), keys = PanelKeyFeed(), menu = AppMenuState()
+            let w = await render(view(env, r, keys: keys, menu: menu))
+            defer { w.close() }
+            env.app.search.query = "plover"
+            #expect(await eventually { env.app.search.phase == .results })
+            menu.toggle()
+            keys.send(.down)
+            try? await Task.sleep(for: .milliseconds(80))
+            #expect(r.selections.last != 1, "selection moved while FSearch menu was open")
+
+            menu.close()
+            keys.send(.down)
+            #expect(await eventually { r.selections.last == 1 })
         }
 
         /// No files: the fallback rows (pressed as VoiceOver does) re-run the query inside files or as definitions.
@@ -311,6 +406,48 @@ extension AppTests {
             let id = "command-\(AppCommand.settings.title)"
             try #require(await axWait(id: id, in: w)).press()
             #expect(r.commands == [.settings])
+        }
+
+        @Test func footerHintsMatchSelectedRowAndEditor() async {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let r = Recorder()
+            let w = await render(view(env, r))
+            defer { w.close() }
+            // Command row selected: no file-only hints ("Reveal in Finder", "Actions").
+            env.app.search.query = "settings"
+            #expect(await axWait(id: "command-\(AppCommand.settings.title)", in: w) != nil)
+            let cmdTexts = axTexts(in: w)
+            #expect(!cmdTexts.contains("Reveal in Finder"))
+            #expect(!cmdTexts.contains("Actions"))
+
+            // Content row with default app (no line-jumping editor): says "Open", not "Open at line".
+            env.daemon.onGrep = { _, _, _ in Wire.grep([("/p/main.swift", [(7, "let needle = 1")])]) }
+            env.app.search.mode = .content
+            env.app.search.query = "needle"
+            #expect(await axWait("main.swift", in: w) != nil)
+            let contentTexts = axTexts(in: w)
+            #expect(!contentTexts.contains("Open at line"))
+            #expect(contentTexts.contains("Open"))
+            #expect(contentTexts.contains("Actions"))
+        }
+
+        @Test func resultRowExposesAccessibilitySelectionAndLabel() async throws {
+            let item = ResultItem.file(Wire.hit("/p/heron.txt"))
+            var activated = 0
+            let w = await render(
+                VStack {
+                    ResultRow(item: item, query: "her", selected: true) { activated += 1 }
+                    ResultRow(item: .file(Wire.hit("/p/other.txt")), query: "her", selected: false)
+                })
+            defer { w.close() }
+            let row = try #require(await axWait(id: "result-/p/heron.txt", in: w))
+            #expect(row.isSelected || row.value == "selected")
+            #expect(row.label.contains("heron.txt"))
+            row.press()
+            #expect(activated == 1)
+            let other = try #require(axNode(id: "result-/p/other.txt", in: w))
+            #expect(!other.isSelected && other.value == "")
         }
     }
 }

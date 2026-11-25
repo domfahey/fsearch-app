@@ -20,17 +20,20 @@ public struct MenuBarWarning: Equatable, Sendable {
     public let message: String
     /// True when the menu should offer "Fix…" (opens Index Details).
     public let offersFix: Bool
-    /// True for the reminder after "Skip for now": the menu offers a Full Disk
-    /// Access item and "Don't Remind Me", and the icon is the subtler variant.
+    /// True when the menu should offer the Full Disk Access item.
     public let offersFullDiskAccess: Bool
-    /// The menu bar icon: the subtler variant for the reminder.
-    public var symbol: String { offersFullDiskAccess ? "magnifyingglass.circle" : "exclamationmark.magnifyingglass" }
+    /// True for the quieter reminder after "Skip for now": offers "Don't Remind Me"
+    /// and uses the subtler menu-bar icon.
+    public let offersDismiss: Bool
+    /// The menu bar icon: the subtler variant for the dismissible skipped-onboarding reminder.
+    public var symbol: String { offersDismiss ? "magnifyingglass.circle" : "exclamationmark.magnifyingglass" }
 
     /// Creates a warning.
-    public init(message: String, offersFix: Bool, offersFullDiskAccess: Bool = false) {
+    public init(message: String, offersFix: Bool, offersFullDiskAccess: Bool = false, offersDismiss: Bool = false) {
         self.message = message
         self.offersFix = offersFix
         self.offersFullDiskAccess = offersFullDiskAccess
+        self.offersDismiss = offersDismiss
     }
 
     /// The menu item that opens Privacy & Security → Full Disk Access. A CLI
@@ -42,8 +45,9 @@ public struct MenuBarWarning: Equatable, Sendable {
 
     /// The warning to show for a daemon condition, or nil for none.
     ///
-    /// Missing Full Disk Access is a "Fix…"-less notice at first; after the user chose "Skip for now" it
-    /// becomes the quieter reminder until dismissed.
+    /// Missing Full Disk Access keeps the prominent icon and offers the Full Disk Access
+    /// item (without "Don't Remind Me") when permission was never skipped; after "Skip for now"
+    /// it becomes the quieter, dismissible reminder.
     ///
     /// - Parameters:
     ///   - c: The daemon's condition.
@@ -58,9 +62,13 @@ public struct MenuBarWarning: Equatable, Sendable {
         case .unresponsive: MenuBarWarning(message: "The search helper isn't answering", offersFix: true)
         case .needsApproval: MenuBarWarning(message: "The search helper needs your approval", offersFix: true)
         case let .running(fda) where !fda && !skippedFullDiskAccess:
-            MenuBarWarning(message: "Full Disk Access is off, so some files won't be found", offersFix: false)
+            MenuBarWarning(
+                message: "Full Disk Access is off, so some files won't be found", offersFix: false, offersFullDiskAccess: true,
+                offersDismiss: false)
         case let .running(fda) where !fda && !dismissedReminder:
-            MenuBarWarning(message: "Full Disk Access is off, so some files won't be found", offersFix: false, offersFullDiskAccess: true)
+            MenuBarWarning(
+                message: "Full Disk Access is off, so some files won't be found", offersFix: false, offersFullDiskAccess: true,
+                offersDismiss: true)
         case .checking, .indexing, .running: nil
         }
     }

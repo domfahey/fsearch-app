@@ -435,6 +435,20 @@ extension AppTests {
             #expect(defaults.string(forKey: DaemonManager.helperIdentityKey) == "old")
         }
 
+        @Test func aFailedUpdateRestartDoesNotStoreTheNewIdentity() async {
+            let defaults = TestEnv.emptySuite(TestEnv.unitSuite)
+            defer { _ = TestEnv.emptySuite(TestEnv.unitSuite) }
+            defaults.set("1:10:5", forKey: DaemonManager.helperIdentityKey)
+            let h = FakeHelper(.enabled)
+            h.registerError = TestError("failed")
+            let d = StubDaemon()
+            d.onPing = { _ in false }
+            let m = manager(h, d, holder: { .ours }, defaults: defaults, identity: { "2:11:6" })
+            await m.start()
+            #expect(h.unregistered == 1 && h.registered == 1)
+            #expect(defaults.string(forKey: DaemonManager.helperIdentityKey) == "1:10:5")
+        }
+
         @Test func anUpdateNeverRestartsSomeoneElsesDaemon() async {
             let defaults = TestEnv.emptySuite(TestEnv.unitSuite)
             defer { _ = TestEnv.emptySuite(TestEnv.unitSuite) }
@@ -512,6 +526,42 @@ extension AppTests {
             #expect(h.unregistered == 1, "once")
         }
 
+        @Test func aGrantSeenWhileIndexingWaitsUntilRunningToRestart() async {
+            let h = FakeHelper(.enabled)
+            let d = StubDaemon()
+            d.onStatus = { _ in throw DaemonError.indexing("indexing") }
+            d.onPing = { _ in false }
+            let seen = AsyncGate(), resume = AsyncGate()
+            let sleeps = LockCount()
+            let clock = DaemonClock(
+                now: { ContinuousClock.now },
+                sleep: { _ in
+                    try Task.checkCancellation()
+                    if sleeps.next() == 3 {
+                        seen.release()
+                        await resume.wait()
+                    }
+                    try Task.checkCancellation()
+                })
+            var checks = 0
+            let m = DaemonManager(
+                client: d, service: h, cliAgentInstalled: { false }, clock: clock, socketHolder: { .ours },
+                defaults: TestEnv.emptySuite(TestEnv.unitSuite),
+                fullDiskAccessGranted: {
+                    checks += 1; return true
+                })
+            await m.refresh()
+            #expect(m.state == .indexing)
+            m.armFullDiskAccessRestart()
+            await seen.wait()
+            #expect(checks == 2 && h.unregistered == 0 && m.fullDiskAccessRestartArmed, "stays armed while indexing")
+            d.onStatus = { _ in Wire.status(fullDiskAccess: false) }
+            await m.refresh()
+            resume.release()
+            #expect(await eventually { h.unregistered == 1 })
+            #expect(!m.fullDiskAccessRestartArmed)
+        }
+
         /// No grant in 2 minutes: the poll stops, and activation still restarts as before.
         @Test func theGrantPollGivesUpAfterTwoMinutes() async {
             let h = FakeHelper(.enabled)
@@ -555,7 +605,33 @@ extension AppTests {
             unknown.armFullDiskAccessRestart()
             await unknown.appBecameActive()
             #expect(h.unregistered == 0)
-            #expect(!unknown.fullDiskAccessRestartArmed)
+            #expect(unknown.fullDiskAccessRestartArmed, "stays armed until status is known")
+        }
+
+        @Test func startWaitsForAnInFlightRestart() async {
+            let h = FakeHelper(.enabled)
+            let d = StubDaemon()
+            d.onPing = { _ in false }
+            let gate = AsyncGate()
+            let clock = DaemonClock(
+                now: { ContinuousClock.now },
+                sleep: { _ in await gate.wait() })
+            let m = DaemonManager(
+                client: d, service: h, cliAgentInstalled: { false }, clock: clock, socketHolder: { .ours },
+                defaults: TestEnv.emptySuite(TestEnv.unitSuite))
+            // Keep restart() suspended during unregister/wait before register.
+            d.onPing = { n in n == 1 }
+            let r = Task { await m.restart() }
+            #expect(await eventually { h.unregistered == 1 && h.registered == 0 })
+            let s = Task { await m.start() }
+            await Task.yield()
+            // While restart is still in flight, start() must not register a second time.
+            #expect(h.registered == 0)
+            gate.release()
+            await r.value
+            await s.value
+            #expect(h.unregistered == 1)
+            #expect(h.registered == 1)
         }
 
         // MARK: item 30
@@ -569,6 +645,16 @@ extension AppTests {
             #expect(MenuBarStatus.condition(.failed("other")) == .failed)
             await m.refresh()
             #expect(!m.isUnresponsive)
+        }
+    }
+}
+
+private final class LockCount: @unchecked Sendable {
+    private let lock = NSLock()
+    private var n = 0
+    func next() -> Int {
+        lock.withLock {
+            n += 1; return n
         }
     }
 }

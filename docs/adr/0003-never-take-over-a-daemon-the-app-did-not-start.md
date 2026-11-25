@@ -40,3 +40,11 @@ The app only checks that the CLI's plist exists. It never changes `~/Library/Lau
 - Switching from the CLI daemon to the app's helper is a manual step.
 
 See [Use FSearch with the fsearch CLI](../how-to/use-with-the-fsearch-cli.md).
+
+## Update note
+
+Three refinements landed after this ADR was accepted while keeping the never-take-over invariant intact:
+
+- When the CLI's login agent plist (`mt.nd.fsearch.plist`) exists and nothing answers immediately, the app now waits up to 10 seconds (`DaemonPlan.recheckWindow(cliAgentInstalled: true)`) before falling back to registering its bundled helper, so a stale leftover plist no longer leaves the app without a daemon.
+- Daemon ownership is verified against `socket.lock` via `SocketHolder` (checking the live process path and, outside the app bundle, its team code signature) rather than relying solely on `SMAppService` status.
+- Upstream `fsearch` (`ba100f4`) now handles stray-daemon takeover for the CLI's own agent; the app still never takes over a daemon it did not start.

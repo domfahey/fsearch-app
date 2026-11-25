@@ -12,7 +12,8 @@ struct RealDaemonLifetimeTests {
         let out = RealDaemon.sh("/bin/ps", ["-axww", "-o", "pid=,command="])
         for line in out.split(separator: "\n") where line.hasSuffix("Vendor/fsearch serve") {
             let pid = Int32(line.split(separator: " ")[0])!
-            if RealDaemon.sh("/bin/ps", ["eww", "-o", "command=", "-p", String(pid)]).contains("HOME=\(home) ") { return pid }
+            let env = RealDaemon.sh("/bin/ps", ["eww", "-o", "command=", "-p", String(pid)])
+            if env.contains("HOME=\(home) ") || env.hasSuffix("HOME=\(home)") || env.hasSuffix("HOME=\(home)\n") { return pid }
         }
         return nil
     }
@@ -41,7 +42,12 @@ struct RealDaemonLifetimeTests {
         wrapper.standardInput = pipe.fileHandleForReading
         wrapper.environment = ["HOME": home, "FSEARCH_ROOT": home + "/root"]
         try writer.run()
+        defer { if writer.isRunning { kill(writer.processIdentifier, SIGKILL); writer.waitUntilExit() } }
         try wrapper.run()
+        defer {
+            if wrapper.isRunning { kill(wrapper.processIdentifier, SIGKILL); wrapper.waitUntilExit() }
+            if let pid = daemonPID(under: home) { kill(pid, SIGKILL) }
+        }
         // Our copies of the pipe must not keep it open.
         try pipe.fileHandleForWriting.close()
         try pipe.fileHandleForReading.close()
@@ -72,21 +78,14 @@ struct RealDaemonLifetimeTests {
         ]
         try sh.run()
         sh.waitUntilExit()
+        defer {
+            for h in [fsk, other] { if let pid = daemonPID(under: h) { kill(pid, SIGKILL) } }
+        }
         #expect(waitFor(10) { daemonPID(under: fsk) != nil && daemonPID(under: other) != nil })
         let keep = try #require(daemonPID(under: other))
-        defer { kill(keep, SIGKILL) }
         RealDaemon.sweep()
         #expect(daemonPID(under: fsk) == nil)
         #expect(!FileManager.default.fileExists(atPath: fsk))
         #expect(kill(keep, 0) == 0)
-    }
-
-    /// Manual harness (FSK_HOLD=1): start a RealDaemon and wait to be SIGKILLed.
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["FSK_HOLD"] != nil))
-    func holdForKill() throws {
-        let d = try RealDaemon(files: ["a.txt": "x"])
-        try d.home.path.write(toFile: ProcessInfo.processInfo.environment["FSK_HOLD"]!, atomically: true, encoding: .utf8)
-        Thread.sleep(forTimeInterval: 120)
-        withExtendedLifetime(d) {}
     }
 }

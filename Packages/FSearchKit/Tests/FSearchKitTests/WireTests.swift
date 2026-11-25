@@ -41,6 +41,25 @@ import Testing
         #expect(r.hits == [Hit(path: "/Users/me/a b/🏡 x.pdf", kind: "file", size: 19, mtime: 1791515321, score: -22)])
     }
 
+    @Test func decodes64BitMtimeBeyondYear2106() throws {
+        let line = #"{"ok":true,"took_us":5,"hits":[{"path":"/future.txt","kind":"file","size":1,"mtime":5000000000,"score":1}],"id":1}"#
+        let r = try DaemonClient.decodeReply(Data(line.utf8), as: SearchReply.self)
+        #expect(r.hits.first?.mtime == 5_000_000_000)
+    }
+
+    @Test func replyIdCheckIgnoresNestedIdsAndStrings() {
+        let nestedString = Data(#"{"ok":true,"hits":[{"path":"/tmp/\"id\":99"}],"id":1}"#.utf8)
+        #expect(replyIsFor(1, nestedString))
+        #expect(!replyIsFor(99, nestedString))
+        let nestedObj = Data(#"{"ok":true,"hits":[{"id":99}],"id":2}"#.utf8)
+        #expect(replyIsFor(2, nestedObj))
+        #expect(!replyIsFor(99, nestedObj))
+        #expect(replyIsFor(5, Data(#"{"ok":true,"id":null}"#.utf8)))
+        #expect(replyIsFor(5, Data(#"{"ok":true}"#.utf8)))
+        #expect(!replyIsFor(5, Data(#"{"ok":true,"id":"5"}"#.utf8)))
+        #expect(replyIsFor(5, Data("not json".utf8)))
+    }
+
     @Test func decodesGrep() throws {
         let line =
             #"{"ok":true,"took_us":900,"source":"index","candidates":3,"read":3,"complete":true,"indexing":0,"files":[{"path":"/p/f.txt","matches":[{"line":2,"text":"a heron needle"}]}],"id":1}"#

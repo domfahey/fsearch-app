@@ -28,6 +28,7 @@ struct FSearchApp: App {
             PanelController.shared.install(app: state)
             OnboardingLauncher.launch(app: state)
             LaunchGuards.observeActivation(daemon: state.daemon)
+            LaunchGuards.observeReopen(app: state)
         }
     }
 
@@ -102,15 +103,47 @@ enum MenuWindows {
 /// Checks at launch, outside test mode, before anything starts.
 @MainActor
 enum LaunchGuards {
-    /// Another FSearch is running: bring it forward. The caller quits.
-    static func anotherCopyIsRunning(options: LaunchOptions) -> Bool {
+    /// Posted when a second copy of FSearch launches so the running LSUIElement instance opens the search panel.
+    static let reopenNotification = Notification.Name("com.domfahey.fsearch.reopen")
+
+    /// Another FSearch is running: ask it to open the panel, bring it forward, and let the caller quit.
+    static func anotherCopyIsRunning(
+        options: LaunchOptions, center: NotificationCenter = DistributedNotificationCenter.default()
+    ) -> Bool {
         guard !options.testMode, let id = Bundle.main.bundleIdentifier else { return false }
         let running = NSRunningApplication.runningApplications(withBundleIdentifier: id)
         guard let pid = SingleInstance.other(pids: running.map(\.processIdentifier), me: getpid()) else { return false }
         Log.daemon.info("another FSearch is running (pid \(pid, privacy: .public)): quitting")
+        notifyOtherInstance(center: center)
         running.first { $0.processIdentifier == pid }?.activate()
         return true
     }
+
+    /// Tells the running instance to show the search panel.
+    static func notifyOtherInstance(center: NotificationCenter = DistributedNotificationCenter.default()) {
+        center.post(name: reopenNotification, object: nil)
+    }
+
+    private static var reopenObserver: NSObjectProtocol?
+    /// Opens the search panel when another launch of FSearch.app hands over to this running instance.
+    static func observeReopen(
+        panel: PanelHost = PanelController.shared, app: AppState,
+        center: NotificationCenter = DistributedNotificationCenter.default()
+    ) {
+        guard reopenObserver == nil else { return }
+        reopenObserver = center.addObserver(forName: reopenNotification, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated {
+                if !panel.isVisible { panel.show(app: app) }
+            }
+        }
+    }
+
+    #if DEBUG
+        static func stopObservingReopen(center: NotificationCenter) {
+            if let o = reopenObserver { center.removeObserver(o) }
+            reopenObserver = nil
+        }
+    #endif
 
     static func installProblem(options: LaunchOptions, bundleURL: URL = Bundle.main.bundleURL) -> InstallLocation.Problem? {
         guard !options.testMode else { return nil }

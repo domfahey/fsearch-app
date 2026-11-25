@@ -1,8 +1,9 @@
 import Foundation
+import Synchronization
 
 /// What the search UI needs from a daemon; ``DaemonClient`` in the app, a fake in tests.
 ///
-/// Every method throws ``DaemonError``.
+/// Every method throws ``DaemonError`` (or `CancellationError` if cancelled before reaching the socket).
 public protocol SearchBackend: Sendable {
     /// Searches file names.
     ///
@@ -46,6 +47,7 @@ public final class DaemonClient: SearchBackend, @unchecked Sendable {
 
     private let socket: LineSocket
     private let queue = DispatchQueue(label: "fsearch.client")
+    private let decoder = DaemonClient.makeDecoder()
     private var nextId = 0
 
     /// Creates a client; it connects lazily on the first call.
@@ -60,6 +62,7 @@ public final class DaemonClient: SearchBackend, @unchecked Sendable {
     }
 
     private func call<T: Decodable & Sendable>(_ req: Request, as: T.Type) async throws -> T {
+        try Task.checkCancellation()
         let cancelled = CancelFlag()
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (cont: CheckedContinuation<T, Error>) in
@@ -70,7 +73,7 @@ public final class DaemonClient: SearchBackend, @unchecked Sendable {
                     let id = nextId
                     do {
                         let line = try socket.roundTrip(req.json(id: id), accepts: { replyIsFor(id, $0) })
-                        cont.resume(returning: try Self.decodeReply(line, as: T.self))
+                        cont.resume(returning: try Self.decodeReply(line, as: T.self, using: decoder))
                     } catch { cont.resume(throwing: error) }
                 }
             }
@@ -117,30 +120,160 @@ public final class DaemonClient: SearchBackend, @unchecked Sendable {
     public func save() async throws { _ = try await call(.save, as: Pong.self) }
 }
 
-/// Just the `id` of a reply, so a reply can be matched to its request before it is fully decoded.
-private struct ReplyId: Decodable {
-    let id: Int?
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: Key.self)
-        // A non-integer id is kept as "not ours" (-1 never matches: ids start at 1).
-        id = (try? c.decode(Int.self, forKey: .id)) ?? ((try? c.decodeNil(forKey: .id)) == false ? -1 : nil)
-    }
-    private enum Key: String, CodingKey { case id }
-}
-
 /// Whether a reply line answers request `id`. The daemon echoes the request's id (null
 /// if the request had none), so a line carrying a different id is a stale leftover.
 /// A line with no id, a null id, or no readable JSON object is accepted: the decode
 /// step then reports it properly instead of it being silently dropped.
 func replyIsFor(_ id: Int, _ line: Data) -> Bool {
-    guard let r = try? JSONDecoder().decode(ReplyId.self, from: line), let got = r.id else { return true }
-    return got == id
+    switch scanTopLevelReplyId(line) {
+    case let .int(got): got == id
+    case .nonInt: false
+    case .missingOrNull, .invalidJSON: true
+    }
+}
+
+private enum ReplyIdScan {
+    case int(Int)
+    case nonInt
+    case missingOrNull
+    case invalidJSON
+}
+
+/// Zero-allocation scanner for a JSON object's top-level `"id"` field, avoiding
+/// a full JSONDecoder pass just to match request ids.
+private func scanTopLevelReplyId(_ line: Data) -> ReplyIdScan {
+    line.withUnsafeBytes { raw -> ReplyIdScan in
+        let b = raw.bindMemory(to: UInt8.self)
+        let n = b.count
+        var i = 0
+
+        func skipWS() {
+            while i < n {
+                switch b[i] {
+                case 0x20, 0x09, 0x0A, 0x0D: i += 1
+                default: return
+                }
+            }
+        }
+
+        func skipString() -> Bool {
+            guard i < n, b[i] == 0x22 else { return false }
+            i += 1
+            while i < n {
+                let c = b[i]
+                i += 1
+                if c == 0x22 { return true }
+                if c == 0x5C {
+                    guard i < n else { return false }
+                    i += 1
+                }
+            }
+            return false
+        }
+
+        func skipValue() -> Bool {
+            skipWS()
+            guard i < n else { return false }
+            switch b[i] {
+            case 0x22: return skipString()
+            case 0x7B, 0x5B:  // '{' or '['
+                var depth = 0
+                while i < n {
+                    switch b[i] {
+                    case 0x22:
+                        guard skipString() else { return false }
+                        continue
+                    case 0x7B, 0x5B: depth += 1
+                    case 0x7D, 0x5D:
+                        depth -= 1
+                        if depth == 0 {
+                            i += 1
+                            return true
+                        }
+                    default: break
+                    }
+                    i += 1
+                }
+                return false
+            default:
+                let start = i
+                while i < n {
+                    switch b[i] {
+                    case 0x20, 0x09, 0x0A, 0x0D, 0x2C, 0x7D, 0x5D: return i > start
+                    default: i += 1
+                    }
+                }
+                return i > start
+            }
+        }
+
+        func parseIdValue() -> ReplyIdScan {
+            skipWS()
+            guard i < n else { return .invalidJSON }
+            // null
+            if i + 4 <= n, b[i] == 0x6E, b[i + 1] == 0x75, b[i + 2] == 0x6C, b[i + 3] == 0x6C {
+                let end = i + 4
+                if end == n || b[end] == 0x2C || b[end] == 0x7D || b[end] == 0x20 || b[end] == 0x09 || b[end] == 0x0A || b[end] == 0x0D {
+                    return .missingOrNull
+                }
+            }
+            var j = i
+            var neg = false
+            if b[j] == 0x2D {
+                neg = true
+                j += 1
+            }
+            let digitsStart = j
+            var value = 0
+            var overflow = false
+            while j < n, b[j] >= 0x30, b[j] <= 0x39 {
+                let d = Int(b[j] - 0x30)
+                let (m, mo) = value.multipliedReportingOverflow(by: 10)
+                let (a, ao) = neg ? m.subtractingReportingOverflow(d) : m.addingReportingOverflow(d)
+                if mo || ao { overflow = true } else { value = a }
+                j += 1
+            }
+            if j > digitsStart, !overflow {
+                if j == n || b[j] == 0x2C || b[j] == 0x7D || b[j] == 0x20 || b[j] == 0x09 || b[j] == 0x0A || b[j] == 0x0D {
+                    return .int(value)
+                }
+            }
+            return .nonInt
+        }
+
+        skipWS()
+        guard i < n, b[i] == 0x7B else { return .invalidJSON }
+        i += 1
+        skipWS()
+        if i < n, b[i] == 0x7D { return .missingOrNull }
+
+        while i < n {
+            guard b[i] == 0x22 else { return .invalidJSON }
+            let keyStart = i + 1
+            guard skipString() else { return .invalidJSON }
+            let keyEnd = i - 1
+            let isIdKey = keyEnd - keyStart == 2 && b[keyStart] == 0x69 && b[keyStart + 1] == 0x64
+            skipWS()
+            guard i < n, b[i] == 0x3A else { return .invalidJSON }
+            i += 1
+            if isIdKey { return parseIdValue() }
+            guard skipValue() else { return .invalidJSON }
+            skipWS()
+            guard i < n else { return .invalidJSON }
+            if b[i] == 0x2C {
+                i += 1
+                skipWS()
+                continue
+            }
+            return b[i] == 0x7D ? .missingOrNull : .invalidJSON
+        }
+        return .invalidJSON
+    }
 }
 
 /// A thread-safe one-way flag, set by the cancellation handler and read on the queue.
-private final class CancelFlag: @unchecked Sendable {
-    private let lock = NSLock()
-    private var value = false
-    func set() { lock.lock(); value = true; lock.unlock() }
-    var isSet: Bool { lock.lock(); defer { lock.unlock() }; return value }
+private final class CancelFlag: Sendable {
+    private let state = Mutex(false)
+    func set() { state.withLock { $0 = true } }
+    var isSet: Bool { state.withLock { $0 } }
 }

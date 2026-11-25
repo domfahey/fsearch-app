@@ -50,5 +50,49 @@ import Testing
     @Test func installedIsOnlyWhatLookupFinds() {
         let found = Editor.installed { $0 == Editor.zed.bundleId ? URL(fileURLWithPath: "/Applications/Zed.app") : nil }
         #expect(found.map(\.0) == [.zed])
+        #expect(Editor.installed { _ in nil }.isEmpty)
+        var asked: [String] = []
+        let all = Editor.installed { id in
+            asked.append(id)
+            return URL(fileURLWithPath: "/Applications/\(id).app")
+        }
+        #expect(all.map(\.0) == Editor.allCases && asked == Editor.allCases.map(\.bundleId))
+    }
+
+    @Test func distinctMetadataAndStableRawValues() {
+        let expected: [Editor: String] = [
+            .vscode: "com.microsoft.VSCode",
+            .cursor: "com.todesktop.230313mzl4w4u92",
+            .zed: "dev.zed.Zed",
+            .sublime: "com.sublimetext.4",
+            .bbedit: "com.barebones.bbedit",
+            .xcode: "com.apple.dt.Xcode",
+        ]
+        #expect(Editor.allCases.count == expected.count)
+        for e in Editor.allCases { #expect(e.bundleId == expected[e]) }
+        #expect(Set(Editor.allCases.map(\.bundleId)).count == Editor.allCases.count)
+        #expect(Set(Editor.allCases.map(\.displayName)).count == Editor.allCases.count)
+        #expect(Editor.allCases.map(\.rawValue) == ["vscode", "cursor", "zed", "sublime", "bbedit", "xcode"])
+        #expect(Editor(rawValue: "emacs") == nil)
+    }
+
+    /// Shell and URL metacharacters in a path are percent-encoded, and only absolute paths produce a URL.
+    @Test func pathsCantBreakOutOfTheURLAndBadLinesClamp() throws {
+        let tricky = "/tmp/it's \"x\" $HOME; rm -rf *.txt?a=1&line=99#frag"
+        for e in Editor.allCases where e != .xcode {
+            let u = try #require(e.openURL(path: tricky, line: 5), "\(e)")
+            let c = try #require(URLComponents(url: u, resolvingAgainstBaseURL: false))
+            #expect(c.fragment == nil, "\(e)")
+            switch e {
+            case .sublime, .bbedit:
+                #expect(c.queryItems?.count == 2 && c.queryItems?.last?.value == "5", "\(e)")
+                #expect(URL(string: c.queryItems?.first?.value ?? "")?.path == tricky, "\(e)")
+            default:
+                #expect(c.query == nil && c.path == "\(tricky):5", "\(e)")
+            }
+        }
+        for e in Editor.allCases { #expect(e.openURL(path: "rel/a.txt", line: 2) == nil) }
+        #expect(Editor.vscode.openURL(path: "/a.txt", line: 0)?.absoluteString == "vscode://file/a.txt:1")
+        #expect(Editor.bbedit.openURL(path: "/a.txt", line: -4)?.absoluteString == "x-bbedit://open?url=file%3A%2F%2F%2Fa.txt&line=1")
     }
 }

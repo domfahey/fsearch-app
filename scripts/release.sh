@@ -39,16 +39,17 @@ case "${1:-}" in
   --sign) PHASE=sign; shift ;;
   -*) fail "unknown option $1 (usage: scripts/release.sh [--prepare | --sign] [VERSION])" ;;
 esac
+[ $# -le 1 ] || fail "unexpected extra arguments (usage: scripts/release.sh [--prepare | --sign] [VERSION])"
 
 # The signing prerequisites; --prepare needs none of them.
 if [ "$PHASE" != prepare ]; then
   [ -n "${DEVELOPER_ID:-}" ] || fail "DEVELOPER_ID is not set (e.g. 'Developer ID Application: Your Name (TEAMID)')"
   # Capture first: `... | grep -q` can SIGPIPE the producer and fail under pipefail.
   IDENTITIES=$(security find-identity -v -p codesigning)
-  grep -qF "$DEVELOPER_ID" <<<"$IDENTITIES" \
+  grep -qF "\"$DEVELOPER_ID\"" <<<"$IDENTITIES" \
     || fail "no codesigning identity matching '$DEVELOPER_ID' in the keychain"
-  xcrun notarytool history --keychain-profile "$PROFILE" ${NOTARY_KC[@]+"${NOTARY_KC[@]}"} >/dev/null 2>&1 \
-    || fail "notarytool profile '$PROFILE' not found (xcrun notarytool store-credentials $PROFILE)"
+  NOTARY_OUT=$(xcrun notarytool history --keychain-profile "$PROFILE" ${NOTARY_KC[@]+"${NOTARY_KC[@]}"} 2>&1) \
+    || fail "notarytool profile '$PROFILE' check failed: $NOTARY_OUT"
 fi
 KEY=$(/usr/libexec/PlistBuddy -c "Print SUPublicEDKey" App/Resources/Info.plist)
 { [ -n "$KEY" ] && [ "$KEY" != "REPLACE_WITH_SPARKLE_PUBLIC_KEY" ]; } \
@@ -56,7 +57,7 @@ KEY=$(/usr/libexec/PlistBuddy -c "Print SUPublicEDKey" App/Resources/Info.plist)
 
 VERSION=${1:-$(git describe --tags --exact-match 2>/dev/null || true)}
 VERSION=${VERSION#v}
-[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)?$ ]] \
+[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]] \
   || fail "no valid version: pass one (scripts/release.sh 0.1.0) or run on a tagged commit (got '${VERSION}')"
 [ "$(git rev-parse --is-shallow-repository)" = false ] \
   || fail "shallow clone: CFBundleVersion needs full history (git fetch --unshallow)"
@@ -96,7 +97,7 @@ echo "Releasing $VERSION (build $BUILD), phase: $PHASE"
 OUT=build/release
 APP="$OUT/FSearch.xcarchive/Products/Applications/FSearch.app"
 # What --prepare built, so --sign signs only an archive of this commit and version.
-STAMP="$VERSION $BUILD $(git rev-parse HEAD)"
+STAMP="$VERSION $BUILD $HEAD_SHA"
 
 if [ "$PHASE" != sign ]; then
   rm -rf "$OUT"; mkdir -p "$OUT"
@@ -157,7 +158,11 @@ done
 # keep them, which is harmless. Removing them breaks the framework's seal; the
 # signing below re-seals it.
 rm -rf "$SV/XPCServices" "$SPARKLE/XPCServices"
-if [ -e "$SV/XPCServices" ] || [ -e "$SPARKLE/XPCServices" ]; then fail "could not strip Sparkle's XPCServices from $APP"; fi
+if [ -e "$SV/XPCServices" ] || [ -L "$SV/XPCServices" ] || [ -e "$SPARKLE/XPCServices" ] || [ -L "$SPARKLE/XPCServices" ]; then
+  fail "could not strip Sparkle's XPCServices from $APP"
+fi
+BUILT_SHORT=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$APP/Contents/Info.plist")
+[ "$BUILT_SHORT" = "$VERSION" ] || fail "built CFBundleShortVersionString is '$BUILT_SHORT', expected '$VERSION'"
 BUILT_VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" "$APP/Contents/Info.plist")
 [ "$BUILT_VERSION" = "$BUILD" ] || fail "built CFBundleVersion is '$BUILT_VERSION', expected '$BUILD'"
 sign "$SV/Autoupdate"
@@ -175,17 +180,25 @@ while IFS= read -r -d '' f; do
   if grep -Eq "$BAD_ENT" <<<"$ENTS"; then fail "forbidden entitlement in $f"; fi
 done < <(find "$APP" -type f -print0)   # includes the app's own executable
 
-# DMG with the app and an /Applications symlink for drag-install.
+# Notarize and staple the app first so the copy baked into the DMG carries its own
+# stapled ticket (offline Gatekeeper checks pass after dragging FSearch.app out of the DMG).
+APP_ZIP="$STAGE/FSearch.zip"
+ditto -c -k --keepParent "$APP" "$APP_ZIP"
+xcrun notarytool submit "$APP_ZIP" --keychain-profile "$PROFILE" ${NOTARY_KC[@]+"${NOTARY_KC[@]}"} --wait
+rm -f "$APP_ZIP"
+xcrun stapler staple "$APP" || fail "stapling $APP failed"
+xcrun stapler validate "$APP" || fail "stapler validate failed for $APP"
+
+# DMG with the stapled app and an /Applications symlink for drag-install.
 DMG="$OUT/FSearch-$VERSION.dmg"
-ditto "$APP" "$STAGE/FSearch.app"
-ln -s /Applications "$STAGE/Applications"
-hdiutil create -volname FSearch -srcfolder "$STAGE" -ov -format UDZO "$DMG"
+DMG_STAGE="$STAGE/dmg"
+mkdir -p "$DMG_STAGE"
+ditto "$APP" "$DMG_STAGE/FSearch.app"
+ln -s /Applications "$DMG_STAGE/Applications"
+hdiutil create -volname FSearch -srcfolder "$DMG_STAGE" -ov -format UDZO "$DMG"
 codesign --force --timestamp --sign "$DEVELOPER_ID" "$DMG"
 xcrun notarytool submit "$DMG" --keychain-profile "$PROFILE" ${NOTARY_KC[@]+"${NOTARY_KC[@]}"} --wait
-xcrun stapler staple "$DMG"
-# Notarization covered the app inside the DMG; staple the archive's identical app
-# too so `stapler validate` can check it below.
-xcrun stapler staple "$APP" || fail "stapling $APP failed"
+xcrun stapler staple "$DMG" || fail "stapling $DMG failed"
 
 # Verify the finished artifacts; any failure stops the release.
 xcrun stapler validate "$APP" || fail "stapler validate failed for $APP"

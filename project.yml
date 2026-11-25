@@ -10,7 +10,10 @@ targets:
   FSearch:
     type: application
     platform: macOS
-    sources: [App]
+    sources:
+      - path: App
+        excludes:
+          - Resources/LaunchAgent.plist
     settings:
       base:
         SWIFT_TREAT_WARNINGS_AS_ERRORS: YES

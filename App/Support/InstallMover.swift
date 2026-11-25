@@ -1,4 +1,3 @@
-import AppKit
 import Foundation
 import os
 
@@ -63,6 +62,8 @@ enum InstallMover {
             p.arguments = relaunchArguments(app: dest, waitingFor: ProcessInfo.processInfo.processIdentifier)
             try run(p)
         } catch {
+            // `dest` did not exist before the copy: clean up any partial or unlaunched copy.
+            if fm.fileExists(atPath: dest.path) { try? fm.removeItem(at: dest) }
             Log.daemon.error("move to Applications failed: \(error.localizedDescription, privacy: .private)")
             workspace.activateFileViewerSelecting([source, applications])
         }

@@ -114,6 +114,8 @@ struct AppMenuView: View {
         }
         .frame(width: Self.width)
         .background(.thickMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .contentShape(RoundedRectangle(cornerRadius: 12))
+        .onTapGesture {}
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.12)))
         .shadow(color: .black.opacity(0.18), radius: 12, y: 4)
         .accessibilityElement(children: .contain)
@@ -126,19 +128,11 @@ struct AppMenuView: View {
         Button {
             menu.choose(item.action, run: run)
         } label: {
-            HStack(spacing: 10) {
-                Image(systemName: item.symbol).foregroundStyle(.secondary).frame(width: 18)
-                Text(item.title)
-                Spacer(minLength: 8)
-                if let detail = item.detail { Text(detail).foregroundStyle(.secondary).lineLimit(1) }
-                HStack(spacing: 3) {
-                    ForEach(item.shortcut, id: \.self) { Keycap(symbol: $0) }
-                }
-            }
-            .font(.system(size: 13))
-            .padding(.horizontal, 8).frame(height: Self.rowHeight)
-            .background(selected ? Color.primary.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 6))
-            .contentShape(Rectangle())
+            AppMenuRowLabel(item: item)
+                .font(.system(size: 13))
+                .padding(.horizontal, 8).frame(height: Self.rowHeight)
+                .background(selected ? Color.primary.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 6))
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { if $0 { menu.model.select(item.action) } }
@@ -147,6 +141,25 @@ struct AppMenuView: View {
         .accessibilityAddTraits(selected ? .isSelected : [])
         .accessibilityIdentifier("appMenu-\(item.id)")
         .accessibilityHint(item.shortcut.isEmpty ? "" : "Shortcut \(item.shortcut.joined())")
+    }
+}
+
+/// The content of one row in ``AppMenuView``: icon, title, optional detail text and optional shortcut keycaps.
+struct AppMenuRowLabel: View {
+    let item: PanelMenuItem
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: item.symbol).foregroundStyle(.secondary).frame(width: 18)
+            Text(item.title)
+            Spacer(minLength: 8)
+            if let detail = item.detail { Text(detail).foregroundStyle(.secondary).lineLimit(1) }
+            if !item.shortcut.isEmpty {
+                HStack(spacing: 3) {
+                    ForEach(item.shortcut, id: \.self) { Keycap(symbol: $0) }
+                }
+            }
+        }
     }
 }
 

@@ -1,6 +1,5 @@
 import AppKit
 import ApplicationServices
-import SwiftUI
 
 /// One element of a hosted view's accessibility tree: what VoiceOver reads and presses.
 /// SwiftUI's elements implement the NSAccessibility methods without Swift seeing the
@@ -12,7 +11,6 @@ struct AXNode {
         guard object.responds(to: NSSelectorFromString(key)) else { return "" }
         return object.value(forKey: key) as? String ?? ""
     }
-    var role: String { string("accessibilityRole") }
     var label: String { string("accessibilityLabel") }
     var title: String { string("accessibilityTitle") }
     var value: String { string("accessibilityValue") }
@@ -26,6 +24,14 @@ struct AXNode {
     var isEnabled: Bool {
         guard object.responds(to: NSSelectorFromString("isAccessibilityEnabled")) else { return true }
         return object.value(forKey: "accessibilityEnabled") as? Bool ?? true
+    }
+    var isSelected: Bool {
+        guard object.responds(to: NSSelectorFromString("isAccessibilitySelected")) else { return false }
+        return object.value(forKey: "accessibilitySelected") as? Bool ?? false
+    }
+    var frame: NSRect {
+        guard object.responds(to: NSSelectorFromString("accessibilityFrame")) else { return .zero }
+        return object.value(forKey: "accessibilityFrame") as? NSRect ?? .zero
     }
     /// Presses it, as VoiceOver would.
     func press() { _ = object.perform(NSSelectorFromString("accessibilityPerformPress")) }

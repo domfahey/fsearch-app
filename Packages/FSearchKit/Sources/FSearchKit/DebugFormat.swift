@@ -63,7 +63,7 @@ public enum DebugFormat {
 
     /// Non-empty lines of `s`.
     public static func lines(_ s: String) -> [String] {
-        s.split(separator: "\n").map(String.init)
+        s.split(whereSeparator: \.isNewline).map(String.init)
     }
 
     /// The last `n` lines of a file, reading at most `maxBytes` from its end
@@ -77,17 +77,21 @@ public enum DebugFormat {
     ///   - maxBytes: The most bytes to read from the end.
     /// - Returns: The lines joined by newlines, or an empty string if the file can't be read.
     public static func tail(of file: URL, lines n: Int, maxBytes: Int = 64 * 1024) -> String {
+        guard n > 0, maxBytes > 0 else { return "" }
         guard let fh = try? FileHandle(forReadingFrom: file) else { return "" }
         defer { try? fh.close() }
         guard let size = try? fh.seekToEnd() else { return "" }
-        let start = size > UInt64(maxBytes) ? size - UInt64(maxBytes) : 0
-        try? fh.seek(toOffset: start)
-        guard let data = try? fh.readToEnd() else { return "" }
-        var text = String(decoding: data, as: UTF8.self)
+        let cap = UInt64(maxBytes)
+        let start = size > cap ? size - cap : 0
+        guard (try? fh.seek(toOffset: start)) != nil else { return "" }
+        guard let data = try? fh.read(upToCount: maxBytes) else { return "" }
+        let slice: Data
         if start > 0 {
-            guard let nl = text.firstIndex(of: "\n") else { return "" }
-            text = String(text[text.index(after: nl)...])
+            guard let nl = data.firstIndex(of: UInt8(ascii: "\n")) else { return "" }
+            slice = data[data.index(after: nl)...]
+        } else {
+            slice = data
         }
-        return lines(text).suffix(n).joined(separator: "\n")
+        return lines(String(decoding: slice, as: UTF8.self)).suffix(n).joined(separator: "\n")
     }
 }

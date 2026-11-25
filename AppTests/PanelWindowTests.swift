@@ -29,8 +29,19 @@ extension AppTests {
             #expect(!PanelController.shared.isVisible)
         }
 
+        /// Switching to another app hides the launcher even if resignKey did not (e.g. while Quick Look was up).
+        @Test func resigningAppActiveHidesTheLauncher() throws {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            defer { PanelController.shared.hide(returnFocus: false) }
+            _ = try showShared(env)
+            #expect(PanelController.shared.isVisible)
+            NotificationCenter.default.post(name: NSApplication.didResignActiveNotification, object: NSApp)
+            #expect(!PanelController.shared.isVisible)
+        }
+
         /// The launcher hands the preview its data source and takes it back when the preview closes.
-        @Test func quickLookControlIsHandedOverAndBack() throws {
+        @Test func quickLookControlIsHandedOverAndBack() async throws {
             let env = TestEnv()
             defer { env.tearDown() }
             defer { PanelController.shared.hide(returnFocus: false) }
@@ -46,6 +57,10 @@ extension AppTests {
             #expect(!ql.isVisible, "the inert host never shows the preview")
             p.endPreviewPanelControl(ql)
             #expect(ql.dataSource == nil)
+            // Hide before draining the async focus hand-back queued by endPreviewPanelControl, so it cannot race the next test.
+            PanelController.shared.hide(returnFocus: false)
+            await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in DispatchQueue.main.async { c.resume() } }
+            #expect(!PanelController.shared.isVisible)
         }
 
         /// The preview closing while FSearch isn't the active app puts the launcher away
@@ -73,6 +88,10 @@ extension AppTests {
             #expect(source.numberOfPreviewItems(in: ql) == 1)
             #expect((source.previewPanel(ql, previewItemAt: 0) as? URL) == url)
             #expect(!ql.isVisible)
+            #expect(QuickLookSource.shouldHandle(.close, isRepeat: false))
+            #expect(!QuickLookSource.shouldHandle(.close, isRepeat: true))
+            #expect(QuickLookSource.shouldHandle(.up, isRepeat: true))
+            #expect(QuickLookSource.shouldHandle(.down, isRepeat: true))
         }
 
         /// Outside the inert host, Settings is opened by performing the app menu's ⌘, item.

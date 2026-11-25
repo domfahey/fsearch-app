@@ -2,8 +2,8 @@ import AppKit
 import SwiftUI
 import os
 
-/// First-launch entry point. A SwiftUI `Window` scene can't open itself at
-/// launch on macOS 14, so the onboarding window is hosted directly.
+/// First-launch entry point. Onboarding opens at launch before any window scene
+/// is shown, so the window is hosted directly.
 @MainActor
 enum OnboardingLauncher {
     /// What launch does about the helper.
@@ -62,6 +62,7 @@ enum OnboardingLauncher {
     #if DEBUG
         /// Forgets a closed window's run, so a test can start over.
         static func reset() {
+            startedDaemon = true
             close()
             startedDaemon = false
         }
@@ -74,7 +75,7 @@ enum OnboardingLauncher {
             return
         }
         let flow = OnboardingFlow(app: app, defaults: defaults)
-        let w = HostSafeWindow(contentViewController: NSHostingController(rootView: OnboardingView(flow: flow).environmentObject(app)))
+        let w = HostSafeWindow(contentViewController: NSHostingController(rootView: OnboardingView(flow: flow)))
         w.title = "Welcome to FSearch"
         w.styleMask = [.titled, .closable]
         w.isReleasedWhenClosed = false

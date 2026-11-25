@@ -23,21 +23,6 @@ enum Fixtures {
     }
 }
 
-/// SearchModel.LogEntry has only a memberwise init internal to FSearchKit, so
-/// the benchmark gets real entries by running a SearchModel against a stub
-/// backend once and capturing what `onSearched` reports.
-enum LogEntryFactory {
-    nonisolated(unsafe) static var template: SearchModel.LogEntry?
-
-    @MainActor static func prepare() async {
-        let stub = StubBackend()
-        let m = SearchModel(names: stub, content: stub)
-        m.onSearched = { template = $0 }
-        m.query = "heron lattice"
-        await m.refresh()
-    }
-}
-
 /// The per-keystroke pure paths.
 @MainActor func benchKeystroke(_ b: Bench, work: URL) async {
     // QuerySplit
@@ -74,39 +59,49 @@ enum LogEntryFactory {
     b.measure("decode.search50") { blackHole(try? DaemonClient.decodeReply(sr, as: SearchReply.self)) }
     b.measure("decode.grep50") { blackHole(try? DaemonClient.decodeReply(gr, as: GrepReply.self)) }
 
-    // SearchLog with a 10k-line file.
-    await LogEntryFactory.prepare()
-    let entry = LogEntryFactory.template!
-    let logDir = work.appendingPathComponent("searchlog")
-    try? FileManager.default.createDirectory(at: logDir, withIntermediateDirectories: true)
-    let seed = logDir.appendingPathComponent("seed.jsonl")
-    let live = logDir.appendingPathComponent("searches.jsonl")
-    // Write 10k records through SearchLog itself, then copy that file before each sample.
-    let w = SearchLog(file: seed, cap: 10_000)
-    for i in 0..<10_000 { w.append(entry, at: Date(timeIntervalSince1970: 1_760_000_000 + Double(i))) }
-    var log: SearchLog!
-    func reset() {
-        try? FileManager.default.removeItem(at: live)
-        try? FileManager.default.copyItem(at: seed, to: live)
-        log = SearchLog(file: live, cap: 10_000)
-        log.append(entry, at: Date())  // seeds the line count; untimed
-    }
-    // File I/O (open, seek, write, close per append): other processes' disk
-    // activity moves it more than CPU work, hence the wider tolerance.
-    b.measure("searchlog.append.10k", ops: 50, tolerance: 0.50, setup: reset) { log.append(entry, at: Date()) }
-    reset()
-    let reader = SearchLog(file: live, cap: 10_000)
-    b.measure("searchlog.entries.10k", ops: 1) { blackHole(reader.entries()) }
-
-    // DebugFormat: the per-row formatters, and the filtered 10k-row log view.
-    let rows = reader.entries()
+    // DebugFormat per-row formatters (no disk fixture needed).
     b.measure("debugformat.row") {
         blackHole(DebugFormat.daemonMs(412))
         blackHole(DebugFormat.roundTrip(1.53))
         blackHole(DebugFormat.bytes(123_456_789))
     }
-    b.measure("debugformat.shown.10k", ops: 1) { blackHole(DebugFormat.shown(rows, filter: "LATTICE 99")) }
-    try? FileManager.default.removeItem(at: logDir)
+
+    // SearchLog with a 10k-line file (skip building the 10k fixture when filtered out).
+    let needsLogFixture =
+        b.config.wants("searchlog.append.10k") || b.config.wants("searchlog.entries.10k") || b.config.wants("debugformat.shown.10k")
+    if needsLogFixture {
+        let entry = SearchModel.LogEntry(
+            query: "heron lattice", mode: .names, resultCount: 50, tookUs: 412, roundTripMs: 1.5, error: nil)
+        let other = SearchModel.LogEntry(
+            query: "project readme", mode: .names, resultCount: 12, tookUs: 210, roundTripMs: 0.9, error: nil)
+        let logDir = work.appendingPathComponent("searchlog")
+        try? FileManager.default.createDirectory(at: logDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: logDir) }
+        let seed = logDir.appendingPathComponent("seed.jsonl")
+        let live = logDir.appendingPathComponent("searches.jsonl")
+        // Write 10k records (~10% matching "LATTICE") through SearchLog itself, then copy that file before each sample.
+        let w = SearchLog(file: seed, cap: 10_000)
+        for i in 0..<10_000 {
+            w.append(i % 10 == 0 ? entry : other, at: Date(timeIntervalSince1970: 1_760_000_000 + Double(i)))
+        }
+        var log: SearchLog!
+        func reset() {
+            try? FileManager.default.removeItem(at: live)
+            try? FileManager.default.copyItem(at: seed, to: live)
+            log = SearchLog(file: live, cap: 10_000)
+            log.append(entry, at: Date())  // seeds the line count; untimed
+        }
+        // File I/O (open, seek, write, close per append): other processes' disk
+        // activity moves it more than CPU work, hence the wider tolerance.
+        b.measure("searchlog.append.10k", ops: 50, tolerance: 0.50, setup: reset) { log.append(entry, at: Date()) }
+        reset()
+        let reader = SearchLog(file: live, cap: 10_000)
+        b.measure("searchlog.entries.10k", ops: 1) { blackHole(reader.entries()) }
+        if b.config.wants("debugformat.shown.10k") {
+            let rows = reader.entries()
+            b.measure("debugformat.shown.10k", ops: 1) { blackHole(DebugFormat.shown(rows, filter: "LATTICE")) }
+        }
+    }
 }
 
 /// Answers instantly with a 50-hit reply (and a 50-file grep reply).

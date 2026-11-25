@@ -38,7 +38,7 @@ Type a word that appears in the text of some file, for example `TODO`.
 
 Below the file results are two rows under "Use “TODO” with…". Press the down arrow until **Search inside files** is selected, then press Return. You can also click it.
 
-A chip that says **Inside files** appears in the search field. Rows now show the matching line of text instead of the folder. The matched text is highlighted.
+A chip that says **Inside files** appears in the search field. Rows now show the line number and matching line of text instead of the folder.
 
 Press Return on a line to open that file. If you chose an editor in Settings, the file opens at that line. See [Open results in your editor](how-to/open-results-in-your-editor.md).
 

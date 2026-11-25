@@ -66,6 +66,17 @@ extension AppTests {
             #expect(OnboardingLauncher.window == nil)
             #expect(OnboardingLauncher.startedDaemon)
         }
+
+        @Test func resetClosesAnOpenWindowWithoutStartingTheDaemon() async {
+            let env = TestEnv(helper: FakeHelper(.enabled))
+            defer { env.tearDown() }
+            OnboardingLauncher.launch(app: env.app)
+            #expect(OnboardingLauncher.window != nil)
+            OnboardingLauncher.reset()
+            #expect(OnboardingLauncher.window == nil && !OnboardingLauncher.startedDaemon)
+            try? await Task.sleep(for: .milliseconds(50))
+            #expect(env.daemon.pings == 0 && env.daemon.statuses == 0)
+        }
     }
 
     @Suite @MainActor
@@ -145,8 +156,10 @@ extension AppTests {
         @Test func failedStateKeepsFacts() async {
             let env = TestEnv()
             defer { env.tearDown() }
-            env.daemon.onStatus = { _ in throw DaemonError.disconnected }
             let flow = OnboardingFlow(app: env.app, defaults: env.defaults, step: .helper)
+            await flow.poll()
+            #expect(flow.facts.helperEnabled)
+            env.daemon.onStatus = { _ in throw DaemonError.disconnected }
             await flow.poll()
             #expect(env.app.daemon.state == .failed("The search helper isn't answering."))
             #expect(!flow.facts.helperEnabled)
@@ -292,7 +305,49 @@ extension AppTests {
                 #expect(Onboarding.helperStepMode(owns: env.app.daemon.ownsDaemon, running: flow.daemonRunning) == .bundledHelper)
                 #expect(!flow.facts.helperEnabled && !flow.busy)
                 #expect(env.app.daemon.state == (fail ? .failed("The search helper isn't answering.") : .checking))
+                if !fail {
+                    // While still checking, don't flash "Open Login Items Settings".
+                    #expect(await eventually { !axTexts(in: w).isEmpty })
+                    #expect(!axTexts(in: w).contains("Open Login Items Settings"))
+                }
             }
+        }
+
+        @Test func indexingStepShowsReadyStateOnceIndexed() async {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            env.daemon.onStatus = { _ in Wire.status(entries: 42) }
+            await env.app.daemon.refresh()
+            let flow = OnboardingFlow(app: env.app, defaults: env.defaults, step: .indexing)
+            flow.apply()
+            #expect(flow.facts.indexReady)
+            let w = await render(OnboardingView(flow: flow).environmentObject(env.app), size: NSSize(width: 440, height: 300))
+            defer { w.close() }
+            #expect(await eventually { !axTexts(in: w).isEmpty })
+            #expect(!axTexts(in: w).contains("Indexing your disk"))
+        }
+
+        @Test func fullDiskAccessPollRestartsOwnedHelperWhenGrantAppears() async {
+            let h = FakeHelper(.enabled)
+            let d = StubDaemon()
+            d.onPing = { _ in false }
+            d.onStatus = { _ in Wire.status(fullDiskAccess: false) }
+            let env = TestEnv(helper: h, daemon: d)
+            defer { env.tearDown() }
+            var granted = false
+            let app = AppState(
+                options: env.app.options, defaults: env.defaults, helper: h,
+                names: d, content: d, control: d, clock: env.clock.clock,
+                cliAgentInstalled: { false }, socketHolder: { .ours }, fullDiskAccessGranted: { granted })
+            let flow = OnboardingFlow(app: app, defaults: env.defaults, step: .fullDiskAccess)
+            await flow.poll()
+            flow.turnOnFullDiskAccess()
+            granted = true
+            d.onStatus = { _ in Wire.status(fullDiskAccess: true) }
+            await flow.poll()
+            #expect(h.unregistered == 1)
+            #expect(!flow.pressedTurnOn)
+            #expect(flow.facts.fullDiskAccess)
         }
     }
 }

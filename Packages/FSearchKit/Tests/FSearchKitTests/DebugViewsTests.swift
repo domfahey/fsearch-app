@@ -81,5 +81,20 @@ import Testing
 
     @Test func linesDropsBlanks() {
         #expect(DebugFormat.lines("a\n\nb\n") == ["a", "b"])
+        #expect(DebugFormat.lines("a\r\n\r\nb\r\n") == ["a", "b"])
+    }
+
+    @Test func tailHandlesCRLFAndNonPositiveBounds() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("fsk-crlf-\(UUID())")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let f = dir.appendingPathComponent("daemon.log")
+        let all = (0..<20).map { "line \($0)" }.joined(separator: "\r\n") + "\r\n"
+        try all.write(to: f, atomically: true, encoding: .utf8)
+        #expect(DebugFormat.tail(of: f, lines: 2, maxBytes: 40) == "line 18\nline 19")
+        #expect(DebugFormat.tail(of: f, lines: 0, maxBytes: 40) == "")
+        #expect(DebugFormat.tail(of: f, lines: -2, maxBytes: 40) == "")
+        #expect(DebugFormat.tail(of: f, lines: 2, maxBytes: 0) == "")
+        #expect(DebugFormat.tail(of: f, lines: 2, maxBytes: -10) == "")
     }
 }

@@ -46,7 +46,8 @@ import Foundation
         }
 
         func open(_ urls: [URL], withApplicationAt app: URL, completion: (@Sendable (Error?) -> Void)?) {
-            record("openWith \(app.lastPathComponent) \(urls.map(\.path).joined(separator: " "))")
+            let targets = urls.map { $0.isFileURL ? $0.path : $0.absoluteString }.joined(separator: " ")
+            record("openWith \(app.lastPathComponent) \(targets)")
             completion?(nil)
         }
 

@@ -1,7 +1,6 @@
 # Developer tasks for FSearch. Run `make help`.
 # Works with macOS's /usr/bin/make (GNU Make 3.81): no .ONESHELL, no $(file).
 SHELL := /bin/bash
-.SHELLFLAGS := -eu -o pipefail -c
 .DELETE_ON_ERROR:
 MAKEFLAGS += --warn-undefined-variables --no-builtin-rules
 
@@ -46,6 +45,7 @@ install-tools:
 	$(Q)if command -v rustup >/dev/null; then rustup target add $(RUST_TARGETS); \
 	else echo "rustup is missing. Install it from https://rustup.rs, then re-run make install" >&2; exit 1; fi
 	$(Q)if [ "$(OPTIONAL)" = "1" ]; then \
+		set -e; \
 		if command -v brew >/dev/null; then \
 			for t in shellcheck actionlint; do \
 				if command -v $$t >/dev/null; then echo "$$t: present"; else brew install $$t; fi; \
@@ -63,13 +63,13 @@ doctor: ## Check developer prerequisites; non-zero if a required one is missing
 	         else printf '  - %s not installed (optional)\n      fix: %s\n' "$$1" "$$2"; fi; }; \
 	echo "FSearch doctor:"; \
 	osv=$$(sw_vers -productVersion 2>/dev/null || echo 0); \
-	if [ "$${osv%%.*}" -ge 14 ]; then ok "macOS $$osv (>= 14)"; else bad "macOS $$osv (need >= 14)" "update macOS"; fi; \
+	if [ "$${osv%%.*}" -ge 15 ]; then ok "macOS $$osv (>= 15)"; else bad "macOS $$osv (need >= 15)" "update macOS"; fi; \
 	if xp=$$(xcode-select -p 2>/dev/null) && [ -d "$$xp" ]; then ok "developer dir $$xp"; \
 	else bad "no Xcode selected" "install Xcode, then sudo xcode-select -s /Applications/Xcode.app"; fi; \
-	xv=$$(xcodebuild -version 2>/dev/null | awk 'NR==1 { print $$2 }'); \
+	xv=$$(xcodebuild -version 2>/dev/null | awk 'NR==1 { print $$2 }' || true); \
 	if [ -n "$$xv" ] && [ "$${xv%%.*}" -ge 16 ]; then ok "Xcode $$xv (>= 16)"; \
 	else bad "Xcode $${xv:-not usable} (need >= 16)" "install Xcode 16+ and sudo xcode-select -s /Applications/Xcode.app; sudo xcodebuild -license accept"; fi; \
-	sv=$$(swift --version 2>&1 | sed -n 's/.*Swift version \([0-9][0-9]*\).*/\1/p' | head -1); \
+	sv=$$(swift --version 2>&1 | sed -n 's/.*Swift version \([0-9][0-9]*\).*/\1/p' | head -1 || true); \
 	if [ -n "$$sv" ] && [ "$$sv" -ge 6 ]; then ok "Swift $$sv"; else bad "Swift $${sv:-not found} (need 6)" "install Xcode 16+"; fi; \
 	if xcrun swift format --version >/dev/null 2>&1; then ok "swift-format"; else bad "swift-format not available" "use Xcode 16+ (xcrun swift format)"; fi; \
 	if command -v rustup >/dev/null 2>&1; then ok "rustup"; else bad "rustup missing" "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"; fi; \
@@ -105,19 +105,19 @@ daemon: ## Rebuild the universal fsearch daemon into Vendor/ (pinned revision)
 project: ## Generate FSearch.xcodeproj with XcodeGen
 	$(Q)scripts/generate-project.sh
 
-build: project ## Build the universal Debug app (same as CI)
+build: Vendor/fsearch project ## Build the universal Debug app (same as CI)
 	$(Q)$(XCODEBUILD) build
 
 test: Vendor/fsearch ## Run FSearchKit tests (builds Vendor/fsearch if missing)
 	$(Q)cd Packages/FSearchKit && swift test
 
-apptest: Vendor/fsearch ## Run the app unit tests (AppTests) and report their coverage
+apptest: Vendor/fsearch project ## Run the app unit tests (AppTests) and report their coverage
 	$(Q)scripts/coverage.sh --unit-only
 
-ui: Vendor/fsearch ## End-to-end UI tests; needs an idle logged-in GUI session
+ui: Vendor/fsearch project ## End-to-end UI tests; needs an idle logged-in GUI session
 	$(Q)scripts/ui-smoke.sh
 
-coverage: Vendor/fsearch ## Coverage report for FSearchKit and both app suites (UI tests need a GUI session)
+coverage: Vendor/fsearch project ## Coverage report for FSearchKit and both app suites (UI tests need a GUI session)
 	$(Q)scripts/coverage.sh
 
 coverage-kit: Vendor/fsearch ## Coverage report for FSearchKit only
@@ -137,15 +137,15 @@ lint: ## Lint swift-format (LINT_FORMAT=0 skips), links, credits, shell scripts,
 	else xcrun swift format lint --strict $(FORMAT_CFG) -r $(SWIFT_DIRS); fi
 	$(Q)scripts/check-links.sh
 	$(Q)scripts/gen-credits.sh --check
-	$(Q)for f in scripts/*.sh scripts/hooks/*; do bash -n "$$f"; done
+	$(Q)set -euo pipefail; for f in scripts/*.sh scripts/hooks/*; do bash -n "$$f"; done
 	$(Q)if command -v shellcheck >/dev/null; then shellcheck -S warning scripts/*.sh scripts/hooks/*; \
 	else echo "shellcheck not installed; skipped (brew install shellcheck)"; fi
 	$(Q)if command -v actionlint >/dev/null; then actionlint; \
 	else echo "actionlint not installed; skipped (brew install actionlint)"; fi
 	@echo "lint: ok"
 
-type: project ## Warnings-as-errors package build, plus app warnings check
-	$(Q)cd Packages/FSearchKit && swift build --build-tests -Xswiftc -warnings-as-errors
+type: Vendor/fsearch project ## Warnings-as-errors package build, plus app warnings check
+	$(Q)cd Packages/FSearchKit && swift build --build-tests -Xswiftc -warnings-as-errors && swift build --product FSearchBench -Xswiftc -warnings-as-errors
 	$(Q)mkdir -p build
 	$(Q)$(XCODEBUILD) build-for-testing > build/type.log 2>&1 || { tail -40 build/type.log; exit 1; }
 	$(Q)w=$$(grep -E '(App|AppTests|AppUITests|Packages)/.*warning:' build/type.log | sort -u || true); \
@@ -161,8 +161,8 @@ ci: check ## Run locally what CI runs: check plus the 90% kit and app unit cover
 hooks: ## Install the repo git hooks (secret checks)
 	$(Q)git config core.hooksPath scripts/hooks
 
-clean: ## Remove build outputs (build/, .build, Packages/FSearchKit/.build)
-	$(Q)rm -rf build .build Packages/FSearchKit/.build
+clean: ## Remove build outputs (build/, Packages/FSearchKit/.build)
+	$(Q)rm -rf build Packages/FSearchKit/.build
 
 distclean: clean ## clean, plus Vendor/fsearch and the generated FSearch.xcodeproj
 	$(Q)rm -rf Vendor/fsearch Vendor/fsearch.rev FSearch.xcodeproj

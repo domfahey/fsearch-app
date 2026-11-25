@@ -44,6 +44,8 @@ final class Uninstaller: ObservableObject {
         "helperIdentity", "updateReminderVisible",
         // Sparkle's own.
         "SUEnableAutomaticChecks", "SUHasLaunchedBefore", "SULastCheckTime", "SUSendProfileInfo",
+        "SUAutomaticallyUpdate", "SUScheduledCheckInterval", "SUSkippedVersion", "SULastProfileSubmissionDate",
+        "SUUpdateGroupIdentifier",
     ]
     /// Privacy settings' Full Disk Access list, where the user removes the entry by hand.
     static let fullDiskAccessURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!
@@ -60,6 +62,7 @@ final class Uninstaller: ObservableObject {
     private let exists: (URL) -> Bool
     private let cliAgentInstalled: () -> Bool
     private let resetShortcut: () -> Void
+    private let waitUntilStopped: @MainActor () async -> Void
 
     /// Creates an uninstaller.
     ///
@@ -73,12 +76,14 @@ final class Uninstaller: ObservableObject {
     ///   - exists: Whether a folder exists.
     ///   - cliAgentInstalled: Whether the CLI's login agent exists.
     ///   - resetShortcut: Clears the global shortcut.
+    ///   - waitUntilStopped: Waits briefly for an unregistered helper to exit before trashing `dataFolder`.
     init(
         helper: HelperService?, loginItem: LoginItemService?, workspace: Workspace, defaults: UserDefaults,
         dataFolder: URL, logFolder: URL,
         exists: @escaping (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) },
         cliAgentInstalled: @escaping () -> Bool = { FileManager.default.fileExists(atPath: DaemonManager.cliAgentPlist.path) },
-        resetShortcut: @escaping () -> Void
+        resetShortcut: @escaping () -> Void,
+        waitUntilStopped: @escaping @MainActor () async -> Void = {}
     ) {
         self.helper = helper
         self.loginItem = loginItem
@@ -89,17 +94,25 @@ final class Uninstaller: ObservableObject {
         self.exists = exists
         self.cliAgentInstalled = cliAgentInstalled
         self.resetShortcut = resetShortcut
+        self.waitUntilStopped = waitUntilStopped
     }
 
     /// The running app's: the real helper, login item, Trash and defaults (none of the first two in test mode).
     static func live(options: LaunchOptions) -> Uninstaller {
-        Uninstaller(
+        let client = DaemonClient(socketPath: options.socketPath, timeout: 0.5)
+        return Uninstaller(
             helper: options.testMode ? nil : SMAppHelperService(),
             loginItem: options.testMode ? nil : SMAppLoginItemService(),
             workspace: FileActions.workspace, defaults: AppDefaults.store,
             dataFolder: DebugFormat.dataDir(socketPath: options.socketPath),
             logFolder: options.searchLogFile.deletingLastPathComponent(),
-            resetShortcut: { KeyboardShortcuts.reset(.togglePanel) })
+            resetShortcut: { KeyboardShortcuts.reset(.togglePanel) },
+            waitUntilStopped: {
+                for _ in 0..<30 {
+                    if (try? await client.ping()) == nil { return }
+                    try? await Task.sleep(for: .milliseconds(100))
+                }
+            })
     }
 
     /// `ownership`: DaemonManager.dataOwnership, read before anything is unregistered.
@@ -113,10 +126,12 @@ final class Uninstaller: ObservableObject {
         defer { daemon?.finishRemoval() }
         var r = Report()
         var helperGone = true
+        var unregisteredHelper = false
 
         if let helper, helper.status == .enabled || helper.status == .requiresApproval {
             do {
                 try await helper.unregister()
+                unregisteredHelper = true
                 r.removed.append("The background helper (search index service)")
             } catch {
                 helperGone = false
@@ -133,16 +148,19 @@ final class Uninstaller: ObservableObject {
             }
         }
 
-        if cliAgentInstalled() {
-            r.kept.append(
-                "The data folder (\(dataFolder.path)) was left alone: the fsearch command-line tool's login agent (mt.nd.fsearch) is installed and its daemon uses the same index."
-            )
-        } else if let reason = Self.keptReason(ownership) {
-            r.kept.append("The data folder (\(dataFolder.path)) was left alone: \(reason)")
-        } else if helperGone {
-            trash(dataFolder, "The index and data folder", into: &r)
-        } else {
-            r.kept.append("The data folder was left in place because the helper is still registered.")
+        if exists(dataFolder) {
+            if cliAgentInstalled() {
+                r.kept.append(
+                    "The data folder (\(dataFolder.path)) was left alone: the fsearch command-line tool's login agent (mt.nd.fsearch) is installed and its daemon uses the same index."
+                )
+            } else if let reason = Self.keptReason(ownership) {
+                r.kept.append("The data folder (\(dataFolder.path)) was left alone: \(reason)")
+            } else if helperGone {
+                if unregisteredHelper { await waitUntilStopped() }
+                trash(dataFolder, "The index and data folder", into: &r)
+            } else {
+                r.kept.append("The data folder was left in place because the helper is still registered.")
+            }
         }
         if logFolder != dataFolder { trash(logFolder, "The debug search log", into: &r) }
 

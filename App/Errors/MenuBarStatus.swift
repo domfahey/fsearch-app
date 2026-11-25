@@ -19,7 +19,7 @@ final class MenuBarStatus {
     @ObservationIgnored private var bound = false
     @ObservationIgnored private var cancellables: Set<AnyCancellable> = []
     /// Where "skipped" and "don't remind me" are read; a throwaway suite under test.
-    @ObservationIgnored private let defaults: UserDefaults
+    @ObservationIgnored let defaults: UserDefaults
 
     init(defaults: UserDefaults = AppDefaults.store) { self.defaults = defaults }
 
@@ -34,10 +34,9 @@ final class MenuBarStatus {
     private func bind(to daemon: DaemonManager) {
         guard !bound else { return }
         bound = true
-        // Defaults can change on any thread: hop to main before anything else
-        // runs, and keep the map nonisolated so an off-main post can't trap.
+        // Defaults can change on any thread: keep the map nonisolated so an
+        // off-main post can't trap, then deliver the combined state on main.
         let skipped = NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
-            .receive(on: DispatchQueue.main)
             .map { @Sendable _ in () }
             .prepend(())
         let defaults = defaults
@@ -90,9 +89,15 @@ enum FullDiskAccessReminder {
 /// The menu-bar icon. A View, so Observation tracks `warning` reliably.
 struct MenuBarLabel: View {
     let app: AppState
+    let status: MenuBarStatus
+
+    init(app: AppState, status: MenuBarStatus = .shared) {
+        self.app = app
+        self.status = status
+    }
 
     var body: some View {
-        Image(systemName: MenuBarStatus.shared.icon(for: app))
+        Image(systemName: status.icon(for: app))
             .accessibilityLabel("FSearch")
     }
 }
@@ -122,7 +127,9 @@ struct MenuBarFixItem: View {
                 Button(MenuBarWarning.fullDiskAccessItemTitle(ownsDaemon: app.daemon.ownsDaemon)) {
                     FullDiskAccessReminder.turnOn(daemon: app.daemon)
                 }
-                Button("Don't Remind Me") { FullDiskAccessReminder.dismiss() }
+            }
+            if w.offersDismiss {
+                Button("Don't Remind Me") { FullDiskAccessReminder.dismiss(defaults: status.defaults) }
             }
             Divider()
         }

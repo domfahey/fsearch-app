@@ -40,6 +40,8 @@ final class FakeDaemon: @unchecked Sendable {
     private func start() {
         unlink(path)
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
+        var one: Int32 = 1
+        _ = setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &one, socklen_t(MemoryLayout<Int32>.size))
         var addr = sockaddr_un()
         addr.sun_family = sa_family_t(AF_UNIX)
         withUnsafeMutableBytes(of: &addr.sun_path) { p in

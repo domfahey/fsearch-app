@@ -8,6 +8,7 @@ import Testing
         let d = FakeDaemon { req in
             ["ok": true, "took_us": 5, "hits": [["path": "/x/\(req["q"]!)", "kind": "file", "size": 1, "mtime": 2, "score": 3]]]
         }
+        defer { d.stop() }
         let c = DaemonClient(socketPath: d.path)
         let r = try await c.search("main.rs", limit: 50)
         #expect(r.hits.first?.path == "/x/main.rs")
@@ -18,6 +19,7 @@ import Testing
         let d = FakeDaemon { req in
             ["ok": true, "took_us": 1, "hits": [["path": "\(req["q"]!)", "kind": "file", "size": 0, "mtime": 0, "score": 0]]]
         }
+        defer { d.stop() }
         let c = DaemonClient(socketPath: d.path)
         let results = try await withThrowingTaskGroup(of: (String, String).self) { g in
             for q in ["a", "b", "c", "d", "e"] { g.addTask { (q, try await c.search(q, limit: 1).hits[0].path) } }
@@ -55,6 +57,7 @@ import Testing
 
     @Test func hungDaemonTimesOut() async {
         let d = FakeDaemon { _ in nil }
+        defer { d.stop() }
         let c = DaemonClient(socketPath: d.path, timeout: 0.3)
         let t = Date()
         await #expect(throws: DaemonError.timeout) { try await c.ping() }
@@ -64,13 +67,14 @@ import Testing
 
     @Test func reconnectsAfterTheDaemonComesBack() async throws {
         let first = FakeDaemon { _ in ["ok": true] }
+        defer { first.stop() }
         let c = DaemonClient(socketPath: first.path)
         try await c.ping()
         first.stop()
         // A new daemon on the same path. The very next ping retries once on a fresh connection.
         let second = FakeDaemon(path: first.path) { _ in ["ok": true] }
+        defer { second.stop() }
         try await c.ping()
-        _ = second
     }
 
     @Test func stoppingAnOldDaemonLeavesTheNewOneAlone() async throws {
@@ -81,9 +85,9 @@ import Testing
             let first = FakeDaemon { _ in ["ok": true] }
             first.stop()
             let second = FakeDaemon(path: first.path) { _ in ["ok": true] }
+            defer { second.stop() }
             first.stop()  // a second stop on a stopped daemon is a no-op
             try await DaemonClient(socketPath: second.path).ping()
-            second.stop()
         }
     }
 
@@ -95,6 +99,7 @@ import Testing
             if q == "a" { Thread.sleep(forTimeInterval: 0.6) }
             return ["ok": true, "took_us": 1, "hits": [["path": "/r/\(q)", "kind": "file", "size": 0, "mtime": 0, "score": 0]]]
         }
+        defer { d.stop() }
         let c = DaemonClient(socketPath: d.path, timeout: 0.3)
         await #expect(throws: DaemonError.timeout) { try await c.search("a", limit: 1) }
         try await Task.sleep(for: .milliseconds(500))  // let the late "a" reply be written
@@ -106,6 +111,7 @@ import Testing
     @Test func timeoutIsNotRetried() async {
         // Reply to the first request only; the second hangs.
         let d = FakeDaemon { req in (req["id"] as? Int) == 1 ? ["ok": true] : nil }
+        defer { d.stop() }
         let c = DaemonClient(socketPath: d.path, timeout: 0.3)
         try? await c.ping()
         await #expect(throws: DaemonError.timeout) { try await c.ping() }
@@ -114,6 +120,7 @@ import Testing
 
     @Test func cancelledQueuedCallsNeverHitTheSocket() async {
         let d = FakeDaemon { _ in nil }
+        defer { d.stop() }
         let c = DaemonClient(socketPath: d.path, timeout: 0.3)
         let t0 = Date()
         let tasks = (0..<5).map { _ in Task { try await c.ping() } }
@@ -126,9 +133,21 @@ import Testing
     }
 
     @Test func cancelledCallThrowsCancellationError() async {
-        let d = FakeDaemon { _ in nil }
+        let reached = DispatchSemaphore(value: 0)
+        let d = FakeDaemon { _ in
+            reached.signal()
+            return nil
+        }
+        defer { d.stop() }
         let c = DaemonClient(socketPath: d.path, timeout: 0.3)
         let blocker = Task { try? await c.ping() }
+        // Wait for `blocker` to occupy the client's serial queue so `victim` queues behind it.
+        await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
+            DispatchQueue.global().async {
+                _ = reached.wait(timeout: .now() + 2)
+                done.resume()
+            }
+        }
         let victim = Task { try await c.ping() }
         victim.cancel()
         await #expect(throws: CancellationError.self) { try await victim.value }
@@ -137,12 +156,14 @@ import Testing
 
     @Test func saveSendsTheSaveOp() async throws {
         let d = FakeDaemon { _ in ["ok": true, "scheduled": true] }
+        defer { d.stop() }
         try await DaemonClient(socketPath: d.path).save()
         #expect(d.requests.first?["op"] as? String == "save")
     }
 
     @Test func daemonErrorsSurface() async {
         let d = FakeDaemon { _ in ["ok": false, "error": "regex parse error"] }
+        defer { d.stop() }
         let c = DaemonClient(socketPath: d.path)
         await #expect(throws: DaemonError.daemon("regex parse error")) {
             try await c.grep(q: "", pattern: "(", mode: .regex)
@@ -215,7 +236,7 @@ import Testing
         let srv = RawServer { fd, _ in
             _ = RawServer.readLine(fd)
             for _ in 0..<200 {
-                RawServer.send(fd, #"{"ok":true,"id":777}"# + "\n")
+                if !RawServer.send(fd, #"{"ok":true,"id":777}"# + "\n") { break }
                 Thread.sleep(forTimeInterval: 0.05)
             }
             close(fd)

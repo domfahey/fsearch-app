@@ -80,7 +80,7 @@ extension AppTests {
             #expect(launches == 0)
         }
 
-        /// The relaunch failing to start falls back to Finder too.
+        /// The relaunch failing to start falls back to Finder too and cleans up the unlaunched copy.
         @Test func aFailedRelaunchRevealsTheAppAndApplications() throws {
             defer { cleanUp() }
             try makeDownload()
@@ -88,6 +88,7 @@ extension AppTests {
             let ws = FakeWorkspace()
             InstallMover.moveToApplications(from: source, applications: apps, workspace: ws) { _ in throw TestError("no sh") }
             #expect(ws.revealed.map { $0.map(\.path) } == [[source.path, apps.path]])
+            #expect(!FileManager.default.fileExists(atPath: apps.appendingPathComponent("FSearch.app").path))
         }
 
         /// A bundle that isn't translocated is its own original.

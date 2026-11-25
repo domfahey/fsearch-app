@@ -23,7 +23,7 @@ Open **Index Details…** from the menu. It shows live numbers from the daemon:
 - Whether Full Disk Access is on, and whether the daemon is the owner (writes the index) or a follower.
 - Content search: files indexed, segments, size and files waiting to be indexed.
 - Folders the index lacks (skipped).
-- The last 30 lines of `daemon.log`.
+- The last 30 lines of `daemon.log` (present when using the fsearch CLI's daemon; the app's bundled helper does not write `daemon.log`).
 
 Buttons:
 

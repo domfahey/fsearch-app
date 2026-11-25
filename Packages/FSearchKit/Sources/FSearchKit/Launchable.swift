@@ -5,7 +5,7 @@ import Foundation
 /// launches them, as an explicit choice.
 public enum Launchable {
     /// Extensions (lowercased) that run something when opened.
-    public static let extensions: Set<String> = [
+    static let extensions: Set<String> = [
         "app", "command", "tool", "terminal", "workflow", "pkg", "mpkg", "scpt", "applescript", "webloc", "inetloc", "fileloc",
     ]
 

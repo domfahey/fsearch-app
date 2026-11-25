@@ -4,6 +4,12 @@ import Observation
 import Sparkle
 import SwiftUI
 
+/// Observable box so menu and Settings views redraw once `Updater.start()` creates the controller.
+@MainActor @Observable
+private final class UpdaterControllerStore {
+    var controller: SPUStandardUpdaterController?
+}
+
 /// Sparkle updater. Not started while Info.plist still carries the placeholder
 /// public key (see docs/release-checklist.md), so dev builds never prompt.
 ///
@@ -17,8 +23,10 @@ enum Updater {
         return !key.isEmpty && key != "REPLACE_WITH_SPARKLE_PUBLIC_KEY"
     }()
 
+    private static let store = UpdaterControllerStore()
+
     /// nil until `start()` runs with a real key.
-    private(set) static var controller: SPUStandardUpdaterController?
+    static var controller: SPUStandardUpdaterController? { store.controller }
 
     /// Whether to start Sparkle. Never under test: a UI-test launch would check the real feed, write
     /// SULastCheckTime to the real defaults and could put up update windows.
@@ -27,16 +35,16 @@ enum Updater {
     /// Called once at launch. Creates (and so starts) Sparkle only when configured, outside test mode.
     /// Later calls do nothing.
     static func start() {
-        guard shouldStart(configured: isConfigured, testMode: LaunchOptions.current.testMode), controller == nil else { return }
+        guard shouldStart(configured: isConfigured, testMode: LaunchOptions.current.testMode), store.controller == nil else { return }
         let c = SPUStandardUpdaterController(
             startingUpdater: true, updaterDelegate: nil, userDriverDelegate: UpdateReminderDriver.shared)
-        controller = c
+        store.controller = c
         resumeReminder(model: .shared, updaterRunning: true) { c.updater.checkForUpdatesInBackground() }
     }
 
     #if DEBUG
         /// Tests install an unstarted controller to render the update items, then remove it.
-        static func setController(_ c: SPUStandardUpdaterController?) { controller = c }
+        static func setController(_ c: SPUStandardUpdaterController?) { store.controller = c }
     #endif
 
     /// The menu-bar reminder lives in memory: if the last run quit with one up,
@@ -141,6 +149,7 @@ final class AutoCheckState: ObservableObject {
     init(updater: SPUUpdater) {
         self.updater = updater
         automatic = updater.automaticallyChecksForUpdates
+        canCheck = updater.canCheckForUpdates
         updater.publisher(for: \.automaticallyChecksForUpdates)
             .receive(on: DispatchQueue.main).sink { [weak self] in
                 if self?.automatic != $0 { self?.automatic = $0 }
@@ -183,6 +192,7 @@ private final class UpdateCheckState: ObservableObject {
     @Published private(set) var canCheck = false
 
     init(updater: SPUUpdater) {
+        canCheck = updater.canCheckForUpdates
         updater.publisher(for: \.canCheckForUpdates)
             .receive(on: DispatchQueue.main)
             .assign(to: &$canCheck)
@@ -208,7 +218,10 @@ private struct CheckForUpdatesButton: View {
     }
 
     var body: some View {
-        Button("Check for Updates…") { controller.checkForUpdates(nil) }
-            .disabled(!state.canCheck)
+        Button("Check for Updates…") {
+            AppActivation.activate()
+            controller.checkForUpdates(nil)
+        }
+        .disabled(!state.canCheck)
     }
 }

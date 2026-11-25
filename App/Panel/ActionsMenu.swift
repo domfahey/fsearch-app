@@ -6,8 +6,8 @@ import FSearchKit
 enum ActionsMenu {
     /// Pops the menu up under the result's row, or under the search field if the row is out of view.
     static func show(for item: ResultItem, in panel: NSPanel?, app: AppState, geometry: PanelGeometry = PanelGeometry()) {
-        let menu = build(for: item, app: app)
         guard let view = panel?.contentView else { return }
+        let menu = build(for: item, app: app)
         popUp(menu, PanelGeometry.viewPoint(geometry.menuAnchor(rowID: item.id), in: view), view)
     }
 
@@ -57,9 +57,9 @@ enum ActionsMenu {
         }
         menu.addItem(with)
         menu.addItem(entry("Reveal in Finder", .reveal) { FileActions.reveal(path, onError: app.showActionError) })
-        menu.addItem(entry("Quick Look", .quickLook) { FileActions.quickLook(path) })
+        menu.addItem(entry("Quick Look", .quickLook) { FileActions.quickLook(path, onError: app.showActionError) })
         menu.addItem(entry("Copy Path", .copyPath) { FileActions.copyPath(path) })
-        menu.addItem(entry("Copy File", .copyFile) { FileActions.copyFile(path) })
+        menu.addItem(entry("Copy File", .copyFile) { FileActions.copyFile(path, onError: app.showActionError) })
         menu.addItem(
             entry("Open Folder in Terminal", .openTerminal) {
                 FileActions.openTerminal(at: path) { app.showActionError($0) }

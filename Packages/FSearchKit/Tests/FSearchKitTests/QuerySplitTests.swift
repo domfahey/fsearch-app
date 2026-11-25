@@ -93,9 +93,12 @@ import Testing
         #expect(QuerySplit.split(#""a  b" ext:md  c"#) == (#""a  b"  c"#, "ext:md"))
     }
     @Test func aWordStartingWithAQuoteIsText() {
-        // Quoting is how to search for filter-looking text.
-        #expect(QuerySplit.split(#""ext:rs" main"#) == (#""ext:rs" main"#, ""))
+        // Wrapping a filter word in quotes escapes it as literal text without keeping the outer quotes.
+        #expect(QuerySplit.split(#""ext:rs" main"#) == ("ext:rs main", ""))
+        #expect(QuerySplit.split(#""in:~/x""#) == ("in:~/x", ""))
+        // Normal quoted phrases keep their quotes so searching code for quoted literals still works.
         #expect(QuerySplit.split(#""kind: Deployment""#) == (#""kind: Deployment""#, ""))
+        #expect(QuerySplit.split(#""hello""#) == (#""hello""#, ""))
     }
     @Test func unclosedQuoteRunsToTheEnd() {
         #expect(QuerySplit.split(#"in:"~/My Stuff todo"#) == ("", #"in:"~/My Stuff todo"#))
@@ -174,5 +177,10 @@ import Testing
         m.query = "path: str"
         await m.refresh()
         #expect(content.calls == ["grep |path: str|literal"])
+    }
+
+    @Test func halfTypedExtendsHandlesLeadingTab() {
+        #expect(QuerySplit.halfTypedExtends("\tfoo size:", answered: "\tfoo siz"))
+        #expect(QuerySplit.halfTypedExtends("\tfoo size:", answered: "foo siz"))
     }
 }

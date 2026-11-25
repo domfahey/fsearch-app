@@ -18,6 +18,23 @@
 set -u -o pipefail
 cd "$(dirname "$0")/.." || exit 1
 export DEVELOPER_DIR=${DEVELOPER_DIR:-$(xcode-select -p)}
+[ -x Vendor/fsearch ] || { echo "ui-smoke: Vendor/fsearch missing (run scripts/build-daemon.sh)" >&2; exit 1; }
+[ -d FSearch.xcodeproj ] || { echo "ui-smoke: FSearch.xcodeproj missing (run scripts/generate-project.sh)" >&2; exit 1; }
+H="" LOG="" DP=""
+# Stop the daemon (TERM, then KILL after ~5 s), then delete the temp HOME.
+cleanup() {
+  if [ -n "$DP" ]; then
+    kill "$DP" 2>/dev/null
+    for _ in $(seq 10); do kill -0 "$DP" 2>/dev/null || break; sleep 0.5; done
+    kill -9 "$DP" 2>/dev/null
+    wait "$DP" 2>/dev/null
+  fi
+  [ -n "$H" ] && rm -rf "$H"
+  [ -n "$LOG" ] && rm -f "$LOG"
+  # The app's test-mode defaults suite (AppDefaults.testSuiteName).
+  rm -f "$HOME"/Library/Preferences/com.domfahey.fsearch.apptests.*.plist
+}
+trap cleanup EXIT
 # A short path under /private/tmp: a Unix socket path can be at most 104 bytes.
 H=/private/tmp/fsa-ui-$(openssl rand -hex 3)
 LOG=$(mktemp -t ui-smoke)
@@ -41,18 +58,7 @@ REAL_BEFORE=$(stamp "$REAL_LOG")
 
 # The daemon indexes only $H/root and keeps its data under the temp HOME.
 HOME=$H FSEARCH_ROOT=$H/root Vendor/fsearch serve >/dev/null 2>&1 & DP=$!
-# Stop the daemon (TERM, then KILL after ~5 s), then delete the temp HOME.
-cleanup() {
-  kill $DP 2>/dev/null
-  for _ in $(seq 10); do kill -0 $DP 2>/dev/null || break; sleep 0.5; done
-  kill -9 $DP 2>/dev/null
-  wait $DP 2>/dev/null
-  rm -rf "$H" "$LOG"
-  # The app's test-mode defaults suite (AppDefaults.testSuiteName).
-  rm -f "$HOME"/Library/Preferences/com.domfahey.fsearch.apptests.*.plist
-}
-trap cleanup EXIT
-for _ in $(seq 50); do [ -S "$SOCK" ] && break; sleep 0.2; done
+for _ in $(seq 50); do [ -S "$SOCK" ] && break; kill -0 "$DP" 2>/dev/null || break; sleep 0.2; done
 [ -S "$SOCK" ] || { echo "ui-smoke: daemon socket never appeared at $SOCK" >&2; exit 1; }
 
 # TEST_RUNNER_* reach the test process without the prefix. UI_REQUIRED makes a

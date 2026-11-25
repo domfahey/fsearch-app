@@ -11,7 +11,7 @@ public enum GrepMode: String, Sendable {
 }
 
 /// One request to the daemon. Name search is the default op.
-public enum Request: Sendable {
+enum Request: Sendable {
     /// Search file names. `limit` is left out of the JSON when `q` has its
     /// own `limit:` word, which the daemon would otherwise override.
     case search(q: String, limit: Int)
@@ -29,7 +29,7 @@ public enum Request: Sendable {
     /// Keys are sorted so the output is stable.
     ///
     /// - Parameter id: The request id; the daemon echoes it in the reply.
-    public func json(id: Int) -> Data {
+    func json(id: Int) -> Data {
         var o: [String: Any] = ["id": id]
         switch self {
         case let .search(q, limit):
@@ -55,11 +55,11 @@ public struct Hit: Decodable, Equatable, Sendable {
     /// Size in bytes.
     public let size: UInt64
     /// Modification time, seconds since the Unix epoch.
-    public let mtime: UInt32
+    public let mtime: Int64
     /// The match score; higher ranks first.
     public let score: Int32
     /// Creates a hit (used by tests and previews).
-    public init(path: String, kind: String, size: UInt64, mtime: UInt32, score: Int32) {
+    public init(path: String, kind: String, size: UInt64, mtime: Int64, score: Int32) {
         (self.path, self.kind, self.size, self.mtime, self.score) = (path, kind, size, mtime, score)
     }
 }
@@ -103,6 +103,8 @@ public struct FileMatches: Decodable, Equatable, Sendable {
     public let path: String
     /// Its matching lines, in file order.
     public let matches: [Match]
+    /// Creates a file's matches (used by tests and previews).
+    public init(path: String, matches: [Match]) { (self.path, self.matches) = (path, matches) }
 }
 
 /// The daemon's answer to a content search.
@@ -119,6 +121,14 @@ public struct GrepReply: Decodable, Equatable, Sendable {
     public let complete: Bool
     /// The files with matches.
     public let files: [FileMatches]
+    /// Creates a grep reply (used by tests and previews).
+    public init(
+        tookUs: UInt64, source: String = "index", candidates: Int = 0, read: Int = 0, complete: Bool = true, files: [FileMatches]
+    ) {
+        (self.tookUs, self.source, self.candidates, self.read, self.complete, self.files) = (
+            tookUs, source, candidates, read, complete, files
+        )
+    }
 }
 
 /// The daemon's index and permission state, as shown in Index Details.
@@ -131,6 +141,19 @@ public struct DaemonStatus: Decodable, Equatable, Sendable {
     public let indexBytes, contentDocs, contentSegments, contentBytes, contentPending: Int
     /// Whether the daemon can read protected folders, and whether it owns the index (as opposed to following another daemon's).
     public let fullDiskAccess, owner: Bool
+
+    /// Creates a daemon status (used by tests and previews).
+    public init(
+        entries: Int, dirs: Int = 0, overlay: Int = 0, removed: Int = 0, eventId: UInt64 = 0,
+        indexBytes: Int = 0, contentDocs: Int = 0, contentSegments: Int = 0, contentBytes: Int = 0, contentPending: Int = 0,
+        fullDiskAccess: Bool = true, owner: Bool = true
+    ) {
+        (self.entries, self.dirs, self.overlay, self.removed, self.eventId) = (entries, dirs, overlay, removed, eventId)
+        (self.indexBytes, self.contentDocs, self.contentSegments, self.contentBytes, self.contentPending) = (
+            indexBytes, contentDocs, contentSegments, contentBytes, contentPending
+        )
+        (self.fullDiskAccess, self.owner) = (fullDiskAccess, owner)
+    }
 
     private enum CodingKeys: String, CodingKey {
         case entries, dirs, overlay, removed, eventId, indexBytes, contentDocs, contentSegments, contentBytes, contentPending,
@@ -181,10 +204,53 @@ public enum DaemonError: Error, Equatable, Sendable, LocalizedError, CustomStrin
     public var errorDescription: String? { description }
 }
 
-/// The `ok`/`error` fields every reply has.
-private struct Envelope: Decodable { let ok: Bool; let error: String? }
+/// Thrown when a reply line has no valid `{"ok": ...}` envelope.
+private struct EnvelopeError: Error {}
+
+/// Decodes the `ok`/`error` envelope and payload in a single JSON pass.
+private struct ReplyEnvelope<Payload: Decodable>: Decodable {
+    let result: Result<Payload, DaemonError>
+    private enum Key: String, CodingKey { case ok, error }
+
+    init(from decoder: Decoder) throws {
+        let c: KeyedDecodingContainer<Key>
+        let ok: Bool
+        do {
+            c = try decoder.container(keyedBy: Key.self)
+            ok = try c.decode(Bool.self, forKey: .ok)
+        } catch {
+            throw EnvelopeError()
+        }
+        if !ok {
+            let msg: String
+            do {
+                msg = try c.decodeIfPresent(String.self, forKey: .error) ?? "error"
+            } catch {
+                throw EnvelopeError()
+            }
+            result = .failure(msg.hasPrefix("indexing") ? .indexing(msg) : .daemon(msg))
+            return
+        }
+        do {
+            result = .success(try Payload(from: decoder))
+        } catch let e as DaemonError {
+            result = .failure(e)
+        } catch let e as DecodingError {
+            result = .failure(.badReply(describe(e)))
+        } catch {
+            result = .failure(.badReply(String(describing: error)))
+        }
+    }
+}
 
 extension DaemonClient {
+    /// Creates a decoder configured for daemon replies (snake_case keys).
+    static func makeDecoder() -> JSONDecoder {
+        let dec = JSONDecoder()
+        dec.keyDecodingStrategy = .convertFromSnakeCase
+        return dec
+    }
+
     /// Decode one reply line, turning `{"ok": false, "error": ...}` into a DaemonError.
     ///
     /// An error beginning "indexing" becomes ``DaemonError/indexing(_:)``; any other becomes `.daemon`.
@@ -192,20 +258,20 @@ extension DaemonClient {
     /// - Parameters:
     ///   - line: One reply, without the newline.
     ///   - as: The type to decode (snake_case keys are converted).
-    /// - Throws: ``DaemonError``; `.badReply` carries a short description (an unparseable line is cut to 200 characters).
+    /// - Throws: ``DaemonError``; `.badReply` carries a short description (an unparseable line is cut to 200 bytes).
     public static func decodeReply<T: Decodable>(_ line: Data, as: T.Type) throws -> T {
-        let dec = JSONDecoder()
-        dec.keyDecodingStrategy = .convertFromSnakeCase
-        guard let env = try? dec.decode(Envelope.self, from: line) else {
+        try decodeReply(line, as: T.self, using: makeDecoder())
+    }
+
+    /// Single-pass decode using a caller-owned `JSONDecoder`.
+    static func decodeReply<T: Decodable>(_ line: Data, as: T.Type, using decoder: JSONDecoder) throws -> T {
+        let env: ReplyEnvelope<T>
+        do {
+            env = try decoder.decode(ReplyEnvelope<T>.self, from: line)
+        } catch {
             throw DaemonError.badReply(String(decoding: line.prefix(200), as: UTF8.self))
         }
-        if !env.ok {
-            let msg = env.error ?? "error"
-            throw msg.hasPrefix("indexing") ? DaemonError.indexing(msg) : DaemonError.daemon(msg)
-        }
-        do { return try dec.decode(T.self, from: line) } catch let e as DaemonError { throw e } catch let e as DecodingError {
-            throw DaemonError.badReply(describe(e))
-        } catch { throw DaemonError.badReply(String(describing: error)) }
+        return try env.result.get()
     }
 }
 

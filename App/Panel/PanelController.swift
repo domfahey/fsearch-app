@@ -18,9 +18,15 @@ final class PanelController: PanelHost {
     static let shared = PanelController()
     /// The panel, created on the first `show`.
     private(set) var panel: Panel?
+    /// The app whose `SearchView` is currently hosted in `panel.contentView`.
+    private weak var hostedApp: AppState?
+    /// Observable state box shared with the hosted `SearchView` so `show()` reuses the view hierarchy.
+    private let viewState = PanelViewState()
     /// Remembers the state at hide, so a quick reopen resumes.
     private var session = PanelSession()
     private weak var app: AppState?
+    /// Observer that hides the panel when the user switches to another app (even if Quick Look held key).
+    private var resignActiveObserver: ObserverToken?
     /// The selected row, mirrored from the view so ``hide(returnFocus:)`` can save it.
     private(set) var selection = 0
     /// The app that was in front when the panel opened, to hand focus back to.
@@ -59,7 +65,11 @@ final class PanelController: PanelHost {
             // The preview closed: give the keyboard back to the launcher.
             DispatchQueue.main.async {
                 guard self.isVisible else { return }
-                if NSApp.isActive { self.makeKey() } else { PanelController.shared.hide(returnFocus: false) }
+                if NSApp.isActive && (NSApp.keyWindow == nil || NSApp.keyWindow === self) {
+                    self.makeKey()
+                } else {
+                    PanelController.shared.hide(returnFocus: false)
+                }
             }
         }
     }
@@ -84,20 +94,15 @@ final class PanelController: PanelHost {
     /// Shows the panel on the screen holding the mouse, resuming the last query if it was hidden within the resume window.
     func show(app: AppState) {
         self.app = app
+        observeAppResignActive()
+        app.recents.invalidate()
         let resumed = session.opened(at: Date())
         app.search.query = resumed.query
         app.search.mode = resumed.mode
         selection = resumed.selection
+        viewState.resume(resumed)
         held.key.cancel()
         geometry.rows = [:]
-        let view = SearchView(
-            model: app.search, state: resumed, held: held, keys: keys, geometry: geometry, menu: menu,
-            isVisible: { [weak self] in self?.isVisible == true },
-            onEffect: { [weak self] effect, items in
-                self?.perform(effect, items)
-            }, onSelect: { [weak self] in self?.selection = $0 },
-            onCommand: { [weak self] in self?.run($0) }
-        ).environmentObject(app)
         let p = panel ?? Panel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         p.staysUpWithoutKey = app.options.showPanel
         p.isFloatingPanel = true
@@ -106,7 +111,18 @@ final class PanelController: PanelHost {
         p.backgroundColor = .clear
         p.hasShadow = true
         p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        p.contentView = NSHostingView(rootView: view)
+        if p.contentView == nil || hostedApp !== app {
+            let view = SearchView(
+                model: app.search, viewState: viewState, held: held, keys: keys, geometry: geometry, menu: menu,
+                isVisible: { [weak self] in self?.isVisible == true },
+                onEffect: { [weak self] effect, items in
+                    self?.perform(effect, items)
+                }, onSelect: { [weak self] in self?.selection = $0 },
+                onCommand: { [weak self] in self?.run($0) }
+            ).environmentObject(app)
+            p.contentView = NSHostingView(rootView: view)
+            hostedApp = app
+        }
         // 680 x 460 matches SearchView's frame; PanelFrame centres it horizontally, a little above the middle, inside the visible frame.
         let size = NSSize(width: 680, height: 460)
         p.setContentSize(size)
@@ -118,14 +134,22 @@ final class PanelController: PanelHost {
         let front = NSWorkspace.shared.frontmostApplication
         previousApp = front == NSRunningApplication.current ? nil : front
         AppActivation.activate()
-        Self.present(p)
+        Presentation.present(p)
         Task { await app.search.refresh() }
     }
 
-    /// Puts the panel on screen and makes it key. The inert unit-test host only
-    /// orders it in, fully transparent and deaf to the mouse, and never key.
-    static func present(_ p: NSPanel, inert: Bool = Presentation.inert) {
-        Presentation.present(p, inert: inert)
+    /// Hides the panel when the user switches to another app, even while Quick Look held key.
+    private func observeAppResignActive() {
+        guard resignActiveObserver == nil else { return }
+        let token = NotificationCenter.default.addObserver(
+            forName: NSApplication.didResignActiveNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.isVisible, self.panel?.staysUpWithoutKey == false else { return }
+                self.hide(returnFocus: false)
+            }
+        }
+        resignActiveObserver = ObserverToken(center: .default, token: token)
     }
 
     /// Hides the panel, saving its state for a quick reopen.
@@ -135,6 +159,7 @@ final class PanelController: PanelHost {
         held.key.cancel()
         menu.close()
         guard let p = panel, p.isVisible, let app else { return }
+        defer { previousApp = nil }
         session.hidden(PanelState(query: app.search.query, mode: app.search.mode, selection: selection), at: Date())
         p.orderOut(nil)
         QuickLookSource.shared.close()
@@ -149,7 +174,6 @@ final class PanelController: PanelHost {
         } else {
             NSApp.hide(nil)
         }
-        previousApp = nil
     }
 
     /// A regular window of ours is on screen: titled, not a panel (the launcher,
@@ -227,7 +251,7 @@ final class PanelController: PanelHost {
                 app.openedRecent(items[i].path)
             }
         case let .reveal(i): FileActions.reveal(items[i].path, onError: app.showActionError)
-        case let .quickLook(i): FileActions.quickLook(items[i].path)
+        case let .quickLook(i): FileActions.quickLook(items[i].path, onError: app.showActionError)
         case let .copyPath(i): FileActions.copyPath(items[i].path)
         case let .showActions(i): ActionsMenu.show(for: items[i], in: panel, app: app, geometry: geometry)
         }
@@ -235,4 +259,12 @@ final class PanelController: PanelHost {
         // away, unless the action failed at once and its error needs reading.
         if PanelInput.menuAction(for: effect)?.hidesPanel(errored: app.actionErrorCount != errors) == true { hide() }
     }
+}
+
+/// Removes a `NotificationCenter` observer automatically on deallocation.
+private final class ObserverToken {
+    let center: NotificationCenter
+    let token: NSObjectProtocol
+    init(center: NotificationCenter, token: NSObjectProtocol) { (self.center, self.token) = (center, token) }
+    deinit { center.removeObserver(token) }
 }

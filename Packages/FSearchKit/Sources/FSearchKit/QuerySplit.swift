@@ -1,3 +1,5 @@
+import Foundation
+
 /// Content queries: the typed text is the pattern, except fsearch filters
 /// (`ext:rs`, `in:~/x`, `mtime:<7d`), which narrow the files searched. Keys
 /// match case-sensitively, as in the daemon. Unlike the daemon, a word is a
@@ -33,10 +35,19 @@ public enum QuerySplit {
                 filters.append(word)  // its surrounding spacing is dropped
             } else {
                 if !pattern.isEmpty { pattern += space }
-                pattern += word
+                pattern += unescapeFilterWord(word)
             }
         }
         return (pattern, filters.joined(separator: " "))
+    }
+
+    /// Strips the outer escape quotes from a quoted filter word (`"ext:rs"` -> `ext:rs`)
+    /// so searching inside files for literal filter syntax doesn't include the quotes.
+    /// Normal quoted phrases (`"a b"`, `"hello"`) keep their quotes intact.
+    private static func unescapeFilterWord(_ word: String) -> String {
+        guard word.hasPrefix("\""), word.hasSuffix("\""), word.count >= 2 else { return word }
+        let inner = String(word.dropFirst().dropLast())
+        return !inner.contains(" ") && isFilter(inner) ? inner : word
     }
 
     /// The words of a query, quotes kept.
@@ -47,7 +58,7 @@ public enum QuerySplit {
     /// A word as the daemon reads it: quotes removed.
     ///
     /// - Parameter word: A word from ``words(_:)``.
-    public static func unquoted(_ word: String) -> String { word.replacingOccurrences(of: "\"", with: "") }
+    static func unquoted(_ word: String) -> String { word.replacingOccurrences(of: "\"", with: "") }
 
     /// A name query holding `grep:`/`content:`/`regex:`/`sym:`/`symbol:` is a
     /// content search: that word's value is the pattern (possibly empty; the last one wins,
@@ -73,7 +84,7 @@ public enum QuerySplit {
     /// dropped, as it does), whatever its value.
     ///
     /// - Parameter query: The typed text.
-    public static func hasLimitWord(_ query: String) -> Bool {
+    static func hasLimitWord(_ query: String) -> Bool {
         words(query).contains { unquoted($0).hasPrefix("limit:") }
     }
 
@@ -89,7 +100,7 @@ public enum QuerySplit {
     /// True if the query has a content key, so a name search would get lines back.
     ///
     /// - Parameter query: The typed text.
-    public static func hasContentKey(_ query: String) -> Bool { contentSearch(query) != nil }
+    static func hasContentKey(_ query: String) -> Bool { contentSearch(query) != nil }
 
     /// The daemon's `type:` values (query.rs `TYPES`, plus `app`).
     static let typeValues: Set<String> = ["code", "doc", "image", "video", "audio", "archive", "font", "app"]
@@ -108,8 +119,12 @@ public enum QuerySplit {
     ///   - query: The typed text.
     ///   - mode: The search mode. Outside names mode a word starting with a quote is text (see ``split(_:)``), never a
     ///     filter; the daemon drops a name query's quotes, so there it can still be one.
-    public static func endsInHalfTypedFilter(_ query: String, mode: SearchMode = .names) -> Bool {
-        guard let last = words(query).last, query.last != " " else { return false }
+    static func endsInHalfTypedFilter(_ query: String, mode: SearchMode = .names) -> Bool {
+        guard query.last != " ", let last = words(query).last else { return false }
+        return isHalfTypedWord(last, mode: mode)
+    }
+
+    private static func isHalfTypedWord(_ last: String, mode: SearchMode) -> Bool {
         if mode != .names && last.hasPrefix("\"") { return false }
         let plain = unquoted(last)
         guard let colon = plain.firstIndex(of: ":") else { return false }
@@ -134,11 +149,11 @@ public enum QuerySplit {
     ///   - answered: The query the rows answer.
     ///   - mode: The search mode, as for ``endsInHalfTypedFilter(_:mode:)``.
     public static func halfTypedExtends(_ query: String, answered: String, mode: SearchMode = .names) -> Bool {
-        guard endsInHalfTypedFilter(query, mode: mode), let last = spacedWords(query).last else { return false }
+        guard query.last != " ", let last = spacedWords(query).last, isHalfTypedWord(last.word, mode: mode) else { return false }
         let before = String(query.dropLast(last.word.count))
         let a = answered.trimmingCharacters(in: .whitespaces)
         if a == before.trimmingCharacters(in: .whitespaces) { return true }
-        let lead = String(before.drop { $0 == " " })
+        let lead = String(before.drop { $0.unicodeScalars.allSatisfy(CharacterSet.whitespaces.contains) })
         guard a.hasPrefix(lead) else { return false }
         let typed = a.dropFirst(lead.count)
         return !typed.isEmpty && last.word.hasPrefix(typed)

@@ -6,14 +6,21 @@ import Foundation
 /// reply line, so a DaemonClient round trip measures only client + socket cost.
 final class CannedServer: @unchecked Sendable {
     let path: String
-    private let reply: Data
+    private let reply: [UInt8]
+    /// Pre-split prefix ending with `"id":`, so per-request replies never round-trip through `String`.
+    private let idPrefix: [UInt8]?
     private var listener: Int32 = -1
 
     init(dir: URL, reply: Data) throws {
         path = dir.appendingPathComponent("canned.sock").path
-        var r = reply
-        r.append(UInt8(ascii: "\n"))
-        self.reply = r
+        var bytes = Array(reply)
+        bytes.append(UInt8(ascii: "\n"))
+        self.reply = bytes
+        if let s = String(data: reply, encoding: .utf8), let r = s.range(of: #""id":"#, options: .backwards) {
+            idPrefix = Array((s[..<r.upperBound]).utf8)
+        } else {
+            idPrefix = nil
+        }
         unlink(path)
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { throw BenchError("socket() failed") }
@@ -29,30 +36,42 @@ final class CannedServer: @unchecked Sendable {
         let ok = withUnsafePointer(to: &addr) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(fd, $0, len) } }
         guard ok == 0, listen(fd, 8) == 0 else { close(fd); throw BenchError("bind/listen failed on \(path)") }
         listener = fd
-        let reply = self.reply
+        let replyBytes = self.reply
+        let idPrefix = self.idPrefix
         Thread.detachNewThread {
             while true {
                 let c = accept(fd, nil, nil)
                 if c < 0 { return }
                 var one: Int32 = 1
                 setsockopt(c, SOL_SOCKET, SO_NOSIGPIPE, &one, socklen_t(MemoryLayout<Int32>.size))
-                Thread.detachNewThread { CannedServer.serve(c, reply) }
+                Thread.detachNewThread { CannedServer.serve(c, replyBytes, idPrefix) }
             }
         }
     }
 
     /// Answers each request line with the canned reply carrying that request's
     /// id: DaemonClient drops a reply whose id isn't the one it asked for.
-    private static func serve(_ c: Int32, _ reply: Data) {
+    private static func serve(_ c: Int32, _ reply: [UInt8], _ idPrefix: [UInt8]?) {
         var chunk = [UInt8](repeating: 0, count: 16 * 1024)
         var line: [UInt8] = []
+        var out: [UInt8] = []
+        out.reserveCapacity(reply.count + 24)
         while true {
             let n = read(c, &chunk, chunk.count)
             if n <= 0 { close(c); return }
             for i in 0..<n {
                 guard chunk[i] == UInt8(ascii: "\n") else { line.append(chunk[i]); continue }
-                let out = withID(requestID(line), reply)
+                let id = requestID(line)
                 line.removeAll(keepingCapacity: true)
+                out.removeAll(keepingCapacity: true)
+                if let id, let prefix = idPrefix {
+                    out.append(contentsOf: prefix)
+                    out.append(contentsOf: String(id).utf8)
+                    out.append(UInt8(ascii: "}"))
+                    out.append(UInt8(ascii: "\n"))
+                } else {
+                    out.append(contentsOf: reply)
+                }
                 let sent = out.withUnsafeBytes { write(c, $0.baseAddress, out.count) }
                 if sent != out.count { close(c); return }
             }
@@ -61,22 +80,15 @@ final class CannedServer: @unchecked Sendable {
 
     /// The integer after `"id":` in a request line, if any.
     private static func requestID(_ line: [UInt8]) -> Int? {
-        let key = Array(#""id":"#.utf8)
+        let key: [UInt8] = [0x22, 0x69, 0x64, 0x22, 0x3A]  // "id":
         guard line.count > key.count else { return nil }
-        for i in 0...(line.count - key.count) where Array(line[i..<(i + key.count)]) == key {
+        for i in 0...(line.count - key.count)
+        where line[i] == key[0] && line[i + 1] == key[1] && line[i + 2] == key[2] && line[i + 3] == key[3] && line[i + 4] == key[4] {
             var j = i + key.count, v = 0, any = false
             while j < line.count, line[j] >= 48, line[j] <= 57 { v = v * 10 + Int(line[j] - 48); j += 1; any = true }
             return any ? v : nil
         }
         return nil
-    }
-
-    /// `reply` (one line, newline-terminated, ending in `"id":<n>}`) with `id` swapped in.
-    private static func withID(_ id: Int?, _ reply: Data) -> Data {
-        guard let id, let s = String(data: reply, encoding: .utf8), let r = s.range(of: #""id":"#, options: .backwards) else {
-            return reply
-        }
-        return Data((s[..<r.lowerBound] + #""id":\#(id)}"# + "\n").utf8)
     }
 
     func stop() {
