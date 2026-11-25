@@ -6,6 +6,8 @@ import os
 /// The app: a menu-bar extra, a Settings scene and two debug windows. The floating panel is AppKit, installed by `PanelController`.
 @main
 struct FSearchApp: App {
+    /// Receives `fsearch://` URL events from LaunchServices even when no SwiftUI window is open.
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     /// Shared by every scene.
     @StateObject private var app: AppState
 
@@ -17,6 +19,7 @@ struct FSearchApp: App {
         _app = StateObject(wrappedValue: state)
         // Hosting unit tests: start nothing (no helper, hotkey, onboarding or Sparkle).
         guard !state.options.unitTestHost else { return }
+        let delegate = appDelegate
         DispatchQueue.main.async {
             // Run from a download's temporary copy or the DMG: never register
             // the helper from there; offer the move to Applications, then quit.
@@ -29,6 +32,7 @@ struct FSearchApp: App {
             OnboardingLauncher.launch(app: state)
             LaunchGuards.observeActivation(daemon: state.daemon)
             LaunchGuards.observeReopen(app: state)
+            delegate.connect(panel: PanelController.shared, app: state)
         }
     }
 
@@ -44,7 +48,34 @@ struct FSearchApp: App {
         }
         Settings { SettingsView().environmentObject(app) }
         Window("Index Details", id: "index") { IndexDetailsView().environmentObject(app) }
+            .handlesExternalEvents(matching: [])
         Window("Search Log", id: "log") { SearchLogView().environmentObject(app) }
+            .handlesExternalEvents(matching: [])
+    }
+}
+
+/// AppKit delegate: receives `fsearch://` URLs from LaunchServices, even when no SwiftUI window is open.
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var openSearch: ((SearchURL) -> Void)?
+    private var pending: SearchURL?
+
+    /// Connects incoming URLs to the panel and replays any URL that arrived during cold launch.
+    func connect(panel: PanelHost, app: AppState) {
+        openSearch = { panel.show(app: app, search: $0) }
+        if let search = pending {
+            pending = nil
+            panel.show(app: app, search: search)
+        }
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        guard let search = urls.compactMap(SearchURL.parse).last else { return }
+        if let openSearch {
+            openSearch(search)
+        } else {
+            pending = search
+        }
     }
 }
 

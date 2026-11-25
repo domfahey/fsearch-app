@@ -31,7 +31,7 @@ The app logs through `os.Logger` (subsystem `com.domfahey.fsearch`, see `App/Sup
 
 ## FSearchKit and the App target
 
-[`Packages/FSearchKit`](../Packages/FSearchKit) holds everything that can be tested without a UI: the wire types and `DaemonClient.decodeReply`, `LineSocket`, `DaemonClient`, `SearchModel`, `QuerySplit`/`QuerySyntax`, `DaemonPlan`, `RestartBudget`, `MenuBarWarning`, onboarding rules, `Recents`, `SearchLog`, key handling (`PanelKey`, `PanelState`, `PanelSession`, `HeldKey` in `PanelKeys.swift`) and row layout (`PanelRows`). It has no dependencies. The `FSearch` target in [`project.yml`](../project.yml) is the glue: windows, `SMAppService`, Sparkle, the global shortcut, and file actions. Put new logic in the package and keep the App code thin.
+[`Packages/FSearchKit`](../Packages/FSearchKit) holds everything that can be tested without a UI: the wire types and `DaemonClient.decodeReply`, `LineSocket`, `DaemonClient`, `SearchModel`, `QuerySplit`/`QuerySyntax`, `SearchURL`, `DaemonPlan`, `RestartBudget`, `MenuBarWarning`, onboarding rules, `Recents`, `SearchLog`, key handling (`PanelKey`, `PanelState`, `PanelSession`, `HeldKey` in `PanelKeys.swift`) and row layout (`PanelRows`). It has no dependencies. The `FSearch` target in [`project.yml`](../project.yml) is the glue: windows, `SMAppService`, Sparkle, the global shortcut, and file actions. Put new logic in the package and keep the App code thin.
 
 ## One keystroke
 

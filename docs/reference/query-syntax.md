@@ -169,6 +169,7 @@ File names are different. Name search covers every file the index holds, whateve
 ## See also
 
 - [Keyboard shortcuts](keyboard-shortcuts.md)
+- [URL scheme](url-scheme.md)
 - [Tutorial: your first search](../tutorial-first-search.md)
 - [Known limitations](limitations.md)
 - [Troubleshooting](troubleshooting.md)

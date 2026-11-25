@@ -93,15 +93,33 @@ final class PanelController: PanelHost {
 
     /// Shows the panel on the screen holding the mouse, resuming the last query if it was hidden within the resume window.
     func show(app: AppState) {
+        present(app: app, state: session.opened(at: Date()))
+    }
+
+    /// Shows the panel pre-filled with a parsed `fsearch://` search, replacing any resumed session state.
+    func show(app: AppState, search: SearchURL) {
+        present(app: app, state: PanelState(query: search.query, mode: search.mode, selection: 0))
+    }
+
+    /// Parses and opens a `fsearch://` URL in the panel. Returns false for unrecognized URLs without showing the panel.
+    @discardableResult
+    func open(url: URL, app: AppState) -> Bool {
+        guard let search = SearchURL.parse(url) else { return false }
+        show(app: app, search: search)
+        return true
+    }
+
+    private func present(app: AppState, state: PanelState) {
+        let wasVisible = isVisible
         self.app = app
         observeAppResignActive()
         app.recents.invalidate()
-        let resumed = session.opened(at: Date())
-        app.search.query = resumed.query
-        app.search.mode = resumed.mode
-        selection = resumed.selection
-        viewState.resume(resumed)
+        app.search.query = state.query
+        app.search.mode = state.mode
+        selection = state.selection
+        viewState.resume(state)
         held.key.cancel()
+        menu.close()
         let p = panel ?? Panel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         p.staysUpWithoutKey = app.options.showPanel
         p.isFloatingPanel = true
@@ -132,7 +150,11 @@ final class PanelController: PanelHost {
         }
         panel = p
         let front = NSWorkspace.shared.frontmostApplication
-        previousApp = front == NSRunningApplication.current ? nil : front
+        if front != NSRunningApplication.current {
+            previousApp = front
+        } else if !wasVisible {
+            previousApp = nil
+        }
         AppActivation.activate()
         Presentation.present(p)
         viewState.requestFocus()
