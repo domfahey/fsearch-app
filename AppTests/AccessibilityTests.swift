@@ -80,6 +80,7 @@ extension AppTests {
             defer { w.close() }
             let chip = try #require(await axWait(id: "searchModeChip", in: w))
             #expect(chip.texts.contains("Search mode: Inside files"))
+            #expect(chip.help == "Press Backspace in an empty search field to clear")
             let debugDot = try #require(await axWait(id: "debugModeIndicator", in: w))
             #expect(debugDot.texts.contains("Debug mode active"))
         }

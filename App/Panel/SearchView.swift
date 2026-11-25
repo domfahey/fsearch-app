@@ -128,7 +128,7 @@ struct SearchView: View {
                         .background(Color.primary.opacity(a11y.chipFillOpacity), in: RoundedRectangle(cornerRadius: 6))
                         .overlay(
                             RoundedRectangle(cornerRadius: 6)
-                                .stroke(a11y.chipStrokeOpacity > 0 ? Color.primary.opacity(a11y.chipStrokeOpacity) : .clear)
+                                .strokeBorder(a11y.chipStrokeOpacity > 0 ? Color.primary.opacity(a11y.chipStrokeOpacity) : .clear)
                         )
                         .accessibilityIdentifier("searchModeChip")
                         .accessibilityLabel("Search mode: \(modeTitle)")
@@ -145,7 +145,7 @@ struct SearchView: View {
                     }
                 if app.debugMode {
                     Circle().fill(.orange).frame(width: 6, height: 6)
-                        .overlay(Circle().stroke(Color.primary.opacity(a11y.selectionStrokeOpacity)))
+                        .overlay(Circle().strokeBorder(Color.primary.opacity(a11y.selectionStrokeOpacity)))
                         .help("Debug mode")
                         .accessibilityIdentifier("debugModeIndicator")
                         .accessibilityLabel("Debug mode active")
@@ -324,7 +324,7 @@ struct SearchView: View {
         return HStack(spacing: 4) {
             Text(t)
             Text(k).padding(.horizontal, 5)
-                .overlay(RoundedRectangle(cornerRadius: 4).stroke(strokeColor.opacity(a11y.hintStrokeOpacity)))
+                .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(strokeColor.opacity(a11y.hintStrokeOpacity)))
         }
     }
 

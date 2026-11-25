@@ -72,11 +72,11 @@ extension View {
         if style.usesOpaqueSurface {
             self
                 .background(Color(nsColor: .windowBackgroundColor), in: shape)
-                .overlay(shape.stroke(Color.primary.opacity(style.surfaceStrokeOpacity)))
+                .overlay(shape.strokeBorder(Color.primary.opacity(style.surfaceStrokeOpacity)))
         } else {
             self
                 .background(material, in: shape)
-                .overlay(shape.stroke(Color.primary.opacity(style.surfaceStrokeOpacity)))
+                .overlay(shape.strokeBorder(Color.primary.opacity(style.surfaceStrokeOpacity)))
         }
     }
 
@@ -87,7 +87,8 @@ extension View {
             self
             .background(selected ? Color.primary.opacity(style.selectionFillOpacity) : .clear, in: shape)
             .overlay(
-                shape.stroke(selected && style.selectionStrokeOpacity > 0 ? Color.primary.opacity(style.selectionStrokeOpacity) : .clear)
+                shape.strokeBorder(
+                    selected && style.selectionStrokeOpacity > 0 ? Color.primary.opacity(style.selectionStrokeOpacity) : .clear)
             )
     }
 }

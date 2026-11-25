@@ -189,7 +189,7 @@ private struct Keycap: View {
             .background(Color.primary.opacity(a11y.keycapFillOpacity), in: RoundedRectangle(cornerRadius: 4))
             .overlay(
                 RoundedRectangle(cornerRadius: 4)
-                    .stroke(a11y.selectionStrokeOpacity > 0 ? Color.primary.opacity(a11y.selectionStrokeOpacity) : .clear)
+                    .strokeBorder(a11y.selectionStrokeOpacity > 0 ? Color.primary.opacity(a11y.selectionStrokeOpacity) : .clear)
             )
     }
 }
