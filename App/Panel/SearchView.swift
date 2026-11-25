@@ -26,6 +26,74 @@ final class PanelViewState {
     }
 }
 
+/// Coordinates deferred keyboard focus between the panel's search field and the FSearch menu's filter field.
+///
+/// Both fields defer claiming focus by one main-queue turn so AppKit finishes attaching or detaching the
+/// underlying `NSTextField` and any synchronous focus resignation completes first. Separate per-field
+/// generations cancel stale callbacks on rapid toggles without depending on SwiftUI's callback order
+/// between `SearchView.onChange` and `AppMenuView.onAppear`/`onDisappear`.
+@MainActor
+final class PanelFocusCoordinator {
+    typealias Scheduler = (@escaping @MainActor () -> Void) -> Void
+
+    private let schedule: Scheduler
+    private var searchGeneration: UInt64 = 0
+    private var menuGeneration: UInt64 = 0
+
+    init(schedule: @escaping Scheduler = { block in DispatchQueue.main.async { block() } }) {
+        self.schedule = schedule
+    }
+
+    /// Defers search-field focus to the next main-queue turn, skipping if superseded, hidden, or if the menu opened.
+    func requestSearchFocus(
+        isVisible: @escaping @MainActor () -> Bool,
+        isMenuOpen: @escaping @MainActor () -> Bool,
+        setFocused: @escaping @MainActor (Bool) -> Void
+    ) {
+        searchGeneration &+= 1
+        let token = searchGeneration
+        schedule { [weak self] in
+            guard let self, self.searchGeneration == token, isVisible(), !isMenuOpen() else { return }
+            setFocused(true)
+        }
+    }
+
+    /// Handles `menu.isOpen` changing in ``SearchView``: opening resigns search-field focus immediately
+    /// (invalidating any pending search-field claim); closing schedules deferred restoration.
+    func handleMenuOpenChanged(
+        _ isOpen: Bool,
+        isVisible: @escaping @MainActor () -> Bool,
+        isMenuOpen: @escaping @MainActor () -> Bool,
+        setSearchFocused: @escaping @MainActor (Bool) -> Void
+    ) {
+        if isOpen {
+            searchGeneration &+= 1
+            setSearchFocused(false)
+        } else {
+            requestSearchFocus(isVisible: isVisible, isMenuOpen: isMenuOpen, setFocused: setSearchFocused)
+        }
+    }
+
+    /// Defers menu filter-field focus to the next main-queue turn, skipping if superseded or if the menu closed.
+    func requestMenuFocus(
+        isMenuOpen: @escaping @MainActor () -> Bool,
+        setFocused: @escaping @MainActor (Bool) -> Void
+    ) {
+        menuGeneration &+= 1
+        let token = menuGeneration
+        schedule { [weak self] in
+            guard let self, self.menuGeneration == token, isMenuOpen() else { return }
+            setFocused(true)
+        }
+    }
+
+    /// Resigns menu filter-field focus and invalidates any pending menu-field claim when the menu disappears.
+    func clearMenuFocus(setFocused: @escaping @MainActor (Bool) -> Void) {
+        menuGeneration &+= 1
+        setFocused(false)
+    }
+}
+
 /// The panel's contents: the search field, the rows (files, commands, fallbacks) and the key hints.
 ///
 /// Rows follow ``PanelRows``: files first, then app commands, then the two fallbacks.
@@ -39,6 +107,7 @@ struct SearchView: View {
     /// The keyboard state, reduced by ``PanelState/reduce(_:)``.
     @Bindable var viewState: PanelViewState
     @FocusState private var focused: Bool
+    @State private var focusCoordinator: PanelFocusCoordinator
     /// A result key pressed before the rows answered the query, run once they do.
     let held: HeldKeyBox
     /// Keys from outside the view: ↑/↓ pressed in Quick Look.
@@ -58,11 +127,13 @@ struct SearchView: View {
     init(
         model: SearchModel, viewState: PanelViewState, held: HeldKeyBox, keys: PanelKeyFeed, geometry: PanelGeometry,
         menu: AppMenuState, isVisible: @escaping () -> Bool,
+        focusCoordinator: PanelFocusCoordinator = PanelFocusCoordinator(),
         onEffect: @escaping (PanelEffect, [ResultItem]) -> Void, onSelect: @escaping (Int) -> Void,
         onCommand: @escaping (AppCommand) -> Void
     ) {
         self.model = model
         self.viewState = viewState
+        _focusCoordinator = State(initialValue: focusCoordinator)
         self.held = held
         self.keys = keys
         self.geometry = geometry
@@ -76,12 +147,13 @@ struct SearchView: View {
     init(
         model: SearchModel, state: PanelState, held: HeldKeyBox, keys: PanelKeyFeed, geometry: PanelGeometry,
         menu: AppMenuState, isVisible: @escaping () -> Bool,
+        focusCoordinator: PanelFocusCoordinator = PanelFocusCoordinator(),
         onEffect: @escaping (PanelEffect, [ResultItem]) -> Void, onSelect: @escaping (Int) -> Void,
         onCommand: @escaping (AppCommand) -> Void
     ) {
         self.init(
             model: model, viewState: PanelViewState(state: state), held: held, keys: keys, geometry: geometry, menu: menu,
-            isVisible: isVisible, onEffect: onEffect, onSelect: onSelect, onCommand: onCommand)
+            isVisible: isVisible, focusCoordinator: focusCoordinator, onEffect: onEffect, onSelect: onSelect, onCommand: onCommand)
     }
 
     private var selection: Int { viewState.state.selection }
@@ -257,9 +329,14 @@ struct SearchView: View {
         // ↑/↓ pressed in Quick Look, which holds the keyboard while it is up.
         .onChange(of: keys.last) { if isVisible() && !menu.isOpen, let k = keys.last?.key { act(k) } }
         .onChange(of: model.mode) { held.key.cancel() }
-        .overlay(alignment: .bottomLeading) { AppMenuOverlay(menu: menu) { AppMenuActions.run($0, app: app) } }
-        // The menu's field had the keyboard: give it back to the search field.
-        .onChange(of: menu.isOpen) { _, open in if !open { focused = true } }
+        .overlay(alignment: .bottomLeading) {
+            AppMenuOverlay(menu: menu, focusCoordinator: focusCoordinator) { AppMenuActions.run($0, app: app) }
+        }
+        // Opening the menu resigns search-field focus immediately; closing defers restoration until teardown finishes.
+        .onChange(of: menu.isOpen) { _, open in
+            focusCoordinator.handleMenuOpenChanged(
+                open, isVisible: { isVisible() }, isMenuOpen: { menu.isOpen }, setSearchFocused: { focused = $0 })
+        }
         // The results for the query in the box arrived: run a key held for them.
         .onChange(of: PanelInput.answer(model)) { old, new in
             geometry.rowsChanged(keeping: Set(self.shown.map(\.id)))
@@ -346,9 +423,7 @@ struct SearchView: View {
     /// activation and presentation finish first (e.g. when opened by the global
     /// shortcut). Skips if the panel hid or the FSearch menu opened meanwhile.
     private func focusSearchField() {
-        DispatchQueue.main.async {
-            if isVisible() && !menu.isOpen { focused = true }
-        }
+        focusCoordinator.requestSearchFocus(isVisible: { isVisible() }, isMenuOpen: { menu.isOpen }, setFocused: { focused = $0 })
     }
 
     /// Re-runs the current query in another mode (the fallback rows).

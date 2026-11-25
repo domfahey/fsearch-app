@@ -57,7 +57,7 @@ final class PanelUITests: PanelUITestCase {
         XCTAssertFalse(text("Files").exists, "a file matched")
         try press(.downArrow)
         try pressReturnOnFallback("fallback-symbols")
-        waitFor(text("Definitions"))
+        waitFor(modeChip("Definitions"))
         waitFor(text("kestrel.swift"))
         waitFor(text(containing: "func kestrelHandler"))
     }
@@ -67,9 +67,9 @@ final class PanelUITests: PanelUITestCase {
         try enterContentMode("quokkaneedle")
         try press(.escape)
         waitUntil(5, "query cleared") { (self.field.value as? String ?? "") == "" }
-        XCTAssertTrue(text("Inside files").exists, "the chip stays after the first Esc")
+        XCTAssertTrue(modeChip("Inside files").exists, "the chip stays after the first Esc")
         try press(.escape)
-        XCTAssertTrue(text("Inside files").waitForNonExistence(timeout: 5))
+        XCTAssertTrue(modeChip("Inside files").waitForNonExistence(timeout: 5))
         try press(.escape)
         XCTAssertTrue(field.waitForNonExistence(timeout: 5), "the third Esc hides the panel")
     }
@@ -79,9 +79,9 @@ final class PanelUITests: PanelUITestCase {
         try enterContentMode("quokkaneedle")
         try search("")
         waitUntil(5, "query cleared") { (self.field.value as? String ?? "") == "" }
-        XCTAssertTrue(text("Inside files").exists, tree())
+        XCTAssertTrue(modeChip("Inside files").exists, tree())
         try press(.delete)
-        XCTAssertTrue(text("Inside files").waitForNonExistence(timeout: 5))
+        XCTAssertTrue(modeChip("Inside files").waitForNonExistence(timeout: 5))
         XCTAssertTrue(field.exists)
     }
 
@@ -258,7 +258,7 @@ final class PanelUITests: PanelUITestCase {
 
     func testMenuBarItemListsTheMenu() throws {
         try launch()
-        let item = app.statusItems["FSearch"]
+        let item = statusItem
         waitFor(item, 10)
         try click(item)
         let menu = item.descendants(matching: .menuItem)
