@@ -32,19 +32,38 @@ enum Updater {
     /// SULastCheckTime to the real defaults and could put up update windows.
     static func shouldStart(configured: Bool, testMode: Bool) -> Bool { configured && !testMode }
 
+    /// Runs a user-initiated check; tests replace this so buttons can be pressed without starting Sparkle.
+    static var checkForUpdates: @MainActor (SPUStandardUpdaterController) -> Void = { $0.checkForUpdates(nil) }
+
     /// Called once at launch. Creates (and so starts) Sparkle only when configured, outside test mode.
     /// Later calls do nothing.
     static func start() {
-        guard shouldStart(configured: isConfigured, testMode: LaunchOptions.current.testMode), store.controller == nil else { return }
-        let c = SPUStandardUpdaterController(
-            startingUpdater: true, updaterDelegate: nil, userDriverDelegate: UpdateReminderDriver.shared)
+        start(
+            configured: isConfigured, testMode: LaunchOptions.current.testMode,
+            makeController: {
+                SPUStandardUpdaterController(
+                    startingUpdater: true, updaterDelegate: nil, userDriverDelegate: UpdateReminderDriver.shared)
+            },
+            checkInBackground: { $0.updater.checkForUpdatesInBackground() })
+    }
+
+    /// Starts the updater using injectable factory and background-check closures so tests never start Sparkle.
+    static func start(
+        configured: Bool, testMode: Bool, model: UpdateReminderModel = .shared,
+        makeController: () -> SPUStandardUpdaterController,
+        checkInBackground: (SPUStandardUpdaterController) -> Void
+    ) {
+        guard shouldStart(configured: configured, testMode: testMode), store.controller == nil else { return }
+        let c = makeController()
         store.controller = c
-        resumeReminder(model: .shared, updaterRunning: true) { c.updater.checkForUpdatesInBackground() }
+        resumeReminder(model: model, updaterRunning: true) { checkInBackground(c) }
     }
 
     #if DEBUG
         /// Tests install an unstarted controller to render the update items, then remove it.
         static func setController(_ c: SPUStandardUpdaterController?) { store.controller = c }
+        /// Lets tests enable the update check buttons without starting Sparkle.
+        static var forceCanCheckForTesting = false
     #endif
 
     /// The menu-bar reminder lives in memory: if the last run quit with one up,
@@ -127,7 +146,7 @@ struct UpdateAvailableItem: View {
         if UpdateReminderModel.shared.indicatorVisible, let controller = Updater.controller {
             Button("Update Available…") {
                 AppActivation.activate()
-                controller.checkForUpdates(nil)
+                Updater.checkForUpdates(controller)
             }
             Divider()
         }
@@ -139,23 +158,39 @@ struct UpdateAvailableItem: View {
 final class AutoCheckState: ObservableObject {
     /// The "Automatically check" setting.
     @Published var automatic: Bool {
-        didSet { if automatic != updater.automaticallyChecksForUpdates { updater.automaticallyChecksForUpdates = automatic } }
+        didSet {
+            if automatic != updater.automaticallyChecksForUpdates {
+                if let writeAutomatic { writeAutomatic(automatic) } else { updater.automaticallyChecksForUpdates = automatic }
+            }
+        }
     }
     /// False while a check is running.
     @Published private(set) var canCheck = false
     private let updater: SPUUpdater
+    private let writeAutomatic: ((Bool) -> Void)?
     private var cancellables: Set<AnyCancellable> = []
 
-    init(updater: SPUUpdater) {
+    init(updater: SPUUpdater, writeAutomatic: ((Bool) -> Void)? = nil) {
         self.updater = updater
+        self.writeAutomatic = writeAutomatic
         automatic = updater.automaticallyChecksForUpdates
-        canCheck = updater.canCheckForUpdates
+        #if DEBUG
+            canCheck = Updater.forceCanCheckForTesting || updater.canCheckForUpdates
+        #else
+            canCheck = updater.canCheckForUpdates
+        #endif
         updater.publisher(for: \.automaticallyChecksForUpdates)
             .receive(on: DispatchQueue.main).sink { [weak self] in
                 if self?.automatic != $0 { self?.automatic = $0 }
             }.store(in: &cancellables)
         updater.publisher(for: \.canCheckForUpdates)
-            .receive(on: DispatchQueue.main).assign(to: &$canCheck)
+            .receive(on: DispatchQueue.main).sink { [weak self] value in
+                #if DEBUG
+                    self?.canCheck = Updater.forceCanCheckForTesting || value
+                #else
+                    self?.canCheck = value
+                #endif
+            }.store(in: &cancellables)
     }
 }
 
@@ -180,7 +215,7 @@ private struct UpdatesSettingsContent: View {
     var body: some View {
         Section("Updates") {
             Toggle("Automatically check for updates", isOn: $state.automatic)
-            Button("Check Now") { controller.checkForUpdates(nil) }
+            Button("Check Now") { Updater.checkForUpdates(controller) }
                 .disabled(!state.canCheck)
         }
     }
@@ -190,12 +225,23 @@ private struct UpdatesSettingsContent: View {
 @MainActor
 private final class UpdateCheckState: ObservableObject {
     @Published private(set) var canCheck = false
+    private var cancellables: Set<AnyCancellable> = []
 
     init(updater: SPUUpdater) {
-        canCheck = updater.canCheckForUpdates
+        #if DEBUG
+            canCheck = Updater.forceCanCheckForTesting || updater.canCheckForUpdates
+        #else
+            canCheck = updater.canCheckForUpdates
+        #endif
         updater.publisher(for: \.canCheckForUpdates)
             .receive(on: DispatchQueue.main)
-            .assign(to: &$canCheck)
+            .sink { [weak self] value in
+                #if DEBUG
+                    self?.canCheck = Updater.forceCanCheckForTesting || value
+                #else
+                    self?.canCheck = value
+                #endif
+            }.store(in: &cancellables)
     }
 }
 
@@ -220,7 +266,7 @@ private struct CheckForUpdatesButton: View {
     var body: some View {
         Button("Check for Updates…") {
             AppActivation.activate()
-            controller.checkForUpdates(nil)
+            Updater.checkForUpdates(controller)
         }
         .disabled(!state.canCheck)
     }

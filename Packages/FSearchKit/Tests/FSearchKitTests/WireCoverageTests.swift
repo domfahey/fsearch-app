@@ -92,6 +92,21 @@ private struct Exploding: Decodable {
         _ = try DaemonClient.decodeReply(Data(#"{"ok":true,"id":1}"#.utf8), as: Pong.self)
     }
 
+    @Test func notOkWithNonStringErrorIsBadReply() {
+        let json = #"{"ok":false,"error":123}"#
+        #expect(badReplyMessage(json, as: SearchReply.self) == json)
+    }
+
+    @Test func daemonStatusMemberwiseInitStoresAllFields() {
+        let s = DaemonStatus(
+            entries: 100, dirs: 12, overlay: 3, removed: 1, eventId: 99,
+            indexBytes: 4096, contentDocs: 8, contentSegments: 2, contentBytes: 8192, contentPending: 4,
+            fullDiskAccess: false, owner: false)
+        #expect(s.entries == 100 && s.dirs == 12 && s.overlay == 3 && s.removed == 1 && s.eventId == 99)
+        #expect(s.indexBytes == 4096 && s.contentDocs == 8 && s.contentSegments == 2 && s.contentBytes == 8192 && s.contentPending == 4)
+        #expect(!s.fullDiskAccess && !s.owner)
+    }
+
     @Test func requestJSONEscapesAndIsDeterministic() {
         // Keys sorted, quotes and newlines escaped, no trailing newline: the exact bytes, every time.
         let line = Request.grep(q: "a\"b", pattern: "x\ny", mode: .symbol, budgetMs: 1).json(id: 9)

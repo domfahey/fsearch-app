@@ -97,6 +97,7 @@ extension AppTests {
             try makeDownload()
             #expect(!InstallMover.isTranslocated(source))
             #expect(InstallMover.originalURL(of: source) == source)
+            #expect(InstallMover.symbol("fsearch_nonexistent_security_symbol", as: UnsafeRawPointer.self) == nil)
         }
     }
 }

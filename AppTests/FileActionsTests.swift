@@ -267,10 +267,12 @@ extension AppTests {
             #expect(ws.actions == want)
             #expect(try String(contentsOf: log, encoding: .utf8) == want.joined(separator: "\n") + "\n")
             #expect(FileManager.default.fileExists(atPath: f))  // not trashed
-            // File checks are real and read-only.
+            // File checks and app lookups are real and read-only.
             #expect(ws.fileInfo(atPath: f) == FileInfo())
             #expect(ws.fileInfo(atPath: env.dir.path)?.isDirectory == true)
             #expect(ws.fileInfo(atPath: env.dir.path + "/nope") == nil)
+            #expect(ws.urlForApplication(withBundleIdentifier: "com.apple.finder") != nil)
+            _ = ws.urlsForApplications(toOpen: URL(fileURLWithPath: f))
         }
 
         /// In this host toggling only sets the item (no preview comes up); the
@@ -341,6 +343,52 @@ extension AppTests {
             feed.send(.down)
             feed.send(.down)
             #expect(feed.last == PanelKeyFeed.Sent(key: .down, n: 2))
+        }
+
+        /// The Quick Look key monitor swallows ⌘Y and ↑/↓ only when the preview panel holds key.
+        @Test func quickLookKeyMonitorHandlesPreviewEvents() throws {
+            let q = QuickLookSource()
+            var moved: [PanelKey] = []
+            q.move = { moved.append($0) }
+
+            func keyEvent(_ chars: String, mods: NSEvent.ModifierFlags, code: UInt16, repeat isRepeat: Bool = false) throws -> NSEvent {
+                try #require(
+                    NSEvent.keyEvent(
+                        with: .keyDown, location: .zero, modifierFlags: mods, timestamp: 0, windowNumber: 0,
+                        context: nil, characters: chars, charactersIgnoringModifiers: chars, isARepeat: isRepeat, keyCode: code))
+            }
+
+            let letter = try keyEvent("a", mods: [], code: 0)
+            #expect(q.filterKeyDown(letter, inPreviewPanel: true) === letter)
+
+            let down = try keyEvent("\u{F701}", mods: [.function, .numericPad], code: 125)
+            #expect(q.filterKeyDown(down) === down, "other windows keep their arrows")
+            #expect(q.filterKeyDown(down, inPreviewPanel: true) == nil)
+            let up = try keyEvent("\u{F700}", mods: [.function, .numericPad], code: 126)
+            #expect(q.filterKeyDown(up, inPreviewPanel: true) == nil)
+            #expect(moved == [.down, .up])
+
+            // Holding ⌘Y swallows the repeat without closing; a fresh press closes.
+            q.previewingForTesting = true
+            let repeatCmdY = try keyEvent("y", mods: .command, code: 0x10, repeat: true)
+            #expect(q.filterKeyDown(repeatCmdY, inPreviewPanel: true) == nil)
+            #expect(q.isPreviewing)
+            let freshCmdY = try keyEvent("y", mods: .command, code: 0x10, repeat: false)
+            #expect(q.filterKeyDown(freshCmdY, inPreviewPanel: true) == nil)
+            #expect(!q.isPreviewing)
+        }
+
+        @Test func quickLookClosesWhenPreviewingAndDefaultErrorHandlersHandleMissingFiles() {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            env.workspace.missing = ["/p/gone.txt"]
+            #expect(!FileActions.copyFile("/p/gone.txt"))
+            #expect(!FileActions.quickLook("/p/gone.txt"))
+
+            QuickLookSource.shared.previewingForTesting = true
+            defer { QuickLookSource.shared.previewingForTesting = false }
+            #expect(FileActions.quickLook("/p/gone.txt"))
+            #expect(!QuickLookSource.shared.isPreviewing)
         }
     }
 

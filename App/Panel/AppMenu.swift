@@ -67,11 +67,17 @@ final class AppMenuState {
 /// About and Quit go through seams, so tests never show a window or quit the host.
 @MainActor
 enum AppMenuActions {
-    /// Shows the standard About panel, as the menu bar's About FSearch does. Never in the unit-test host.
-    static var showAbout: @MainActor () -> Void = live {
-        AppActivation.activate()
-        NSApp.orderFrontStandardAboutPanel(nil)
+    /// Brings the app forward and orders the standard About panel to the front.
+    static func performAbout(
+        activate: () -> Void = { AppActivation.activate() },
+        orderFront: () -> Void = { NSApp.orderFrontStandardAboutPanel(nil) }
+    ) {
+        activate()
+        orderFront()
     }
+
+    /// Shows the standard About panel, as the menu bar's About FSearch does. Never in the unit-test host.
+    static var showAbout: @MainActor () -> Void = live { performAbout() }
 
     /// Quits the app. Never in the unit-test host; tests replace it.
     static var quit: @MainActor () -> Void = live { NSApp.terminate(nil) }
@@ -120,8 +126,12 @@ enum AppMenuActions {
 
     /// The app's short version and build, the strings the bug report sends.
     static func version(_ bundle: Bundle = .main) -> (version: String, build: String) {
-        let info = bundle.infoDictionary
-        return (info?["CFBundleShortVersionString"] as? String ?? "unknown", info?["CFBundleVersion"] as? String ?? "")
+        version(info: bundle.infoDictionary)
+    }
+
+    /// Extracts short version and build from an Info.plist dictionary, falling back when absent.
+    static func version(info: [String: Any]?) -> (version: String, build: String) {
+        (info?["CFBundleShortVersionString"] as? String ?? "unknown", info?["CFBundleVersion"] as? String ?? "")
     }
 
     /// The menu's header: "FSearch v0.1.0 (42)".

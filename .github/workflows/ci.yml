@@ -22,7 +22,7 @@ env:
 # per actions/runner-images macos-26-arm64 Readme, image 20260907. Bump both together.
 # UI tests (AppUITests) are not run here: they need a logged-in GUI session and
 # accessibility permission that hosted runners don't grant reliably. Run locally.
-# Coverage: the kit job gates FSearchKit at 90%; the app job gates AppTests-only coverage at 90%.
+# Coverage: the kit job gates FSearchKit at 95%; the app job gates AppTests-only coverage at 95%.
 jobs:
   kit:
     strategy:
@@ -43,8 +43,8 @@ jobs:
         working-directory: Packages/FSearchKit
       - run: swift build --product FSearchBench -Xswiftc -warnings-as-errors
         working-directory: Packages/FSearchKit
-      - name: FSearchKit tests and coverage gate (90%)
-        run: scripts/coverage.sh --kit-only --min 90
+      - name: FSearchKit tests and coverage gate (95%)
+        run: scripts/coverage.sh --kit-only --min 95
 
   app:
     runs-on: macos-26
@@ -64,12 +64,12 @@ jobs:
           CODE_SIGN_IDENTITY=- build
       - name: App unit tests and coverage gate
         # Hosted unit tests (AppTests) run headless on the runner; the UI tests do not.
-        # The floor is 90% (ADR 0011); the local end-to-end run (`make coverage`) combines both suites.
+        # The floor is 95% (ADR 0012); the local end-to-end run (`make coverage`) combines both suites.
         env:
           # xcodebuild hands TEST_RUNNER_* to the test host without the prefix:
           # the menu-bar safety test records, not fails, a status window left up here.
           TEST_RUNNER_FSEARCH_CI: '1'
-        run: scripts/coverage.sh --unit-only --min 90
+        run: scripts/coverage.sh --unit-only --min 95
 
   lint:
     runs-on: macos-26

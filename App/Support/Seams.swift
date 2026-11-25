@@ -160,6 +160,7 @@ enum Presentation {
 ///
 /// Outside the host it behaves as a plain `NSWindow`.
 final class HostSafeWindow: NSWindow {
-    override var canBecomeKey: Bool { !LaunchOptions.current.unitTestHost && super.canBecomeKey }
-    override var canBecomeMain: Bool { !LaunchOptions.current.unitTestHost && super.canBecomeMain }
+    var isUnitTestHost: () -> Bool = { LaunchOptions.current.unitTestHost }
+    override var canBecomeKey: Bool { !isUnitTestHost() && super.canBecomeKey }
+    override var canBecomeMain: Bool { !isUnitTestHost() && super.canBecomeMain }
 }

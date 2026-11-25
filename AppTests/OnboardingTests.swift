@@ -349,5 +349,82 @@ extension AppTests {
             #expect(!flow.pressedTurnOn)
             #expect(flow.facts.fullDiskAccess)
         }
+
+        @Test func pollForwardsTaskCancellationToInFlightRefresh() async {
+            let gate = AsyncGate()
+            let d = StubDaemon()
+            d.onStatus = { _ in throw DaemonError.timeout }
+            let env = TestEnv(daemon: d)
+            defer { env.tearDown() }
+            let clock = DaemonClock(
+                now: { ContinuousClock.now },
+                sleep: { _ in
+                    await gate.wait()
+                    try Task.checkCancellation()
+                })
+            let app = AppState(
+                options: env.app.options, defaults: env.defaults, helper: nil,
+                names: d, content: d, control: d, clock: clock, cliAgentInstalled: { false })
+            let flow = OnboardingFlow(app: app, defaults: env.defaults, step: .helper)
+            let pollTask = Task { await flow.poll() }
+            #expect(await eventually { d.statuses == 1 })
+            pollTask.cancel()
+            gate.release()
+            await pollTask.value
+            #expect(app.daemon.state == .checking, "cancelled poll must not publish a stale result")
+        }
+
+        @Test func welcomeStepShowsHotkeyConflictWarning() async {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let flow = OnboardingFlow(app: env.app, defaults: env.defaults, step: .welcome)
+            let w = await render(
+                OnboardingView(flow: flow, runningBundleIds: { ["com.raycast.macos"] }).environmentObject(env.app),
+                size: NSSize(width: 440, height: 300))
+            defer { w.close() }
+            #expect(await eventually { axTexts(in: w).contains { $0.contains("Raycast") } })
+        }
+
+        @Test func helperStepButtonsRetryFailureAndOpenLoginItems() async throws {
+            let helper = FakeHelper(.enabled)
+            let env = TestEnv(helper: helper)
+            defer { env.tearDown() }
+            env.daemon.onStatus = { _ in throw DaemonError.disconnected }
+            await env.app.daemon.refresh()
+            let flow = OnboardingFlow(app: env.app, defaults: env.defaults, step: .helper)
+            let w = await render(OnboardingView(flow: flow).environmentObject(env.app), size: NSSize(width: 440, height: 300))
+            defer { w.close() }
+            env.daemon.onStatus = { _ in Wire.status() }
+            try #require(await axWait("Try Again", in: w)).press()
+            #expect(await eventually { flow.facts.helperEnabled })
+
+            let approvalHelper = FakeHelper(.requiresApproval)
+            let env2 = TestEnv(helper: approvalHelper)
+            defer { env2.tearDown() }
+            env2.daemon.onPing = { _ in false }
+            await env2.app.daemon.start()
+            let flow2 = OnboardingFlow(app: env2.app, defaults: env2.defaults, step: .helper)
+            let w2 = await render(OnboardingView(flow: flow2).environmentObject(env2.app), size: NSSize(width: 440, height: 300))
+            defer { w2.close() }
+            try #require(await axWait("Open Login Items Settings", in: w2)).press()
+            #expect(approvalHelper.openedSettings == 1)
+            // Becoming active while approved retries automatically.
+            approvalHelper.status = .enabled
+            NotificationCenter.default.post(name: NSApplication.didBecomeActiveNotification, object: nil)
+            #expect(await eventually { flow2.facts.helperEnabled })
+        }
+
+        @Test func indexingStepShowsProgressBeforeFilesAppear() async {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            env.daemon.onStatus = { _ in Wire.status(entries: 0) }
+            await env.app.daemon.refresh()
+            let flow = OnboardingFlow(app: env.app, defaults: env.defaults, step: .indexing)
+            flow.apply()
+            #expect(!flow.facts.indexReady)
+            let w = await render(OnboardingView(flow: flow).environmentObject(env.app), size: NSSize(width: 440, height: 300))
+            defer { w.close() }
+            #expect(await axWait("Indexing your disk", in: w) != nil)
+        }
     }
 }

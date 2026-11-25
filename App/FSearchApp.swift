@@ -20,20 +20,7 @@ struct FSearchApp: App {
         // Hosting unit tests: start nothing (no helper, hotkey, onboarding or Sparkle).
         guard !state.options.unitTestHost else { return }
         let delegate = appDelegate
-        DispatchQueue.main.async {
-            // Run from a download's temporary copy or the DMG: never register
-            // the helper from there; offer the move to Applications, then quit.
-            if let problem = LaunchGuards.installProblem(options: state.options) {
-                LaunchGuards.offerMove(problem)
-                return
-            }
-            Updater.start()
-            PanelController.shared.install(app: state)
-            OnboardingLauncher.launch(app: state)
-            LaunchGuards.observeActivation(daemon: state.daemon)
-            LaunchGuards.observeReopen(app: state)
-            delegate.connect(panel: PanelController.shared, app: state)
-        }
+        DispatchQueue.main.async { LaunchGuards.startApp(state: state, delegate: delegate) }
     }
 
     /// No menu-bar item while hosting unit tests; UI tests (test mode) click it, so it stays there.
@@ -82,37 +69,70 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 /// The menu's content lives in its own View so it can read `openWindow`.
 struct MenuContent: View {
     @ObservedObject var app: AppState
-    @Environment(\.openWindow) private var openWindow
-    @Environment(\.openSettings) private var openSettings
+    @Environment(\.openWindow) private var envOpenWindow
+    @Environment(\.openSettings) private var envOpenSettings
+    #if DEBUG
+        private let openWindowOverride: ((String) -> Void)?
+        private let openSettingsOverride: (() -> Void)?
+
+        init(app: AppState, openWindow: ((String) -> Void)? = nil, openSettings: (() -> Void)? = nil) {
+            self.app = app
+            self.openWindowOverride = openWindow
+            self.openSettingsOverride = openSettings
+        }
+    #endif
+
+    private func openWindow(_ id: String) {
+        #if DEBUG
+            let open: (String) -> Void = openWindowOverride ?? { envOpenWindow(id: $0) }
+        #else
+            let open: (String) -> Void = { envOpenWindow(id: $0) }
+        #endif
+        MenuWindows.open(id, open)
+    }
+
+    private func openSettings() {
+        #if DEBUG
+            let open: () -> Void = openSettingsOverride ?? { envOpenSettings() }
+        #else
+            let open: () -> Void = { envOpenSettings() }
+        #endif
+        MenuWindows.openSettings(open)
+    }
 
     var body: some View {
         Button("Search…") { PanelController.shared.toggle(app: app) }
         Divider()
         if app.debugMode {
-            Button("Index Details…") { MenuWindows.open("index") { openWindow(id: $0) } }
-            Button("Search Log…") { MenuWindows.open("log") { openWindow(id: $0) } }
+            Button("Index Details…") { openWindow("index") }
+            Button("Search Log…") { openWindow("log") }
             Divider()
         }
         DebugMenuItem(app: app)
         FinishSetupMenuItem(app: app)
-        Menu("Help") {
-            ForEach(HelpLinks.items, id: \.title) { item in
-                Button(item.title) { FileActions.workspace.open(item.url) }
-            }
-            Divider()
-            ForEach(HelpLinks.community, id: \.title) { item in
-                Button(item.title) { FileActions.workspace.open(item.url) }
-            }
-            Divider()
-            Button(HelpLinks.reportTitle) { HelpLinks.reportIssue(daemon: app.daemon, workspace: FileActions.workspace) }
-        }
-        Button("About FSearch") {
-            AppActivation.activate(); NSApp.orderFrontStandardAboutPanel(nil)
-        }
+        Menu("Help") { HelpMenuContent(app: app) }
+        Button("About FSearch") { AppMenuActions.showAbout() }
         // Not SettingsLink: it doesn't bring a menu-bar app to the front.
-        Button("Settings…") { MenuWindows.openSettings { openSettings() } }
+        Button("Settings…") { openSettings() }
         CheckForUpdatesItem()
-        Button("Quit FSearch") { NSApp.terminate(nil) }
+        Button("Quit FSearch") { AppMenuActions.quit() }
+    }
+}
+
+/// Items inside the menu bar's Help submenu, extracted so view tests can press each action directly.
+struct HelpMenuContent: View {
+    @ObservedObject var app: AppState
+
+    var body: some View {
+        ForEach(HelpLinks.items, id: \.title) { item in
+            Button(item.title) { FileActions.workspace.open(item.url) }
+        }
+        Divider()
+        ForEach(HelpLinks.community, id: \.title) { item in
+            Button(item.title) { FileActions.workspace.open(item.url) }
+        }
+        Divider()
+        Button(HelpLinks.reportTitle) { HelpLinks.reportIssue(daemon: app.daemon, workspace: FileActions.workspace) }
     }
 }
 
@@ -137,16 +157,46 @@ enum LaunchGuards {
     /// Posted when a second copy of FSearch launches so the running LSUIElement instance opens the search panel.
     static let reopenNotification = Notification.Name("com.domfahey.fsearch.reopen")
 
+    /// Starts the app's runtime services, or offers to move into Applications if launched from a bad location.
+    static func startApp(
+        state: AppState, delegate: AppDelegate,
+        panel: PanelController = .shared,
+        bundleURL: URL = Bundle.main.bundleURL,
+        activationCenter: NotificationCenter = .default,
+        reopenCenter: NotificationCenter = DistributedNotificationCenter.default(),
+        offerMove: ((InstallLocation.Problem) -> Void)? = nil
+    ) {
+        // Run from a download's temporary copy or the DMG: never register
+        // the helper from there; offer the move to Applications, then quit.
+        if let problem = installProblem(options: state.options, bundleURL: bundleURL) {
+            if let offerMove { offerMove(problem) } else { self.offerMove(problem) }
+            return
+        }
+        Updater.start()
+        panel.install(app: state)
+        OnboardingLauncher.launch(app: state)
+        observeActivation(daemon: state.daemon, center: activationCenter)
+        observeReopen(panel: panel, app: state, center: reopenCenter)
+        delegate.connect(panel: panel, app: state)
+    }
+
     /// Another FSearch is running: ask it to open the panel, bring it forward, and let the caller quit.
     static func anotherCopyIsRunning(
-        options: LaunchOptions, center: NotificationCenter = DistributedNotificationCenter.default()
+        options: LaunchOptions, center: NotificationCenter = DistributedNotificationCenter.default(),
+        bundleIdentifier: String? = Bundle.main.bundleIdentifier,
+        runningApps: ((String) -> [(pid: pid_t, activate: () -> Void)])? = nil,
+        me: pid_t = getpid()
     ) -> Bool {
-        guard !options.testMode, let id = Bundle.main.bundleIdentifier else { return false }
-        let running = NSRunningApplication.runningApplications(withBundleIdentifier: id)
-        guard let pid = SingleInstance.other(pids: running.map(\.processIdentifier), me: getpid()) else { return false }
+        guard !options.testMode, let id = bundleIdentifier else { return false }
+        let running =
+            runningApps?(id)
+            ?? NSRunningApplication.runningApplications(withBundleIdentifier: id).map { app in
+                (app.processIdentifier, { _ = app.activate() })
+            }
+        guard let pid = SingleInstance.other(pids: running.map(\.pid), me: me) else { return false }
         Log.daemon.info("another FSearch is running (pid \(pid, privacy: .public)): quitting")
         notifyOtherInstance(center: center)
-        running.first { $0.processIdentifier == pid }?.activate()
+        running.first { $0.pid == pid }?.activate()
         return true
     }
 
@@ -183,7 +233,12 @@ enum LaunchGuards {
             bundlePath: bundleURL.path, translocated: InstallMover.isTranslocated(bundleURL), readOnlyVolume: readOnly)
     }
 
-    static func offerMove(_ problem: InstallLocation.Problem) {
+    static func offerMove(
+        _ problem: InstallLocation.Problem,
+        runAlert: ((NSAlert) -> NSApplication.ModalResponse)? = nil,
+        move: ((URL) -> Void)? = nil,
+        terminate: (() -> Void)? = nil
+    ) {
         Log.daemon.info("launched from a bad location: \(String(describing: problem), privacy: .public)")
         AppActivation.activate()
         let alert = NSAlert()
@@ -191,10 +246,11 @@ enum LaunchGuards {
         alert.informativeText = problem.message
         alert.addButton(withTitle: String(localized: "Move to Applications"))
         alert.addButton(withTitle: String(localized: "Quit"))
-        if alert.runModal() == .alertFirstButtonReturn {
-            InstallMover.moveToApplications(from: Bundle.main.bundleURL)
+        let response = runAlert?(alert) ?? alert.runModal()
+        if response == .alertFirstButtonReturn {
+            if let move { move(Bundle.main.bundleURL) } else { InstallMover.moveToApplications(from: Bundle.main.bundleURL) }
         }
-        NSApp.terminate(nil)
+        if let terminate { terminate() } else { NSApp.terminate(nil) }
     }
 
     /// Back from System Settings after the menu's Full Disk Access item.

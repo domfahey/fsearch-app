@@ -47,11 +47,11 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
   - FSearchKit Swift package with unit and daemon integration tests. A separate UI smoke test (`scripts/ui-smoke.sh`) runs locally, not in CI.
   - Benchmarks: `scripts/bench.sh` measures keystroke, client and real-daemon performance and fails when a result regresses against `bench/baseline.json`. See [bench/README.md](bench/README.md).
   - A Makefile for common tasks (`make test`, `apptest`, `coverage-kit`, `lint`, `type`, `bench`, `check`, `ci`, `doctor`, `install`, `clean`) and a `.swift-format` style config.
-  - CI runs the FSearchKit tests on macOS 26 (Xcode 26.6), builds the universal app, runs the app's unit tests (AppTests), gates coverage (FSearchKit at 90%, the app's unit tests at 90%), treats compiler warnings as errors, blocks on swift-format lint, checks Markdown links, lints the scripts and workflows, and checks benchmarks against the `ci-macos-26` baseline.
+  - CI runs the FSearchKit tests on macOS 26 (Xcode 26.6), builds the universal app, runs the app's unit tests (AppTests), gates coverage (FSearchKit at 95%, the app's unit tests at 95%), treats compiler warnings as errors, blocks on swift-format lint, checks Markdown links, lints the scripts and workflows, and checks benchmarks against the `ci-macos-26` baseline.
   - The CI release job runs in the protected `release` environment, only for tags on main, after the kit, app and lint jobs, with a 60-minute timeout. It publishes a draft GitHub release with the DMG, checksum and build-provenance attestation (verify with `gh attestation verify`).
   - Pre-commit scans staged blobs and pre-push scans every unpushed commit for GitHub tokens and EdDSA-style keys. Key and certificate file types are git-ignored.
   - Every public FSearchKit API has a doc comment.
-  - Documentation: limitations and update pages, an FAQ glossary, the content-search scope, ADRs 0007–0011, test tiers in the contributing guide, deeper daemon-verified query syntax docs (ranking, typo tolerance, word combining, `limit:`), and, in the security policy, known limitations (same-user access to the daemon and its index), scope, a 90-day disclosure target, how to verify a download and a key-compromise process.
+  - Documentation: limitations and update pages, an FAQ glossary, the content-search scope, ADRs 0007–0012, test tiers in the contributing guide, deeper daemon-verified query syntax docs (ranking, typo tolerance, word combining, `limit:`), and, in the security policy, known limitations (same-user access to the daemon and its index), scope, a 90-day disclosure target, how to verify a download and a key-compromise process.
   - Repository settings: CodeQL for Swift and the workflows, private vulnerability reporting, a protected `main` (required checks on up-to-date branches, linear history, squash merges), a protected release environment and tags, and an Actions allow list that requires SHA pins.
   - Open-source project files: contributing guide, security policy, code of conduct, architecture overview, issue and pull request templates, CODEOWNERS, and Dependabot for GitHub Actions.
 
@@ -63,7 +63,7 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
 - The panel shows at most 1000 results.
 - `limit:` now works in name searches, because the app no longer sends its own limit over it.
 - The debug search log folder is private (0700) and its file 0600, both excluded from backups. The privacy manifest gives one reason for file timestamps, C617.1: the app reads them only for its own files and never shows them.
-- CI's coverage gate for the app's unit tests is 90%, up from 80%.
+- CI's coverage gates are now 95% for both FSearchKit and the app's unit tests (up from 90% and 80%, respectively).
 - CI's `bench` job now compares against a `ci-macos-26` baseline in `bench/baseline.json` (seeded from five hosted `macos-26` runs with hosted-runner tolerances), failing on reproduced regressions while warning on inconclusive busy-runner runs (exit 75).
 
 ### Fixed

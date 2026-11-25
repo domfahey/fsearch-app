@@ -86,6 +86,38 @@ extension AppTests {
             #expect(NSApp.windows.filter { $0.isVisible && $0.alphaValue > 0 && !Self.isStatusItem($0) }.isEmpty)
             #expect(NSApp.windows.filter(\.isVisible).count == before)
         }
+
+        /// Presentation toggles visibility, mouse events, and ordering without flashing windows in tests.
+        @Test func presentationSetsAlphaMouseEventsAndOrdering() {
+            final class SpyWindow: NSWindow {
+                var madeKey = 0, ordered = 0
+                override func makeKeyAndOrderFront(_ sender: Any?) { madeKey += 1 }
+                override func orderFrontRegardless() { ordered += 1 }
+            }
+            let w = SpyWindow(
+                contentRect: NSRect(origin: offscreenOrigin, size: NSSize(width: 100, height: 100)),
+                styleMask: [.borderless], backing: .buffered, defer: true)
+            Presentation.present(w, inert: true)
+            #expect(w.alphaValue == 0 && w.ignoresMouseEvents && w.ordered == 1 && w.madeKey == 0)
+            Presentation.present(w, inert: false)
+            #expect(w.alphaValue == 1 && !w.ignoresMouseEvents && w.ordered == 1 && w.madeKey == 1)
+        }
+
+        /// Outside the unit-test host, HostSafeWindow behaves as an ordinary NSWindow.
+        @Test func hostSafeWindowAllowsKeyAndMainOutsideUnitTestHost() {
+            let w = HostSafeWindow(
+                contentRect: NSRect(origin: offscreenOrigin, size: NSSize(width: 100, height: 100)),
+                styleMask: [.titled], backing: .buffered, defer: false)
+            w.isReleasedWhenClosed = false
+            Presentation.present(w, inert: true)
+            defer {
+                w.isUnitTestHost = { LaunchOptions.current.unitTestHost }
+                w.close()
+            }
+            #expect(!w.canBecomeKey && !w.canBecomeMain)
+            w.isUnitTestHost = { false }
+            #expect(w.canBecomeKey && w.canBecomeMain)
+        }
     }
 }
 

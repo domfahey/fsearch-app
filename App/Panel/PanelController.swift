@@ -63,13 +63,19 @@ final class PanelController: PanelHost {
         override func endPreviewPanelControl(_ panel: QLPreviewPanel!) {
             MainActor.assumeIsolated { QuickLookSource.shared.detach(panel) }
             // The preview closed: give the keyboard back to the launcher.
-            DispatchQueue.main.async {
-                guard self.isVisible else { return }
-                if NSApp.isActive && (NSApp.keyWindow == nil || NSApp.keyWindow === self) {
-                    self.makeKey()
-                } else {
-                    PanelController.shared.hide(returnFocus: false)
-                }
+            DispatchQueue.main.async { self.restoreFocusAfterPreview() }
+        }
+
+        /// Restores keyboard focus to the panel if FSearch is still active, or hides it otherwise.
+        func restoreFocusAfterPreview(
+            isActive: Bool = NSApp.isActive, keyWindow: NSWindow? = NSApp.keyWindow,
+            makeKey: (() -> Void)? = nil, hide: (() -> Void)? = nil
+        ) {
+            guard isVisible else { return }
+            if isActive && (keyWindow == nil || keyWindow === self) {
+                if let makeKey { makeKey() } else { self.makeKey() }
+            } else {
+                if let hide { hide() } else { PanelController.shared.hide(returnFocus: false) }
             }
         }
     }
@@ -78,10 +84,15 @@ final class PanelController: PanelHost {
     static func registersGlobalHotkey(_ options: LaunchOptions) -> Bool { !options.testMode }
 
     /// Connects the panel to the app and registers the global shortcut (not in test mode).
-    func install(app: AppState) {
+    func install(app: AppState, registerHotkey: ((@escaping @MainActor () -> Void) -> Void)? = nil) {
         self.app = app
         if Self.registersGlobalHotkey(app.options) {
-            KeyboardShortcuts.onKeyUp(for: .togglePanel) { [weak self] in self?.toggle(app: app) }
+            let toggle: @MainActor () -> Void = { [weak self] in self?.toggle(app: app) }
+            if let registerHotkey {
+                registerHotkey(toggle)
+            } else {
+                KeyboardShortcuts.onKeyUp(for: .togglePanel, action: toggle)
+            }
         }
         if app.options.showPanel { show(app: app) }
     }
@@ -149,16 +160,22 @@ final class PanelController: PanelHost {
             p.setFrameOrigin(PanelFrame.origin(size: size, in: screen.visibleFrame))
         }
         panel = p
-        let front = NSWorkspace.shared.frontmostApplication
-        if front != NSRunningApplication.current {
-            previousApp = front
-        } else if !wasVisible {
-            previousApp = nil
-        }
+        updatePreviousApp(front: NSWorkspace.shared.frontmostApplication, wasVisible: wasVisible)
         AppActivation.activate()
         Presentation.present(p)
         viewState.requestFocus()
         Task { await app.search.refresh() }
+    }
+
+    /// Remembers the frontmost non-FSearch app, or clears it when opening fresh while FSearch is already frontmost.
+    func updatePreviousApp(
+        front: NSRunningApplication?, current: NSRunningApplication = .current, wasVisible: Bool
+    ) {
+        if front != current {
+            previousApp = front
+        } else if !wasVisible {
+            previousApp = nil
+        }
     }
 
     /// Hides the panel when the user switches to another app, even while Quick Look held key.
@@ -186,23 +203,34 @@ final class PanelController: PanelHost {
         session.hidden(PanelState(query: app.search.query, mode: app.search.mode, selection: selection), at: Date())
         p.orderOut(nil)
         QuickLookSource.shared.close()
+        restoreFocusOnHide(except: p, returnFocus: returnFocus)
+    }
+
+    /// Returns focus after hiding the panel: activates the previous app if another window of ours stays open, or hides the app.
+    func restoreFocusOnHide(
+        except panel: NSWindow, returnFocus: Bool, inert: Bool = Presentation.inert,
+        appIsActive: Bool = NSApp.isActive, windows: [NSWindow] = NSApp.windows,
+        activate: ((NSRunningApplication) -> Void)? = nil, hideApp: (() -> Void)? = nil
+    ) {
         // The unit-test host never moves focus between apps.
-        guard returnFocus && !Presentation.inert && NSApp.isActive else { return }
+        guard returnFocus && !inert && appIsActive else { return }
         // Hiding the app hands focus back to whatever was in front before, but it
         // would hide Settings, onboarding or a debug window too. With one of those
         // up, give focus straight to the app the panel was summoned over (if it
         // was another app and is still running); our windows stay where they were.
-        if Self.otherWindowsVisible(except: p) {
-            if let prev = previousApp, !prev.isTerminated { prev.activate() }
+        if Self.otherWindowsVisible(except: panel, in: windows) {
+            if let prev = previousApp, !prev.isTerminated {
+                if let activate { activate(prev) } else { prev.activate() }
+            }
         } else {
-            NSApp.hide(nil)
+            if let hideApp { hideApp() } else { NSApp.hide(nil) }
         }
     }
 
     /// A regular window of ours is on screen: titled, not a panel (the launcher,
     /// Quick Look) and not the menu-bar item's borderless window.
-    private static func otherWindowsVisible(except panel: NSWindow) -> Bool {
-        NSApp.windows.contains { w in
+    static func otherWindowsVisible(except panel: NSWindow, in windows: [NSWindow] = NSApp.windows) -> Bool {
+        windows.contains { w in
             w !== panel && w.isVisible && !(w is NSPanel) && w.styleMask.contains(.titled)
         }
     }

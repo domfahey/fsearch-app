@@ -7,7 +7,16 @@ import Foundation
 /// It dials lazily and keeps the connection between calls; any failure closes it.
 final class LineSocket {
     /// Reject runaway replies rather than growing the receive buffer without bound.
-    private static let maxLineBytes = 64 * 1024 * 1024
+    static let defaultMaxLineBytes = 64 * 1024 * 1024
+
+    /// Thin wrapper over blocking socket syscalls so tests can inject EINTR/EAGAIN/poll errors.
+    struct IO {
+        var write: (Int32, UnsafeRawPointer, Int) -> Int = { Darwin.write($0, $1, $2) }
+        var poll: (UnsafeMutablePointer<pollfd>, nfds_t, Int32) -> Int32 = { Darwin.poll($0, $1, $2) }
+        var read: (Int32, UnsafeMutableRawPointer, Int) -> Int = { Darwin.read($0, $1, $2) }
+
+        static var live: IO { IO() }
+    }
 
     private var fd: Int32 = -1
     private var buffer = Data()
@@ -16,9 +25,14 @@ final class LineSocket {
     let timeout: TimeInterval
     /// The only uid whose socket is trusted: ours, unless a test says otherwise.
     let expectedPeerUid: uid_t
+    let maxLineBytes: Int
+    let io: IO
 
-    init(path: String, timeout: TimeInterval, expectedPeerUid: uid_t = getuid()) {
-        (self.path, self.timeout, self.expectedPeerUid) = (path, timeout, expectedPeerUid)
+    init(
+        path: String, timeout: TimeInterval, expectedPeerUid: uid_t = getuid(),
+        maxLineBytes: Int = LineSocket.defaultMaxLineBytes, io: IO = .live
+    ) {
+        (self.path, self.timeout, self.expectedPeerUid, self.maxLineBytes, self.io) = (path, timeout, expectedPeerUid, maxLineBytes, io)
     }
     deinit { close() }
 
@@ -109,7 +123,7 @@ final class LineSocket {
         try data.withUnsafeBytes { raw in
             guard let base = raw.baseAddress else { return }
             while offset < data.count {
-                let n = Darwin.write(fd, base.advanced(by: offset), data.count - offset)
+                let n = io.write(fd, base.advanced(by: offset), data.count - offset)
                 if n > 0 { offset += n; continue }
                 if n < 0 && errno == EINTR {
                     if ContinuousClock.now >= deadline { throw DaemonError.timeout }
@@ -130,18 +144,18 @@ final class LineSocket {
             guard ContinuousClock.now < deadline else { throw DaemonError.timeout }
             let from = buffer.index(buffer.startIndex, offsetBy: scanned)
             if let nl = buffer[from...].firstIndex(of: UInt8(ascii: "\n")) {
-                if nl - buffer.startIndex > Self.maxLineBytes { throw DaemonError.badReply("reply line too large") }
+                if nl - buffer.startIndex > maxLineBytes { throw DaemonError.badReply("reply line too large") }
                 let line = Data(buffer[buffer.startIndex..<nl])
                 buffer.removeSubrange(buffer.startIndex...nl)
                 if buffer.isEmpty { buffer.removeAll(keepingCapacity: true) }
                 return line
             }
-            if buffer.count >= Self.maxLineBytes { throw DaemonError.badReply("reply line too large") }
+            if buffer.count >= maxLineBytes { throw DaemonError.badReply("reply line too large") }
             scanned = buffer.count
             let ms = Self.remainingMilliseconds(ContinuousClock.now.duration(to: deadline))
             guard ms > 0 else { throw DaemonError.timeout }
             var pfd = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
-            let ready = Darwin.poll(&pfd, 1, ms)
+            let ready = io.poll(&pfd, 1, ms)
             if ready == 0 { continue }
             if ready < 0 {
                 if errno == EINTR { continue }
@@ -150,7 +164,7 @@ final class LineSocket {
             guard ContinuousClock.now < deadline else { throw DaemonError.timeout }
             if pfd.revents & Int16(POLLNVAL) != 0 { throw DaemonError.disconnected }
             guard pfd.revents & Int16(POLLIN | POLLHUP | POLLERR) != 0 else { continue }
-            let n = read(fd, &chunk, chunk.count)
+            let n = io.read(fd, &chunk, chunk.count)
             if n > 0 {
                 buffer.append(contentsOf: chunk[0..<n])
                 continue
@@ -164,7 +178,7 @@ final class LineSocket {
         }
     }
 
-    private static func remainingMilliseconds(_ d: Duration) -> Int32 {
+    static func remainingMilliseconds(_ d: Duration) -> Int32 {
         let (s, a) = d.components
         if s < 0 || (s == 0 && a <= 0) { return 0 }
         let msFromSec = s > Int64(Int32.max / 1000) ? Int64(Int32.max) : s * 1000

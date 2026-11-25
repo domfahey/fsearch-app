@@ -250,6 +250,57 @@ import Testing
         #expect(Date().timeIntervalSince(t0) < 7)
     }
 
+    @Test func defaultSocketPathPointsIntoApplicationSupport() {
+        #expect(DaemonClient.defaultSocketPath == NSHomeDirectory() + "/Library/Application Support/FSearch/fsearch.sock")
+    }
+
+    @Test func queuedCancellationSetsCancelFlagAndNeverTouchesSocket() async {
+        let reached = DispatchSemaphore(value: 0)
+        let release = DispatchSemaphore(value: 0)
+        let d = FakeDaemon { _ in
+            reached.signal()
+            _ = release.wait(timeout: .now() + 2)
+            return ["ok": true]
+        }
+        defer {
+            release.signal()
+            d.stop()
+        }
+        let c = DaemonClient(socketPath: d.path, timeout: 2)
+        let blocker = Task { try? await c.ping() }
+        await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
+            DispatchQueue.global().async {
+                _ = reached.wait(timeout: .now() + 2)
+                done.resume()
+            }
+        }
+        let victim = Task { try await c.ping() }
+        // Let `victim` enter withTaskCancellationHandler and enqueue onto the serial queue.
+        try? await Task.sleep(for: .milliseconds(30))
+        victim.cancel()
+        release.signal()
+        await #expect(throws: CancellationError.self) { try await victim.value }
+        _ = await blocker.value
+        #expect(d.requests.count == 1)
+    }
+
+    @Test func replyIdScannerHandlesMalformedAndNegativeIds() {
+        // Negative integer ids match or mismatch cleanly.
+        #expect(replyIsFor(-7, Data(#"{"id":-7,"ok":true}"#.utf8)))
+        #expect(!replyIsFor(7, Data(#"{"id":-7,"ok":true}"#.utf8)))
+        // Non-int / overflow ids are rejected as mismatched.
+        #expect(!replyIsFor(1, Data(#"{"id":999999999999999999999999999}"#.utf8)))
+        // Escaped quotes inside preceding string values are skipped cleanly.
+        #expect(replyIsFor(2, Data(#"{"a":"x\"y","id":2}"#.utf8)))
+        // Truncated or malformed JSON is accepted so the decoder reports badReply.
+        #expect(replyIsFor(1, Data("   ".utf8)))
+        #expect(replyIsFor(1, Data(#"{"a":"unterminated"#.utf8)))
+        #expect(replyIsFor(1, Data(#"{"a":{"b":1"#.utf8)))
+        #expect(replyIsFor(1, Data(#"{"a":[1,2"#.utf8)))
+        #expect(replyIsFor(1, Data(#"{"a":123"#.utf8)))
+        #expect(replyIsFor(1, Data(#"{"a":1,   "#.utf8)))
+    }
+
     @Test func repliesWithoutAnIdAreAccepted() async throws {
         let srv = RawServer { fd, _ in
             while RawServer.readLine(fd) { RawServer.send(fd, #"{"ok":true}"# + "\n") }
