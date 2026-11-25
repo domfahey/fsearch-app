@@ -4,25 +4,61 @@ This page lists the query syntax that FSearch for Mac passes to the fsearch daem
 
 ## Plain words
 
-Words match file names. A word also matches if any parent folder name matches it, so `projects invoice` can find `invoice.pdf` inside a folder called `projects`. Matching is fuzzy and ignores case, and typos are tolerated in longer words.
+Words match file and folder names. Matching is fuzzy and ignores case, and a single typo is tolerated in longer words.
 
 Prefixes and suffixes change how one word matches:
 
 | Write | Meaning |
 |---|---|
-| `word` | Fuzzy match |
-| `'word` | The name contains the text exactly, as one unbroken run. Case is ignored, and it can be part of a longer word. |
-| `^word` | The name starts with it |
-| `word$` | The name ends with it |
-| `!word` | Drop a file if its name or any parent folder name contains the text. Case is ignored. |
+| `word` | Fuzzy match (subsequence, with 1-typo tolerance for 5+ characters) |
+| `'word` | The name contains the text exactly, as one unbroken run. Case is ignored, and it can be part of a longer word. No typo tolerance. |
+| `^word` | The name starts with it. No typo tolerance. |
+| `word$` | The name ends with it. No typo tolerance. |
+| `!word` | Drop a file if its name or any parent folder name contains the exact substring. Case is ignored; not fuzzy. |
 
 Use one prefix or suffix per word. They do not combine: `^word$` is read as a "starts with" match for the text `word$`, not as an exact name.
 
 Case folding covers the letters A to Z only, so `é` does not match `É`. For accented letters stored in the other Unicode form, see [Accented names](#accented-names) and [Known limitations](limitations.md).
 
-A word with `/` in it is split at the slashes, so `src/main` is two words. The daemon tracks up to eight positive words; extra ones are ignored.
+### How words combine
 
-The panel asks for up to 50 results. In name search, add `limit:` to ask for more or fewer; the panel shows at most 1000.
+- **All positive words must match (AND), in any order:** `projects invoice` and `invoice projects` return the same hits in the same order.
+- **At least one word must match the entry's own name:** a single word matches file and folder names only, never files merely sitting inside a matching folder (`projects` finds the `projects` folder itself, not every file under it). With two or more words, the extra words can match parent folder names (`projects invoice` finds `projects/2026/invoice_march.pdf`). Explicit prefixes and suffixes (`'exact`, `^prefix`, `suffix$`) also match parent folder names in multi-word queries.
+- **Slashes split words:** a word containing `/` is split at the slashes, so `src/main` is searched as `src main`.
+- **Up to eight positive words:** the daemon evaluates at most 8 positive words; any 9th or later positive word is ignored.
+- **Negations (`!word`) are exact substring exclusions:** they check the entry name and every parent folder name case-insensitively, without fuzzy matching — so `heron !heron` drops `heron.txt` while still matching `h_e_r_o_n.txt`.
+- **Filters combine with words using AND** and can appear anywhere in the query.
+
+### Typo tolerance
+
+Plain fuzzy words of **5 or more characters** tolerate **at most 1 typo** per word:
+
+- a wrong character (`alpxa` → `alpha.txt`)
+- two adjacent letters swapped (`alhpa` → `alpha.txt`)
+- one extra character (`alppha` → `alpha.txt`)
+- one missing character (`alpa` → `alpha.txt`)
+
+Typo tolerance also works on parent folder names in multi-word queries (`myfoldxr target` finds `myfolder/target.txt`). Its limits:
+
+- **Words of 4 characters or fewer** do not tolerate substitutions or transpositions (`byrd` or `brid` will not match `bird.txt`; a dropped letter like `brd` still matches because it is a plain fuzzy subsequence).
+- **The first character must match:** a typo in the first letter (`xlpha` for `alpha.txt`) does not match.
+- **Two or more typos in one word** do not match, even in long words.
+- **Modifiers turn it off:** `'word`, `^word`, and `word$` never tolerate typos.
+
+### Ranking
+
+Name results are ordered highest score first:
+
+1. **Exact full name** (folders edge out files with the same name).
+2. **Exact stem** (`foo` ranks `foo.txt` ahead of `foo_bar.txt` and `foobar.txt`).
+3. **Prefix** (`foo_bar.txt`, `foobar.txt`).
+4. **Word-boundary match** after `_`, `-`, `.`, space, or a camelCase boundary (`my_widget.txt`, `myWidget.txt`).
+5. **Mid-word substring or scattered fuzzy match** (`xfooy.txt`, `f_o_o.txt`).
+
+Two tie-breakers adjust closely matched results:
+
+- **Shorter names** score slightly higher than longer names with the same match quality.
+- **Recently modified files** receive a modest recency boost (over a year-old peer) without overriding a substantially stronger name match. Folder depth itself does not penalize equal name matches.
 
 ### Accented names
 
@@ -71,6 +107,15 @@ Sizes use `b`, `k`/`kb`, `m`/`mb`, `g`/`gb` or `t`/`tb` (decimal, so 1mb is one 
 
 Ages use `s` (seconds), `m` or `min` (minutes), `h`, `d` (days, the default), `w`, `mo` and `y`. `mtime:<7d` means modified in the last 7 days. A bare age such as `mtime:3d` means 3 to 4 days ago, like `find -mtime`.
 
+### Result limits (`limit:`)
+
+By default, the panel asks for up to **50** hits in name search and **50** matching files in content and definition searches (each file returns up to **5** matching lines).
+
+- Add `limit:N` to ask for more or fewer results in name search, **Inside files**, or **Definitions** (`limit:200`, `limit:5`).
+- The panel displays at most **1000** rows, keeping the highest-ranked results when `limit:` asks for more.
+- If `limit:` appears more than once, the **last one wins** (`limit:1 limit:7` returns up to 7).
+- `limit:0` is valid and returns no results; non-numeric or negative values (`limit:abc`, `limit:-5`) show a `bad limit` error.
+
 ### Quoting
 
 Wrap a value that has spaces in double quotes: `in:"~/My Stuff"`. Quotes group words so the space does not split them.
@@ -83,7 +128,7 @@ These keys make the daemon search file contents and return matching lines:
 |---|---|
 | `grep:text` or `content:text` | Literal text |
 | `regex:pattern` | Regular expression |
-| `sym:name` or `symbol:name` | Definitions of a function, type or similar |
+| `sym:name` or `symbol:name` | Definitions of a function, type or similar (matches the full symbol name, not a partial substring) |
 
 You can type one in the normal search field, or pick **Search inside files** or **Find definitions** from the "Use … with…" rows. Both do the same thing.
 
