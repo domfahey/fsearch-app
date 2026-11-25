@@ -376,6 +376,16 @@ extension AppTests {
             let freshCmdY = try keyEvent("y", mods: .command, code: 0x10, repeat: false)
             #expect(q.filterKeyDown(freshCmdY, inPreviewPanel: true) == nil)
             #expect(!q.isPreviewing)
+
+            // The monitor closure preserves nil when swallowing events and passes through once deallocated.
+            var weakSource: QuickLookSource? = QuickLookSource()
+            weakSource?.move = { moved.append($0) }
+            let handler = QuickLookSource.makeKeyMonitorHandler(for: try #require(weakSource), inPreviewPanel: true)
+            #expect(handler(down) == nil, "monitor closure must return nil when swallowing a key")
+            #expect(handler(repeatCmdY) == nil, "monitor closure must swallow ⌘Y repeats")
+            #expect(handler(letter) === letter)
+            weakSource = nil
+            #expect(handler(down) === down, "deallocated source passes events through unchanged")
         }
 
         @Test func quickLookClosesWhenPreviewingAndDefaultErrorHandlersHandleMissingFiles() {

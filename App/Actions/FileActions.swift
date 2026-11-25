@@ -328,15 +328,23 @@ final class QuickLookSource: NSObject, @preconcurrency QLPreviewPanelDataSource 
             keyCode: event.keyCode, isRepeat: event.isARepeat, inPreviewPanel: inPanel) ? nil : event
     }
 
+    /// Builds the local keyDown monitor closure, preserving `nil` when a handled event is swallowed
+    /// and passing events through unchanged once the source is deallocated.
+    nonisolated static func makeKeyMonitorHandler(
+        for source: QuickLookSource, inPreviewPanel: Bool? = nil
+    ) -> (NSEvent) -> NSEvent? {
+        { [weak source] event in
+            guard let source else { return event }
+            return source.filterKeyDown(event, inPreviewPanel: inPreviewPanel)
+        }
+    }
+
     /// The launcher took control of the preview.
     func attach(_ panel: QLPreviewPanel) {
         panel.dataSource = self
         // The preview is key while it is up, so its keys (⌘Y, ↑/↓) go to it, not the launcher's key handling: handle them here.
         keyMonitor =
-            keyMonitor
-            ?? NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                self?.filterKeyDown(event) ?? event
-            }
+            keyMonitor ?? NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: Self.makeKeyMonitorHandler(for: self))
     }
 
     /// The launcher gave up control of the preview.
