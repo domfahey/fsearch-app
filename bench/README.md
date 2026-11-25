@@ -129,13 +129,28 @@ daemon metrics move with it.
 
 ## CI
 
-The `bench` job in `.github/workflows/ci.yml` runs `scripts/bench.sh
---report-only` with `BENCH_MACHINE=ci-macos-26` and uploads `bench/results/*.json`
-as the `bench-results` artifact. It is `continue-on-error` and never fails the
-workflow. It also sets `FSEARCH_BENCH_TIMEOUT=90`: the seconds one daemon request
-may take before the run gives up. It replaces the local defaults (15 s for the
-canned server, 30 s for the real daemon) and works the same way locally.
-There is no `ci-macos-26` entry yet, so it only reports; to add one,
-take the JSON from a CI artifact and run
-`swift run -c release --package-path Packages/FSearchKit FSearchBench record --baseline bench/baseline.json --current <file> --machine ci-macos-26`.
-Hosted runners vary between runs, so treat CI numbers as a trend.
+The `bench` job in `.github/workflows/ci.yml` runs `scripts/bench.sh` with
+`BENCH_MACHINE=ci-macos-26`, compares against the `ci-macos-26` entry in
+`bench/baseline.json`, and uploads `bench/results/*.json` as the `bench-results`
+artifact. It also sets `FSEARCH_BENCH_TIMEOUT=90`: the seconds one daemon
+request may take before the run gives up (replacing the local 15 s / 30 s
+defaults; works the same way locally).
+
+Because hosted `macos-26` runners (`VirtualMac2,1`, 3 cores) vary more between
+runs than a dedicated Mac, the `ci-macos-26` baseline was seeded from the median
+of five CI runs with wider tolerances (50% in-process, 75% `searchlog.append.10k`,
+85% daemon queries/status, 50%/60% index build, 10% index bytes, 25%/35%
+canaries). If the runner stays busy or slow (`scripts/bench.sh` exit 75),
+CI emits a warning and passes; if a metric regresses on both the run and its
+re-run with a quiet canary (exit 1), the `bench` job fails.
+
+To refresh the `ci-macos-26` baseline after an intentional change or runner
+image bump, download `bench-results` JSON artifact(s) from CI and run:
+
+```sh
+swift run -c release --package-path Packages/FSearchKit FSearchBench record \
+  --baseline bench/baseline.json --current <file> --machine ci-macos-26
+```
+
+Existing per-metric tolerances in `bench/baseline.json` are preserved across
+re-recordings.
