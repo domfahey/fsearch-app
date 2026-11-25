@@ -7,6 +7,8 @@ import os
 /// Debug window: the search log, newest first, with a filter, export and clear.
 struct SearchLogView: View {
     @EnvironmentObject var app: AppState
+    @Environment(\.accessibilityStyleOverride) private var styleOverride
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var rows: [SearchLog.Record] = []
     /// Bumped whenever `rows` is replaced, so the filter re-runs.
     @State private var rowsGen = 0
@@ -20,6 +22,8 @@ struct SearchLogView: View {
         VStack(alignment: .leading) {
             HStack {
                 TextField("Filter", text: $filter)
+                    .accessibilityLabel("Filter search log")
+                    .accessibilityIdentifier("searchLogFilter")
                 Button("Export…", action: export)
                 Button("Clear Log") {
                     app.log.clear(); setRows([])
@@ -40,6 +44,7 @@ struct SearchLogView: View {
             }
         }
         .frame(minWidth: 760, minHeight: 420)
+        .respectingReduceMotion(AccessibilityStyle.resolved(override: styleOverride, reduceMotion: reduceMotion).suppressesAnimations)
         // Polls only while this window's view is on screen. Re-reads the log
         // only when its size or modification date changed, off the main actor.
         .task {

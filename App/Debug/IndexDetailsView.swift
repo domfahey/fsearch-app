@@ -6,6 +6,8 @@ import os
 /// Debug window: the daemon's index statistics, skipped folders and log tail, with Save Now and Restart Daemon.
 struct IndexDetailsView: View {
     @EnvironmentObject var app: AppState
+    @Environment(\.accessibilityStyleOverride) private var styleOverride
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var skipped: [String] = []
     @State private var logTail = ""
     @State private var skippedStamp: DebugFormat.FileStamp?
@@ -45,6 +47,7 @@ struct IndexDetailsView: View {
             }
         }
         .formStyle(.grouped).frame(minWidth: 520, minHeight: 600)
+        .respectingReduceMotion(AccessibilityStyle.resolved(override: styleOverride, reduceMotion: reduceMotion).suppressesAnimations)
         // Runs only while this window's view is on screen; cancelled when it goes away.
         .task {
             while !Task.isCancelled {
