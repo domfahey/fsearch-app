@@ -31,6 +31,10 @@ final class PanelViewState {
 /// Rows follow ``PanelRows``: files first, then app commands, then the two fallbacks.
 struct SearchView: View {
     @EnvironmentObject var app: AppState
+    @Environment(\.accessibilityStyleOverride) private var styleOverride
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @Bindable var model: SearchModel
     /// The keyboard state, reduced by ``PanelState/reduce(_:)``.
     @Bindable var viewState: PanelViewState
@@ -82,6 +86,11 @@ struct SearchView: View {
 
     private var selection: Int { viewState.state.selection }
 
+    private var a11y: AccessibilityStyle {
+        AccessibilityStyle.resolved(
+            override: styleOverride, reduceMotion: reduceMotion, reduceTransparency: reduceTransparency, contrast: colorSchemeContrast)
+    }
+
     /// The file rows: recents for an empty query, the search results otherwise.
     private var shown: [ResultItem] {
         // Reading the generation makes a trash or open re-read the recents.
@@ -111,11 +120,19 @@ struct SearchView: View {
         let fallbacksStart = shown.count + rows.commands.count
         return VStack(spacing: 0) {
             HStack(spacing: 10) {
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
                 if model.mode != .names {
-                    Text(model.mode == .content ? "Inside files" : "Definitions")
+                    let modeTitle = model.mode == .content ? "Inside files" : "Definitions"
+                    Text(modeTitle)
                         .font(.caption).padding(.horizontal, 8).padding(.vertical, 2)
-                        .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 6))
+                        .background(Color.primary.opacity(a11y.chipFillOpacity), in: RoundedRectangle(cornerRadius: 6))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(a11y.chipStrokeOpacity > 0 ? Color.primary.opacity(a11y.chipStrokeOpacity) : .clear)
+                        )
+                        .accessibilityIdentifier("searchModeChip")
+                        .accessibilityLabel("Search mode: \(modeTitle)")
+                        .accessibilityHint("Press Backspace in an empty search field to clear")
                 }
                 TextField("Search files", text: $model.query)
                     .textFieldStyle(.plain).font(.system(size: 17))
@@ -126,7 +143,13 @@ struct SearchView: View {
                         held.key.cancel()  // a key held for the old query never runs on the new one
                         Task { await model.refresh() }
                     }
-                if app.debugMode { Circle().fill(.orange).frame(width: 6, height: 6).help("Debug mode") }
+                if app.debugMode {
+                    Circle().fill(.orange).frame(width: 6, height: 6)
+                        .overlay(Circle().stroke(Color.primary.opacity(a11y.selectionStrokeOpacity)))
+                        .help("Debug mode")
+                        .accessibilityIdentifier("debugModeIndicator")
+                        .accessibilityLabel("Debug mode active")
+                }
             }
             .padding(14)
             .onPanelFrame { geometry.field = $0 }
@@ -220,7 +243,8 @@ struct SearchView: View {
             .font(.system(size: 12)).padding(.horizontal, 12).padding(.vertical, 8)
         }
         .frame(width: 680, height: 460)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .panelSurface(cornerRadius: 16, material: .regularMaterial, style: a11y)
+        .respectingReduceMotion(a11y.suppressesAnimations)
         .coordinateSpace(.named(PanelGeometry.space))
         .onAppear { focusSearchField() }
         .onChange(of: viewState.focusTrigger) { focusSearchField() }
@@ -277,14 +301,15 @@ struct SearchView: View {
 
     private func section(_ t: String) -> some View {
         Text(t).font(.system(size: 11)).foregroundStyle(.secondary).padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 4)
+            .accessibilityAddTraits(.isHeader)
     }
 
     private func fallback(_ t: String, _ icon: String, selected: Bool, action: @escaping () -> Void) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: icon).frame(width: 22); Text(t)
+            Image(systemName: icon).frame(width: 22).accessibilityHidden(true); Text(t)
         }
         .padding(.horizontal, 12).padding(.vertical, 6)
-        .background(selected ? Color.primary.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 8))
+        .selectionHighlight(selected: selected, cornerRadius: 8, style: a11y)
         .contentShape(Rectangle()).onTapGesture(perform: action)
         // A container (its Text stays findable) whose value says whether ↵ would run it.
         .accessibilityElement(children: .contain)
@@ -295,8 +320,11 @@ struct SearchView: View {
     }
 
     private func hint(_ t: String, _ k: String) -> some View {
-        HStack(spacing: 4) {
-            Text(t); Text(k).padding(.horizontal, 5).overlay(RoundedRectangle(cornerRadius: 4).stroke(.secondary.opacity(0.5)))
+        let strokeColor: Color = a11y.increasedContrast ? .primary : .secondary
+        return HStack(spacing: 4) {
+            Text(t)
+            Text(k).padding(.horizontal, 5)
+                .overlay(RoundedRectangle(cornerRadius: 4).stroke(strokeColor.opacity(a11y.hintStrokeOpacity)))
         }
     }
 

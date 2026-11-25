@@ -7,6 +7,8 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject var app: AppState
     @Environment(\.dismissWindow) private var dismissWindow
+    @Environment(\.accessibilityStyleOverride) private var styleOverride
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var loginItem = LoginItemModel(
         service: LaunchOptions.current.testMode ? nil : SMAppLoginItemService())
     @StateObject private var uninstaller = Uninstaller.live(options: .current)
@@ -50,6 +52,7 @@ struct SettingsView: View {
                 defaultIsOptionSpace: shortcut == .init(.space, modifiers: [.option]), runningBundleIds: runningBundleIds())
             {
                 Text("⚠ " + w).foregroundStyle(.orange).font(.callout)
+                    .accessibilityLabel("Warning: \(w)")
             }
             Picker("Open content results in:", selection: $app.editorRaw) {
                 ForEach(editorRows, id: \.tag) { row in
@@ -64,6 +67,7 @@ struct SettingsView: View {
             Section { removeSection }
         }
         .padding(20).frame(width: 440)
+        .respectingReduceMotion(AccessibilityStyle.resolved(override: styleOverride, reduceMotion: reduceMotion).suppressesAnimations)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             loginItem.refresh()
         }
@@ -118,6 +122,7 @@ struct SettingsView: View {
                 HStack {
                     Button("Open Full Disk Access…") { uninstaller.openFullDiskAccess() }
                     Button("Done") { uninstaller.dismiss() }
+                        .keyboardShortcut(.defaultAction)
                 }
             }
         }

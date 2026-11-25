@@ -20,6 +20,8 @@ struct SearchLogView: View {
         VStack(alignment: .leading) {
             HStack {
                 TextField("Filter", text: $filter)
+                    .accessibilityLabel("Filter search log")
+                    .accessibilityIdentifier("searchLogFilter")
                 Button("Export…", action: export)
                 Button("Clear Log") {
                     app.log.clear(); setRows([])

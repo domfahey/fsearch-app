@@ -104,6 +104,7 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
 - Remove Background Helper and Data… keeps the shared index unless FSearch's own helper is confirmed to hold it, and says why it kept it: the helper is off, another fsearch daemon holds it, or it couldn't confirm.
 - Move to Applications opens the moved copy only after the old one has quit.
 - VoiceOver can activate the panel's "Use … with" rows and the FSearch Settings row. Before, only a click ran them.
+- Accessibility polish: panel and FSearch menu respect Reduce Motion, Reduce Transparency (opaque surfaces), and Increase Contrast (stronger selection/chip/keycap contrast, borders, and underlined match highlights); Onboarding Continue/Done and Settings Done support the default Return shortcut; VoiceOver gets section/step headings, clean warning labels, search-mode/debug indicators, a labeled Search Log filter, and warning/update-aware menu-bar labels.
 
 ### Security
 

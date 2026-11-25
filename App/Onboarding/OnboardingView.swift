@@ -192,6 +192,8 @@ final class OnboardingFlow: ObservableObject {
 
 /// The first-launch window: the four steps of ``OnboardingStep``, driven by an ``OnboardingFlow``.
 struct OnboardingView: View {
+    @Environment(\.accessibilityStyleOverride) private var styleOverride
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var flow: OnboardingFlow
     /// Observed directly: AppState doesn't forward DaemonManager's changes.
     @ObservedObject private var daemon: DaemonManager
@@ -207,6 +209,7 @@ struct OnboardingView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Step \(flow.step.rawValue + 1) of 4").font(.caption).foregroundStyle(.secondary)
+                .accessibilityIdentifier("onboardingStepCounter")
             switch flow.step {
             case .welcome: welcome
             case .helper: helper
@@ -214,9 +217,11 @@ struct OnboardingView: View {
             case .indexing:
                 if flow.facts.indexReady {
                     Label("Ready to search", systemImage: "checkmark.circle.fill").font(.title3.bold()).foregroundStyle(.green)
+                        .accessibilityAddTraits(.isHeader).accessibilityIdentifier("onboardingHeading")
                     Text("\(flow.entries.formatted()) files indexed.").foregroundStyle(.secondary)
                 } else {
                     Text("Indexing your disk").font(.title3.bold())
+                        .accessibilityAddTraits(.isHeader).accessibilityIdentifier("onboardingHeading")
                     ProgressView().progressViewStyle(.linear)
                     Text(Onboarding.indexingLine(entries: flow.entries)).foregroundStyle(.secondary)
                 }
@@ -227,9 +232,12 @@ struct OnboardingView: View {
                 Spacer()
                 Button(flow.step == .indexing ? "Done" : "Continue", action: flow.next)
                     .buttonStyle(.borderedProminent).disabled(!flow.canContinue)
+                    .keyboardShortcut(.defaultAction)
+                    .accessibilityIdentifier("onboardingPrimaryButton")
             }
         }
         .padding(20).frame(width: 440, height: 300)
+        .respectingReduceMotion(AccessibilityStyle.resolved(override: styleOverride, reduceMotion: reduceMotion).suppressesAnimations)
         .onAppear { flow.appeared() }
         // The loop belongs to the view, so closing the window cancels it.
         .task {
@@ -245,6 +253,7 @@ struct OnboardingView: View {
 
     @ViewBuilder private var welcome: some View {
         Text("Find anything on your Mac").font(.title3.bold())
+            .accessibilityAddTraits(.isHeader).accessibilityIdentifier("onboardingHeading")
         Text("Press your shortcut from anywhere, type a few letters, and every file on your disk shows up as you type. Even inside files.")
         HStack {
             Text("Your shortcut:"); KeyboardShortcuts.Recorder(for: .togglePanel) { shortcut = $0 }
@@ -254,11 +263,13 @@ struct OnboardingView: View {
             runningBundleIds: Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier)))
         {
             Text("⚠ " + w).foregroundStyle(.orange).font(.callout)
+                .accessibilityLabel("Warning: \(w)")
         }
     }
 
     @ViewBuilder private var helper: some View {
         Text("Keep search ready in the background").font(.title3.bold())
+            .accessibilityAddTraits(.isHeader).accessibilityIdentifier("onboardingHeading")
         if Onboarding.helperStepMode(owns: daemon.ownsDaemon, running: flow.daemonRunning) == .existingDaemon {
             Label("Using the fsearch daemon that's already running", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
         } else {
@@ -278,6 +289,7 @@ struct OnboardingView: View {
 
     @ViewBuilder private var fullDiskAccess: some View {
         Text("Let FSearch see all your files").font(.title3.bold())
+            .accessibilityAddTraits(.isHeader).accessibilityIdentifier("onboardingHeading")
         Text(
             "Without Full Disk Access, macOS hides Desktop, Documents, Downloads, Mail, Messages and iCloud Drive from every app. Nothing leaves your Mac: the index stays on this computer."
         )

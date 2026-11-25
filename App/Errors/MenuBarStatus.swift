@@ -62,6 +62,13 @@ final class MenuBarStatus {
         case .failed: .failed
         }
     }
+
+    /// VoiceOver label for the menu-bar icon, reflecting active warnings or pending updates.
+    nonisolated static func accessibilityLabel(warning: MenuBarWarning?, updateAvailable: Bool) -> String {
+        if let warning { return "FSearch: \(warning.message)" }
+        if updateAvailable { return "FSearch: Update available" }
+        return "FSearch"
+    }
 }
 
 /// The reminder's actions, apart from the view so tests can run them.
@@ -98,7 +105,9 @@ struct MenuBarLabel: View {
 
     var body: some View {
         Image(systemName: status.icon(for: app))
-            .accessibilityLabel("FSearch")
+            .accessibilityLabel(
+                MenuBarStatus.accessibilityLabel(
+                    warning: status.warning, updateAvailable: UpdateReminderModel.shared.indicatorVisible))
     }
 }
 

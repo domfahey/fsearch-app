@@ -3,19 +3,22 @@ import SwiftUI
 
 /// The footer's gear: opens and closes the FSearch menu, as ⌘/ does.
 struct AppMenuButton: View {
+    @Environment(\.accessibilityStyleOverride) private var styleOverride
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     let menu: AppMenuState
 
     var body: some View {
+        let a11y = AccessibilityStyle.resolved(override: styleOverride, contrast: colorSchemeContrast)
         Button {
             menu.toggle()
         } label: {
             HStack(spacing: 5) {
-                Image(systemName: "gearshape")
+                Image(systemName: "gearshape").accessibilityHidden(true)
                 Text("FSearch")
             }
-            .foregroundStyle(.secondary)
+            .foregroundStyle(a11y.increasedContrast ? .primary : .secondary)
             .padding(.horizontal, 5).padding(.vertical, 2)
-            .background(menu.isOpen ? Color.primary.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 5))
+            .selectionHighlight(selected: menu.isOpen, cornerRadius: 5, style: a11y)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -49,9 +52,18 @@ struct AppMenuOverlay: View {
 
 /// The FSearch menu card: the version header, the rows (scrolling if tall), and the filter field.
 struct AppMenuView: View {
+    @Environment(\.accessibilityStyleOverride) private var styleOverride
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @Bindable var menu: AppMenuState
     let run: (PanelMenuAction) -> Void
     @FocusState private var fieldFocused: Bool
+
+    private var a11y: AccessibilityStyle {
+        AccessibilityStyle.resolved(
+            override: styleOverride, reduceMotion: reduceMotion, reduceTransparency: reduceTransparency, contrast: colorSchemeContrast)
+    }
 
     static let width: CGFloat = 300
     /// The rows scroll past this height, between the fixed header and field.
@@ -113,10 +125,10 @@ struct AppMenuView: View {
                 .accessibilityIdentifier("appMenuField")
         }
         .frame(width: Self.width)
-        .background(.thickMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .panelSurface(cornerRadius: 12, material: .thickMaterial, style: a11y)
+        .respectingReduceMotion(a11y.suppressesAnimations)
         .contentShape(RoundedRectangle(cornerRadius: 12))
         .onTapGesture {}
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.12)))
         .shadow(color: .black.opacity(0.18), radius: 12, y: 4)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("FSearch menu")
@@ -131,7 +143,7 @@ struct AppMenuView: View {
             AppMenuRowLabel(item: item)
                 .font(.system(size: 13))
                 .padding(.horizontal, 8).frame(height: Self.rowHeight)
-                .background(selected ? Color.primary.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 6))
+                .selectionHighlight(selected: selected, cornerRadius: 6, style: a11y)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -150,7 +162,7 @@ struct AppMenuRowLabel: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: item.symbol).foregroundStyle(.secondary).frame(width: 18)
+            Image(systemName: item.symbol).foregroundStyle(.secondary).frame(width: 18).accessibilityHidden(true)
             Text(item.title)
             Spacer(minLength: 8)
             if let detail = item.detail { Text(detail).foregroundStyle(.secondary).lineLimit(1) }
@@ -165,12 +177,19 @@ struct AppMenuRowLabel: View {
 
 /// One key of a shortcut badge (⌘, then ,), Raycast-style.
 private struct Keycap: View {
+    @Environment(\.accessibilityStyleOverride) private var styleOverride
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     let symbol: String
 
     var body: some View {
+        let a11y = AccessibilityStyle.resolved(override: styleOverride, contrast: colorSchemeContrast)
         Text(symbol)
-            .font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
+            .font(.system(size: 11, weight: .medium)).foregroundStyle(a11y.increasedContrast ? .primary : .secondary)
             .frame(minWidth: 18, minHeight: 18).padding(.horizontal, 1)
-            .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 4))
+            .background(Color.primary.opacity(a11y.keycapFillOpacity), in: RoundedRectangle(cornerRadius: 4))
+            .overlay(
+                RoundedRectangle(cornerRadius: 4)
+                    .stroke(a11y.selectionStrokeOpacity > 0 ? Color.primary.opacity(a11y.selectionStrokeOpacity) : .clear)
+            )
     }
 }

@@ -15,6 +15,8 @@ struct AXNode {
     var title: String { string("accessibilityTitle") }
     var value: String { string("accessibilityValue") }
     var identifier: String { string("accessibilityIdentifier") }
+    var role: String { string("accessibilityRole") }
+    var help: String { string("accessibilityHelp") }
     /// Every readable string on the element.
     var texts: [String] { [label, title, value].filter { !$0.isEmpty } }
     var children: [NSObject] {
