@@ -58,14 +58,18 @@ extension Onboarding {
     ///
     /// - Parameter entries: Files indexed so far.
     public static func indexingLine(entries: Int) -> String {
-        entries == 0 ? "Indexing your disk…" : "\(entries.formatted()) files so far… usually under a minute."
+        entries == 0
+            ? String(localized: "Indexing your disk…", bundle: .module)
+            : String(localized: "\(entries.formatted()) files so far… usually under a minute.", bundle: .module)
     }
 
     /// Step 4's ending, naming the user's actual shortcut.
     ///
     /// - Parameter shortcut: The shortcut's display text, or nil if none is set.
     public static func tryItLine(shortcut: String?) -> String {
-        guard let shortcut else { return "Try it now: set a shortcut in Settings, then type part of any file name." }
-        return "Try it now: press \(shortcut) and type part of any file name."
+        guard let shortcut else {
+            return String(localized: "Try it now: set a shortcut in Settings, then type part of any file name.", bundle: .module)
+        }
+        return String(localized: "Try it now: press \(shortcut) and type part of any file name.", bundle: .module)
     }
 }

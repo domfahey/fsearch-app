@@ -1,7 +1,9 @@
+import Foundation
+
 /// What the panel says instead of results, if anything.
 public enum UserMessage {
     /// A daemon that times out, or is still gone after the restarts ran out.
-    static let notAnswering = "The search helper isn't answering"
+    static let notAnswering = String(localized: "The search helper isn't answering", bundle: .module)
 
     /// The text for a search phase, or nil when results (or nothing) should show.
     ///
@@ -11,10 +13,10 @@ public enum UserMessage {
     public static func forPhase(_ p: SearchPhase, helperGaveUp: Bool = false) -> String? {
         switch p {
         case .idle, .loading, .results: nil
-        case .indexing: "Indexing your disk… results will appear shortly"
+        case .indexing: String(localized: "Indexing your disk… results will appear shortly", bundle: .module)
         case .failed(.timeout): notAnswering
-        case .failed(.disconnected): helperGaveUp ? notAnswering : "Starting search…"
-        case .failed(.indexing(_)): "Indexing your disk… results will appear shortly"
+        case .failed(.disconnected): helperGaveUp ? notAnswering : String(localized: "Starting search…", bundle: .module)
+        case .failed(.indexing(_)): String(localized: "Indexing your disk… results will appear shortly", bundle: .module)
         case let .failed(e): e.description  // .daemon and .badReply
         }
     }

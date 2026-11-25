@@ -76,6 +76,7 @@ Two modes keep tests away from your real setup. **Test mode** starts when you pa
 | Coverage of FSearchKit only | `make coverage-kit` | `scripts/coverage.sh --kit-only` |
 | Coverage of both app suites (plus FSearchKit when `--min` / `COVERAGE_MIN` is set) | `make coverage` | `scripts/coverage.sh` |
 | Check developer prerequisites | `make doctor` | |
+| Sync App and FSearchKit String Catalogs | `make strings` | `scripts/sync-strings.sh` |
 | Install developer prerequisites (not the app) | `make install` | `brew install xcodegen`, `rustup target add aarch64-apple-darwin x86_64-apple-darwin`, `make hooks` |
 | Remove build outputs / also the daemon and generated project | `make clean` / `make distclean` | |
 

@@ -122,7 +122,7 @@ struct SearchView: View {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
                 if model.mode != .names {
-                    let modeTitle = model.mode == .content ? "Inside files" : "Definitions"
+                    let modeTitle = model.mode == .content ? String(localized: "Inside files") : String(localized: "Definitions")
                     Text(modeTitle)
                         .font(.caption).padding(.horizontal, 8).padding(.vertical, 2)
                         .background(Color.primary.opacity(a11y.chipFillOpacity), in: RoundedRectangle(cornerRadius: 6))
@@ -179,18 +179,18 @@ struct SearchView: View {
                         }
                         // Below the files, so ↵ after "set" still opens the top file.
                         if !rows.commands.isEmpty {
-                            section("FSearch")
-                            ForEach(Array(rows.commands.enumerated()), id: \.offset) { i, c in
-                                fallback(c.title, c.symbol, selected: selection == commandsStart + i) { onCommand(c) }
-                                    .accessibilityIdentifier("command-\(c.title)")
-                                    .id("command-\(c.title)")
+                            section(verbatim: "FSearch")
+                            ForEach(Array(rows.commands.enumerated()), id: \.element.id) { i, c in
+                                fallback(verbatim: c.title, c.symbol, selected: selection == commandsStart + i) { onCommand(c) }
+                                    .accessibilityIdentifier("command-\(c.id)")
+                                    .id("command-\(c.id)")
                             }
                         }
                         if rows.hasFallbacks {
                             // UI tests press ↵ on a fallback only once the search is done and the row is selected.
                             section("Use “\(model.query)” with…")
                                 .accessibilityIdentifier("fallbacks")
-                                .accessibilityValue(model.phase == .loading ? "searching" : "done")
+                                .accessibilityValue(Text(verbatim: model.phase == .loading ? "searching" : "done"))
                             fallback("Search inside files", "doc.text.magnifyingglass", selected: selection == fallbacksStart) {
                                 switchMode(.content)
                             }
@@ -217,7 +217,8 @@ struct SearchView: View {
             HStack(spacing: 14) {
                 AppMenuButton(menu: menu)
                 if app.debugMode, let us = model.lastTookUs {
-                    Text(String(format: "%.1f ms · %d results", Double(us) / 1000, model.items.count)).foregroundStyle(.secondary)
+                    let ms = String(format: "%.1f", Double(us) / 1000)
+                    Text("\(ms) ms · \(model.items.count) results").foregroundStyle(.secondary)
                 }
                 if let err = app.actionError {
                     Text(err).foregroundStyle(.red).lineLimit(1).accessibilityIdentifier("actionError")
@@ -290,7 +291,7 @@ struct SearchView: View {
             section("Query syntax")
             ForEach(QuerySyntax.cheatSheet, id: \.syntax) { row in
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    Text(row.syntax).font(.system(size: 13, design: .monospaced)).frame(width: 220, alignment: .leading)
+                    Text(verbatim: row.syntax).font(.system(size: 13, design: .monospaced)).frame(width: 220, alignment: .leading)
                     Text(row.meaning).foregroundStyle(.secondary)
                 }
                 .padding(.horizontal, 16).padding(.vertical, 3)
@@ -299,31 +300,44 @@ struct SearchView: View {
         .accessibilityIdentifier("cheatSheet")
     }
 
-    private func section(_ t: String) -> some View {
+    private func section(_ t: LocalizedStringKey) -> some View {
         Text(t).font(.system(size: 11)).foregroundStyle(.secondary).padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 4)
             .accessibilityAddTraits(.isHeader)
     }
 
-    private func fallback(_ t: String, _ icon: String, selected: Bool, action: @escaping () -> Void) -> some View {
+    private func section(verbatim t: String) -> some View {
+        Text(verbatim: t).font(.system(size: 11)).foregroundStyle(.secondary).padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 4)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private func fallback(_ t: LocalizedStringKey, _ icon: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        fallbackRow(Text(t), icon, selected: selected, action: action)
+    }
+
+    private func fallback(verbatim t: String, _ icon: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        fallbackRow(Text(verbatim: t), icon, selected: selected, action: action)
+    }
+
+    private func fallbackRow(_ label: Text, _ icon: String, selected: Bool, action: @escaping () -> Void) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: icon).frame(width: 22).accessibilityHidden(true); Text(t)
+            Image(systemName: icon).frame(width: 22).accessibilityHidden(true); label
         }
         .padding(.horizontal, 12).padding(.vertical, 6)
         .selectionHighlight(selected: selected, cornerRadius: 8, style: a11y)
         .contentShape(Rectangle()).onTapGesture(perform: action)
         // A container (its Text stays findable) whose value says whether ↵ would run it.
         .accessibilityElement(children: .contain)
-        .accessibilityValue(selected ? "selected" : "")
+        .accessibilityValue(Text(verbatim: selected ? "selected" : ""))
         .accessibilityAddTraits(selected ? .isSelected : [])
         // VoiceOver's press runs it too, as a click does.
         .accessibilityAction(.default, action)
     }
 
-    private func hint(_ t: String, _ k: String) -> some View {
+    private func hint(_ t: LocalizedStringKey, _ k: String) -> some View {
         let strokeColor: Color = a11y.increasedContrast ? .primary : .secondary
         return HStack(spacing: 4) {
             Text(t)
-            Text(k).padding(.horizontal, 5)
+            Text(verbatim: k).padding(.horizontal, 5)
                 .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(strokeColor.opacity(a11y.hintStrokeOpacity)))
         }
     }

@@ -26,7 +26,7 @@ XCODEBUILD ?= xcodebuild -project FSearch.xcodeproj -scheme FSearch -configurati
 
 .DEFAULT_GOAL := help
 .PHONY: help install install-tools setup doctor daemon project build test apptest ui coverage coverage-kit bench \
-	format format-check lint type check ci hooks clean distclean
+	format format-check lint type check ci hooks strings clean distclean
 
 help: ## List targets
 	@echo "FSearch developer tasks:"
@@ -160,6 +160,9 @@ ci: check ## Run locally what CI runs: check plus the 90% kit and app unit cover
 
 hooks: ## Install the repo git hooks (secret checks)
 	$(Q)git config core.hooksPath scripts/hooks
+
+strings: Vendor/fsearch ## Sync App and FSearchKit String Catalogs from Swift sources
+	$(Q)scripts/sync-strings.sh
 
 clean: ## Remove build outputs (build/, Packages/FSearchKit/.build)
 	$(Q)rm -rf build Packages/FSearchKit/.build

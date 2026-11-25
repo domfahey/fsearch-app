@@ -132,41 +132,44 @@ final class Uninstaller: ObservableObject {
             do {
                 try await helper.unregister()
                 unregisteredHelper = true
-                r.removed.append("The background helper (search index service)")
+                r.removed.append(String(localized: "The background helper (search index service)"))
             } catch {
                 helperGone = false
-                r.failures.append("Couldn't remove the background helper: \(error.localizedDescription)")
+                r.failures.append(String(localized: "Couldn't remove the background helper: \(error.localizedDescription)"))
             }
         }
 
         if let loginItem, loginItem.status == .enabled || loginItem.status == .requiresApproval {
             do {
                 try await loginItem.unregister()
-                r.removed.append("Open FSearch at login")
+                r.removed.append(String(localized: "Open FSearch at login"))
             } catch {
-                r.failures.append("Couldn't turn off Open at login: \(error.localizedDescription)")
+                r.failures.append(String(localized: "Couldn't turn off Open at login: \(error.localizedDescription)"))
             }
         }
 
         if exists(dataFolder) {
             if cliAgentInstalled() {
                 r.kept.append(
-                    "The data folder (\(dataFolder.path)) was left alone: the fsearch command-line tool's login agent (mt.nd.fsearch) is installed and its daemon uses the same index."
+                    String(
+                        localized:
+                            "The data folder (\(dataFolder.path)) was left alone: the fsearch command-line tool's login agent (mt.nd.fsearch) is installed and its daemon uses the same index."
+                    )
                 )
             } else if let reason = Self.keptReason(ownership) {
-                r.kept.append("The data folder (\(dataFolder.path)) was left alone: \(reason)")
+                r.kept.append(String(localized: "The data folder (\(dataFolder.path)) was left alone: \(reason)"))
             } else if helperGone {
                 if unregisteredHelper { await waitUntilStopped() }
-                trash(dataFolder, "The index and data folder", into: &r)
+                trash(dataFolder, String(localized: "The index and data folder"), into: &r)
             } else {
-                r.kept.append("The data folder was left in place because the helper is still registered.")
+                r.kept.append(String(localized: "The data folder was left in place because the helper is still registered."))
             }
         }
-        if logFolder != dataFolder { trash(logFolder, "The debug search log", into: &r) }
+        if logFolder != dataFolder { trash(logFolder, String(localized: "The debug search log"), into: &r) }
 
         for key in Self.defaultsKeys { defaults.removeObject(forKey: key) }
         resetShortcut()
-        r.removed.append("The app's settings and recent files")
+        r.removed.append(String(localized: "The app's settings and recent files"))
 
         phase = .done(r)
     }
@@ -175,10 +178,15 @@ final class Uninstaller: ObservableObject {
     private static func keptReason(_ ownership: DataOwnership) -> String? {
         switch ownership {
         case .ours: nil
-        case .helperOff: "this app's background helper wasn't enabled, so the index there wasn't the app's to remove."
-        case .otherDaemon: "another fsearch daemon, not this app's helper, is using the index there."
+        case .helperOff:
+            String(localized: "this app's background helper wasn't enabled, so the index there wasn't the app's to remove.")
+        case .otherDaemon:
+            String(localized: "another fsearch daemon, not this app's helper, is using the index there.")
         case .unconfirmed:
-            "FSearch couldn't confirm that the daemon using it is this app's helper. If nothing else uses it, move it to the Trash yourself."
+            String(
+                localized:
+                    "FSearch couldn't confirm that the daemon using it is this app's helper. If nothing else uses it, move it to the Trash yourself."
+            )
         }
     }
 
@@ -187,9 +195,9 @@ final class Uninstaller: ObservableObject {
         guard exists(url) else { return }
         do {
             try workspace.trash(url)
-            r.removed.append("\(what), moved to the Trash")
+            r.removed.append(String(localized: "\(what), moved to the Trash"))
         } catch {
-            r.failures.append("Couldn't move \(url.path) to the Trash: \(error.localizedDescription)")
+            r.failures.append(String(localized: "Couldn't move \(url.path) to the Trash: \(error.localizedDescription)"))
         }
     }
 

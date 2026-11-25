@@ -403,7 +403,7 @@ extension AppTests {
             let w = await render(view(env, r))
             defer { w.close() }
             env.app.search.query = "settings"
-            let id = "command-\(AppCommand.settings.title)"
+            let id = "command-\(AppCommand.settings.id)"
             try #require(await axWait(id: id, in: w)).press()
             #expect(r.commands == [.settings])
         }
@@ -416,7 +416,7 @@ extension AppTests {
             defer { w.close() }
             // Command row selected: no file-only hints ("Reveal in Finder", "Actions").
             env.app.search.query = "settings"
-            #expect(await axWait(id: "command-\(AppCommand.settings.title)", in: w) != nil)
+            #expect(await axWait(id: "command-\(AppCommand.settings.id)", in: w) != nil)
             let cmdTexts = axTexts(in: w)
             #expect(!cmdTexts.contains("Reveal in Finder"))
             #expect(!cmdTexts.contains("Actions"))

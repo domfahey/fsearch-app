@@ -65,8 +65,8 @@ final class MenuBarStatus {
 
     /// VoiceOver label for the menu-bar icon, reflecting active warnings or pending updates.
     nonisolated static func accessibilityLabel(warning: MenuBarWarning?, updateAvailable: Bool) -> String {
-        if let warning { return "FSearch: \(warning.message)" }
-        if updateAvailable { return "FSearch: Update available" }
+        if let warning { return String(localized: "FSearch: \(warning.message)") }
+        if updateAvailable { return String(localized: "FSearch: Update available") }
         return "FSearch"
     }
 }

@@ -14,7 +14,7 @@ struct AppMenuButton: View {
         } label: {
             HStack(spacing: 5) {
                 Image(systemName: "gearshape").accessibilityHidden(true)
-                Text("FSearch")
+                Text(verbatim: "FSearch")
             }
             .foregroundStyle(a11y.increasedContrast ? .primary : .secondary)
             .padding(.horizontal, 5).padding(.vertical, 2)
@@ -149,10 +149,10 @@ struct AppMenuView: View {
         .buttonStyle(.plain)
         .onHover { if $0 { menu.model.select(item.action) } }
         .accessibilityLabel(item.title)
-        .accessibilityValue(selected ? "selected" : "")
+        .accessibilityValue(Text(verbatim: selected ? "selected" : ""))
         .accessibilityAddTraits(selected ? .isSelected : [])
         .accessibilityIdentifier("appMenu-\(item.id)")
-        .accessibilityHint(item.shortcut.isEmpty ? "" : "Shortcut \(item.shortcut.joined())")
+        .accessibilityHint(item.shortcut.isEmpty ? Text(verbatim: "") : Text("Shortcut \(item.shortcut.joined())"))
     }
 }
 
@@ -183,7 +183,7 @@ private struct Keycap: View {
 
     var body: some View {
         let a11y = AccessibilityStyle.resolved(override: styleOverride, contrast: colorSchemeContrast)
-        Text(symbol)
+        Text(verbatim: symbol)
             .font(.system(size: 11, weight: .medium)).foregroundStyle(a11y.increasedContrast ? .primary : .secondary)
             .frame(minWidth: 18, minHeight: 18).padding(.horizontal, 1)
             .background(Color.primary.opacity(a11y.keycapFillOpacity), in: RoundedRectangle(cornerRadius: 4))

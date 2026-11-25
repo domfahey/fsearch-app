@@ -13,9 +13,12 @@ import Testing
         #expect(AppCommand.matches(q).isEmpty)
     }
 
-    @Test func titleAndSymbol() {
+    @Test func idTitleAndSymbol() {
+        #expect(AppCommand.settings.id == "FSearch Settings")
         #expect(AppCommand.settings.title == "FSearch Settings")
         #expect(!AppCommand.settings.symbol.isEmpty)
+        let ids = AppCommand.allCases.map(\.id)
+        #expect(Set(ids).count == ids.count)
     }
 }
 

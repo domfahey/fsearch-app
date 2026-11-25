@@ -37,10 +37,10 @@ struct SearchLogView: View {
                 TableColumn("Time") { Text($0.time.formatted(date: .omitted, time: .standard)) }
                 TableColumn("Mode", value: \.mode)
                 TableColumn("Query", value: \.query)
-                TableColumn("Results") { Text("\($0.results)") }
+                TableColumn("Results") { Text(verbatim: "\($0.results)") }
                 TableColumn("Daemon") { Text(DebugFormat.daemonMs($0.tookUs)) }
                 TableColumn("Round trip") { Text(DebugFormat.roundTrip($0.roundTripMs)) }
-                TableColumn("Error") { Text($0.error ?? "") }
+                TableColumn("Error") { Text(verbatim: $0.error ?? "") }
             }
         }
         .frame(minWidth: 760, minHeight: 420)
@@ -90,7 +90,7 @@ struct SearchLogView: View {
             exportError = nil
         } catch {
             Log.debug.error("search log export failed: \(error.localizedDescription, privacy: .private)")
-            exportError = "Export failed: \(error.localizedDescription)"
+            exportError = String(localized: "Export failed: \(error.localizedDescription)")
         }
     }
 }

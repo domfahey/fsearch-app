@@ -193,11 +193,11 @@ public enum DaemonError: Error, Equatable, Sendable, LocalizedError, CustomStrin
     /// Short text for the user (and the search log), not the Swift case name.
     public var description: String {
         switch self {
-        case .indexing: "The search index is still being built"
-        case let .daemon(msg): msg.isEmpty ? "The search daemon reported an error" : msg
-        case .disconnected: "Can't reach the search daemon"
-        case .timeout: "The search daemon didn't answer in time"
-        case let .badReply(detail): "Unexpected reply from the search daemon: \(detail)"
+        case .indexing: String(localized: "The search index is still being built", bundle: .module)
+        case let .daemon(msg): msg.isEmpty ? String(localized: "The search daemon reported an error", bundle: .module) : msg
+        case .disconnected: String(localized: "Can't reach the search daemon", bundle: .module)
+        case .timeout: String(localized: "The search daemon didn't answer in time", bundle: .module)
+        case let .badReply(detail): String(localized: "Unexpected reply from the search daemon: \(detail)", bundle: .module)
         }
     }
     /// The same text as ``description``, for `LocalizedError`.

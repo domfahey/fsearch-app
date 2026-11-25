@@ -1,3 +1,5 @@
+import Foundation
+
 /// Where the app runs from. A translocated copy (opened straight from a
 /// download) or one on a read-only volume (the DMG) must not register the
 /// helper: the login item would point into a path that goes away.
@@ -8,9 +10,15 @@ public enum InstallLocation {
         public var message: String {
             switch self {
             case .translocated:
-                "FSearch is running from a temporary location macOS made for it. Move FSearch to your Applications folder, then open it from there."
+                String(
+                    localized:
+                        "FSearch is running from a temporary location macOS made for it. Move FSearch to your Applications folder, then open it from there.",
+                    bundle: .module)
             case .readOnlyVolume:
-                "FSearch is running from the disk image. Move FSearch to your Applications folder, then open it from there."
+                String(
+                    localized:
+                        "FSearch is running from the disk image. Move FSearch to your Applications folder, then open it from there.",
+                    bundle: .module)
             }
         }
     }

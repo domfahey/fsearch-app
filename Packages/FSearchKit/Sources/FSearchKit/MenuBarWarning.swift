@@ -1,3 +1,5 @@
+import Foundation
+
 /// The daemon's condition, reduced to what the menu bar cares about.
 public enum DaemonCondition: Equatable, Sendable {
     /// Asking the daemon; nothing to warn about yet.
@@ -40,7 +42,9 @@ public struct MenuBarWarning: Equatable, Sendable {
     /// daemon is a different binary, so the item says whose grant it is.
     public static func fullDiskAccessItemTitle(ownsDaemon: Bool) -> String {
         // Full Disk Access is granted per binary; a CLI daemon is not the app's helper.
-        ownsDaemon ? "Turn On Full Disk Access…" : "Grant Full Disk Access to fsearch…"
+        ownsDaemon
+            ? String(localized: "Turn On Full Disk Access…", bundle: .module)
+            : String(localized: "Grant Full Disk Access to fsearch…", bundle: .module)
     }
 
     /// The warning to show for a daemon condition, or nil for none.
@@ -58,17 +62,20 @@ public struct MenuBarWarning: Equatable, Sendable {
         dismissedReminder: Bool = false
     ) -> MenuBarWarning? {
         switch c {
-        case .failed: MenuBarWarning(message: "The search helper isn't running", offersFix: true)
-        case .unresponsive: MenuBarWarning(message: "The search helper isn't answering", offersFix: true)
-        case .needsApproval: MenuBarWarning(message: "The search helper needs your approval", offersFix: true)
+        case .failed:
+            MenuBarWarning(message: String(localized: "The search helper isn't running", bundle: .module), offersFix: true)
+        case .unresponsive:
+            MenuBarWarning(message: String(localized: "The search helper isn't answering", bundle: .module), offersFix: true)
+        case .needsApproval:
+            MenuBarWarning(message: String(localized: "The search helper needs your approval", bundle: .module), offersFix: true)
         case let .running(fda) where !fda && !skippedFullDiskAccess:
             MenuBarWarning(
-                message: "Full Disk Access is off, so some files won't be found", offersFix: false, offersFullDiskAccess: true,
-                offersDismiss: false)
+                message: String(localized: "Full Disk Access is off, so some files won't be found", bundle: .module), offersFix: false,
+                offersFullDiskAccess: true, offersDismiss: false)
         case let .running(fda) where !fda && !dismissedReminder:
             MenuBarWarning(
-                message: "Full Disk Access is off, so some files won't be found", offersFix: false, offersFullDiskAccess: true,
-                offersDismiss: true)
+                message: String(localized: "Full Disk Access is off, so some files won't be found", bundle: .module), offersFix: false,
+                offersFullDiskAccess: true, offersDismiss: true)
         case .checking, .indexing, .running: nil
         }
     }

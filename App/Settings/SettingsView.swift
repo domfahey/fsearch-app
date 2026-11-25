@@ -35,10 +35,10 @@ struct SettingsView: View {
     /// Picker entries for the content-results editor: Default app, installed editors, and any previously
     /// chosen editor that is no longer installed so SwiftUI's Picker never holds an unlisted tag.
     static func editorOptions(selected: Editor?, installed: [Editor]) -> [(tag: String, label: String)] {
-        var rows: [(String, String)] = [("", "Default app")]
+        var rows: [(String, String)] = [("", String(localized: "Default app"))]
         for e in installed { rows.append((e.rawValue, e.displayName)) }
         if let selected, !installed.contains(selected) {
-            rows.append((selected.rawValue, "\(selected.displayName) (not installed)"))
+            rows.append((selected.rawValue, String(localized: "\(selected.displayName) (not installed)")))
         }
         return rows
     }

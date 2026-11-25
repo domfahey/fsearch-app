@@ -37,7 +37,7 @@ final class DaemonManager: ObservableObject {
     static let cliAgentPlist = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/LaunchAgents/mt.nd.fsearch.plist")
     /// The state after timeouts, or a disconnect once the restarts ran out.
-    nonisolated static let unresponsiveMessage = "The search helper stopped answering."
+    nonisolated static let unresponsiveMessage = String(localized: "The search helper stopped answering.")
     /// Defaults key: the bundled helper's identity when it was last seen running.
     static let helperIdentityKey = "helperIdentity"
     /// Defaults key: removal turned automatic recovery off. Not one of
@@ -237,7 +237,7 @@ final class DaemonManager: ObservableObject {
             )
             // Already waiting for approval is not an error worth showing as one.
             if service.status == .requiresApproval { return .needsApproval }
-            setState(.failed("Couldn't start the search helper: \(error.localizedDescription)"))
+            setState(.failed(String(localized: "Couldn't start the search helper: \(error.localizedDescription)")))
             return .registerBundled
         }
         return DaemonPlan.afterRegister(ownStatus: service.status)
@@ -260,7 +260,7 @@ final class DaemonManager: ObservableObject {
         if Task.isCancelled { return }
         switch DaemonPlan.noAnswer(wasNeedingApproval: state == .needsApproval, ownStatus: service?.status) {
         case .needsApproval: setState(.needsApproval)
-        case .failed: setState(.failed("The search helper isn't answering."))
+        case .failed: setState(.failed(String(localized: "The search helper isn't answering.")))
         }
     }
 
