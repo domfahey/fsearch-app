@@ -67,7 +67,7 @@ final class RealDaemon {
         return String(decoding: data, as: UTF8.self)
     }
 
-    init(files: [String: String]) throws {
+    init(files: [String: String], mtimes: [String: Date] = [:]) throws {
         RealDaemon.sweepOnce
         home = URL(fileURLWithPath: "/private/tmp/fsk-\(UUID().uuidString.prefix(6))")
         root = home.appendingPathComponent("root")
@@ -76,6 +76,9 @@ final class RealDaemon {
                 let f = root.appendingPathComponent(rel)
                 try FileManager.default.createDirectory(at: f.deletingLastPathComponent(), withIntermediateDirectories: true)
                 try body.write(to: f, atomically: true, encoding: .utf8)
+            }
+            for (rel, date) in mtimes {
+                try FileManager.default.setAttributes([.modificationDate: date], ofItemAtPath: root.appendingPathComponent(rel).path)
             }
             process.executableURL = URL(fileURLWithPath: "/bin/sh")
             process.arguments = ["-c", RealDaemon.wrapperScript, RealDaemon.binary!.path, home.path]

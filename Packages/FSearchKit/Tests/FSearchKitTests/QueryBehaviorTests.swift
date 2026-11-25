@@ -50,23 +50,22 @@ struct QueryBehaviorTests {
             files[String(format: "many/item_%02d.rs", i)] = "needle_many \(i)\npub fn shared_sym() {}\n"
         }
 
-        let d = try RealDaemon(files: files)
+        // Equalize mtimes in rank/ and rank2/, and separate old vs new in rec/, before starting the daemon.
+        let steady = Date(timeIntervalSinceNow: -86_400 * 30)
+        var mtimes: [String: Date] = [
+            "rec/old_heron.txt": Date(timeIntervalSinceNow: -86_400 * 365),
+            "rec/new_heron.txt": Date(),
+        ]
+        for rel in ["rank/foo.txt", "rank/foo_bar.txt", "rank/my_foo.txt", "rank/xfooy.txt", "rank/f_o_o.txt", "rank2/foo"] {
+            mtimes[rel] = steady
+        }
+
+        let d = try RealDaemon(files: files, mtimes: mtimes)
         defer { withExtendedLifetime(d) {} }
 
-        // Equalize mtimes in rank/ and rank2/, and separate old vs new in rec/.
-        let fm = FileManager.default
-        let steady = Date(timeIntervalSinceNow: -86_400 * 30)
-        for rel in ["rank/foo.txt", "rank/foo_bar.txt", "rank/my_foo.txt", "rank/xfooy.txt", "rank/f_o_o.txt", "rank2/foo"] {
-            try fm.setAttributes([.modificationDate: steady], ofItemAtPath: d.root.appendingPathComponent(rel).path)
-        }
-        try fm.setAttributes(
-            [.modificationDate: Date(timeIntervalSinceNow: -86_400 * 365)],
-            ofItemAtPath: d.root.appendingPathComponent("rec/old_heron.txt").path)
-        try fm.setAttributes(
-            [.modificationDate: Date()], ofItemAtPath: d.root.appendingPathComponent("rec/new_heron.txt").path)
-
         let c = DaemonClient(socketPath: d.socketPath)
-        try await waitReady(c, minEntries: files.count, minContentDocs: 60)
+        let indexableContentFiles = files.keys.filter { !$0.hasSuffix(".pdf") }.count
+        try await waitReady(c, minEntries: files.count, minContentDocs: indexableContentFiles)
 
         // 1. Ranking: exact name > exact stem > prefix > word boundary > mid-word/fuzzy; recency breaks equal ties.
         let ranked = try await c.search("foo", limit: 20).hits.map { ($0.path as NSString).lastPathComponent }

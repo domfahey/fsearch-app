@@ -78,7 +78,7 @@ A filter is `key:value`. Keys are lowercase and case-sensitive. A word that star
 | `mtime:` or `modified:` | A modified-time range | `mtime:<7d` |
 | `re:` | Regular expression on the file name, ignoring case | `re:^main\.` |
 | `path:` | Regular expression on the full path, ignoring case | `path:src/.*test` |
-| `limit:` | How many results to ask for, in name search and in searches inside files. The panel shows at most 1000. | `limit:200` |
+| `limit:` | How many results to ask for, in name, content and definition searches. The panel shows at most 1000. | `limit:200` |
 
 An unknown `type:` or `kind:` value shows an error under the search field.
 
