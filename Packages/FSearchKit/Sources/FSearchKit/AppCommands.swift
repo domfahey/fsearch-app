@@ -2,9 +2,16 @@ import Foundation
 
 /// An app command the panel offers as a row when the query names it, such as
 /// "settings". Only Settings for now; About or Quit would be more cases.
-public enum AppCommand: Equatable, Sendable, CaseIterable {
+public enum AppCommand: Equatable, Identifiable, Sendable, CaseIterable {
     /// Opens the app's Settings window.
     case settings
+
+    /// Stable English identifier used for view and accessibility ids (`command-FSearch Settings`), independent of localization.
+    public var id: String {
+        switch self {
+        case .settings: "FSearch Settings"
+        }
+    }
 
     /// The row title shown in the panel.
     public var title: String {

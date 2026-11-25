@@ -180,10 +180,10 @@ struct SearchView: View {
                         // Below the files, so ↵ after "set" still opens the top file.
                         if !rows.commands.isEmpty {
                             section(verbatim: "FSearch")
-                            ForEach(Array(rows.commands.enumerated()), id: \.offset) { i, c in
+                            ForEach(Array(rows.commands.enumerated()), id: \.element.id) { i, c in
                                 fallback(verbatim: c.title, c.symbol, selected: selection == commandsStart + i) { onCommand(c) }
-                                    .accessibilityIdentifier("command-\(c.title)")
-                                    .id("command-\(c.title)")
+                                    .accessibilityIdentifier("command-\(c.id)")
+                                    .id("command-\(c.id)")
                             }
                         }
                         if rows.hasFallbacks {

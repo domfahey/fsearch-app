@@ -231,7 +231,7 @@ enum PanelInput {
     static func rowID(at i: Int, shown: [ResultItem], rows: PanelRows) -> String? {
         switch rows.row(at: i) {
         case let .result(f): shown.indices.contains(f) ? shown[f].id : nil
-        case let .command(c): "command-\(c.title)"
+        case let .command(c): "command-\(c.id)"
         case .searchInside: "fallback-content"
         case .findDefinitions: "fallback-symbols"
         case nil: nil
