@@ -31,7 +31,18 @@ struct AppMenuButton: View {
 /// The open menu over the panel: a clear layer that closes it on a click outside, and the card above the footer.
 struct AppMenuOverlay: View {
     let menu: AppMenuState
+    let focusCoordinator: PanelFocusCoordinator
     let run: (PanelMenuAction) -> Void
+
+    init(
+        menu: AppMenuState,
+        focusCoordinator: PanelFocusCoordinator = PanelFocusCoordinator(),
+        run: @escaping (PanelMenuAction) -> Void
+    ) {
+        self.menu = menu
+        self.focusCoordinator = focusCoordinator
+        self.run = run
+    }
 
     /// The card sits this far up, just above the footer and its gear (the click-catching layer still covers them).
     static let footerHeight: CGFloat = 36
@@ -43,7 +54,7 @@ struct AppMenuOverlay: View {
                     .contentShape(Rectangle())
                     .onTapGesture { menu.close() }
                     .accessibilityHidden(true)
-                AppMenuView(menu: menu, run: run)
+                AppMenuView(menu: menu, focusCoordinator: focusCoordinator, run: run)
                     .padding(.leading, 8).padding(.bottom, Self.footerHeight)
             }
         }
@@ -57,8 +68,19 @@ struct AppMenuView: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @Bindable var menu: AppMenuState
+    let focusCoordinator: PanelFocusCoordinator
     let run: (PanelMenuAction) -> Void
     @FocusState private var fieldFocused: Bool
+
+    init(
+        menu: AppMenuState,
+        focusCoordinator: PanelFocusCoordinator = PanelFocusCoordinator(),
+        run: @escaping (PanelMenuAction) -> Void
+    ) {
+        self.menu = menu
+        self.focusCoordinator = focusCoordinator
+        self.run = run
+    }
 
     private var a11y: AccessibilityStyle {
         AccessibilityStyle.resolved(
@@ -133,7 +155,12 @@ struct AppMenuView: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel("FSearch menu")
         .accessibilityIdentifier("appMenu")
-        .onAppear { fieldFocused = true }
+        .onAppear {
+            focusCoordinator.requestMenuFocus(isMenuOpen: { menu.isOpen }, setFocused: { fieldFocused = $0 })
+        }
+        .onDisappear {
+            focusCoordinator.clearMenuFocus { fieldFocused = $0 }
+        }
     }
 
     private func row(_ item: PanelMenuItem, selected: Bool) -> some View {

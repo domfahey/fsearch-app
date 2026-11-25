@@ -210,6 +210,23 @@ class PanelUITestCase: XCTestCase {
     /// Any element with this accessibility identifier.
     func element(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(identifier: id).firstMatch }
 
+    /// The search-mode chip (`Inside files` or `Definitions`), matched by its accessibility id and VoiceOver label.
+    func modeChip(_ modeTitle: String) -> XCUIElement {
+        let expected = "Search mode: \(modeTitle)"
+        return app.staticTexts.matching(
+            NSPredicate(format: "identifier == 'searchModeChip' AND (label == %@ OR value == %@)", expected, expected)
+        ).firstMatch
+    }
+
+    /// FSearch's menu-bar status item, whether healthy (`FSearch`) or announcing a warning/update (`FSearch: …`).
+    var statusItem: XCUIElement {
+        app.statusItems.matching(
+            NSPredicate(
+                format: "title == 'FSearch' OR title BEGINSWITH 'FSearch: ' OR label == 'FSearch' OR label BEGINSWITH 'FSearch: '"
+            )
+        ).firstMatch
+    }
+
     /// The general pasteboard's string. Reading one of the fixtures' paths
     /// marks it as the test's own copy, so tearDown may put the user's back.
     var clipboard: String? {
@@ -275,6 +292,6 @@ class PanelUITestCase: XCTestCase {
         try search(query, file: file, line: line)
         waitFor(text("Search inside files"), 20, file, line)
         try pressReturnOnFallback("fallback-content", file: file, line: line)
-        waitFor(text("Inside files"), 20, file, line)
+        waitFor(modeChip("Inside files"), 20, file, line)
     }
 }

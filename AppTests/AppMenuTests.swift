@@ -381,5 +381,186 @@ extension AppTests {
             #expect(w.canBecomeKey == false && g.canBecomeKey == false)
             #expect(ran.isEmpty)
         }
+
+        /// Opening the menu resigns search-field focus immediately and defers menu filter-field focus;
+        /// closing resigns menu focus and defers search-field restoration, regardless of callback order.
+        @Test func focusCoordinatorHandsFocusToMenuOnOpenAndBackOnClose() {
+            @MainActor final class State {
+                var pending: [@MainActor () -> Void] = []
+                var visible = true
+                var menuOpen = false
+                var searchFocused = true
+                var menuFocused = false
+                func flushAll() {
+                    while !pending.isEmpty { pending.removeFirst()() }
+                }
+            }
+            let s = State()
+            let coordinator = PanelFocusCoordinator { s.pending.append($0) }
+
+            // Opening: SearchView resigns immediately; AppMenuView defers claiming focus.
+            s.menuOpen = true
+            coordinator.handleMenuOpenChanged(
+                true, isVisible: { s.visible }, isMenuOpen: { s.menuOpen }, setSearchFocused: { s.searchFocused = $0 })
+            #expect(!s.searchFocused, "opening the menu must resign search-field focus immediately")
+            #expect(s.pending.isEmpty)
+
+            coordinator.requestMenuFocus(isMenuOpen: { s.menuOpen }, setFocused: { s.menuFocused = $0 })
+            #expect(!s.menuFocused, "menu filter focus must be deferred to the next main-queue turn")
+            #expect(s.pending.count == 1)
+            s.pending.removeFirst()()
+            #expect(s.menuFocused && !s.searchFocused)
+
+            // Closing: AppMenuView clears on disappear; SearchView defers restoring focus.
+            s.menuOpen = false
+            coordinator.clearMenuFocus { s.menuFocused = $0 }
+            #expect(!s.menuFocused)
+            coordinator.handleMenuOpenChanged(
+                false, isVisible: { s.visible }, isMenuOpen: { s.menuOpen }, setSearchFocused: { s.searchFocused = $0 })
+            #expect(!s.searchFocused, "closing the menu must defer search-field focus restoration")
+            #expect(s.pending.count == 1)
+            s.pending.removeFirst()()
+            #expect(s.searchFocused && !s.menuFocused)
+
+            // Order independence: AppMenuView.onAppear before SearchView.onChange(true),
+            // and SearchView.onChange(false) before AppMenuView.onDisappear.
+            s.menuOpen = true
+            coordinator.requestMenuFocus(isMenuOpen: { s.menuOpen }, setFocused: { s.menuFocused = $0 })
+            coordinator.handleMenuOpenChanged(
+                true, isVisible: { s.visible }, isMenuOpen: { s.menuOpen }, setSearchFocused: { s.searchFocused = $0 })
+            #expect(!s.searchFocused && !s.menuFocused)
+            s.flushAll()
+            #expect(s.menuFocused && !s.searchFocused)
+
+            s.menuOpen = false
+            coordinator.handleMenuOpenChanged(
+                false, isVisible: { s.visible }, isMenuOpen: { s.menuOpen }, setSearchFocused: { s.searchFocused = $0 })
+            coordinator.clearMenuFocus { s.menuFocused = $0 }
+            #expect(!s.searchFocused && !s.menuFocused)
+            s.flushAll()
+            #expect(s.searchFocused && !s.menuFocused)
+        }
+
+        /// Stale deferred focus callbacks must be ignored after rapid open/close toggles or hiding the panel.
+        @Test func focusCoordinatorDropsStaleDeferredCallbacks() {
+            @MainActor final class State {
+                var pending: [@MainActor () -> Void] = []
+                var visible = true
+                var menuOpen = false
+                var searchFocused = false
+                var menuFocused = false
+                var firstMenuFocused = false
+                var secondMenuFocused = false
+                func flushAll() {
+                    while !pending.isEmpty { pending.removeFirst()() }
+                }
+            }
+            let s = State()
+            let coordinator = PanelFocusCoordinator { s.pending.append($0) }
+
+            // 1. Panel opens (queues search focus), then menu opens before that async turn runs.
+            coordinator.requestSearchFocus(isVisible: { s.visible }, isMenuOpen: { s.menuOpen }, setFocused: { s.searchFocused = $0 })
+            s.menuOpen = true
+            coordinator.handleMenuOpenChanged(
+                true, isVisible: { s.visible }, isMenuOpen: { s.menuOpen }, setSearchFocused: { s.searchFocused = $0 })
+            coordinator.requestMenuFocus(isMenuOpen: { s.menuOpen }, setFocused: { s.menuFocused = $0 })
+            #expect(s.pending.count == 2)
+            s.flushAll()
+            #expect(!s.searchFocused && s.menuFocused)
+
+            // 2. Menu opens then closes before the async turn runs: menu field is NOT focused, search field IS.
+            s.searchFocused = false
+            s.menuFocused = false
+            s.menuOpen = true
+            coordinator.handleMenuOpenChanged(
+                true, isVisible: { s.visible }, isMenuOpen: { s.menuOpen }, setSearchFocused: { s.searchFocused = $0 })
+            coordinator.requestMenuFocus(isMenuOpen: { s.menuOpen }, setFocused: { s.menuFocused = $0 })
+            s.menuOpen = false
+            coordinator.clearMenuFocus { s.menuFocused = $0 }
+            coordinator.handleMenuOpenChanged(
+                false, isVisible: { s.visible }, isMenuOpen: { s.menuOpen }, setSearchFocused: { s.searchFocused = $0 })
+            s.flushAll()
+            #expect(!s.menuFocused && s.searchFocused)
+
+            // 3. Rapid open -> close -> open before any async turn runs: only the latest menu view gets focus.
+            s.searchFocused = false
+            s.menuOpen = true
+            coordinator.handleMenuOpenChanged(
+                true, isVisible: { s.visible }, isMenuOpen: { s.menuOpen }, setSearchFocused: { s.searchFocused = $0 })
+            coordinator.requestMenuFocus(isMenuOpen: { s.menuOpen }, setFocused: { s.firstMenuFocused = $0 })
+            s.menuOpen = false
+            coordinator.clearMenuFocus { s.firstMenuFocused = $0 }
+            coordinator.handleMenuOpenChanged(
+                false, isVisible: { s.visible }, isMenuOpen: { s.menuOpen }, setSearchFocused: { s.searchFocused = $0 })
+            s.menuOpen = true
+            coordinator.handleMenuOpenChanged(
+                true, isVisible: { s.visible }, isMenuOpen: { s.menuOpen }, setSearchFocused: { s.searchFocused = $0 })
+            coordinator.requestMenuFocus(isMenuOpen: { s.menuOpen }, setFocused: { s.secondMenuFocused = $0 })
+            s.flushAll()
+            #expect(!s.firstMenuFocused, "stale open callback from the closed menu view must not fire")
+            #expect(!s.searchFocused, "stale close callback must not steal focus after reopening")
+            #expect(s.secondMenuFocused)
+
+            // 4. Panel hides before close's async turn runs: search field is NOT focused.
+            s.searchFocused = false
+            s.menuOpen = false
+            coordinator.clearMenuFocus { s.secondMenuFocused = $0 }
+            coordinator.handleMenuOpenChanged(
+                false, isVisible: { s.visible }, isMenuOpen: { s.menuOpen }, setSearchFocused: { s.searchFocused = $0 })
+            s.visible = false
+            s.flushAll()
+            #expect(!s.searchFocused, "closing the menu while hiding the panel must not focus the search field")
+        }
+
+        /// Hosted SearchView + AppMenuOverlay exercises open -> close deferred focus scheduling in the inert host.
+        @Test func searchViewMenuToggleSchedulesDeferredFocusInInertHost() async throws {
+            @MainActor final class Queue {
+                var pending: [@MainActor () -> Void] = []
+                func flushAll() {
+                    while !pending.isEmpty { pending.removeFirst()() }
+                }
+            }
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let menu = AppMenuState()
+            let queue = Queue()
+            let coordinator = PanelFocusCoordinator { queue.pending.append($0) }
+            let view = SearchView(
+                model: env.app.search, state: PanelState(), held: HeldKeyBox(), keys: PanelKeyFeed(), geometry: PanelGeometry(),
+                menu: menu, isVisible: { true }, focusCoordinator: coordinator,
+                onEffect: { _, _ in }, onSelect: { _ in }, onCommand: { _ in }
+            ).environmentObject(env.app)
+            let w = await render(view, size: NSSize(width: 680, height: 460))
+            defer { w.close() }
+            #expect(w.canBecomeKey == false)
+            // Initial SearchView.onAppear deferred search-field focus.
+            #expect(await eventually { !queue.pending.isEmpty })
+            queue.flushAll()
+
+            // Opening the menu mounts AppMenuView and queues a deferred menu-field focus callback.
+            menu.toggle()
+            #expect(await axWait(id: "appMenuField", in: w) != nil)
+            #expect(await eventually { queue.pending.count == 1 })
+            queue.flushAll()
+
+            // Closing unmounts AppMenuView (clearing menu focus) and queues a deferred search-field restoration.
+            menu.toggle()
+            #expect(await eventually { axNode(id: "appMenuField", in: w) == nil })
+            #expect(await eventually { queue.pending.count == 1 })
+            queue.flushAll()
+
+            // Default scheduler path through PanelController also toggles open -> close cleanly in the inert host.
+            let pc = PanelController()
+            pc.show(app: env.app)
+            defer { pc.hide(returnFocus: false) }
+            pc.menu.toggle()
+            let panel = try #require(pc.panel)
+            #expect(await axWait(id: "appMenuField", in: panel) != nil)
+            await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in DispatchQueue.main.async { c.resume() } }
+            pc.menu.toggle()
+            #expect(await eventually { axNode(id: "appMenuField", in: panel) == nil })
+            await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in DispatchQueue.main.async { c.resume() } }
+            #expect(!pc.menu.isOpen && panel.canBecomeKey == false)
+        }
     }
 }
