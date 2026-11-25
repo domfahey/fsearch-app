@@ -320,6 +320,62 @@ extension AppTests {
             #expect(opts.map(\.tag) == ["", "vscode", "bbedit"])
             #expect(opts.last?.label == "BBEdit (not installed)")
         }
+
+        @Test func waitUntilStoppedPollsUntilPingFailsOrCapsAtMaxAttempts() async {
+            // Immediate failure -> 0 sleeps.
+            var sleeps = 0
+            await Uninstaller.waitUntilStopped(ping: { throw DaemonError.disconnected }, sleep: { sleeps += 1 }, maxAttempts: 5)
+            #expect(sleeps == 0)
+
+            // Answers twice, fails on 3rd -> 2 sleeps.
+            var pings = 0
+            await Uninstaller.waitUntilStopped(
+                ping: {
+                    pings += 1
+                    if pings >= 3 { throw DaemonError.disconnected }
+                }, sleep: { sleeps += 1 }, maxAttempts: 5)
+            #expect(pings == 3 && sleeps == 2)
+
+            // Always answers -> capped at maxAttempts.
+            sleeps = 0
+            await Uninstaller.waitUntilStopped(ping: {}, sleep: { sleeps += 1 }, maxAttempts: 3)
+            #expect(sleeps == 3)
+        }
+
+        @Test func reentrantRunIsIgnoredWhileAlreadyRunning() async {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let gate = AsyncGate()
+            let helper = FakeHelper(.enabled)
+            helper.onUnregister = { await gate.wait() }
+            let u = make(env, helper: helper, login: nil)
+            let first = Task { await u.run(ownership: .ours) }
+            #expect(await eventually { u.phase == .running })
+            await u.run(ownership: .ours)
+            gate.release()
+            await first.value
+            #expect(helper.unregistered == 1)
+        }
+
+        @Test func defaultFilesystemChecksHandleMissingTempFolders() async {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let missingData = env.dir.appendingPathComponent("no-data")
+            let missingLog = env.dir.appendingPathComponent("no-log")
+            let u = Uninstaller(
+                helper: nil, loginItem: nil, workspace: env.workspace, defaults: env.defaults,
+                dataFolder: missingData, logFolder: missingLog, resetShortcut: {})
+            await u.run(ownership: .ours)
+            #expect(env.workspace.trashed.isEmpty)
+            // Also verify the default cliAgentInstalled closure runs cleanly when the data folder exists.
+            let realData = env.dir.appendingPathComponent("existing-data")
+            try? FileManager.default.createDirectory(at: realData, withIntermediateDirectories: true)
+            let u2 = Uninstaller(
+                helper: nil, loginItem: nil, workspace: env.workspace, defaults: env.defaults,
+                dataFolder: realData, logFolder: missingLog, resetShortcut: {})
+            await u2.run(ownership: .helperOff)
+            #expect(env.workspace.trashed.isEmpty)
+        }
     }
 }
 

@@ -221,9 +221,16 @@ final class QuickLookSource: NSObject, @preconcurrency QLPreviewPanelDataSource 
     private(set) var item: URL?
     /// True while the preview is being brought up, before it is visible.
     private(set) var opening = false
+    #if DEBUG
+        /// Lets unit tests exercise the "already previewing" path without showing a real QLPreviewPanel.
+        var previewingForTesting = false
+    #endif
 
     /// Whether Quick Look is up or coming up, so the launcher keeps itself open behind it.
     var isPreviewing: Bool {
+        #if DEBUG
+            if previewingForTesting { return true }
+        #endif
         if opening || NSApp.keyWindow is QLPreviewPanel { return true }
         return QLPreviewPanel.sharedPreviewPanelExists() && QLPreviewPanel.shared().isVisible
     }
@@ -242,6 +249,9 @@ final class QuickLookSource: NSObject, @preconcurrency QLPreviewPanelDataSource 
 
     /// Closes the preview if it is up.
     func close() {
+        #if DEBUG
+            previewingForTesting = false
+        #endif
         if QLPreviewPanel.sharedPreviewPanelExists(), QLPreviewPanel.shared().isVisible { QLPreviewPanel.shared().orderOut(nil) }
     }
 
@@ -298,21 +308,43 @@ final class QuickLookSource: NSObject, @preconcurrency QLPreviewPanelDataSource 
     /// A local key monitor, held while the preview is attached so it is installed once.
     private var keyMonitor: Any?
 
+    /// Handles ⌘Y and ↑/↓ while Quick Look is key, returning true when the event should be swallowed.
+    nonisolated func handleKeyDown(
+        characters: String, modifiers: NSEvent.ModifierFlags, keyCode: UInt16, isRepeat: Bool, inPreviewPanel: Bool
+    ) -> Bool {
+        let key = Self.previewKey(characters: characters, modifiers: modifiers, keyCode: keyCode)
+        guard let key, inPreviewPanel else { return false }
+        if Self.shouldHandle(key, isRepeat: isRepeat) {
+            MainActor.assumeIsolated { self.handle(key) }
+        }
+        return true
+    }
+
+    /// Filters a keyDown event from the local event monitor while Quick Look is attached.
+    nonisolated func filterKeyDown(_ event: NSEvent, inPreviewPanel: Bool? = nil) -> NSEvent? {
+        let inPanel = inPreviewPanel ?? (event.window is QLPreviewPanel)
+        return handleKeyDown(
+            characters: event.charactersIgnoringModifiers ?? "", modifiers: event.modifierFlags,
+            keyCode: event.keyCode, isRepeat: event.isARepeat, inPreviewPanel: inPanel) ? nil : event
+    }
+
+    /// Builds the local keyDown monitor closure, preserving `nil` when a handled event is swallowed
+    /// and passing events through unchanged once the source is deallocated.
+    nonisolated static func makeKeyMonitorHandler(
+        for source: QuickLookSource, inPreviewPanel: Bool? = nil
+    ) -> (NSEvent) -> NSEvent? {
+        { [weak source] event in
+            guard let source else { return event }
+            return source.filterKeyDown(event, inPreviewPanel: inPreviewPanel)
+        }
+    }
+
     /// The launcher took control of the preview.
     func attach(_ panel: QLPreviewPanel) {
         panel.dataSource = self
         // The preview is key while it is up, so its keys (⌘Y, ↑/↓) go to it, not the launcher's key handling: handle them here.
         keyMonitor =
-            keyMonitor
-            ?? NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                let key = Self.previewKey(
-                    characters: event.charactersIgnoringModifiers ?? "", modifiers: event.modifierFlags, keyCode: event.keyCode)
-                guard let key, event.window is QLPreviewPanel else { return event }
-                if Self.shouldHandle(key, isRepeat: event.isARepeat) {
-                    MainActor.assumeIsolated { self?.handle(key) }
-                }
-                return nil
-            }
+            keyMonitor ?? NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: Self.makeKeyMonitorHandler(for: self))
     }
 
     /// The launcher gave up control of the preview.

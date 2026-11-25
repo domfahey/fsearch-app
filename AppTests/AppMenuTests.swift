@@ -181,6 +181,16 @@ extension AppTests {
             let version = AppMenuActions.version().version
             #expect(!version.isEmpty)
             #expect(AppMenuActions.header().hasPrefix("FSearch v\(version)"))
+            let missing = AppMenuActions.version(info: nil)
+            #expect(missing.version == "unknown" && missing.build == "")
+            let custom = AppMenuActions.version(info: ["CFBundleShortVersionString": "1.2.3", "CFBundleVersion": "42"])
+            #expect(custom.version == "1.2.3" && custom.build == "42")
+        }
+
+        @Test func performAboutActivatesBeforeOrderingAboutPanel() {
+            var events: [String] = []
+            AppMenuActions.performAbout(activate: { events.append("activate") }, orderFront: { events.append("about") })
+            #expect(events == ["activate", "about"])
         }
 
         /// ↵ held for a slow search, then the menu opens (⌘/ or the gear): the key never runs behind the menu.

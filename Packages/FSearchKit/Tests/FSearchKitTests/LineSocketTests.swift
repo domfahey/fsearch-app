@@ -366,6 +366,134 @@ final class RawServer: @unchecked Sendable {
         #expect(throws: DaemonError.timeout) { try LineSocket(path: srv.path, timeout: 0.25).roundTrip(req()) }
         #expect(t0.duration(to: .now) < .seconds(3))
     }
+
+    @Test func replyLineExceedingMaxBytesIsBadReply() {
+        let srv = RawServer { fd, n in
+            _ = RawServer.readLine(fd)
+            if n == 1 {
+                RawServer.send(fd, String(repeating: "a", count: 32) + "\n")
+            } else {
+                RawServer.send(fd, String(repeating: "b", count: 32))
+                Thread.sleep(forTimeInterval: 0.1)
+            }
+            close(fd)
+        }
+        defer { srv.stop() }
+        // With newline past maxLineBytes (hits nl - startIndex > maxLineBytes).
+        #expect(throws: DaemonError.badReply("reply line too large")) {
+            try LineSocket(path: srv.path, timeout: 2, maxLineBytes: 16).roundTrip(req())
+        }
+        // Without newline past maxLineBytes (hits buffer.count >= maxLineBytes).
+        #expect(throws: DaemonError.badReply("reply line too large")) {
+            try LineSocket(path: srv.path, timeout: 2, maxLineBytes: 16).roundTrip(req())
+        }
+    }
+
+    @Test func writeAndReadHandleEintrEagainAndPollErrors() throws {
+        let srv = RawServer { fd, _ in
+            while RawServer.readLine(fd) { RawServer.send(fd, "ok\n") }
+            close(fd)
+        }
+        defer { srv.stop() }
+
+        // Transient EINTR on write, poll, and read, plus transient EAGAIN on read: all retry and succeed.
+        var writeEintr = true
+        var pollEintr = true
+        var readEintr = true
+        var readEagain = true
+        var io = LineSocket.IO.live
+        io.write = { fd, buf, count in
+            if writeEintr {
+                writeEintr = false
+                errno = EINTR
+                return -1
+            }
+            return Darwin.write(fd, buf, count)
+        }
+        io.poll = { pfd, nfds, ms in
+            if pollEintr {
+                pollEintr = false
+                errno = EINTR
+                return -1
+            }
+            return Darwin.poll(pfd, nfds, ms)
+        }
+        io.read = { fd, buf, count in
+            if readEintr {
+                readEintr = false
+                errno = EINTR
+                return -1
+            }
+            if readEagain {
+                readEagain = false
+                errno = EAGAIN
+                return -1
+            }
+            return Darwin.read(fd, buf, count)
+        }
+        let s = LineSocket(path: srv.path, timeout: 2, io: io)
+        #expect(String(decoding: try s.roundTrip(req()), as: UTF8.self) == "ok")
+        #expect(!writeEintr && !pollEintr && !readEintr && !readEagain)
+
+        // Write EINTR past deadline -> timeout.
+        var writeTimeoutIO = LineSocket.IO.live
+        writeTimeoutIO.write = { _, _, _ in
+            Thread.sleep(forTimeInterval: 0.05)
+            errno = EINTR
+            return -1
+        }
+        #expect(throws: DaemonError.timeout) {
+            try LineSocket(path: srv.path, timeout: 0.03, io: writeTimeoutIO).roundTrip(req())
+        }
+
+        // Write EAGAIN -> timeout.
+        var writeEagainIO = LineSocket.IO.live
+        writeEagainIO.write = { _, _, _ in
+            errno = EAGAIN
+            return -1
+        }
+        #expect(throws: DaemonError.timeout) {
+            try LineSocket(path: srv.path, timeout: 1, io: writeEagainIO).roundTrip(req())
+        }
+
+        // Poll error (non-EINTR) -> disconnected.
+        var pollErrIO = LineSocket.IO.live
+        pollErrIO.poll = { _, _, _ in
+            errno = EBADF
+            return -1
+        }
+        #expect(throws: DaemonError.disconnected) {
+            try LineSocket(path: srv.path, timeout: 1, io: pollErrIO).roundTrip(req())
+        }
+
+        // Poll POLLNVAL -> disconnected.
+        var pollNvalIO = LineSocket.IO.live
+        pollNvalIO.poll = { pfd, _, _ in
+            pfd.pointee.revents = Int16(POLLNVAL)
+            return 1
+        }
+        #expect(throws: DaemonError.disconnected) {
+            try LineSocket(path: srv.path, timeout: 1, io: pollNvalIO).roundTrip(req())
+        }
+
+        // Read EAGAIN past deadline -> timeout.
+        var readTimeoutIO = LineSocket.IO.live
+        readTimeoutIO.read = { _, _, _ in
+            Thread.sleep(forTimeInterval: 0.05)
+            errno = EAGAIN
+            return -1
+        }
+        #expect(throws: DaemonError.timeout) {
+            try LineSocket(path: srv.path, timeout: 0.03, io: readTimeoutIO).roundTrip(req())
+        }
+    }
+
+    @Test func remainingMillisecondsClampsNonPositiveAndOverflowDurations() {
+        #expect(LineSocket.remainingMilliseconds(.zero) == 0)
+        #expect(LineSocket.remainingMilliseconds(.seconds(-1)) == 0)
+        #expect(LineSocket.remainingMilliseconds(.seconds(Int64(Int32.max))) == Int32.max)
+        #expect(LineSocket.remainingMilliseconds(.milliseconds(15)) == 15)
+    }
 }
 
 final class Locked<T>: @unchecked Sendable {

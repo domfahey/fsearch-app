@@ -1,3 +1,4 @@
+import AppKit
 import FSearchKit
 import Foundation
 import Testing
@@ -260,6 +261,105 @@ extension AppTests {
             let url = URL(string: "vscode://file/p/main.swift:42")!
             ws.open([url], withApplicationAt: URL(fileURLWithPath: "/Applications/Visual Studio Code.app"), completion: nil)
             #expect(ws.actions == ["openWith Visual Studio Code.app vscode://file/p/main.swift:42"])
+        }
+
+        @Test func startAppOffersMoveOnBadLocationAndStartsNothing() {
+            let env = TestEnv(helper: FakeHelper(.enabled))
+            defer { env.tearDown() }
+            let panel = PanelController()
+            let delegate = AppDelegate()
+            let actCenter = NotificationCenter(), reopenCenter = NotificationCenter()
+            var offered: [InstallLocation.Problem] = []
+            let badBundle = URL(fileURLWithPath: NSTemporaryDirectory() + "AppTranslocation/x/FSearch.app")
+            LaunchGuards.startApp(
+                state: env.app, delegate: delegate, panel: panel, bundleURL: badBundle,
+                activationCenter: actCenter, reopenCenter: reopenCenter,
+                offerMove: { offered.append($0) })
+            #expect(offered == [.translocated])
+            #expect(OnboardingLauncher.window == nil && !OnboardingLauncher.startedDaemon)
+            #expect(!panel.isVisible)
+        }
+
+        @Test func startAppWiresPanelOnboardingObserversAndDelegate() throws {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let panel = PanelController()
+            defer { panel.hide(returnFocus: false) }
+            let delegate = AppDelegate()
+            let actCenter = NotificationCenter(), reopenCenter = NotificationCenter()
+            defer {
+                LaunchGuards.stopObservingActivation(center: actCenter)
+                LaunchGuards.stopObservingReopen(center: reopenCenter)
+            }
+            var offered: [InstallLocation.Problem] = []
+            LaunchGuards.startApp(
+                state: env.app, delegate: delegate, panel: panel,
+                activationCenter: actCenter, reopenCenter: reopenCenter,
+                offerMove: { offered.append($0) })
+            #expect(offered.isEmpty)
+            #expect(OnboardingLauncher.startedDaemon)
+            // Reopen notification reaches the panel installed by startApp.
+            LaunchGuards.notifyOtherInstance(center: reopenCenter)
+            #expect(panel.isVisible)
+            panel.hide(returnFocus: false)
+            // URL delegate was connected to the panel.
+            let url = try #require(URL(string: "fsearch://search?q=heron"))
+            delegate.application(NSApp, open: [url])
+            #expect(panel.isVisible && env.app.search.query == "heron")
+        }
+
+        @Test func anotherCopyIsRunningNotifiesAndActivatesOtherInstance() {
+            let real = LaunchOptions(socketPath: "/x.sock", testMode: false, unitTestHost: false, showPanel: false)
+            let center = NotificationCenter()
+            // Missing bundle id -> false.
+            #expect(!LaunchGuards.anotherCopyIsRunning(options: real, center: center, bundleIdentifier: nil))
+            // Live NSRunningApplication lookup sees only our own process -> false.
+            #expect(!LaunchGuards.anotherCopyIsRunning(options: real, center: center))
+            // Another instance running -> posts reopen notification, activates it, returns true.
+            final class Counter: @unchecked Sendable { var n = 0 }
+            let notified = Counter()
+            var activated = 0
+            let token = center.addObserver(forName: LaunchGuards.reopenNotification, object: nil, queue: nil) { _ in
+                notified.n += 1
+            }
+            defer { center.removeObserver(token) }
+            let me: pid_t = 100
+            let found = LaunchGuards.anotherCopyIsRunning(
+                options: real, center: center, bundleIdentifier: "com.domfahey.fsearch",
+                runningApps: { _ in [(me, {}), (200, { activated += 1 })] }, me: me)
+            #expect(found && notified.n == 1 && activated == 1)
+        }
+
+        @Test func offerMoveMovesOnFirstButtonAndSkipsMoveOnQuit() {
+            let saved = AppActivation.activate
+            var activations = 0
+            AppActivation.activate = { activations += 1 }
+            defer { AppActivation.activate = saved }
+
+            var moved: [URL] = [], terminated = 0, titles: [String] = []
+            LaunchGuards.offerMove(
+                .translocated,
+                runAlert: { alert in
+                    #expect(alert.messageText == "Move FSearch to Applications")
+                    #expect(alert.informativeText == InstallLocation.Problem.translocated.message)
+                    titles = alert.buttons.map(\.title)
+                    return .alertFirstButtonReturn
+                },
+                move: { moved.append($0) },
+                terminate: { terminated += 1 })
+            #expect(activations == 1)
+            #expect(titles == ["Move to Applications", "Quit"])
+            #expect(moved == [Bundle.main.bundleURL])
+            #expect(terminated == 1)
+
+            LaunchGuards.offerMove(
+                .readOnlyVolume,
+                runAlert: { _ in .alertSecondButtonReturn },
+                move: { moved.append($0) },
+                terminate: { terminated += 1 })
+            #expect(activations == 2)
+            #expect(moved.count == 1)
+            #expect(terminated == 2)
         }
     }
 }

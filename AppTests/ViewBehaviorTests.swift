@@ -145,6 +145,53 @@ extension AppTests {
             try #require(await axWait("Search…", in: w)).press()
             #expect(PanelController.shared.isVisible)
         }
+
+        /// Debug window, Settings, About, and Quit items in MenuContent route through their seams.
+        @Test func menuContentActionsRouteThroughSeams() async throws {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            env.app.debugMode = true
+            let savedActivate = AppActivation.activate
+            let savedAbout = AppMenuActions.showAbout
+            let savedQuit = AppMenuActions.quit
+            var events: [String] = []
+            AppActivation.activate = { events.append("activate") }
+            AppMenuActions.showAbout = { events.append("about") }
+            AppMenuActions.quit = { events.append("quit") }
+            defer {
+                AppActivation.activate = savedActivate
+                AppMenuActions.showAbout = savedAbout
+                AppMenuActions.quit = savedQuit
+            }
+            let view = VStack {
+                MenuContent(
+                    app: env.app,
+                    openWindow: { events.append("window:\($0)") },
+                    openSettings: { events.append("settings") })
+            }
+            let w = await render(view, size: NSSize(width: 300, height: 420))
+            defer { w.close() }
+            try #require(await axWait("Index Details…", in: w)).press()
+            try #require(axNode("Search Log…", in: w)).press()
+            try #require(axNode("Settings…", in: w)).press()
+            try #require(axNode("About FSearch", in: w)).press()
+            try #require(axNode("Quit FSearch", in: w)).press()
+            #expect(
+                events == [
+                    "activate", "window:index", "activate", "window:log", "activate", "settings", "about", "quit",
+                ])
+
+            // Help submenu items open documentation, community links, and the prefilled issue form.
+            let helpWindow = await render(VStack { HelpMenuContent(app: env.app) }, size: NSSize(width: 300, height: 320))
+            defer { helpWindow.close() }
+            try #require(await axWait(HelpLinks.items[0].title, in: helpWindow)).press()
+            try #require(axNode(HelpLinks.community[0].title, in: helpWindow)).press()
+            try #require(axNode(HelpLinks.reportTitle, in: helpWindow)).press()
+            #expect(env.workspace.opened.count == 3)
+            #expect(env.workspace.opened[0] == HelpLinks.items[0].url)
+            #expect(env.workspace.opened[1] == HelpLinks.community[0].url)
+            #expect(env.workspace.opened[2].absoluteString.hasPrefix(IssueReport.newIssueBase))
+        }
     }
 
     @Suite @MainActor
@@ -255,6 +302,47 @@ extension AppTests {
             defer { w.close() }
             #expect(await eventually { axTexts(in: w).contains { $0.contains("Raycast") } })
         }
+
+        /// Becoming active refreshes the login item status in Settings.
+        @Test func becomingActiveRefreshesLoginItem() async throws {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let item = FakeLoginItem(.requiresApproval)
+            let login = LoginItemModel(service: item)
+            let w = await show(env, login: login, uninstaller: uninstaller(env))
+            defer { w.close() }
+            #expect(await axWait("Open Login Items…", in: w) != nil)
+            item.status = .enabled
+            NotificationCenter.default.post(name: NSApplication.didBecomeActiveNotification, object: nil)
+            #expect(await eventually { login.display == .on && !axTexts(in: w).contains("Open Login Items…") })
+        }
+
+        /// Running removal shows progress; finishing with kept/failure items displays them and refreshes login status.
+        @Test func removalProgressAndKeptFailureReportShowInSettings() async {
+            let gate = AsyncGate()
+            let helper = FakeHelper(.enabled)
+            helper.onUnregister = { await gate.wait() }
+            let env = TestEnv(helper: helper)
+            defer { env.tearDown() }
+            env.workspace.trashError = TestError("disk locked")
+            let item = FakeLoginItem(.enabled)
+            let login = LoginItemModel(service: item)
+            let u = Uninstaller(
+                helper: helper, loginItem: item, workspace: env.workspace, defaults: env.defaults,
+                dataFolder: data, logFolder: logs, exists: { _ in true }, cliAgentInstalled: { false }, resetShortcut: {})
+            let w = await show(env, login: login, uninstaller: u)
+            defer { w.close() }
+
+            let task = Task { await SettingsView.performRemoval(app: env.app, uninstaller: u, loginItem: login) }
+            #expect(await axWait("Removing…", in: w) != nil)
+            gate.release()
+            await task.value
+            #expect(login.display == .off)
+            #expect(await axWait("Done", in: w) != nil)
+            let texts = axTexts(in: w)
+            #expect(texts.contains { $0.contains("was left alone") })
+            #expect(texts.contains { $0.contains("disk locked") })
+        }
     }
 
     @Suite @MainActor
@@ -274,6 +362,82 @@ extension AppTests {
             #expect(await axWait("Export…", in: w) != nil)
             try #require(axNode("Clear Log", in: w)).press()
             #expect(env.app.log.entries().isEmpty)
+        }
+
+        /// Export configures the save panel, writes JSONL on OK, ignores Cancel, and surfaces write errors inline.
+        @Test func exportWritesJsonlHandlesCancelAndShowsErrors() async throws {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            env.app.debugMode = true
+            for q in ["alpha", "beta"] {
+                env.app.search.query = q
+                await env.app.search.refresh()
+            }
+            let goodURL = env.dir.appendingPathComponent("exported.jsonl")
+            let badURL = env.dir.appendingPathComponent("missing-dir/exported.jsonl")
+            var targets: [URL?] = [nil, goodURL, badURL]
+            var suggestedNames: [String] = []
+            let view = SearchLogView(filter: "alp") { panel in
+                suggestedNames.append(panel.nameFieldStringValue)
+                return targets.isEmpty ? nil : targets.removeFirst()
+            }.environmentObject(env.app)
+            let w = await render(view, size: NSSize(width: 760, height: 420), settle: .milliseconds(300))
+            defer { w.close() }
+
+            let exportButton = try #require(await axWait("Export…", in: w))
+            // 1. Cancelled save panel: writes nothing, shows no error.
+            exportButton.press()
+            #expect(!FileManager.default.fileExists(atPath: goodURL.path))
+            #expect(!axTexts(in: w).contains { $0.contains("Export failed:") })
+
+            // 2. Valid path: writes all rows as JSONL.
+            exportButton.press()
+            let written = try String(contentsOf: goodURL, encoding: .utf8)
+            #expect(written.contains("alpha") && written.contains("beta"))
+
+            // 3. Unwritable path: displays the inline export error.
+            exportButton.press()
+            #expect(await eventually { axTexts(in: w).contains { $0.contains("Export failed:") } })
+            #expect(suggestedNames == ["fsearch-searches.jsonl", "fsearch-searches.jsonl", "fsearch-searches.jsonl"])
+        }
+    }
+
+    @Suite @MainActor
+    struct IndexDetailsViewTests {
+        /// Pressing every action button in IndexDetailsView reveals data, saves, restarts, copies a report, and opens Login Items.
+        @Test func indexDetailsButtonsPerformTheirActions() async throws {
+            let helper = FakeHelper(.enabled)
+            let env = TestEnv(helper: helper)
+            defer { env.tearDown() }
+            env.daemon.onPing = { _ in false }
+            let dataDir = DebugFormat.dataDir(socketPath: env.app.options.socketPath)
+            try FileManager.default.createDirectory(at: dataDir, withIntermediateDirectories: true)
+            try "/Users/x/Library/Mail\n".write(to: dataDir.appendingPathComponent("skipped"), atomically: true, encoding: .utf8)
+            try "started\n".write(to: dataDir.appendingPathComponent("daemon.log"), atomically: true, encoding: .utf8)
+
+            let w = await render(
+                IndexDetailsView().environmentObject(env.app), size: NSSize(width: 520, height: 600), settle: .milliseconds(200))
+            defer { w.close() }
+            try #require(await axWait("Reveal Data Folder", in: w)).press()
+            #expect(env.workspace.revealed == [[dataDir]])
+            try #require(axNode("Save Now", in: w)).press()
+            #expect(await eventually { env.daemon.saves == 1 })
+            try #require(axNode("Restart Daemon", in: w)).press()
+            #expect(await eventually { helper.unregistered == 1 })
+            try #require(axNode("Copy All", in: w)).press()
+            let copied = env.pasteboard.string(forType: .string) ?? ""
+            #expect(copied.contains("state:") && copied.contains("/Users/x/Library/Mail") && copied.contains("started"))
+
+            // Approval state exposes Open Login Items Settings.
+            let approvalHelper = FakeHelper(.requiresApproval)
+            let env2 = TestEnv(helper: approvalHelper)
+            defer { env2.tearDown() }
+            env2.daemon.onStatus = { _ in throw DaemonError.disconnected }
+            await env2.app.daemon.refresh()
+            let w2 = await render(IndexDetailsView().environmentObject(env2.app), size: NSSize(width: 520, height: 600))
+            defer { w2.close() }
+            try #require(await axWait("Open Login Items Settings", in: w2)).press()
+            #expect(approvalHelper.openedSettings == 1)
         }
     }
 

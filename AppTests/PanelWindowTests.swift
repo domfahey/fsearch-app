@@ -176,6 +176,146 @@ extension AppTests {
             pc.show(app: env2.app)
             #expect(pc.geometry.rows["file:/p/a.txt"] == nil, "rebuilding contentView clears stale row frames")
         }
+
+        @Test func restoreFocusAfterPreviewMakesKeyWhenActiveAndHidesOtherwise() throws {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            defer { PanelController.shared.hide(returnFocus: false) }
+            let p = try showShared(env)
+            var madeKey = 0, hid = 0
+            p.restoreFocusAfterPreview(isActive: true, keyWindow: nil, makeKey: { madeKey += 1 }, hide: { hid += 1 })
+            p.restoreFocusAfterPreview(isActive: true, keyWindow: p, makeKey: { madeKey += 1 }, hide: { hid += 1 })
+            #expect(madeKey == 2 && hid == 0)
+
+            let other = NSWindow(contentRect: .zero, styleMask: [.titled], backing: .buffered, defer: true)
+            p.restoreFocusAfterPreview(isActive: true, keyWindow: other, makeKey: { madeKey += 1 }, hide: { hid += 1 })
+            p.restoreFocusAfterPreview(isActive: false, keyWindow: nil, makeKey: { madeKey += 1 }, hide: { hid += 1 })
+            #expect(madeKey == 2 && hid == 2)
+
+            PanelController.shared.hide(returnFocus: false)
+            p.restoreFocusAfterPreview(isActive: true, keyWindow: nil, makeKey: { madeKey += 1 }, hide: { hid += 1 })
+            #expect(madeKey == 2 && hid == 2, "hidden panel does nothing")
+        }
+
+        @Test func installOutsideTestModeRegistersHotkeyAndHonorsShowPanel() {
+            let env = TestEnv(helper: FakeHelper(.enabled))
+            defer { env.tearDown() }
+            let opts = LaunchOptions(
+                socketPath: env.app.options.socketPath, testMode: false, unitTestHost: false, showPanel: true,
+                searchLogOverride: env.app.options.searchLogOverride)
+            let app = AppState(
+                options: opts, defaults: env.defaults, helper: env.helper,
+                names: env.daemon, content: env.daemon, control: env.daemon, clock: env.clock.clock,
+                cliAgentInstalled: { false })
+            let pc = PanelController()
+            defer { pc.hide(returnFocus: false) }
+            var hotkey: (@MainActor () -> Void)?
+            pc.install(app: app) { hotkey = $0 }
+            #expect(pc.isVisible, "showPanel opens the panel during install")
+            #expect(hotkey != nil)
+            hotkey?()
+            #expect(!pc.isVisible)
+            hotkey?()
+            #expect(pc.isVisible)
+        }
+
+        @Test func hostedSearchViewCallbacksDrivePanelController() async throws {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let savedSettings = PanelController.openSettings
+            var settingsOpened = 0
+            PanelController.openSettings = { settingsOpened += 1 }
+            defer { PanelController.openSettings = savedSettings }
+
+            let pc = PanelController()
+            defer { pc.hide(returnFocus: false) }
+            pc.show(app: env.app)
+            let panel = try #require(pc.panel)
+
+            // Command row triggers onCommand -> pc.run(.settings).
+            env.app.search.query = "settings"
+            try #require(await axWait(id: "command-\(AppCommand.settings.id)", in: panel)).press()
+            #expect(settingsOpened == 1 && !pc.isVisible)
+
+            // Result row selection + press triggers onSelect and onEffect -> pc.perform(.open).
+            let a = env.file("a.txt"), b = env.file("b.txt")
+            env.daemon.onSearch = { _ in SearchReply(tookUs: 1, hits: [Wire.hit(a), Wire.hit(b)]) }
+            pc.show(app: env.app)
+            env.app.search.query = "txt"
+            #expect(await axWait(id: "result-\(b)", in: panel) != nil)
+            pc.keys.send(.down)
+            #expect(await eventually { pc.selection == 1 })
+            try #require(axNode(id: "result-\(b)", in: panel)).press()
+            #expect(await eventually { env.workspace.opened.contains(URL(fileURLWithPath: b)) })
+        }
+
+        @Test func updatePreviousAppAndRestoreFocusOnHide() throws {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let pc = PanelController()
+            pc.show(app: env.app)
+            defer { pc.hide(returnFocus: false) }
+            let panel = try #require(pc.panel)
+
+            let current = NSRunningApplication.current
+            let other = NSWorkspace.shared.runningApplications.first { $0 != current && !$0.isTerminated }
+
+            let titledVisible = HostSafeWindow(
+                contentRect: NSRect(origin: offscreenOrigin, size: NSSize(width: 100, height: 100)),
+                styleMask: [.titled], backing: .buffered, defer: false)
+            titledVisible.isReleasedWhenClosed = false
+            Presentation.present(titledVisible, inert: true)
+            defer { titledVisible.close() }
+            let titledHidden = HostSafeWindow(
+                contentRect: NSRect(origin: offscreenOrigin, size: NSSize(width: 100, height: 100)),
+                styleMask: [.titled], backing: .buffered, defer: true)
+            let borderless = HostSafeWindow(
+                contentRect: NSRect(origin: offscreenOrigin, size: NSSize(width: 100, height: 100)),
+                styleMask: [.borderless], backing: .buffered, defer: false)
+            borderless.isReleasedWhenClosed = false
+            Presentation.present(borderless, inert: true)
+            defer { borderless.close() }
+
+            #expect(!PanelController.otherWindowsVisible(except: panel, in: [panel, titledHidden, borderless]))
+            #expect(PanelController.otherWindowsVisible(except: panel, in: [panel, titledVisible]))
+
+            // Guard branches: no-op when returnFocus is false, inert is true, or app isn't active.
+            var activated: [NSRunningApplication] = [], hid = 0
+            pc.restoreFocusOnHide(
+                except: panel, returnFocus: false, inert: false, appIsActive: true, windows: [panel],
+                activate: { activated.append($0) }, hideApp: { hid += 1 })
+            pc.restoreFocusOnHide(
+                except: panel, returnFocus: true, inert: true, appIsActive: true, windows: [panel],
+                activate: { activated.append($0) }, hideApp: { hid += 1 })
+            pc.restoreFocusOnHide(
+                except: panel, returnFocus: true, inert: false, appIsActive: false, windows: [panel],
+                activate: { activated.append($0) }, hideApp: { hid += 1 })
+            #expect(activated.isEmpty && hid == 0)
+
+            // No other titled windows visible -> hides the app.
+            pc.restoreFocusOnHide(
+                except: panel, returnFocus: true, inert: false, appIsActive: true, windows: [panel],
+                activate: { activated.append($0) }, hideApp: { hid += 1 })
+            #expect(hid == 1 && activated.isEmpty)
+
+            // Another titled window visible + previousApp stored -> activates previousApp, keeps our windows up.
+            if let other {
+                pc.updatePreviousApp(front: other, current: current, wasVisible: false)
+                // Re-showing while already visible preserves previousApp.
+                pc.updatePreviousApp(front: current, current: current, wasVisible: true)
+                pc.restoreFocusOnHide(
+                    except: panel, returnFocus: true, inert: false, appIsActive: true, windows: [panel, titledVisible],
+                    activate: { activated.append($0) }, hideApp: { hid += 1 })
+                #expect(activated == [other] && hid == 1)
+            }
+
+            // Fresh open when FSearch is already frontmost clears previousApp.
+            pc.updatePreviousApp(front: current, current: current, wasVisible: false)
+            pc.restoreFocusOnHide(
+                except: panel, returnFocus: true, inert: false, appIsActive: true, windows: [panel, titledVisible],
+                activate: { activated.append($0) }, hideApp: { hid += 1 })
+            #expect(hid == 1)
+        }
     }
 }
 

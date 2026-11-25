@@ -72,6 +72,73 @@ extension AppTests {
             #expect(!axTexts(in: w).contains("Check for Updates…"))
             #expect(!axTexts(in: w).contains("Automatically check for updates"))
         }
+
+        /// Starting installs the controller once and resumes a persisted reminder in the background.
+        @Test func startInstallsControllerOnceAndResumesReminder() {
+            let defaults = TestEnv.emptySuite(TestEnv.unitSuite)
+            defer {
+                Updater.setController(nil)
+                _ = TestEnv.emptySuite(TestEnv.unitSuite)
+            }
+            let model = UpdateReminderModel(defaults: defaults)
+            model.update { $0.willShow(bySparkle: false, userInitiated: false) }
+            #expect(model.persistedVisible)
+
+            var created = 0, bgChecks = 0
+            let make = { () -> SPUStandardUpdaterController in
+                created += 1
+                return SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: nil, userDriverDelegate: nil)
+            }
+            Updater.start(configured: true, testMode: false, model: model, makeController: make) { _ in bgChecks += 1 }
+            #expect(created == 1 && bgChecks == 1 && Updater.controller != nil && !model.persistedVisible)
+            // Second start is a no-op once a controller is installed.
+            Updater.start(configured: true, testMode: false, model: model, makeController: make) { _ in bgChecks += 1 }
+            #expect(created == 1 && bgChecks == 1)
+        }
+
+        /// Toggling automatic checks writes back through the seam without touching UserDefaults.standard.
+        @Test func autoCheckStateWritesChangesThroughSeam() {
+            let c = installController()
+            defer { Updater.setController(nil) }
+            var written: [Bool] = []
+            let state = AutoCheckState(updater: c.updater, writeAutomatic: { written.append($0) })
+            let toggled = !state.automatic
+            state.automatic = toggled
+            #expect(written == [toggled])
+        }
+
+        /// The menu and Settings update buttons activate where required and invoke checkForUpdates.
+        @Test func updateButtonsInvokeCheckForUpdates() async throws {
+            let model = UpdateReminderModel.shared
+            defer { model.update { $0.userDidReceiveAttention() } }
+            let savedCheck = Updater.checkForUpdates
+            let savedActivate = AppActivation.activate
+            Updater.forceCanCheckForTesting = true
+            defer {
+                Updater.forceCanCheckForTesting = false
+                Updater.checkForUpdates = savedCheck
+                AppActivation.activate = savedActivate
+                Updater.setController(nil)
+            }
+            var events: [String] = []
+            AppActivation.activate = { events.append("activate") }
+            Updater.checkForUpdates = { _ in events.append("check") }
+
+            _ = installController()
+            model.update { $0.willShow(bySparkle: false, userInitiated: false) }
+            let w = await render(
+                VStack {
+                    UpdateAvailableItem()
+                    CheckForUpdatesItem()
+                    Form { UpdatesSettingsSection() }
+                }, size: NSSize(width: 440, height: 220))
+            defer { w.close() }
+
+            try #require(await axWait("Update Available…", in: w)).press()
+            try #require(await axWait("Check for Updates…", in: w)).press()
+            try #require(await axWait("Check Now", in: w)).press()
+            #expect(events == ["activate", "check", "activate", "check", "check"])
+        }
     }
 
     @Suite @MainActor

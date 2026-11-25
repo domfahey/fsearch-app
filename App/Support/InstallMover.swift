@@ -10,7 +10,7 @@ enum InstallMover {
         @convention(c) (CFURL, UnsafeMutablePointer<Bool>, UnsafeMutablePointer<Unmanaged<CFError>?>?) -> Bool
     private typealias OriginalPath = @convention(c) (CFURL, UnsafeMutablePointer<Unmanaged<CFError>?>?) -> Unmanaged<CFURL>?
 
-    private static func symbol<T>(_ name: String, as: T.Type) -> T? {
+    static func symbol<T>(_ name: String, as: T.Type) -> T? {
         guard let h = dlopen("/System/Library/Frameworks/Security.framework/Security", RTLD_LAZY), let s = dlsym(h, name) else {
             return nil
         }

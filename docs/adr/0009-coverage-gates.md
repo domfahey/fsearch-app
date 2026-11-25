@@ -1,7 +1,7 @@
 # 0009. Coverage gates (FSearchKit 90%, app unit tests 80%)
 
 Date: 2026-10-10
-Status: Accepted. Superseded in part by [ADR 0011](0011-app-unit-test-gate-at-90.md): the app unit-test gate is now 90%.
+Status: Superseded by [ADR 0011](0011-app-unit-test-gate-at-90.md) and [ADR 0012](0012-coverage-gates-at-95.md): both coverage gates are now 95%.
 
 ## Context
 

@@ -15,6 +15,14 @@ struct SearchLogView: View {
     @State private var shown: [SearchLog.Record] = []
     @State private var filter = ""
     @State private var exportError: String?
+    #if DEBUG
+        private let runSavePanel: ((NSSavePanel) -> URL?)?
+
+        init(filter: String = "", runSavePanel: ((NSSavePanel) -> URL?)? = nil) {
+            _filter = State(initialValue: filter)
+            self.runSavePanel = runSavePanel
+        }
+    #endif
 
     private struct FilterKey: Equatable { let filter: String; let gen: Int }
 
@@ -84,7 +92,13 @@ struct SearchLogView: View {
         let p = NSSavePanel()
         p.nameFieldStringValue = "fsearch-searches.jsonl"
         p.allowedContentTypes = [UTType(filenameExtension: "jsonl") ?? .plainText]
-        guard p.runModal() == .OK, let url = p.url else { return }
+        let url: URL?
+        #if DEBUG
+            url = if let runSavePanel { runSavePanel(p) } else { p.runModal() == .OK ? p.url : nil }
+        #else
+            url = p.runModal() == .OK ? p.url : nil
+        #endif
+        guard let url else { return }
         do {
             try DebugFormat.jsonl(rows).write(to: url, options: .atomic)
             exportError = nil

@@ -1,7 +1,7 @@
 # 0011. App unit-test coverage gate at 90%
 
 Date: 2026-10-11
-Status: Accepted. Supersedes the app gate in [ADR 0009](0009-coverage-gates.md).
+Status: Superseded by [ADR 0012](0012-coverage-gates-at-95.md): both coverage gates are now 95%. Supersedes the app gate in [ADR 0009](0009-coverage-gates.md).
 
 ## Context
 

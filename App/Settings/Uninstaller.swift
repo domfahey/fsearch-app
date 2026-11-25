@@ -107,12 +107,19 @@ final class Uninstaller: ObservableObject {
             dataFolder: DebugFormat.dataDir(socketPath: options.socketPath),
             logFolder: options.searchLogFile.deletingLastPathComponent(),
             resetShortcut: { KeyboardShortcuts.reset(.togglePanel) },
-            waitUntilStopped: {
-                for _ in 0..<30 {
-                    if (try? await client.ping()) == nil { return }
-                    try? await Task.sleep(for: .milliseconds(100))
-                }
-            })
+            waitUntilStopped: { await Self.waitUntilStopped(ping: { try await client.ping() }) })
+    }
+
+    /// Polls `ping` until the unregistered helper stops answering, up to `maxAttempts`.
+    static func waitUntilStopped(
+        ping: @escaping () async throws -> Void,
+        sleep: @escaping () async -> Void = { try? await Task.sleep(for: .milliseconds(100)) },
+        maxAttempts: Int = 30
+    ) async {
+        for _ in 0..<maxAttempts {
+            if (try? await ping()) == nil { return }
+            await sleep()
+        }
     }
 
     /// `ownership`: DaemonManager.dataOwnership, read before anything is unregistered.

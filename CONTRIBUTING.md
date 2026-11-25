@@ -59,7 +59,7 @@ Two modes keep tests away from your real setup. **Test mode** starts when you pa
 | Tier | Run it | Safe to run while you work? | In CI? |
 |---|---|---|---|
 | FSearchKit unit and integration tests, against a real daemon in a temporary `HOME` | `make test` | Yes | Yes, on macOS 26 |
-| AppTests, the app's unit tests, in an inert host with fakes | `make apptest` or `scripts/coverage.sh --unit-only` | Yes. The host shows nothing and takes no focus. | Yes, with a 90% coverage gate |
+| AppTests, the app's unit tests, in an inert host with fakes | `make apptest` or `scripts/coverage.sh --unit-only` | Yes. The host shows nothing and takes no focus. | Yes, with a 95% coverage gate |
 | UI and end-to-end tests (AppUITests) | `make ui` | No. It synthesizes keystrokes. Use a hands-off GUI session. | No |
 | Benchmarks | `scripts/bench.sh --report-only --skip-daemon` (or `make bench` for the full run) | Yes | Report-only |
 
@@ -103,7 +103,7 @@ Two modes keep tests away from your real setup. **Test mode** starts when you pa
 ## Tests
 
 - New behavior needs a test that fails without it.
-- Coverage gates: CI fails if FSearchKit line coverage drops below 90% (`scripts/coverage.sh --kit-only --min 90`) or if AppTests-only app coverage (excluding documented system adapters) drops below 90% (`scripts/coverage.sh --unit-only --min 90`). See [ADR 0011](docs/adr/0011-app-unit-test-gate-at-90.md). `make ci` runs both gates. To try a different floor, pass `--min` or set `COVERAGE_MIN`, for example `scripts/coverage.sh --kit-only --min 90` or `COVERAGE_MIN=90 scripts/coverage.sh --kit-only`. The full app number, which combines AppTests with the UI tests, needs a hands-off GUI session: run `make coverage`.
+- Coverage gates: CI fails if FSearchKit line coverage drops below 95% (`scripts/coverage.sh --kit-only --min 95`) or if AppTests-only app coverage (excluding documented system adapters) drops below 95% (`scripts/coverage.sh --unit-only --min 95`). See [ADR 0012](docs/adr/0012-coverage-gates-at-95.md). `make ci` runs both gates. To try a different floor, pass `--min` or set `COVERAGE_MIN`, for example `scripts/coverage.sh --kit-only --min 95` or `COVERAGE_MIN=95 scripts/coverage.sh --kit-only`. The full app number, which combines AppTests with the UI tests, needs a hands-off GUI session: run `make coverage`.
 - Tests must never touch the real index, `~/Library/LaunchAgents`, `~/.local/bin` or `~/Library/Application Support/FSearch`.
 - Use a temporary `HOME` and `FSEARCH_ROOT` for anything that starts a daemon. In the core tests, use `RealDaemon`: it runs the daemon under a watchdog that stops it and deletes its temporary directory when the test process exits or crashes, and it sweeps orphans from earlier hard-killed runs. See [ADR 0005](docs/adr/0005-tests-never-touch-the-real-index.md).
 

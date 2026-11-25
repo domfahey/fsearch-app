@@ -98,11 +98,7 @@ struct SettingsView: View {
                 .disabled(app.options.testMode)
                 .confirmationDialog("Remove FSearch's background helper and data?", isPresented: $confirming) {
                     Button("Remove", role: .destructive) {
-                        let ownership = app.daemon.dataOwnership
-                        Task {
-                            await uninstaller.run(ownership: ownership, daemon: app.daemon)
-                            loginItem.refresh()
-                        }
+                        Task { await Self.performRemoval(app: app, uninstaller: uninstaller, loginItem: loginItem) }
                     }
                     Button("Cancel", role: .cancel) {}
                 } message: {
@@ -126,6 +122,14 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    /// Captures daemon ownership before unregistering, runs the uninstaller, and refreshes the login item state.
+    @MainActor
+    static func performRemoval(app: AppState, uninstaller: Uninstaller, loginItem: LoginItemModel) async {
+        let ownership = app.daemon.dataOwnership
+        await uninstaller.run(ownership: ownership, daemon: app.daemon)
+        loginItem.refresh()
     }
 
     /// Turning debug mode off also deletes the search log and closes the debug windows.

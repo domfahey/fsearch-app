@@ -200,13 +200,23 @@ struct OnboardingView: View {
     /// Observed directly: AppState doesn't forward DaemonManager's changes.
     @ObservedObject private var daemon: DaemonManager
     @State private var shortcut = KeyboardShortcuts.getShortcut(for: .togglePanel)
+    private let runningBundleIds: () -> Set<String>
 
     private static let pollInterval = Duration.seconds(1)
 
     init(flow: OnboardingFlow) {
         _flow = StateObject(wrappedValue: flow)
         daemon = flow.app.daemon
+        runningBundleIds = { Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier)) }
     }
+
+    #if DEBUG
+        init(flow: OnboardingFlow, runningBundleIds: @escaping () -> Set<String>) {
+            _flow = StateObject(wrappedValue: flow)
+            daemon = flow.app.daemon
+            self.runningBundleIds = runningBundleIds
+        }
+    #endif
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -262,7 +272,7 @@ struct OnboardingView: View {
         }
         if let w = Onboarding.hotkeyWarning(
             defaultIsOptionSpace: shortcut == .init(.space, modifiers: [.option]),
-            runningBundleIds: Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier)))
+            runningBundleIds: runningBundleIds())
         {
             Text("⚠ " + w).foregroundStyle(.orange).font(.callout)
                 .accessibilityLabel("Warning: \(w)")
