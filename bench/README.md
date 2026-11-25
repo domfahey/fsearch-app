@@ -12,7 +12,7 @@ scripts/bench.sh --record          # run + rewrite this machine's baseline entry
 scripts/bench.sh --self-test       # simulate a 2x slowdown: must exit 1
 scripts/bench.sh --skip-daemon     # in-process metrics only (no Vendor/fsearch needed)
 scripts/bench.sh --filter daemon.grep,decode   # metrics whose names start with these
-scripts/bench.sh --report-only     # compare, but never fail (CI)
+scripts/bench.sh --report-only     # compare, but never fail
 ```
 
 A full run takes about 20 s. Results land in `bench/results/<UTC time>-<machine>.json`

@@ -29,11 +29,12 @@ Click the FSearch icon in the menu bar and choose **Quit FSearch**.
 
 Quitting the app does not stop the background helper. Do step 2 to stop it, or use the in-app button first.
 
-### 2. Remove the background helper
+### 2. Remove the background helper and login item
 
 1. Open **System Settings**.
 2. Go to **General**, then **Login Items & Extensions**.
-3. Find **FSearch** in the list of background items and turn it off or remove it.
+3. If you enabled **Open FSearch at login**, remove **FSearch** from **Open at Login**.
+4. Find **FSearch** under **Allow in the Background** and turn it off or remove it.
 
 The helper's launch agent is `com.domfahey.fsearch.daemon` (file `com.domfahey.fsearch.daemon.plist`). Do this before you delete the app, so no entry is left behind.
 

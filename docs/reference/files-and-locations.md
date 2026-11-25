@@ -11,7 +11,7 @@ This is the fsearch daemon's folder. The app and the fsearch CLI share it, so th
 | File | What it is |
 |---|---|
 | `fsearch.sock` | The socket the app uses to talk to the daemon. |
-| `daemon.log` | The daemon's log (written by the fsearch CLI's daemon; the app's bundled `SMAppService` helper does not write `daemon.log` and logs to the macOS unified log instead). Index Details shows its last 30 lines in debug mode when present. |
+| `daemon.log` | The daemon's log, written by the fsearch CLI's daemon. The app's bundled `SMAppService` helper does not write `daemon.log` (its stderr is discarded; the FSearch app itself writes operational logs to the macOS unified log). Index Details shows the last 30 lines of `daemon.log` in debug mode when present. |
 
 In debug mode, **Reveal Data Folder** in Index Details opens this folder.
 

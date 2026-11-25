@@ -14,13 +14,13 @@ The new shortcut works right away. You can also set it in the first step of the 
 
 Another app may already use the same keys. macOS gives no way to ask which app owns a shortcut, so FSearch cannot tell you directly.
 
-During setup, FSearch warns you when it sees one of these launchers running while the shortcut is still ⌥Space:
+During setup and in Settings, FSearch warns you when it sees one of these launchers running while the shortcut is still ⌥Space:
 
 - Raycast uses ⌥Space by default. Pick another shortcut in FSearch, or turn Raycast's off in Raycast's settings.
 - Alfred may use ⌥Space. Pick another shortcut in FSearch, or change Alfred's.
 
 Other apps can hold the same keys without a warning. If your shortcut does nothing, choose a different one.
 
-You can always open the panel from the menu-bar icon with **Search…**.
+You can always open the panel from the menu-bar icon with **Search…**, by opening `fsearch://search` (see [URL scheme](../reference/url-scheme.md)), or by launching FSearch again while it is already running.
 
-See also: [Keyboard shortcuts](../reference/keyboard-shortcuts.md), [Troubleshooting](../reference/troubleshooting.md).
+See also: [Keyboard shortcuts](../reference/keyboard-shortcuts.md), [URL scheme](../reference/url-scheme.md), [Troubleshooting](../reference/troubleshooting.md).

@@ -4,9 +4,11 @@ import Foundation
 /// download) or one on a read-only volume (the DMG) must not register the
 /// helper: the login item would point into a path that goes away.
 public enum InstallLocation {
+    /// Why the current bundle location cannot safely register the background helper.
     public enum Problem: Equatable, Sendable {
         case translocated, readOnlyVolume
 
+        /// Localized explanation shown in the "Move FSearch to Applications" alert.
         public var message: String {
             switch self {
             case .translocated:
@@ -23,6 +25,7 @@ public enum InstallLocation {
         }
     }
 
+    /// Returns the install-location problem for `bundlePath`, or nil when it is safe to run from there.
     public static func problem(bundlePath: String, translocated: Bool, readOnlyVolume: Bool) -> Problem? {
         if translocated || bundlePath.contains("/AppTranslocation/") { return .translocated }
         return readOnlyVolume ? .readOnlyVolume : nil

@@ -10,7 +10,7 @@ The daemon can only index what macOS lets it read. See [Full Disk Access](#full-
 
 ## Where it lives
 
-- **The index and the daemon's files** are in `~/Library/Application Support/FSearch`. This folder is the daemon's data folder. It holds the index, the socket the app talks to, and the daemon's log.
+- **The index and the daemon's files** are in `~/Library/Application Support/FSearch`. This folder is the daemon's data folder. It holds the index, the socket the app talks to, and (when using a separately installed fsearch CLI daemon) `daemon.log`. The app's bundled background helper does not write `daemon.log`.
 - **The app's settings** are stored in macOS preferences (UserDefaults) for the app. They include your shortcut, your editor choice, debug mode, and onboarding progress.
 - **Recent files** are the paths of the last files you opened from the panel. FSearch stores paths only, not file contents. It keeps up to 16 and shows up to 8.
 - **The debug search log** is in `~/Library/Logs/FSearch/searches.jsonl`. See below.
@@ -19,13 +19,19 @@ The daemon can only index what macOS lets it read. See [Full Disk Access](#full-
 
 Debug mode is off by default. It is turned on in Settings, or with Turn On Debug Mode in the menu bar (⌥⌘D, which works while the menu-bar menu is open).
 
-While debug mode is on, FSearch writes one line for each search it runs in the panel. Each line has the time, the query, the search mode, the number of results, and the timings. Your search text is in the log.
+While debug mode is on, FSearch writes one line for each search it runs in the panel (including searches opened via `fsearch://search`). Each line has the time, the query, the search mode, the number of results, and the timings. Your search text is in the log.
 
-- The log is capped at 10,000 searches. Older ones are dropped.
-- It only records searches from this app. It does not record searches from the fsearch CLI or other apps.
+- The log shows the newest 10,000 searches (and compacts the file back down to 10,000 lines whenever it reaches 20,000). Older ones are dropped.
+- It only records searches made in the panel. It does not record searches from the fsearch CLI, background Shortcuts (**Search Files**) runs, or other apps.
 - Turning debug mode off deletes the log.
 - Clear Log, in the Search Log window, empties it at any time.
 - The log folder is readable only by your account (mode 0700), the file is private to you (0600), and both are left out of Time Machine backups.
+
+## Unified logging and Privacy Manifest
+
+- The app writes operational events to the macOS unified log (`os.Logger`, subsystem `com.domfahey.fsearch`). Queries are never logged, and file paths and error details are marked `private`. See [Collecting logs](reference/troubleshooting.md#collecting-logs).
+- `FSearch.app` includes a Privacy Manifest (`PrivacyInfo.xcprivacy`) declaring no tracking, no collected data types, and only two required-reason API categories: UserDefaults (`CA92.1`, the app's own preferences) and file timestamps (`C617.1`, reading modification times of its own helper binary and log/skipped files).
+- **Report an Issue…** (or **Send Feedback**) opens a pre-filled GitHub issue form in your browser containing only non-private diagnostics (app version/build, macOS version, chip, and daemon install/state) — never paths or queries, and nothing is sent unless you submit the form.
 
 ## Known limitations
 
@@ -36,7 +42,7 @@ The index and the daemon's socket live in your account's data folder and are not
 - The app has no telemetry and no analytics.
 - The app does not send your files, file names, searches or logs anywhere.
 - The app's dependencies are KeyboardShortcuts (the shortcut) and Sparkle (updates). Neither one sends your data.
-- The only network request the app makes is the update check, and only once update signing keys are configured in a release build. Sparkle then reads the update feed at `https://domfahey.github.io/fsearch-app/appcast.xml` and downloads signed updates.
+- The only network request the app makes is the update check, and only once a real Sparkle public key (`SUPublicEDKey`) is configured in `Info.plist` (outside test mode). Sparkle then reads the update feed at `https://domfahey.github.io/fsearch-app/appcast.xml` and downloads signed updates.
 
 ## Full Disk Access
 

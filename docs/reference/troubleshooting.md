@@ -18,7 +18,7 @@ The app cannot reach the search daemon. It restarts the daemon it registered its
 
 The fsearch daemon is building its first index. Results appear when it finishes, usually within a minute or so. The panel keeps checking by itself. Searching works as soon as the index is ready.
 
-If it never finishes, open Index Details and check that the entry count grows.
+If it never finishes, open Index Details: while initial indexing is running it shows **Indexing…**; once the initial scan finishes, it switches to the **Index** stats (entries, folders and content files waiting to be indexed). If it stays stuck on **Indexing…**, check the unified log below or `daemon.log` (when using the CLI daemon).
 
 ## The menu-bar icon shows a warning
 
@@ -45,11 +45,11 @@ macOS asks you to approve background helpers. Open System Settings, General, Log
 
 ## Opening a line opens the file instead
 
-The file opens in its default app, not at the line, when:
+The file opens without jumping to the line when:
 
-- you left **Open content results in** on **Default app**;
-- the chosen editor is gone, or it couldn't open the file (the app then falls back to the default app);
-- the editor is Xcode, which opens the file without jumping to the line;
+- you left **Open content results in** on **Default app** (opens in the default app);
+- the chosen editor is gone, or LaunchServices returns an error when opening with it (falls back to the default app);
+- the chosen editor is Xcode, or another installed editor whose open-at-line URL scheme is not registered with LaunchServices (opens in that chosen editor, without jumping to the line);
 - the result is a file name, not a matching line. Only matching lines open at a line.
 
 See [Open results in your editor](../how-to/open-results-in-your-editor.md). Zed, Sublime Text and BBEdit are not tested on a real install yet.
@@ -108,7 +108,7 @@ Quit FSearch from the menu and open it again. Then see [Support](../../.github/S
 FSearch writes to the macOS unified log under the subsystem `com.domfahey.fsearch`, in the categories `daemon`, `onboarding`, `actions` and `debug`. To watch it live:
 
 ```sh
-log stream --predicate 'subsystem == "com.domfahey.fsearch"' --level debug
+/usr/bin/log stream --predicate 'subsystem == "com.domfahey.fsearch"' --level debug
 ```
 
 In Console.app, choose your Mac, then search for `subsystem:com.domfahey.fsearch`. Turn on Action > Include Info Messages to see state changes (routine polls stay quiet).

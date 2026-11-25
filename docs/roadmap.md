@@ -10,7 +10,9 @@ The launcher panel, opened with a shortcut. It searches by name, inside files, a
 
 Also in v1:
 
-- App commands in the panel ("settings" opens Settings).
+- App commands in the panel ("settings" opens Settings) and the panel's FSearch menu (`⌘/`).
+- `fsearch://` URL scheme ([URL scheme](reference/url-scheme.md)) and the **Search Files** Shortcuts action ([Shortcuts](reference/shortcuts.md)).
+- Accessibility support (Reduce Motion, Reduce Transparency, Increase Contrast, VoiceOver labels and traits, keyboard defaults) and English String Catalogs ready for translation.
 - Open FSearch at login.
 - An in-app uninstall button. See [Uninstall](uninstall.md).
 - Unified logging.
@@ -18,7 +20,7 @@ Also in v1:
 
 ## Next
 
-- Accessibility and localization.
+- Non-English translations (English String Catalogs for the app and FSearchKit are already in place).
 
 ## v2: an Everything-style search window
 

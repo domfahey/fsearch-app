@@ -14,13 +14,13 @@ This page lists every keyboard shortcut in FSearch for Mac.
 |---|---|
 | ↑ or ⌃P | Move the selection up |
 | ↓ or ⌃N | Move the selection down |
-| ↵ | Open the selected file in its default app. For a line from a content search, open it at that line in your chosen editor. On a "Use … with…" row, switch to that search. On the **FSearch Settings** row, open Settings. The panel hides after a file opens. |
+| ↵ | Open the selected file in its default app (or reveal it in Finder if it is an app, script, installer, internet location or executable — use ⌘K → **Open** to launch it). For a matching line from a content or definition search, open it at that line in your chosen editor. On a "Use … with…" row, switch to that search. On the **FSearch Settings** row, open Settings and hide the panel. The panel hides after a file opens or is revealed. |
 | ⌘↵ | Reveal the selected file in Finder, and hide the panel |
 | ⌘Y | Quick Look the selected file. While the preview is up, ↑ and ↓ (with no modifiers) move the selection and the preview follows; ⌘ or ⇧ arrows go to Quick Look. Press ⌘Y again to close it. |
 | ⌘⇧C | Copy the selected file's path |
 | ⌘K | Open the actions menu under the selected file |
 | ⌘/ | Open or close the FSearch menu. See [FSearch menu (⌘/)](#fsearch-menu-) below. |
-| ⌘1 to ⌘9 | Open the first to ninth file result. It never lands on a command or "Use … with…" row. |
+| ⌘1 to ⌘9 | Open the first to ninth file result (revealing launchables, as with ↵). It never lands on a command or "Use … with…" row. |
 | Esc | Clear the query. If the query is already empty, remove the **Inside files** or **Definitions** chip. If there is no chip, hide the panel. |
 | Backspace on an empty field | Remove the **Inside files** or **Definitions** chip |
 
@@ -45,7 +45,7 @@ Type a command's name (or the start of it) to show its row under the file result
 | Action | Result |
 |---|---|
 | Click a row | Select it |
-| Double-click a row | Open it |
+| Double-click a row | Open it (or reveal it if launchable, as with ↵) |
 | Drag a row | Drag the file into Finder, Mail or another app |
 | Click a "Use … with…" row | Switch to Search inside files or Find definitions |
 | Click the FSearch Settings row | Open Settings |
@@ -101,8 +101,8 @@ The mouse works too: point at a row to select it, click to run it, and click out
 | Item | Shortcut | Does |
 |---|---|---|
 | Update Available… | | Shown when a scheduled update is waiting; opens the update window |
-| Turn On Full Disk Access… or Grant Full Disk Access to fsearch… | | Shown after you skip Full Disk Access, until access is granted. Opens Full Disk Access in System Settings |
-| Don't Remind Me | | Next to the Full Disk Access item; hides the reminder |
+| Turn On Full Disk Access… or Grant Full Disk Access to fsearch… | | Shown whenever Full Disk Access is off (unless you skipped and dismissed the reminder). Opens Full Disk Access in System Settings and, for FSearch's own helper, restarts the helper automatically once granted |
+| Don't Remind Me | | Shown below the Full Disk Access item only if you skipped Full Disk Access during onboarding; hides the reminder |
 | Search… | | Open the panel |
 | Index Details… | | Debug mode only |
 | Search Log… | | Debug mode only |
