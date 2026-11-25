@@ -230,12 +230,13 @@ jobs:
         run: security delete-keychain "$KEYCHAIN" || true
 
   bench:
-    # Non-blocking performance report (bench/README.md). Compares against a
-    # "ci-macos-26" baseline entry if one exists, never fails the workflow, and
-    # uploads the results JSON. Hosted-runner timings are noisy; read trends, not single runs.
+    # Performance regression check (bench/README.md). Compares against the
+    # "ci-macos-26" baseline entry in bench/baseline.json and uploads the results
+    # JSON. Exit 75 means the hosted runner stayed busy or slow (logged as a
+    # warning); exit 1 means a metric regressed twice on a quiet canary and fails
+    # this job.
     runs-on: macos-26
     timeout-minutes: 45
-    continue-on-error: true
     env:
       BENCH_MACHINE: ci-macos-26
       # Seconds each daemon request may take (local default 15 or 30). Hosted runners stall.
@@ -247,7 +248,15 @@ jobs:
       - run: sudo xcode-select -s /Applications/Xcode_26.6.app
       - run: scripts/setup-rust.sh
       - run: scripts/build-daemon.sh --host-only
-      - run: scripts/bench.sh --report-only
+      - name: Run benchmarks and compare against ci-macos-26 baseline
+        run: |
+          rc=0
+          scripts/bench.sh || rc=$?
+          if [ "$rc" -eq 75 ]; then
+            echo "::warning::Benchmarks inconclusive (hosted runner busy or slow); not failing CI"
+            exit 0
+          fi
+          exit "$rc"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:

@@ -7,7 +7,7 @@ Detail for the bug-audit items is in `.superpowers/audit-round2.md`, and for the
 ## P2: smaller bugs and polish
 
 - [ ] One empty `com.domfahey.fsearch.apptests.unit.plist` stays in ~/Library/Preferences after a full AppTests run (cfprefsd writes it back); it is swept on the next run.
-- [ ] CI benchmark baseline: add a `ci-macos-26` entry from a CI artifact, so the bench job can gate.
+- [x] CI benchmark baseline: add a `ci-macos-26` entry from a CI artifact, so the bench job can gate.
 - [ ] Accessibility: keyboard navigation in Settings and onboarding, Reduce Motion and Transparency, Increase Contrast.
 - [ ] Localization readiness: a String Catalog, English only for now.
 - [ ] Query docs depth: ranking, typo tolerance, how words combine, `limit:`. Check each against the daemon first.
