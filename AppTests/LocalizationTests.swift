@@ -32,7 +32,7 @@ extension AppTests {
                     "FSearch Help",
                     "Turn on FSearch",
                     "FSearch won't open when you log in.",
-                    "The search helper stopped answering.",
+                    "The background helper stopped answering.",
                     "Welcome to FSearch",
                     "Move to Trash",
                     "Move FSearch to Applications",
@@ -61,7 +61,7 @@ extension AppTests {
             #expect(String(localized: "Move to Trash", bundle: .main) == "Move to Trash")
             #expect(String(localized: "Move FSearch to Applications", bundle: .main) == "Move FSearch to Applications")
             #expect(FileActions.missingMessage("/p/report.pdf") == "“report.pdf” is gone: moved or deleted")
-            #expect(UserMessage.forPhase(.failed(.disconnected), helperGaveUp: true) == "The search helper isn't answering")
+            #expect(UserMessage.forPhase(.failed(.disconnected), helperGaveUp: true) == "The background helper isn't answering")
         }
     }
 }

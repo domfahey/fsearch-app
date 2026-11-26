@@ -42,6 +42,16 @@ extension AppTests {
             #expect(env.workspace.openedWith.isEmpty)
         }
 
+        @Test func footerMessagesShowNoBidiControlsInNames() {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            #expect(FileActions.missingMessage("/p/invoice\u{202E}fdp.exe") == "“invoice\u{FFFD}fdp.exe” is gone: moved or deleted")
+            env.workspace.defaultOpenSucceeds = false
+            var errors: [String] = []
+            #expect(!FileActions.open(.file(Wire.hit("/p/invoice\u{202E}fdp.exe")), editor: nil) { errors.append($0) })
+            #expect(errors == ["Couldn't open “invoice\u{FFFD}fdp.exe”"])
+        }
+
         @Test func defaultOpenRefusalReportsAnErrorAndReturnsFalse() {
             let env = TestEnv()
             defer { env.tearDown() }
@@ -123,6 +133,36 @@ extension AppTests {
             env.workspace.openWithError = TestError("no handler")
             #expect(FileActions.open(line, editor: .vscode, onError: noErrors))
             #expect(await eventually { env.workspace.opened == [URL(fileURLWithPath: "/p/main.swift")] })
+        }
+
+        /// An app squatting an editor's bundle id must not receive file paths: untrusted means default app plus an error.
+        @Test func untrustedEditorIsNeverOpenedAndFallsBackWithAnError() throws {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            env.workspace.apps[Editor.vscode.bundleId] = vscodeApp
+            env.workspace.schemeHandlers["vscode"] = [vscodeApp]
+            env.workspace.untrustedApps = [vscodeApp]
+            #expect(FileActions.editorTarget(for: line, editor: .vscode) == nil)
+            #expect(!FileActions.opensAtLine(line, editor: .vscode))
+            var errors: [String] = []
+            #expect(FileActions.open(line, editor: .vscode) { errors.append($0) })
+            #expect(env.workspace.openedWith.isEmpty)
+            #expect(env.workspace.opened == [URL(fileURLWithPath: "/p/main.swift")])
+            #expect(
+                errors == ["Not opening in Visual Studio Code: its code signature isn’t the genuine app’s. Opened with the default app."])
+            #expect(!env.workspace.checkedRequirements.isEmpty)
+            #expect(env.workspace.checkedRequirements.allSatisfy { $0 == Editor.vscode.codeRequirement })
+        }
+
+        @Test func untrustedEditorWithRefusingDefaultReportsOnlyTheOpenFailure() {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            env.workspace.apps[Editor.vscode.bundleId] = vscodeApp
+            env.workspace.untrustedApps = [vscodeApp]
+            env.workspace.defaultOpenSucceeds = false
+            var errors: [String] = []
+            #expect(!FileActions.open(line, editor: .vscode) { errors.append($0) })
+            #expect(errors == ["Couldn't open “main.swift”"])
         }
 
         @Test func editorFallbackRefusalReportsAnError() async throws {
@@ -612,6 +652,36 @@ extension AppTests {
             run(menu.item(withTitle: "Open Folder in Terminal"))  // no Terminal: errors
             #expect(env.app.actionError == "Couldn't find Terminal")
             #expect(env.panel.hides == 1)
+        }
+
+        // Real Security framework, read-only: a system app nothing launches.
+        @Test func codeSignatureAnswersFromTheIdentityCheckThenFullValidationOffTheMainThread() async {
+            let calculator = URL(fileURLWithPath: "/System/Applications/Calculator.app")
+            CodeSignature.reset()
+            defer { CodeSignature.reset() }
+            #expect(CodeSignature.identityFlags.contains(SecCSFlags(rawValue: kSecCSDoNotValidateResources)))
+            #expect(!CodeSignature.fullFlags.contains(SecCSFlags(rawValue: kSecCSDoNotValidateResources)))
+            #expect(CodeSignature.satisfies(calculator, requirement: "anchor apple"))
+            await CodeSignature.settle()
+            #expect(CodeSignature.checks == [.identity, .full], "the full check, resources included, runs once in the background")
+            #expect(CodeSignature.satisfies(calculator, requirement: "anchor apple"))
+            #expect(CodeSignature.checks == [.identity, .full], "then the answer is cached")
+            #expect(!CodeSignature.satisfies(calculator, requirement: "identifier \"com.example.nope\""))
+            await CodeSignature.settle()
+            #expect(CodeSignature.checks == [.identity, .full, .identity], "a failed identity check needs no full one")
+            #expect(!CodeSignature.satisfies(URL(fileURLWithPath: "/nonexistent/Nope.app"), requirement: "anchor apple"))
+        }
+
+        /// An app whose identity checks out but whose resources were changed (an Electron editor's
+        /// JavaScript, say) stops being trusted once the full check finishes.
+        @Test func codeSignatureDistrustsAnAppWhoseResourcesFailTheFullCheck() async {
+            let calculator = URL(fileURLWithPath: "/System/Applications/Calculator.app")
+            CodeSignature.reset()
+            defer { CodeSignature.reset() }
+            CodeSignature.validator = { _, _, flags in flags == CodeSignature.identityFlags }
+            #expect(CodeSignature.satisfies(calculator, requirement: "anchor apple"), "identity only so far")
+            await CodeSignature.settle()
+            #expect(!CodeSignature.satisfies(calculator, requirement: "anchor apple"))
         }
     }
 }

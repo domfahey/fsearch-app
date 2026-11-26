@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 
 @testable import FSearchKit
@@ -123,5 +124,60 @@ import Testing
         log.clear()
         log.flush()
         #expect(log.entries().isEmpty)
+    }
+
+    // MARK: age limit
+
+    private static let now = Date(timeIntervalSince1970: 1_800_000_000)
+    private func line(_ query: String, age: TimeInterval) throws -> String {
+        let enc = JSONEncoder(); enc.dateEncodingStrategy = .secondsSince1970
+        let r = SearchLog.Record(
+            time: Self.now.addingTimeInterval(-age), query: query, mode: "names", results: 1, tookUs: nil, roundTripMs: 0, error: nil)
+        return String(decoding: try enc.encode(r), as: UTF8.self)
+    }
+    private let day: TimeInterval = 86_400
+
+    @Test func entriesHidesRecordsOlderThanSevenDays() throws {
+        let s = sandbox(); defer { try? FileManager.default.removeItem(at: s.dir) }
+        try FileManager.default.createDirectory(at: s.dir, withIntermediateDirectories: true)
+        try [line("old", age: 7 * day + 1), line("edge", age: 7 * day - 1), line("new", age: 60)].joined(separator: "\n")
+            .appending("\n").write(to: s.file, atomically: true, encoding: .utf8)
+        let log = SearchLog(file: s.file, now: { Self.now })
+        #expect(log.entries().map(\.query) == ["edge", "new"])
+    }
+
+    @Test func appendDropsExpiredRecordsFromTheFile() throws {
+        let s = sandbox(); defer { try? FileManager.default.removeItem(at: s.dir) }
+        try FileManager.default.createDirectory(at: s.dir, withIntermediateDirectories: true)
+        try [line("old", age: 8 * day), line("new", age: 60)].joined(separator: "\n")
+            .appending("\n").write(to: s.file, atomically: true, encoding: .utf8)
+        let log = SearchLog(file: s.file, now: { Self.now })
+        log.append(e, at: Self.now)
+        let raw = try String(contentsOf: s.file, encoding: .utf8)
+        #expect(!raw.contains("old"))
+        #expect(log.entries().map(\.query) == ["new", "main"])
+    }
+
+    @Test func recordsAgeOutAsTheClockAdvances() {
+        let s = sandbox(); defer { try? FileManager.default.removeItem(at: s.dir) }
+        let clock = Mutex(Self.now)
+        let log = SearchLog(file: s.file, now: { clock.withLock { $0 } })
+        log.append(e, at: Self.now)
+        #expect(log.entries().count == 1)
+        clock.withLock { $0 = Self.now.addingTimeInterval(8 * 86_400) }
+        #expect(log.entries().isEmpty)
+        log.append(e, at: clock.withLock { $0 })
+        #expect(log.entries().count == 1)
+    }
+
+    @Test func atomicRewriteCreatesTheFileOwnerOnlyEvenWithALooseUmask() throws {
+        let s = sandbox(); defer { try? FileManager.default.removeItem(at: s.dir) }
+        try FileManager.default.createDirectory(at: s.dir, withIntermediateDirectories: true)
+        let old = umask(0); defer { umask(old) }
+        try SearchLog.writeAtomically(Data("x\n".utf8), to: s.file)
+        let mode = try FileManager.default.attributesOfItem(atPath: s.file.path)[.posixPermissions] as? Int
+        #expect(mode == 0o600)
+        #expect(try String(contentsOf: s.file, encoding: .utf8) == "x\n")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: s.dir.path) == ["searches.jsonl"])
     }
 }

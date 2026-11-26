@@ -263,7 +263,7 @@ extension AppTests {
                 if n <= 50 { throw DaemonError.disconnected }; return Wire.status()
             }
             await env.app.daemon.refresh()
-            #expect(env.app.daemon.state == .failed("The search helper isn't answering."))
+            #expect(env.app.daemon.state == .failed("The background helper isn't answering."))
 
             // Results while it is marked failed: re-checked, and it is back.
             env.daemon.onSearch = { _ in SearchReply(tookUs: 1, hits: [Wire.hit("/p/a")]) }

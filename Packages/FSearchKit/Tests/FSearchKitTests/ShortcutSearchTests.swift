@@ -157,6 +157,20 @@ struct ShortcutSearchTests {
         #expect(inlineCall?.mode == .regex)
     }
 
+    /// Shortcuts gates every search that reads file contents, including inline content keys in names mode.
+    @Test func readsFileContentsCoversContentModesAndInlineContentKeys() {
+        #expect(ShortcutSearch.readsFileContents(query: "BEGIN RSA PRIVATE KEY", mode: .content))
+        #expect(ShortcutSearch.readsFileContents(query: "", mode: .content))
+        #expect(ShortcutSearch.readsFileContents(query: "SearchModel", mode: .symbols))
+        #expect(!ShortcutSearch.readsFileContents(query: "invoice ext:pdf in:~/Documents", mode: .names))
+        #expect(!ShortcutSearch.readsFileContents(query: "", mode: .names))
+        for inline in ["ext:pem grep:BEGIN", "content:secret", "regex:TODO", "sym:Foo", "symbol:Foo", "\"grep:a b\"", "grep:"] {
+            #expect(ShortcutSearch.readsFileContents(query: inline, mode: .names), "\(inline)")
+        }
+        // Same sanitizing as run(): a tab before the key still makes it a separate content-key word.
+        #expect(ShortcutSearch.readsFileContents(query: "notes\tgrep:password", mode: .names))
+    }
+
     @Test(.enabled(if: RealDaemon.binary != nil, "Vendor/fsearch not built"))
     func worksEndToEndAgainstRealDaemon() async throws {
         let nfdName = "cafe\u{0301}_notes.txt"

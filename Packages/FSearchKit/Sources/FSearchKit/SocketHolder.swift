@@ -2,10 +2,12 @@ import Darwin
 import Foundation
 import Security
 
-/// Who holds the daemon's socket, read from `<dataDir>/socket.lock`. The
-/// daemon writes its pid there (decimal text, no newline) after taking the
+/// Who holds the daemon's socket: preferably the connected peer named by its
+/// audit token (``PeerIdentifier``), otherwise read from `<dataDir>/socket.lock`.
+/// The daemon writes its pid there (decimal text, no newline) after taking the
 /// lock. Only read, never locked: taking the lock, even briefly, could make a
-/// daemon starting at that moment give up.
+/// daemon starting at that moment give up. Any same-user process can write a pid
+/// there, so it is only a fallback for when the peer can't be identified.
 public enum SocketHolder: Equatable, Sendable {
     /// No lock file, no pid, or the pid isn't running: nobody we can name.
     case none
@@ -71,6 +73,30 @@ public enum SocketHolder: Equatable, Sendable {
     ) -> SocketHolder {
         guard pid != nil else { return .none }
         guard let path else { return signedAsHelper() ? .ours : .none }
+        return classifyByPath(path, signedAsHelper: signedAsHelper, appTeamSigned: appTeamSigned, bundlePath: bundlePath)
+    }
+
+    /// Classifies a socket's peer, named by its audit token (see ``PeerIdentifier``), by the
+    /// same rules as ``classify(pid:path:signedAsHelper:appTeamSigned:bundlePath:)``. A peer whose
+    /// file is gone and isn't signed as our helper is ``none``, as socket.lock's holder would be:
+    /// an old helper whose bundle an update deleted stays ours to restart.
+    ///
+    /// - Parameters:
+    ///   - path: The peer's executable, nil when it can't be read (its file is gone).
+    ///   - signedAsHelper: Whether the peer's signature satisfies ``helperRequirement``.
+    ///   - appTeamSigned: Whether the app itself satisfies ``teamRequirement``.
+    ///   - bundlePath: The app's bundle.
+    static func classifyPeer(
+        path: String?, signedAsHelper: () -> Bool, appTeamSigned: () -> Bool, bundlePath: String
+    ) -> SocketHolder {
+        guard let path else { return signedAsHelper() ? .ours : .none }
+        return classifyByPath(path, signedAsHelper: signedAsHelper, appTeamSigned: appTeamSigned, bundlePath: bundlePath)
+    }
+
+    /// The path rules shared by socket.lock's holder and a socket's peer.
+    private static func classifyByPath(
+        _ path: String, signedAsHelper: () -> Bool, appTeamSigned: () -> Bool, bundlePath: String
+    ) -> SocketHolder {
         var bundle = bundlePath
         while bundle.count > 1 && bundle.hasSuffix("/") { bundle.removeLast() }
         if !bundle.isEmpty && bundle != "/" && path.hasPrefix(bundle + "/") {

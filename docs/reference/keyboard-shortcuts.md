@@ -14,7 +14,7 @@ This page lists every keyboard shortcut in FSearch for Mac.
 |---|---|
 | ↑ or ⌃P | Move the selection up |
 | ↓ or ⌃N | Move the selection down |
-| ↵ | Open the selected file in its default app (or reveal it in Finder if it is an app, script, installer, internet location or executable — use ⌘K → **Open** to launch it). For a matching line from a content or definition search, open it at that line in your chosen editor. On a "Use … with…" row, switch to that search. On the **FSearch Settings** row, open Settings and hide the panel. The panel hides after a file opens or is revealed. |
+| ↵ | Open the selected file in its default app (or reveal it in Finder if it is an app, script, installer, internet location, executable or another type that would run or install something: see [Files that reveal instead of open](#files-that-reveal-instead-of-open). Use ⌘K → **Open** to launch it). For a matching line from a content or definition search, open it at that line in your chosen editor. On a "Use … with…" row, switch to that search. On the **FSearch Settings** row, open Settings and hide the panel. The panel hides after a file opens or is revealed. |
 | ⌘↵ | Reveal the selected file in Finder, and hide the panel |
 | ⌘Y | Quick Look the selected file. While the preview is up, ↑ and ↓ (with no modifiers) move the selection and the preview follows; ⌘ or ⇧ arrows go to Quick Look. Press ⌘Y again to close it. |
 | ⌘⇧C | Copy the selected file's path |
@@ -31,10 +31,23 @@ Notes:
 - Keys that act on a result do nothing when there are no rows.
 - ⌘1 to ⌘9 open the first nine file results only.
 - Copy Path leaves the panel open. Open, Reveal and the actions that go to another app hide it.
+- When another app opens the panel (an `fsearch://` URL, or FSearch being opened again while it runs), ↵, ⌘↵ and ⌘1 to ⌘9 are ignored for 0.5 s. This stops a keypress meant for the other app from opening the selected file. The hotkey and the menu never start this wait. Other keys work at once.
+
+## Files that reveal instead of open
+
+↵, ⌘1 to ⌘9 and a double-click show these in Finder instead of opening them, because opening would run or install them. ⌘K → **Open** still opens them. A matching line opened in your chosen editor is not affected.
+
+- Apps and executables: `.app`, `.command`, `.tool`, `.terminal`, `.workflow`, and any file with no extension that is executable.
+- Scripts: `.scpt`, `.scptd`, `.applescript`.
+- Installers and disk images: `.pkg`, `.mpkg`, `.dmg`.
+- Internet locations: `.webloc`, `.inetloc`, `.fileloc`.
+- Profiles, panes and plugins: `.mobileconfig`, `.prefpane`, `.saver`, `.qlgenerator`, `.osax`.
+- Actions and shortcuts: `.action`, `.shortcut`.
+- Java programs: `.jar`, `.jnlp`.
 
 ## App commands
 
-Type a command's name (or the start of it) to show its row under the file results, just above the "Use … with…" rows. ↵ still opens the top file; select the command row first (↓, or click it). With no matching files, the command row is first.
+Type at least two letters of a command's name (or of its keywords) to show its row under the file results, just above the "Use … with…" rows. Command rows appear only in name search, not in Inside files or Definitions mode. ↵ still opens the top file; select the command row first (↓, or click it). With no matching files, the command row is first.
 
 | Type | Row | ↵ does |
 |---|---|---|
@@ -88,8 +101,8 @@ Every row except Quit hides the panel.
 
 | Key | Action |
 |---|---|
-| Type | Filter the rows by name (for example `chan` for Changelog). The first match is selected. |
-| ↑ or ⌃P, ↓ or ⌃N | Move the selection. It wraps from the last row to the first. |
+| Type | Filter the rows by name or keyword. The first match is selected. For example, `chan` finds Changelog, `bug` finds Send Feedback, `docs` finds Manual, and `exit` finds Quit FSearch. |
+| ↑ or ⌃P, ↓ or ⌃N | Move the selection. It wraps at both ends: from the last row to the first, and from the first row to the last. |
 | ↵ | Run the selected row |
 | Esc | Clear the filter. If it is already empty, close the menu. The panel stays up. |
 | ⌘/ | Close the menu |
@@ -114,7 +127,7 @@ The mouse works too: point at a row to select it, click to run it, and click out
 | Check for Updates… | | Shown only in builds with updates configured |
 | Quit FSearch | | |
 
-When something needs attention, the menu starts with a warning line and, for some problems, a **Fix…** button. See [Troubleshooting](troubleshooting.md).
+When an update is waiting, **Update Available…** is the first item, above any warning line. When something needs attention, the menu starts with a warning line and, for some problems, a **Fix…** button. See [Troubleshooting](troubleshooting.md).
 
 ## See also
 

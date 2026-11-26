@@ -63,6 +63,7 @@ struct SettingsView: View {
             Text("Debug mode shows index details and records searches on this Mac only (last 10,000).")
                 .font(.caption).foregroundStyle(.secondary)
             loginSection
+            shortcutsSection
             UpdatesSettingsSection()
             Section { removeSection }
         }
@@ -103,7 +104,7 @@ struct SettingsView: View {
                     Button("Cancel", role: .cancel) {}
                 } message: {
                     Text(
-                        "This turns off FSearch's background helper and moves its logs and settings to the Trash, and its index too when only this app's helper uses it. A separately installed fsearch command-line tool is left alone. You can undo it from the Trash."
+                        "This turns off FSearch's background helper, moves its logs to the Trash, and its index too when only this app's helper uses it, and clears the app's settings and shortcut. A separately installed fsearch command-line tool is left alone. You can restore the logs and index from the Trash, but not the settings."
                     )
                 }
         case .running:
@@ -138,5 +139,14 @@ struct SettingsView: View {
             get: { app.debugMode },
             set: { on in DebugMode.set(on, app: app, dismiss: dismissWindow) }
         )
+    }
+
+    /// Opt-in for Shortcuts content searches: the action runs unattended with FSearch's Full Disk Access.
+    @ViewBuilder private var shortcutsSection: some View {
+        Toggle(isOn: $app.allowShortcutsContentSearch) { Text(SearchFilesIntent.allowContentSearchTitle) }
+        Text(
+            "Any shortcut could then find files by what they contain, including files it can't open itself. File name searches always work."
+        )
+        .font(.caption).foregroundStyle(.secondary)
     }
 }

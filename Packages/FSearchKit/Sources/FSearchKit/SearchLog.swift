@@ -42,12 +42,21 @@ public final class SearchLog: Sendable {
         var lineCount: Int?
         /// Whether this instance has secured the file it is appending to (see `secure()`).
         var secured = false
+        /// When this instance last dropped expired records from the file.
+        var prunedAt: Date?
     }
 
     /// The log file.
     public let file: URL
     /// How many records are kept and shown.
     private let cap: Int
+    /// The current time, for the age limit; tests inject a fixed one.
+    private let now: @Sendable () -> Date
+
+    /// Records older than this are dropped (7 days).
+    public static let maxAge: TimeInterval = 7 * 24 * 60 * 60
+    /// How often an instance re-checks the file for expired records.
+    private static let pruneInterval: TimeInterval = 60 * 60
     private let queue = DispatchQueue(label: "fsearch.searchlog", qos: .utility)
     private let state = Mutex(State())
 
@@ -56,10 +65,13 @@ public final class SearchLog: Sendable {
     /// - Parameters:
     ///   - file: The JSON-lines file; its folder is created on the first write.
     ///   - cap: The records kept. The file may grow to twice this before it is compacted.
+    ///   - now: The clock for the 7-day age limit.
     public init(
         file: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/FSearch/searches.jsonl"),
-        cap: Int = 10_000
+        cap: Int = 10_000,
+        now: @escaping @Sendable () -> Date = { Date() }
     ) {
+        self.now = now
         self.file = file
         self.cap = max(0, cap)
     }
@@ -102,6 +114,12 @@ public final class SearchLog: Sendable {
             guard var line = try? s.encoder.encode(r) else { return }
             line.append(UInt8(ascii: "\n"))
 
+            if FileManager.default.fileExists(atPath: file.path),
+                s.prunedAt.map({ now().timeIntervalSince($0) >= Self.pruneInterval }) ?? true
+            {
+                s.prunedAt = now()
+                if readRecords(decoder: s.decoder).contains(where: { isExpired($0) }) { compact(&s) }
+            }
             let exists = FileManager.default.fileExists(atPath: file.path)
             if !exists {
                 s.lineCount = 0
@@ -148,7 +166,7 @@ public final class SearchLog: Sendable {
     /// The newest records (at most the cap), oldest first; corrupt lines are skipped.
     public func entries() -> [Record] {
         queue.sync {
-            state.withLock { s in Array(readRecords(decoder: s.decoder).suffix(cap)) }
+            state.withLock { s in Array(readRecords(decoder: s.decoder).filter { !isExpired($0) }.suffix(cap)) }
         }
     }
 
@@ -164,7 +182,7 @@ public final class SearchLog: Sendable {
 
     /// Rewrite the file with only the newest `cap` valid records. Caller holds the lock.
     private func compact(_ s: inout State) {
-        let kept = readRecords(decoder: s.decoder).suffix(cap)
+        let kept = readRecords(decoder: s.decoder).filter { !isExpired($0) }.suffix(cap)
         var body = Data()
         var written = 0
         for record in kept {
@@ -174,10 +192,32 @@ public final class SearchLog: Sendable {
             written += 1
         }
         do {
-            try body.write(to: file, options: .atomic)
+            try Self.writeAtomically(body, to: file)
             secure()
             s.lineCount = written
         } catch {}
+    }
+
+    private func isExpired(_ r: Record) -> Bool {
+        now().timeIntervalSince(r.time) > Self.maxAge
+    }
+
+    /// Replaces `url` with `data` through a temp file in the same folder, created
+    /// 0600 from the start (so the content is never readable by others, whatever
+    /// the umask or folder mode), then renamed over the target.
+    static func writeAtomically(_ data: Data, to url: URL) throws {
+        let tmp = url.deletingLastPathComponent().appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString).tmp")
+        let fd = open(tmp.path, O_WRONLY | O_CREAT | O_EXCL, 0o600)
+        guard fd >= 0 else { throw CocoaError(.fileWriteUnknown) }
+        let fh = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
+        do {
+            try fh.write(contentsOf: data)
+            try fh.close()
+            guard rename(tmp.path, url.path) == 0 else { throw CocoaError(.fileWriteUnknown) }
+        } catch {
+            try? FileManager.default.removeItem(at: tmp)
+            throw error
+        }
     }
 
     /// The log holds search text: folder 0700, file 0600, both left out of backups.

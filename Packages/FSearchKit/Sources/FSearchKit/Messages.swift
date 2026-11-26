@@ -3,7 +3,7 @@ import Foundation
 /// What the panel says instead of results, if anything.
 public enum UserMessage {
     /// A daemon that times out, or is still gone after the restarts ran out.
-    static let notAnswering = String(localized: "The search helper isn't answering", bundle: .module)
+    static let notAnswering = String(localized: "The background helper isn't answering", bundle: .module)
 
     /// The text for a search phase, or nil when results (or nothing) should show.
     ///

@@ -16,6 +16,13 @@ import Testing
         #expect(Launchable.revealsOnReturn(path: "/x/Do It.workflow", isDirectory: true, isExecutable: false))
     }
 
+    /// Types that install a profile, plugin or code, or run a program, when opened.
+    @Test func codeBearingTypesReveal() {
+        for ext in ["mobileconfig", "prefpane", "saver", "jar", "shortcut", "action", "qlgenerator", "osax", "dmg", "scptd", "jnlp"] {
+            #expect(Launchable.revealsOnReturn(path: "/x/Thing.\(ext)", isDirectory: false, isExecutable: false), "\(ext)")
+        }
+    }
+
     @Test func documentsAndFoldersOpen() {
         for p in ["/x/readme.md", "/x/photo.jpg", "/x/main.swift", "/x/script.sh", "/x/a.command.txt", "/x/app"] {
             #expect(!Launchable.revealsOnReturn(path: p, isDirectory: false, isExecutable: false), "\(p)")

@@ -63,11 +63,11 @@ public struct MenuBarWarning: Equatable, Sendable {
     ) -> MenuBarWarning? {
         switch c {
         case .failed:
-            MenuBarWarning(message: String(localized: "The search helper isn't running", bundle: .module), offersFix: true)
+            MenuBarWarning(message: String(localized: "The background helper isn't running", bundle: .module), offersFix: true)
         case .unresponsive:
-            MenuBarWarning(message: String(localized: "The search helper isn't answering", bundle: .module), offersFix: true)
+            MenuBarWarning(message: String(localized: "The background helper isn't answering", bundle: .module), offersFix: true)
         case .needsApproval:
-            MenuBarWarning(message: String(localized: "The search helper needs your approval", bundle: .module), offersFix: true)
+            MenuBarWarning(message: String(localized: "The background helper needs your approval", bundle: .module), offersFix: true)
         case let .running(fda) where !fda && !skippedFullDiskAccess:
             MenuBarWarning(
                 message: String(localized: "Full Disk Access is off, so some files won't be found", bundle: .module), offersFix: false,

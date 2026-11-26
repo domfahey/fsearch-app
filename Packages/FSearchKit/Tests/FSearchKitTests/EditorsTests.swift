@@ -95,4 +95,19 @@ import Testing
         #expect(Editor.vscode.openURL(path: "/a.txt", line: 0)?.absoluteString == "vscode://file/a.txt:1")
         #expect(Editor.bbedit.openURL(path: "/a.txt", line: -4)?.absoluteString == "x-bbedit://open?url=file%3A%2F%2F%2Fa.txt&line=1")
     }
+
+    /// Every editor must be Apple-anchored and carry its own bundle id as signing
+    /// identifier; team ids are pinned only where read from an installed copy.
+    @Test func codeRequirementsAnchorAndPinIdentifiers() {
+        for e in Editor.allCases {
+            #expect(e.codeRequirement.hasPrefix("anchor apple"), "\(e)")
+            #expect(e.codeRequirement.contains("identifier \"\(e.bundleId)\""), "\(e)")
+        }
+        #expect(Editor.vscode.codeRequirement.contains("certificate leaf[subject.OU] = \"UBF8T346G9\""))
+        #expect(Editor.cursor.codeRequirement.contains("certificate leaf[subject.OU] = \"VDXQ22DGB9\""))
+        #expect(Editor.xcode.codeRequirement == "anchor apple and identifier \"com.apple.dt.Xcode\"")
+        // Not installed when checked, so no team id is guessed.
+        for e in [Editor.zed, .sublime, .bbedit] { #expect(!e.codeRequirement.contains("subject.OU"), "\(e)") }
+        #expect(Editor.zed.codeRequirement.hasPrefix("anchor apple generic and"))
+    }
 }

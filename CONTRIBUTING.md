@@ -12,14 +12,15 @@ Never commit keys, certificates, provisioning profiles, notary API keys or the S
 
 ### Prerequisites
 
+- **macOS 15 or later** (`make doctor` checks it).
 - **Xcode 16 or later** (Swift 6). The app and FSearchKit are tested with Xcode 26.6. The Makefile and scripts use `DEVELOPER_DIR` if it is set, otherwise the Xcode that `xcode-select -p` reports. Select one with `sudo xcode-select -s /Applications/Xcode.app`, or `export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
 - **Rust** through [rustup](https://rustup.rs), with both macOS targets: `rustup target add aarch64-apple-darwin x86_64-apple-darwin`.
-- **XcodeGen**: `scripts/install-xcodegen.sh ~/.local/share/xcodegen` installs the pinned, checksum-verified release that CI uses (it empties that folder first) and prints its `bin` folder; add that folder to your `PATH`. `brew install xcodegen` (what `make install` runs) also works, but its version floats.
+- **XcodeGen**: `scripts/install-xcodegen.sh ~/.local/share/xcodegen` installs the pinned, checksum-verified release that CI uses (it empties that folder first) and prints its `bin` folder; add that folder to your `PATH`. `brew install xcodegen` also works, but its version floats. `make install` runs it only if `xcodegen` is missing.
 - **python3**, which `scripts/check-links.sh` uses. macOS and Xcode's command-line tools provide it.
 - **Network access** the first time you build the daemon. `scripts/build-daemon.sh` clones the pinned fsearch commit from GitHub.
-- Optional: `shellcheck` and `actionlint`. `make lint` skips them with a message when they are missing. CI runs both.
+- Optional: `shellcheck` and `actionlint`. `make lint` skips them with a message when they are missing. CI runs both. `OPTIONAL=1 make install` installs both with Homebrew.
 
-Run `make doctor` to check all of this. Run `make install` to install the developer tools and git hooks. It does not install the app.
+Run `make doctor` to check all of this. Run `make install` to install the developer tools and git hooks, and finish with `make doctor`. It does not install the app, and it does not build the daemon, so `make doctor` stays red until you run `make daemon`.
 
 Run `make help` to list the developer tasks used below.
 
@@ -38,8 +39,8 @@ Or run the raw commands:
 scripts/build-daemon.sh
 scripts/generate-project.sh   # xcodegen generate + the committed Package.resolved
 xcodebuild -project FSearch.xcodeproj -scheme FSearch -configuration Debug \
-  -derivedDataPath build -destination 'generic/platform=macOS' \
-  CODE_SIGN_IDENTITY=- build
+  -onlyUsePackageVersionsFromResolvedFile -derivedDataPath build \
+  -destination 'generic/platform=macOS' CODE_SIGN_IDENTITY=- build
 ```
 
 ## Where does my change go
@@ -50,6 +51,8 @@ xcodebuild -project FSearch.xcodeproj -scheme FSearch -configuration Debug \
 | Glue between the app and macOS, such as the panel, menus, onboarding, settings and the updater | `App/` |
 | A call to something macOS owns, such as `SMAppService`, `NSWorkspace`, the Trash or Sparkle | A protocol (a seam) in `App/Support/Seams.swift` or `SystemSeams.swift`. Add a fake to `AppTests/Support/Fakes.swift` and test against it. |
 | A test of app code | `AppTests/`. For a view, render it off screen with `render(_:)` and read or press it through its accessibility tree (`axNode`, in `AppTests/Support/Accessibility.swift`). Never press a button that opens a real window or quits. |
+| An App Intent for Shortcuts | `App/Intents/`. Test it in `AppTests/AppIntentsTests.swift` by swapping the intent's `backendFactory` seam (`App/Intents/SearchFilesIntent.swift`) for a fake. See [Shortcuts](docs/reference/shortcuts.md). |
+| A user-facing string | Swift source, then `make strings` to update the two String Catalogs (see [Localization](#localization)) |
 | A test that drives the real UI | `AppUITests/` (see the focus-safety rule below) |
 
 Two modes keep tests away from your real setup. **Test mode** starts when you pass `-FSEARCH_SOCKET <path>`. The app then talks to that throwaway daemon and never touches the login item or shows onboarding. The **inert host** is the app when it hosts AppTests: it starts no helper, hotkey, onboarding or updater, and it points at a socket nobody listens on. See [ADR 0007](docs/adr/0007-test-seams-inert-test-host-and-test-mode.md) and [ADR 0005](docs/adr/0005-tests-never-touch-the-real-index.md).
@@ -69,7 +72,7 @@ Two modes keep tests away from your real setup. **Test mode** starts when you pa
 
 | Task | Command | Raw equivalent |
 |---|---|---|
-| Lint (swift-format, links, credits, shell scripts, workflows) | `make lint` | see the `lint` target in the [Makefile](Makefile) |
+| Lint (swift-format, links, credits, appcast checks, shell scripts, workflows) | `make lint` | see the `lint` target in the [Makefile](Makefile) |
 | Warnings as errors | `make type` | `swift build --build-tests -Xswiftc -warnings-as-errors` and `swift build --product FSearchBench -Xswiftc -warnings-as-errors` in the package, plus a warnings check of the app build |
 | Lint, type and test together | `make check` | |
 | Lint, type, test and both 95% coverage gates (excludes `bench`) | `make ci` | |
@@ -82,6 +85,9 @@ Two modes keep tests away from your real setup. **Test mode** starts when you pa
 
 - `make test` needs `Vendor/fsearch` from `make daemon`, and builds it if it is missing.
 - `make lint` ends with `lint: ok` when everything passes. The checks print nothing of their own on success. It includes `scripts/check-links.sh`, which checks that every relative Markdown link and anchor resolves. CI runs it, so run it when you edit docs.
+
+- [`.github/workflows/deps.yml`](.github/workflows/deps.yml) scans the dependencies in CI. It runs `cargo-deny` on the daemon's crates (policy in [`.github/cargo-deny.toml`](.github/cargo-deny.toml): advisories, yanked crates, sources and bans) and `osv-scanner` on the daemon's `Cargo.lock` and `Package.resolved`. It runs on pull requests, on pushes to `main` and weekly. It reads lockfiles only and builds nothing. If it flags a crate, bump the pin or, with a reason, add an exception to `cargo-deny.toml` in the same pull request.
+- [`scripts/test-appcast-verify.sh`](scripts/test-appcast-verify.sh) checks that `scripts/appcast.sh` refuses to sign an unverified DMG and ignores a `generate_appcast` on `PATH`. It uses a fake DMG and stub tools and signs nothing. `make lint` runs it.
 
 ## Running your own build
 
@@ -100,16 +106,34 @@ Two modes keep tests away from your real setup. **Test mode** starts when you pa
 - Give every public FSearchKit API a `///` doc comment.
 - Formatting is checked by `swift format` with the repository's `.swift-format` config. `make format` applies it.
 
+## Localization
+
+- Write user-facing text as SwiftUI literals (`Text("Search")`) or `String(localized:)`. In FSearchKit, pass `bundle: .module`, as in `Packages/FSearchKit/Sources/FSearchKit/Messages.swift`.
+- Use `Text(verbatim:)` for technical tokens that must not be translated, such as accessibility values built from data.
+- After you add or change text, run `make strings`. It does a full `xcodebuild`, so it takes a while. It syncs both String Catalogs from the compiler output.
+- Commit both catalogs: `App/Resources/Localizable.xcstrings` and `Packages/FSearchKit/Sources/FSearchKit/Resources/Localizable.xcstrings`.
+- `AppTests/LocalizationTests.swift` and `Packages/FSearchKit/Tests/FSearchKitTests/LocalizationTests.swift` check that the catalogs are compiled into the bundles and resolve in English.
+
+## URL scheme and App Intents
+
+The `fsearch://search?q=` URL scheme ([URL scheme](docs/reference/url-scheme.md)) and the Search Files intent ([Shortcuts](docs/reference/shortcuts.md)) are tested in layers:
+
+- Parsing and query logic live in FSearchKit (`SearchURL`, `ShortcutSearch`), with tests in `Packages/FSearchKit/Tests/FSearchKitTests/SearchURLTests.swift` and `ShortcutSearchTests.swift`.
+- The app delegate's URL handling is tested in `AppTests/URLSchemeTests.swift`.
+- The intent's `backendFactory` seam (`App/Intents/SearchFilesIntent.swift`) lets `AppTests/AppIntentsTests.swift` run it against a fake backend, never your real daemon.
+- To try it by hand, start a throwaway daemon (see [Running your own build](#running-your-own-build)), launch a Debug build with `-FSEARCH_SOCKET <throwaway socket>`, then run `open 'fsearch://search?q=hello'`.
+
 ## Tests
 
 - New behavior needs a test that fails without it.
-- Coverage gates: CI fails if FSearchKit line coverage drops below 95% (`scripts/coverage.sh --kit-only --min 95`) or if AppTests-only app coverage (excluding documented system adapters) drops below 95% (`scripts/coverage.sh --unit-only --min 95`). See [ADR 0012](docs/adr/0012-coverage-gates-at-95.md). `make ci` runs both gates. To try a different floor, pass `--min` or set `COVERAGE_MIN`, for example `scripts/coverage.sh --kit-only --min 95` or `COVERAGE_MIN=95 scripts/coverage.sh --kit-only`. The full app number, which combines AppTests with the UI tests, needs a hands-off GUI session: run `make coverage`.
+- Coverage gates: CI fails if FSearchKit line coverage drops below 95% (`scripts/coverage.sh --kit-only --min 95`) or if AppTests-only app coverage (excluding documented system adapters) drops below 95% (`scripts/coverage.sh --unit-only --min 95`). See [ADR 0012](docs/adr/0012-coverage-gates-at-95.md). `make ci` runs both gates. To try a different floor, pass `--min` or set `COVERAGE_MIN`, for example `scripts/coverage.sh --kit-only --min 90` or `COVERAGE_MIN=90 scripts/coverage.sh --kit-only`. The full app number, which combines AppTests with the UI tests, needs a hands-off GUI session: run `make coverage`.
 - Tests must never touch the real index, `~/Library/LaunchAgents`, `~/.local/bin` or `~/Library/Application Support/FSearch`.
 - Use a temporary `HOME` and `FSEARCH_ROOT` for anything that starts a daemon. In the core tests, use `RealDaemon`: it runs the daemon under a watchdog that stops it and deletes its temporary directory when the test process exits or crashes, and it sweeps orphans from earlier hard-killed runs. See [ADR 0005](docs/adr/0005-tests-never-touch-the-real-index.md).
 
 ## Commit messages
 
 - Write the subject in the imperative mood, such as "Fix follower wait". Keep it short.
+- An optional capitalised area prefix is common, such as `Panel:`, `Docs:`, `Tests:` or `CI:`. Dependabot uses lowercase `ci:`. Squash merges append the pull request number, as in `(#32)`.
 - Use the body to say why the change is needed.
 
 ## Branches and pull requests
@@ -141,17 +165,26 @@ Use the issue templates. For a bug, include the Index Details output from debug 
 ## Updating dependencies
 
 - GitHub Actions are pinned to full commit SHAs, each with a version comment. Dependabot updates them weekly. Only pin a release that is at least two weeks old.
-- The app's Swift packages (KeyboardShortcuts and Sparkle) are declared in `project.yml` for XcodeGen. Dependabot cannot read that file. Bump `exactVersion` there by hand, again choosing a release at least two weeks old, resolve packages to update the committed `Package.resolved` (CI and release builds pass `-onlyUsePackageVersionsFromResolvedFile`), and update [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) to match. Then run `scripts/gen-credits.sh` to rebuild the About window credits, which `make lint` checks.
+- The app's Swift packages (KeyboardShortcuts and Sparkle) are declared in `project.yml` for XcodeGen. Dependabot cannot read that file. Bump `exactVersion` there by hand, again choosing a release at least two weeks old, update the committed `Package.resolved` as below (CI and release builds pass `-onlyUsePackageVersionsFromResolvedFile`), and update [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) to match. Then run `scripts/gen-credits.sh` to rebuild the About window credits, which `make lint` checks: it fails if `App/Resources/Credits.html` is out of sync with THIRD_PARTY_NOTICES.md, or if the notices lack the pinned daemon commit or package versions.
+- To update `Package.resolved`, run these from the repository root:
+
+  ```sh
+  scripts/generate-project.sh
+  xcodebuild -resolvePackageDependencies -project FSearch.xcodeproj -scheme FSearch
+  cp FSearch.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved Package.resolved
+  ```
+
+  `scripts/generate-project.sh` seeds the project from the old file, which is why the copy goes back the other way. Review the diff before you commit it.
 - `Packages/FSearchKit` has no dependencies.
 
 ### Bumping the daemon pin
 
-The fsearch daemon is pinned by commit in `scripts/build-daemon.sh` (the `REV=` line). See [ADR 0010](docs/adr/0010-pin-the-daemon-to-a-fork-commit.md) for why. To move the pin:
+The fsearch daemon is pinned by commit in `scripts/build-daemon.sh` (the `REV=` line). See [ADR 0010](docs/adr/0010-pin-the-daemon-to-a-fork-commit.md) for why and [ADR 0013](docs/adr/0013-keep-the-daemon-on-the-fork-pin-after-upstream-closed-the-prs.md) for when it moves to an upstream tag. To move the pin:
 
 1. Change `REV` in `scripts/build-daemon.sh` to the new commit.
 2. Run `make daemon`, then `make check`. `make doctor` confirms `Vendor/fsearch` matches the pin.
 3. Re-record this machine's benchmark baseline with `scripts/bench.sh --record` if performance moved on purpose. See [bench/README.md](bench/README.md).
-4. Update the daemon's commit in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), then run `scripts/gen-credits.sh`.
+4. Update the daemon's commit in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), then run `scripts/gen-credits.sh`. Also regenerate the Rust crate table and licence texts in that file from the new daemon `Cargo.lock` (runtime dependencies only, not build or dev dependencies).
 5. Add a line to [CHANGELOG.md](CHANGELOG.md) under Unreleased if users can see the change.
 
 ## License

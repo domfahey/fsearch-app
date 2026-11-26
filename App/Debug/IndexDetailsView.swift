@@ -10,6 +10,7 @@ struct IndexDetailsView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var skipped: [String] = []
     @State private var logTail = ""
+    @State private var folderIssues: [DataFolderCheck.Issue] = []
     @State private var skippedStamp: DebugFormat.FileStamp?
     @State private var logStamp: DebugFormat.FileStamp?
     /// The running daemon's folder (a temp folder in test mode).
@@ -24,6 +25,11 @@ struct IndexDetailsView: View {
                     Text("None").foregroundStyle(.secondary)
                 } else {
                     ForEach(skipped, id: \.self) { Text(verbatim: $0).font(.system(.caption, design: .monospaced)) }
+                }
+            }
+            Section("Data folder safety") {
+                ForEach(Self.folderLines(folderIssues), id: \.self) { line in
+                    Text(verbatim: line).foregroundStyle(folderIssues.isEmpty ? Color.secondary : Color.orange)
                 }
             }
             Section("daemon.log (last 30 lines)") {
@@ -62,6 +68,7 @@ struct IndexDetailsView: View {
     private func load() async {
         let dir = dataDir
         let prevSkipped = skippedStamp, prevLog = logStamp
+        folderIssues = await Task.detached { DataFolderCheck.issues(in: dir) }.value
         let result = await Task.detached {
             let skippedURL = dir.appendingPathComponent("skipped")
             let logURL = dir.appendingPathComponent("daemon.log")
@@ -85,6 +92,11 @@ struct IndexDetailsView: View {
             "No daemon.log. FSearch's own background helper doesn't write one: its launchd plist is fixed inside the app and can't name a log file in your home folder. A daemon started by the fsearch command-line tool writes its log here."
     )
 
+    /// The lines under "Data folder safety": a reassurance, or one line per problem.
+    static func folderLines(_ issues: [DataFolderCheck.Issue]) -> [String] {
+        issues.isEmpty ? [String(localized: "No problems found")] : issues.map(\.message)
+    }
+
     static func logText(_ tail: String) -> String { tail.isEmpty ? noLogNote : tail }
 
     private func report() -> String {
@@ -107,6 +119,7 @@ private struct IndexStatsSections: View {
                 row("Index size", DebugFormat.bytes(s.indexBytes))
                 row("Full Disk Access", s.fullDiskAccess ? String(localized: "On") : String(localized: "Off"))
                 row("Role", s.owner ? String(localized: "Owner (writes the index)") : String(localized: "Follower"))
+                row("Daemon", DebugFormat.peerLabel(daemon.connectedPeer))
             }
             Section("Content index") {
                 row("Files", s.contentDocs.formatted())

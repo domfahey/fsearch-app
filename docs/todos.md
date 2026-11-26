@@ -19,7 +19,7 @@ Open work, by priority. "You" items need the maintainer: a decision, credentials
 
 ## Upstream (fsearch)
 
-- [ ] Land the PR stack #12 → #13 → #14 (rebase #14 if #17 merges first). Then move `scripts/build-daemon.sh` from the fork pin `d26cf78` (tagged `app-pin-2026-10-10`) to an upstream tag and update THIRD_PARTY_NOTICES.md. Until then, keep the fork's `tests-daemon` branch.
+- [ ] Upstream closed PRs #12 to #14 unmerged (2026-10-12) and shipped its own fixes in v0.2.1 and v0.2.2. We stay on the fork pin `d26cf78` (tagged `app-pin-2026-10-10`) per [ADR 0013](adr/0013-keep-the-daemon-on-the-fork-pin-after-upstream-closed-the-prs.md). Re-pin to an upstream tag when a release has the stray-daemon yield (`ba100f4`) and passes the integration tests and benchmark gate; then update THIRD_PARTY_NOTICES.md. Keep the fork's `tests-daemon` branch until then.
 - [ ] Daemon changes the app wants (the socket peer check is a security issue: report it privately, through a security advisory on noahdunnagan/fsearch, not a public issue):
   - version in `status`;
   - agent ownership for the app's LaunchAgent;

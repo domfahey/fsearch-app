@@ -97,7 +97,7 @@ extension AppTests {
             _ = status.icon(for: env.app)
             env.daemon.onPing = { _ in false }
             await env.app.daemon.start()
-            #expect(await eventually { status.warning?.message == "The search helper needs your approval" })
+            #expect(await eventually { status.warning?.message == "The background helper needs your approval" })
         }
 
         @Test func restartBudgetDefaults() {
@@ -180,6 +180,22 @@ extension AppTests {
             let dir1 = c.icon(for: NSTemporaryDirectory(), isDirectory: true)
             #expect(dir1.size.width > 0)
             #expect(c.icon(for: NSTemporaryDirectory(), isDirectory: true) === dir1)  // cached by path
+        }
+
+        @Test func resultRowShowsNoBidiControlsInNameFolderOrLabels() {
+            let item = ResultItem.file(Wire.hit("/p\u{202E}q/invoice\u{202E}fdp.exe"))
+            #expect(String(ResultRow.nameText(for: item, query: "").characters) == "invoice\u{FFFD}fdp.exe")
+            #expect(String(ResultRow.detailText(for: item, query: "").characters) == "/p\u{FFFD}q")
+            #expect(ResultRow.displayName(for: item) == "invoice\u{FFFD}fdp.exe")
+            #expect(ResultRow.displayDetail(for: item) == "/p\u{FFFD}q")
+            // The path actions use is untouched.
+            #expect(item.path == "/p\u{202E}q/invoice\u{202E}fdp.exe")
+        }
+
+        @Test func contentHitLinesShowNoBidiControls() {
+            let item = ResultItem.line(path: "/p/a.txt", match: Match(line: 3, text: "  pay \u{202E}fdp.exe"))
+            #expect(ResultRow.displayDetail(for: item) == "3 · pay \u{FFFD}fdp.exe")
+            #expect(String(ResultRow.detailText(for: item, query: "pay").characters) == "3 · pay \u{FFFD}fdp.exe")
         }
 
         @Test func resultRowHighlightsFilenameOrMatchLine() {
@@ -273,7 +289,7 @@ extension AppTests {
                 if s == .checking {
                     #expect(e.app.daemon.state == .checking)
                 } else {
-                    #expect(e.app.daemon.state == .failed("The search helper isn't answering."))
+                    #expect(e.app.daemon.state == .failed("The background helper isn't answering."))
                 }
             }
         }

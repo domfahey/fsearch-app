@@ -1,12 +1,32 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "%@ belongs to another user.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ belongs to another user."
+          }
+        }
+      }
+    },
     "%@ files so far… usually under a minute.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "%@ files so far… usually under a minute."
+          }
+        }
+      }
+    },
+    "%@ is a symbolic link.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is a symbolic link."
           }
         }
       }
@@ -77,6 +97,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "FSearch Settings"
+          }
+        }
+      }
+    },
+    "FSearch helper (signature verified)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FSearch helper (signature verified)"
           }
         }
       }
@@ -181,6 +211,26 @@
         }
       }
     },
+    "Not identified": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not identified"
+          }
+        }
+      }
+    },
+    "Other (unverified)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Other (unverified)"
+          }
+        }
+      }
+    },
     "Quit FSearch": {
       "localizations": {
         "en": {
@@ -231,6 +281,76 @@
         }
       }
     },
+    "The background helper isn't answering": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The background helper isn't answering"
+          }
+        }
+      }
+    },
+    "The background helper isn't running": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The background helper isn't running"
+          }
+        }
+      }
+    },
+    "The background helper needs your approval": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The background helper needs your approval"
+          }
+        }
+      }
+    },
+    "The data folder belongs to another user.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The data folder belongs to another user."
+          }
+        }
+      }
+    },
+    "The data folder can be written to by other users.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The data folder can be written to by other users."
+          }
+        }
+      }
+    },
+    "The data folder is a symbolic link.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The data folder is a symbolic link."
+          }
+        }
+      }
+    },
+    "The data folder is not a folder.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The data folder is not a folder."
+          }
+        }
+      }
+    },
     "The search daemon didn't answer in time": {
       "localizations": {
         "en": {
@@ -247,36 +367,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "The search daemon reported an error"
-          }
-        }
-      }
-    },
-    "The search helper isn't answering": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The search helper isn't answering"
-          }
-        }
-      }
-    },
-    "The search helper isn't running": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The search helper isn't running"
-          }
-        }
-      }
-    },
-    "The search helper needs your approval": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The search helper needs your approval"
           }
         }
       }

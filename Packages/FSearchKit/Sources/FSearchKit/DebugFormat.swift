@@ -36,6 +36,17 @@ public enum DebugFormat {
         ByteCountFormatter.string(fromByteCount: Int64(n), countStyle: .file)
     }
 
+    /// Index Details' "Daemon" row: who the connected daemon is, by its code signature.
+    ///
+    /// - Parameter peer: The connected daemon (see ``PeerIdentifier``), nil when unknown.
+    public static func peerLabel(_ peer: SocketHolder?) -> String {
+        switch peer {
+        case .ours?: String(localized: "FSearch helper (signature verified)", bundle: .module)
+        case .other?: String(localized: "Other (unverified)", bundle: .module)
+        case .none?, nil: String(localized: "Not identified", bundle: .module)
+        }
+    }
+
     /// The daemon's data folder: the directory holding its socket.
     ///
     /// - Parameter socketPath: The daemon's socket path.

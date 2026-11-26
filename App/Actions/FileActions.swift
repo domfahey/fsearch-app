@@ -31,9 +31,25 @@ enum FileActions {
     static func url(_ path: String) -> URL { URL(fileURLWithPath: path) }
 
     /// The chosen editor's app, if it is installed and the item is a content hit it opens.
-    private static func editorApp(for item: ResultItem, editor: Editor?) -> URL? {
+    /// Not yet checked: any app can claim an editor's bundle id.
+    private static func installedEditorApp(for item: ResultItem, editor: Editor?) -> URL? {
         guard case .line = item, let e = editor else { return nil }
         return workspace.urlForApplication(withBundleIdentifier: e.bundleId)
+    }
+
+    /// Whether `app` is the genuine `editor`: valid signature, Apple-anchored, its own identifier (see ``Editor/codeRequirement``).
+    private static func isGenuine(_ app: URL, _ editor: Editor) -> Bool {
+        let ok = workspace.isTrustedApp(at: app, requirement: editor.codeRequirement)
+        if !ok {
+            Log.actions.error("\(editor.bundleId, privacy: .public) at \(app.path, privacy: .private) failed its code signature check")
+        }
+        return ok
+    }
+
+    /// The chosen editor's app if it is installed, the item is a content hit and the app is the genuine editor.
+    private static func editorApp(for item: ResultItem, editor: Editor?) -> URL? {
+        guard let e = editor, let app = installedEditorApp(for: item, editor: e), isGenuine(app, e) else { return nil }
+        return app
     }
 
     /// What opens a content hit in the chosen editor, if it is installed: its
@@ -53,7 +69,7 @@ enum FileActions {
     /// What ↵ does on `item`: reveals launchables, or opens content hits at a line when the chosen editor supports it.
     /// Does at most one LaunchServices app lookup for both answers.
     static func returnBehavior(_ item: ResultItem, editor: Editor?) -> (reveals: Bool, opensAtLine: Bool) {
-        if case let .line(path, match) = item, let e = editor, let appURL = workspace.urlForApplication(withBundleIdentifier: e.bundleId) {
+        if case let .line(path, match) = item, let e = editor, let appURL = editorApp(for: item, editor: e) {
             let lineJump =
                 if let lineURL = e.openURL(path: path, line: match.line) {
                     workspace.urlsForApplications(toOpen: lineURL).contains(where: { $0.path == appURL.path })
@@ -75,7 +91,7 @@ enum FileActions {
 
     /// The footer line for a result that is no longer on disk.
     static func missingMessage(_ path: String) -> String {
-        String(localized: "“\((path as NSString).lastPathComponent)” is gone: moved or deleted")
+        String(localized: "“\(DisplaySafe.name((path as NSString).lastPathComponent))” is gone: moved or deleted")
     }
 
     /// False, after reporting it, if `path` is gone (moved or deleted since the search).
@@ -93,7 +109,15 @@ enum FileActions {
         guard exists(item.path, onError) else { return false }
         let file = url(item.path)
         guard let target = editorTarget(for: item, editor: editor) else {
-            return openInDefaultApp(file, onError: onError)
+            let opened = openInDefaultApp(file, onError: onError)
+            // The editor is installed but isn't the genuine app: say so (unless the open itself failed, which says more).
+            if opened, let e = editor, let app = installedEditorApp(for: item, editor: e), !isGenuine(app, e) {
+                onError(
+                    String(
+                        localized:
+                            "Not opening in \(e.displayName): its code signature isn’t the genuine app’s. Opened with the default app."))
+            }
+            return opened
         }
         // The editor may fail to take the URL (no handler, editor damaged): fall back to the default app.
         workspace.open([target.url], withApplicationAt: target.app) { error in
@@ -107,7 +131,7 @@ enum FileActions {
     /// Reports a refused LaunchServices request. `NSWorkspace.open` has no error value to pass along.
     private static func openInDefaultApp(_ file: URL, onError: @escaping @MainActor (String) -> Void) -> Bool {
         guard workspace.open(file) else {
-            let message = String(localized: "Couldn't open “\(file.lastPathComponent)”")
+            let message = String(localized: "Couldn't open “\(DisplaySafe.name(file.lastPathComponent))”")
             Log.actions.error("default app refused to open file: \(file.path, privacy: .private)")
             onError(message)
             return false
@@ -152,7 +176,7 @@ enum FileActions {
     /// Opens the file in a chosen app; a missing file or a launch error goes to `onError`.
     static func openWith(_ path: String, app: URL, onError: @escaping @MainActor (String) -> Void) {
         guard exists(path, onError) else { return }
-        let name = app.deletingPathExtension().lastPathComponent
+        let name = DisplaySafe.name(app.deletingPathExtension().lastPathComponent)
         workspace.open([url(path)], withApplicationAt: app) { error in
             guard let error else { return }
             Log.actions.error("Open With failed: \(error.localizedDescription, privacy: .private)")

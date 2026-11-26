@@ -162,62 +162,132 @@ jobs:
           FSEARCH_PREBUILT: '1'
           FSEARCH_PROJECT_READY: '1'
         run: scripts/release.sh --prepare "${GITHUB_REF_NAME#v}"
+      # SBOM of the daemon's crates (CycloneDX), generated before the keychain exists for the
+      # same reason as the build above. cargo-cyclonedx only reads `cargo metadata`; it runs
+      # no build scripts. Swift packages (KeyboardShortcuts, Sparkle) are not in this SBOM:
+      # no pinned, checksum-verified tool reads Package.resolved into CycloneDX; they are
+      # listed in THIRD_PARTY_NOTICES.md and scanned by deps.yml.
+      - name: Generate the daemon SBOM (CycloneDX)
+        env:
+          CARGO_CYCLONEDX: '0.5.10'
+          CARGO_CYCLONEDX_SHA256: 4c39e13494d51c9d7f63e2923e7afdb5648a7a806a9ed7684dbe3786d2e2d1da
+        run: |
+          set -euo pipefail
+          rev=$(grep -m1 '^REV=' scripts/build-daemon.sh | grep -o '[0-9a-f]\{40\}' || true)
+          [[ "$rev" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::could not read REV from scripts/build-daemon.sh"; exit 1; }
+          [ "$(cat Vendor/fsearch.rev)" = "$rev" ] || { echo "::error::Vendor/fsearch.rev is not the pinned $rev"; exit 1; }
+          cd "$RUNNER_TEMP"
+          t="cargo-cyclonedx-aarch64-apple-darwin.tar.xz"
+          curl -fsSLo "$t" "https://github.com/CycloneDX/cyclonedx-rust-cargo/releases/download/cargo-cyclonedx-${CARGO_CYCLONEDX}/$t"
+          echo "$CARGO_CYCLONEDX_SHA256  $t" | shasum -a 256 -c -
+          mkdir sbom-tool && tar -xJf "$t" --strip-components 1 -C sbom-tool cargo-cyclonedx-aarch64-apple-darwin/cargo-cyclonedx
+          git init -q sbom-src
+          git -C sbom-src fetch -q --depth 1 https://github.com/domfahey/fsearch.git "$rev"
+          git -C sbom-src checkout -q FETCH_HEAD
+          [ "$(git -C sbom-src rev-parse HEAD)" = "$rev" ] || { echo "::error::fetched commit is not $rev"; exit 1; }
+          sbom-tool/cargo-cyclonedx cyclonedx --manifest-path sbom-src/Cargo.toml --format json --target all \
+            --override-filename fsearch-daemon.cdx
+          cd "$GITHUB_WORKSPACE"
+          mkdir -p build/sbom
+          mv "$RUNNER_TEMP/sbom-src/fsearch-daemon.cdx.json" "build/sbom/fsearch-daemon-${GITHUB_REF_NAME}.cdx.json"
+      # Signing steps. They share a guard against a tampered environment: each uses a fixed
+      # shell and absolute tool paths, and resets PATH and clears DYLD_* itself (GITHUB_PATH
+      # and GITHUB_ENV, writable by earlier steps, otherwise prepend to PATH or inject
+      # variables). The guard fails the job if an earlier step altered the environment.
+      # Residual risk: everything before this point ran in the same job and on the same
+      # runner as the keys, so code from the build can still tamper with files or leave a
+      # background process behind. Splitting build and sign into two jobs would remove that.
+      - name: Check the environment before the keychain is unlocked
+        shell: /usr/bin/env -u BASH_ENV /bin/bash --noprofile --norc -eo pipefail {0}
+        run: |
+          bad=0
+          while IFS='=' read -r name _; do
+            case "$name" in
+              DYLD_*|LD_*|BASH_ENV|ENV|BASH_FUNC_*|CDPATH|GIT_EXEC_PATH|GIT_CONFIG*|SSH_ASKPASS|DEVELOPER_DIR|TOOLCHAINS)
+                echo "::error::$name is set; an earlier step altered the environment"; bad=1 ;;
+            esac
+          done < <(/usr/bin/env)
+          # The signing steps reset PATH to /usr/bin:/bin:/usr/sbin:/sbin, so the system
+          # copies of their tools are what run. The runner's own PATH (Homebrew first) is
+          # not checked: a Homebrew shasum there is never called.
+          for t in xcrun security ditto shasum codesign hdiutil base64; do
+            [ -x "/usr/bin/$t" ] || { echo "::error::/usr/bin/$t is missing"; bad=1; }
+          done
+          [ "$bad" -eq 0 ]
       - name: Import signing certificate
+        shell: /usr/bin/env -u BASH_ENV /bin/bash --noprofile --norc -eo pipefail {0}
         env:
           CERT_P12_BASE64: ${{ secrets.DEVELOPER_ID_CERT_P12_BASE64 }}
           CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERT_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
+          export PATH=/usr/bin:/bin:/usr/sbin:/sbin
           KEYCHAIN="$RUNNER_TEMP/build.keychain-db"
           echo "KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
           umask 077
-          trap 'rm -f "$RUNNER_TEMP/cert.p12"' EXIT
-          echo "$CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
-          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$CERT_PASSWORD" -T /usr/bin/codesign
-          rm -f "$RUNNER_TEMP/cert.p12"
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          trap '/bin/rm -f "$RUNNER_TEMP/cert.p12"' EXIT
+          echo "$CERT_P12_BASE64" | /usr/bin/base64 --decode > "$RUNNER_TEMP/cert.p12"
+          /usr/bin/security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          /usr/bin/security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          /usr/bin/security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          /usr/bin/security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          /bin/rm -f "$RUNNER_TEMP/cert.p12"
+          /usr/bin/security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
           # Add to the user search list (keeping the existing ones) and make it default.
           EXISTING=()
-          while IFS= read -r kc; do [ -n "$kc" ] && EXISTING+=("$kc"); done < <(security list-keychains -d user | sed 's/^[[:space:]]*"//; s/"$//')
-          security list-keychains -d user -s "$KEYCHAIN" ${EXISTING[@]+"${EXISTING[@]}"}
-          security default-keychain -d user -s "$KEYCHAIN"
+          while IFS= read -r kc; do [ -n "$kc" ] && EXISTING+=("$kc"); done < <(/usr/bin/security list-keychains -d user | /usr/bin/sed 's/^[[:space:]]*"//; s/"$//')
+          /usr/bin/security list-keychains -d user -s "$KEYCHAIN" ${EXISTING[@]+"${EXISTING[@]}"}
+          /usr/bin/security default-keychain -d user -s "$KEYCHAIN"
       - name: Store notary credentials (App Store Connect API key)
+        shell: /usr/bin/env -u BASH_ENV /bin/bash --noprofile --norc -eo pipefail {0}
         env:
           NOTARY_KEY_P8_BASE64: ${{ secrets.NOTARY_API_KEY_P8_BASE64 }}
           NOTARY_KEY_ID: ${{ secrets.NOTARY_API_KEY_ID }}
           NOTARY_ISSUER_ID: ${{ secrets.NOTARY_API_ISSUER_ID }}
         run: |
+          export PATH=/usr/bin:/bin:/usr/sbin:/sbin
           umask 077
           KEYFILE="$RUNNER_TEMP/notary-key.p8"
-          trap 'rm -f "$KEYFILE"' EXIT
-          echo "$NOTARY_KEY_P8_BASE64" | base64 --decode > "$KEYFILE"
-          xcrun notarytool store-credentials fsearch-notary \
+          trap '/bin/rm -f "$KEYFILE"' EXIT
+          echo "$NOTARY_KEY_P8_BASE64" | /usr/bin/base64 --decode > "$KEYFILE"
+          /usr/bin/xcrun notarytool store-credentials fsearch-notary \
             --key "$KEYFILE" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" \
             --keychain "$KEYCHAIN"
       - name: Sign, notarize, package
+        shell: /usr/bin/env -u BASH_ENV /bin/bash --noprofile --norc -eo pipefail {0}
         env:
           DEVELOPER_ID: ${{ secrets.DEVELOPER_ID }}
         # Signs the archive built above, before the keychain existed; builds nothing.
-        run: scripts/release.sh --sign "${GITHUB_REF_NAME#v}"
+        # release.sh --sign calls only system tools (codesign, xcrun, ditto, hdiutil, shasum,
+        # spctl, PlistBuddy, file, find), so the reset PATH is enough for it.
+        run: |
+          export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+          scripts/release.sh --sign "${GITHUB_REF_NAME#v}"
       - name: Attest build provenance
         id: attest
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: build/release/*.dmg
+      - name: Attest the daemon SBOM
+        id: attest-sbom
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-path: build/release/*.dmg
+          sbom-path: build/sbom/fsearch-daemon-${{ github.ref_name }}.cdx.json
       - name: Draft GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           ATTESTATION_BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+          SBOM_ATTESTATION_BUNDLE: ${{ steps.attest-sbom.outputs.bundle-path }}
         run: |
           set -euo pipefail
           DMG=$(ls build/release/*.dmg)
+          SBOM="build/sbom/fsearch-daemon-${GITHUB_REF_NAME}.cdx.json"
           cp "$ATTESTATION_BUNDLE" "$DMG.intoto.jsonl"
+          cp "$SBOM_ATTESTATION_BUNDLE" "$SBOM.intoto.jsonl"
           gh release create "$GITHUB_REF_NAME" --draft --verify-tag --title "FSearch ${GITHUB_REF_NAME#v}" \
             --notes "Draft. Verify the download with the instructions in .github/SECURITY.md." \
-            "$DMG" "$DMG.sha256" "$DMG.intoto.jsonl"
+            "$DMG" "$DMG.sha256" "$DMG.intoto.jsonl" "$SBOM" "$SBOM.intoto.jsonl"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: FSearch-dmg
@@ -225,9 +295,11 @@ jobs:
             build/release/*.dmg
             build/release/*.sha256
             build/release/*.intoto.jsonl
+            build/sbom/*
       - name: Delete signing keychain
         if: always()
-        run: security delete-keychain "$KEYCHAIN" || true
+        shell: /usr/bin/env -u BASH_ENV /bin/bash --noprofile --norc -eo pipefail {0}
+        run: /usr/bin/security delete-keychain "$KEYCHAIN" || true
 
   bench:
     # Performance regression check (bench/README.md). Compares against the

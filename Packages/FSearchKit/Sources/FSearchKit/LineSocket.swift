@@ -27,12 +27,18 @@ final class LineSocket {
     let expectedPeerUid: uid_t
     let maxLineBytes: Int
     let io: IO
+    /// Names the peer of each new connection (see ``PeerIdentifier``); nil skips it.
+    let identifyPeer: ((Int32) -> SocketHolder?)?
+    /// Who the open connection's peer is, nil when not connected, not identified, or its token was unreadable.
+    private(set) var peer: SocketHolder?
 
     init(
         path: String, timeout: TimeInterval, expectedPeerUid: uid_t = getuid(),
-        maxLineBytes: Int = LineSocket.defaultMaxLineBytes, io: IO = .live
+        maxLineBytes: Int = LineSocket.defaultMaxLineBytes, io: IO = .live,
+        identifyPeer: ((Int32) -> SocketHolder?)? = nil
     ) {
         (self.path, self.timeout, self.expectedPeerUid, self.maxLineBytes, self.io) = (path, timeout, expectedPeerUid, maxLineBytes, io)
+        self.identifyPeer = identifyPeer
     }
     deinit { close() }
 
@@ -40,6 +46,7 @@ final class LineSocket {
     func close() {
         if fd >= 0 { Darwin.close(fd) }
         fd = -1
+        peer = nil
         buffer.removeAll()
     }
 
@@ -76,6 +83,9 @@ final class LineSocket {
         guard peerIsTrusted(peerUid: getpeereid(s, &uid, &gid) == 0 ? uid : nil, expected: expectedPeerUid) else {
             Darwin.close(s); throw DaemonError.disconnected
         }
+        // Who we talk to, from the kernel's record of this connection's peer, not from socket.lock.
+        // An unknown same-user daemon (the CLI's) is still used; it is just never taken for ours.
+        peer = identifyPeer?(s)
         fd = s
     }
 

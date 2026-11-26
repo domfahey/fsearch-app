@@ -41,7 +41,7 @@ final class Uninstaller: ObservableObject {
     /// these keys must not turn automatic recovery back on.
     static let defaultsKeys = [
         "editor", "debugMode", "onboarded", "skippedFullDiskAccess", "dismissedFullDiskAccessReminder", "recentPaths",
-        "helperIdentity", "updateReminderVisible",
+        "helperIdentity", "updateReminderVisible", SearchFilesIntent.allowContentSearchKey,
         // Sparkle's own.
         "SUEnableAutomaticChecks", "SUHasLaunchedBefore", "SULastCheckTime", "SUSendProfileInfo",
         "SUAutomaticallyUpdate", "SUScheduledCheckInterval", "SUSkippedVersion", "SULastProfileSubmissionDate",
@@ -61,6 +61,7 @@ final class Uninstaller: ObservableObject {
     private let logFolder: URL
     private let exists: (URL) -> Bool
     private let cliAgentInstalled: () -> Bool
+    private let dataFolderIssues: (URL) -> [DataFolderCheck.Issue]
     private let resetShortcut: () -> Void
     private let waitUntilStopped: @MainActor () async -> Void
 
@@ -75,6 +76,7 @@ final class Uninstaller: ObservableObject {
     ///   - logFolder: The debug log's folder.
     ///   - exists: Whether a folder exists.
     ///   - cliAgentInstalled: Whether the CLI's login agent exists.
+    ///   - dataFolderIssues: Problems with the data folder; a symlink or another owner stops it being trashed.
     ///   - resetShortcut: Clears the global shortcut.
     ///   - waitUntilStopped: Waits briefly for an unregistered helper to exit before trashing `dataFolder`.
     init(
@@ -82,6 +84,7 @@ final class Uninstaller: ObservableObject {
         dataFolder: URL, logFolder: URL,
         exists: @escaping (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) },
         cliAgentInstalled: @escaping () -> Bool = { FileManager.default.fileExists(atPath: DaemonManager.cliAgentPlist.path) },
+        dataFolderIssues: @escaping (URL) -> [DataFolderCheck.Issue] = { DataFolderCheck.issues(in: $0) },
         resetShortcut: @escaping () -> Void,
         waitUntilStopped: @escaping @MainActor () async -> Void = {}
     ) {
@@ -93,6 +96,7 @@ final class Uninstaller: ObservableObject {
         self.logFolder = logFolder
         self.exists = exists
         self.cliAgentInstalled = cliAgentInstalled
+        self.dataFolderIssues = dataFolderIssues
         self.resetShortcut = resetShortcut
         self.waitUntilStopped = waitUntilStopped
     }
@@ -165,6 +169,12 @@ final class Uninstaller: ObservableObject {
                 )
             } else if let reason = Self.keptReason(ownership) {
                 r.kept.append(String(localized: "The data folder (\(dataFolder.path)) was left alone: \(reason)"))
+            } else if let unsafe = dataFolderIssues(dataFolder).first(where: \.unsafeToTrash) {
+                r.kept.append(
+                    String(
+                        localized:
+                            "The data folder (\(dataFolder.path)) was left alone: \(unsafe.message) Check it before removing it yourself."
+                    ))
             } else if helperGone {
                 if unregisteredHelper { await waitUntilStopped() }
                 trash(dataFolder, String(localized: "The index and data folder"), into: &r)

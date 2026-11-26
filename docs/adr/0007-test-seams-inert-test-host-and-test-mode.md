@@ -18,7 +18,7 @@ The app's unit tests (AppTests) run inside the app as a test host, so the real a
 ## Decision
 
 - **Seams.** System services sit behind protocols in `App/Support/Seams.swift` (for example `HelperService`, `LoginItemService` and `DaemonControl`). The real adapters live in `App/Support/SystemSeams.swift`. Tests use the fakes in `AppTests/Support/Fakes.swift`.
-- **Test mode.** The flag `-FSEARCH_SOCKET <path>` points the app at a throwaway daemon. In test mode the app never touches `SMAppService`, never shows onboarding and keeps its search log beside that daemon. The UI tests and `scripts/ui-smoke.sh` use it.
+- **Test mode.** The flag `-FSEARCH_SOCKET <path>` points the app at a throwaway daemon. In test mode the app never touches `SMAppService`, never shows onboarding and keeps its search log beside that daemon. The UI tests and `scripts/ui-smoke.sh` use it. This flag and the XCTest environment check are compiled in only for Debug builds (`LaunchOptions.testHooksCompiledIn`). A Release build ignores both, so no other process can switch off the helper and updates (for example by setting `XCTestSessionIdentifier` with `launchctl setenv`) or point the app at its own socket. Commits `49231fd` and `1d7e933` made this change.
 - **Inert host.** When the app hosts AppTests, it detects the XCTest environment and runs as test mode with a socket nobody listens on. It starts no helper, hotkey, onboarding or Sparkle. Windows are ordered in invisibly, and the app never activates itself. `TestHostSafetyTests` checks that no window is key or visible after the app's window paths run.
 
 ## Consequences

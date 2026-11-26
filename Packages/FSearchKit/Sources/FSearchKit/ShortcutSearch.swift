@@ -8,6 +8,17 @@ public enum ShortcutSearch: Sendable {
     /// Hard upper bound on returned files, matching the launcher panel's result cap.
     public static let maxLimit = 1000
 
+    /// True if ``run(query:mode:limit:backend:)`` would search file contents: content or symbol mode, or a
+    /// `grep:`/`content:`/`regex:`/`sym:`/`symbol:` key in a names-mode query (checked after the same sanitizing).
+    ///
+    /// - Parameters:
+    ///   - query: The search query, as passed to ``run(query:mode:limit:backend:)``.
+    ///   - mode: The search mode.
+    /// - Returns: Whether the search would read text inside files.
+    public static func readsFileContents(query: String, mode: SearchMode) -> Bool {
+        mode != .names || QuerySplit.contentSearch(SearchURL.sanitize(query)) != nil
+    }
+
     /// Searches for matching files and returns their absolute paths in ranked order, deduplicated.
     ///
     /// - Parameters:

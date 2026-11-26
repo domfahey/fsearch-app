@@ -71,11 +71,12 @@ extension AppTests {
 
         func make(
             _ env: TestEnv, helper: FakeHelper?, login: FakeLoginItem?, exists: @escaping (URL) -> Bool = { _ in true },
-            cliAgent: Bool = false, shortcutResets: Box = Box()
+            cliAgent: Bool = false, shortcutResets: Box = Box(), issues: [DataFolderCheck.Issue] = []
         ) -> Uninstaller {
             Uninstaller(
                 helper: helper, loginItem: login, workspace: env.workspace, defaults: env.defaults,
                 dataFolder: data, logFolder: logs, exists: exists, cliAgentInstalled: { cliAgent },
+                dataFolderIssues: { _ in issues },
                 resetShortcut: { shortcutResets.n += 1 })
         }
 
@@ -286,6 +287,26 @@ extension AppTests {
             await u3.run(ownership: .helperOff)
             guard case let .done(r3) = u3.phase else { Issue.record("not done"); return }
             #expect(r3.kept.isEmpty)
+        }
+
+        @Test func unsafeDataFolderIsNotTrashed() async {
+            for issue in [DataFolderCheck.Issue.folderIsSymlink, .folderNotOwned] {
+                let env = TestEnv()
+                defer { env.tearDown() }
+                let u = make(env, helper: FakeHelper(.enabled), login: nil, issues: [issue])
+                await u.run(ownership: .ours)
+                #expect(!env.workspace.trashed.contains(data))
+                guard case let .done(r) = u.phase else { Issue.record("not done"); return }
+                #expect(r.kept.count == 1 && r.kept[0].contains(data.path) && r.kept[0].contains(issue.message))
+            }
+        }
+
+        @Test func softDataFolderIssueStillTrashes() async {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let u = make(env, helper: FakeHelper(.enabled), login: nil, issues: [.folderWritableByOthers])
+            await u.run(ownership: .ours)
+            #expect(env.workspace.trashed.contains(data))
         }
 
         @Test func opensFullDiskAccess() {

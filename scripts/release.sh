@@ -45,10 +45,10 @@ esac
 if [ "$PHASE" != prepare ]; then
   [ -n "${DEVELOPER_ID:-}" ] || fail "DEVELOPER_ID is not set (e.g. 'Developer ID Application: Your Name (TEAMID)')"
   # Capture first: `... | grep -q` can SIGPIPE the producer and fail under pipefail.
-  IDENTITIES=$(security find-identity -v -p codesigning)
+  IDENTITIES=$(/usr/bin/security find-identity -v -p codesigning)
   grep -qF "\"$DEVELOPER_ID\"" <<<"$IDENTITIES" \
     || fail "no codesigning identity matching '$DEVELOPER_ID' in the keychain"
-  NOTARY_OUT=$(xcrun notarytool history --keychain-profile "$PROFILE" ${NOTARY_KC[@]+"${NOTARY_KC[@]}"} 2>&1) \
+  NOTARY_OUT=$(/usr/bin/xcrun notarytool history --keychain-profile "$PROFILE" ${NOTARY_KC[@]+"${NOTARY_KC[@]}"} 2>&1) \
     || fail "notarytool profile '$PROFILE' check failed: $NOTARY_OUT"
 fi
 KEY=$(/usr/libexec/PlistBuddy -c "Print SUPublicEDKey" App/Resources/Info.plist)
@@ -116,13 +116,13 @@ if [ "$PHASE" != sign ]; then
       || fail "FSEARCH_PROJECT_READY=1 but $DERIVED/SourcePackages is missing (resolve the packages into $DERIVED first)"
   else
     scripts/generate-project.sh
-    xcodebuild -resolvePackageDependencies -project FSearch.xcodeproj -scheme FSearch \
+    /usr/bin/xcodebuild -resolvePackageDependencies -project FSearch.xcodeproj -scheme FSearch \
       -derivedDataPath "$DERIVED" -onlyUsePackageVersionsFromResolvedFile
   fi
   # Archive ad-hoc signed; the Developer ID signature is applied below, inside-out,
   # by hand. That keeps team/profile settings out of the project and makes this
   # script the single place that decides how every nested binary is signed.
-  xcodebuild -project FSearch.xcodeproj -scheme FSearch -configuration Release \
+  /usr/bin/xcodebuild -project FSearch.xcodeproj -scheme FSearch -configuration Release \
     -archivePath "$OUT/FSearch.xcarchive" -derivedDataPath "$DERIVED" -onlyUsePackageVersionsFromResolvedFile \
     MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD" \
     CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO archive
@@ -141,8 +141,23 @@ fi
 STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT
 
+# The helper must satisfy the same requirement the app enforces at runtime
+# (SocketHolder.helperRequirement), read from that source so the two cannot drift.
+SOCKET_HOLDER=Packages/FSearchKit/Sources/FSearchKit/SocketHolder.swift
+HELPER_ID=$(sed -n 's/^ *static let helperIdentifier = "\(.*\)"$/\1/p' "$SOCKET_HOLDER")
+TEAM_REQ=$(sed -n 's/^ *static let teamRequirement = #"\(.*\)"#$/\1/p' "$SOCKET_HOLDER")
+TEAM_ID=$(sed -n 's/.*subject\.OU\] = "\([A-Z0-9]*\)".*/\1/p' <<<"$TEAM_REQ")
+[ -n "$HELPER_ID" ] && [ -n "$TEAM_REQ" ] && [ -n "$TEAM_ID" ] \
+  || fail "could not read the helper identifier and team requirement from $SOCKET_HOLDER"
+HELPER_REQ="identifier \"$HELPER_ID\" and $TEAM_REQ"
+# The signing identity must belong to that team, or the signed helper would be rejected at runtime.
+case "$DEVELOPER_ID" in
+  *"($TEAM_ID)") ;;
+  *) fail "DEVELOPER_ID '$DEVELOPER_ID' is not team $TEAM_ID, the team $SOCKET_HOLDER requires" ;;
+esac
+
 # Hardened runtime + secure timestamp are required for notarization.
-sign() { codesign --force --options runtime --timestamp --sign "$DEVELOPER_ID" "$@"; }
+sign() { /usr/bin/codesign --force --options runtime --timestamp --sign "$DEVELOPER_ID" "$@"; }
 
 # Inside-out, as Sparkle's docs prescribe: Autoupdate and Updater.app, then the
 # framework, then our helper, then the app.
@@ -168,47 +183,49 @@ BUILT_VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" "$APP/Content
 sign "$SV/Autoupdate"
 sign "$SV/Updater.app"
 sign "$SPARKLE"
-sign --identifier com.domfahey.fsearch.daemon "$APP/Contents/Helpers/fsearch"
+sign --identifier "$HELPER_ID" "$APP/Contents/Helpers/fsearch"
+/usr/bin/codesign --verify -R="$HELPER_REQ" "$APP/Contents/Helpers/fsearch" \
+  || fail "the signed helper does not satisfy the app's runtime requirement: $HELPER_REQ"
 sign --entitlements "$ENTITLEMENTS" "$APP"
-codesign --verify --deep --strict --verbose=2 "$APP"
+/usr/bin/codesign --verify --deep --strict --verbose=2 "$APP"
 
 # No nested binary may carry an entitlement that weakens the hardened runtime.
 BAD_ENT='com.apple.security.get-task-allow|com.apple.security.cs.allow-jit|com.apple.security.cs.disable-library-validation|com.apple.security.cs.allow-dyld-environment-variables'
 while IFS= read -r -d '' f; do
-  file -b "$f" | grep -q 'Mach-O' || continue
-  ENTS=$(codesign -d --entitlements - --xml "$f" 2>/dev/null || true)
+  /usr/bin/file -b "$f" | grep -q 'Mach-O' || continue
+  ENTS=$(/usr/bin/codesign -d --entitlements - --xml "$f" 2>/dev/null || true)
   if grep -Eq "$BAD_ENT" <<<"$ENTS"; then fail "forbidden entitlement in $f"; fi
 done < <(find "$APP" -type f -print0)   # includes the app's own executable
 
 # Notarize and staple the app first so the copy baked into the DMG carries its own
 # stapled ticket (offline Gatekeeper checks pass after dragging FSearch.app out of the DMG).
 APP_ZIP="$STAGE/FSearch.zip"
-ditto -c -k --keepParent "$APP" "$APP_ZIP"
-xcrun notarytool submit "$APP_ZIP" --keychain-profile "$PROFILE" ${NOTARY_KC[@]+"${NOTARY_KC[@]}"} --wait
+/usr/bin/ditto -c -k --keepParent "$APP" "$APP_ZIP"
+/usr/bin/xcrun notarytool submit "$APP_ZIP" --keychain-profile "$PROFILE" ${NOTARY_KC[@]+"${NOTARY_KC[@]}"} --wait
 rm -f "$APP_ZIP"
-xcrun stapler staple "$APP" || fail "stapling $APP failed"
-xcrun stapler validate "$APP" || fail "stapler validate failed for $APP"
+/usr/bin/xcrun stapler staple "$APP" || fail "stapling $APP failed"
+/usr/bin/xcrun stapler validate "$APP" || fail "stapler validate failed for $APP"
 
 # DMG with the stapled app and an /Applications symlink for drag-install.
 DMG="$OUT/FSearch-$VERSION.dmg"
 DMG_STAGE="$STAGE/dmg"
 mkdir -p "$DMG_STAGE"
-ditto "$APP" "$DMG_STAGE/FSearch.app"
+/usr/bin/ditto "$APP" "$DMG_STAGE/FSearch.app"
 ln -s /Applications "$DMG_STAGE/Applications"
-hdiutil create -volname FSearch -srcfolder "$DMG_STAGE" -ov -format UDZO "$DMG"
-codesign --force --timestamp --sign "$DEVELOPER_ID" "$DMG"
-xcrun notarytool submit "$DMG" --keychain-profile "$PROFILE" ${NOTARY_KC[@]+"${NOTARY_KC[@]}"} --wait
-xcrun stapler staple "$DMG" || fail "stapling $DMG failed"
+/usr/bin/hdiutil create -volname FSearch -srcfolder "$DMG_STAGE" -ov -format UDZO "$DMG"
+/usr/bin/codesign --force --timestamp --sign "$DEVELOPER_ID" "$DMG"
+/usr/bin/xcrun notarytool submit "$DMG" --keychain-profile "$PROFILE" ${NOTARY_KC[@]+"${NOTARY_KC[@]}"} --wait
+/usr/bin/xcrun stapler staple "$DMG" || fail "stapling $DMG failed"
 
 # Verify the finished artifacts; any failure stops the release.
-xcrun stapler validate "$APP" || fail "stapler validate failed for $APP"
-xcrun stapler validate "$DMG" || fail "stapler validate failed for $DMG"
-codesign --verify --deep --strict --verbose=2 "$APP" || fail "codesign verification failed for $APP"
-spctl -a -t open --context context:primary-signature -v "$DMG" || fail "Gatekeeper rejected $DMG"
-spctl -a -t exec -vv "$APP" || fail "Gatekeeper rejected $APP"
+/usr/bin/xcrun stapler validate "$APP" || fail "stapler validate failed for $APP"
+/usr/bin/xcrun stapler validate "$DMG" || fail "stapler validate failed for $DMG"
+/usr/bin/codesign --verify --deep --strict --verbose=2 "$APP" || fail "codesign verification failed for $APP"
+/usr/sbin/spctl -a -t open --context context:primary-signature -v "$DMG" || fail "Gatekeeper rejected $DMG"
+/usr/sbin/spctl -a -t exec -vv "$APP" || fail "Gatekeeper rejected $APP"
 
 # Checksums to publish next to the DMG (verify with: shasum -a 256 -c FILE.dmg.sha256).
-(cd "$OUT" && shasum -a 256 "$(basename "$DMG")" > "$(basename "$DMG").sha256") \
+(cd "$OUT" && /usr/bin/shasum -a 256 "$(basename "$DMG")" > "$(basename "$DMG").sha256") \
   || fail "could not write checksum for $DMG"
 mkdir -p "$(dirname "$LAST_BUILD_FILE")"; echo "$BUILD" > "$LAST_BUILD_FILE"
 echo "SHA-256:"; cat "$DMG.sha256"

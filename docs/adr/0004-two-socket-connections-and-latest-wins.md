@@ -1,7 +1,9 @@
-# 0004. Two socket connections, and the latest search wins
+# 0004. Separate socket connections, and the latest search wins
 
 Date: 2026-10-10
 Status: Accepted
+
+The title and decision originally said two connections. The app now opens three; the third is the control connection.
 
 ## Context
 
@@ -13,11 +15,11 @@ The daemon answers each connection in order. If name and content searches shared
 
 - One connection for everything. A slow content search would hold back the next name search.
 - A new connection for every request. This costs a connection setup on every keystroke.
-- Two long-lived connections, one for names and one for content. This is the choice below.
+- Long-lived connections split by job: one for names, one for content, one for control. This is the choice below.
 
 ## Decision
 
-- Use two connections to the daemon. One carries name searches. The other carries content and definition searches. Each connection sends one request at a time, so replies never cross.
+- Use three connections to the daemon (`App/AppState.swift`). One carries name searches. One carries content and definition searches. The third carries control requests, so they never wait on a search. Each connection sends one request at a time, so replies never cross.
 - Give each refresh a generation number. Only the newest refresh may publish results. Starting a new one cancels the old one, so a hung daemon costs one timeout, not one per keystroke.
 - A cancelled request that is still queued is skipped without touching the socket.
 

@@ -21,8 +21,10 @@ Open **Index Details…** from the menu. It shows live numbers from the daemon:
 
 - Entries, folders, pending changes (added and removed), the last FSEvents id and the index size.
 - Whether Full Disk Access is on, and whether the daemon is the owner (writes the index) or a follower.
+- **Daemon**: who is on the other end of the socket, found from its code signature. **FSearch helper (signature verified)** is FSearch's own background helper. **Other (unverified)** is any other daemon, such as the one from the fsearch CLI. **Not identified** means the app could not read the connected program's identity, for example before it has connected.
 - Content search: files indexed, segments, size and files waiting to be indexed.
 - Folders the index lacks (skipped).
+- **Data folder safety**: a read-only check of the daemon's data folder. It reads **No problems found**, or one line per problem (see [Troubleshooting](../reference/troubleshooting.md#data-folder-safety-shows-a-problem)). It changes nothing.
 - The last 30 lines of `daemon.log` (present when using the fsearch CLI's daemon; the app's bundled helper does not write `daemon.log`).
 
 Buttons:
@@ -42,7 +44,7 @@ Open **Search Log…** from the menu. It lists each search this app makes: time,
 
 - The log records only searches made in the panel (including `fsearch://search`). It does not see searches from the CLI, background Shortcuts (**Search Files**) runs, or other tools.
 - It is saved on your Mac in `~/Library/Logs/FSearch/searches.jsonl` and never sent anywhere.
-- It keeps the last 10,000 searches.
+- It keeps the last 10,000 searches, and drops any older than 7 days.
 - Turning debug mode off deletes the log and closes the debug windows.
 - Nothing is recorded while debug mode is off.
 

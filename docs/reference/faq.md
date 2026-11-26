@@ -12,7 +12,7 @@ macOS 15 (Sequoia) and later, on Apple silicon and Intel.
 
 ## Does it send my files or searches anywhere?
 
-No. The index and logs stay on your Mac. The app makes no network requests of its own, except that the updater checks for new versions in builds that have updates configured. See [Privacy](../privacy.md).
+No. The index and logs stay on your Mac. Apart from the updater, which checks for new versions in builds that have updates configured, the app makes no network requests of its own. Opening a Help menu or FSearch menu link, or **Report an Issue…**, opens github.com in your browser, which then makes that request. See [Privacy](../privacy.md).
 
 ## Does it replace Spotlight?
 
@@ -68,7 +68,7 @@ It skips dependency, build and cache folders such as `node_modules`, `.git`, `bu
 
 ## Is it on the Mac App Store?
 
-No. It is distributed as a signed, notarized download. See [ADR 0006](../adr/0006-not-on-the-mac-app-store.md).
+No. It will be distributed as a signed, notarized download. See [ADR 0006](../adr/0006-not-on-the-mac-app-store.md).
 
 ## How do I update it?
 
@@ -89,6 +89,18 @@ The daemon rejected your query, and the red text is its own message, for example
 ## Where do I report a bug or ask for a feature?
 
 See [Support](../../.github/SUPPORT.md). For security problems, see [Security](../../.github/SECURITY.md).
+
+## Does it follow my Accessibility settings?
+
+Yes. The panel and the FSearch menu follow Reduce Motion (no implicit animations), Reduce Transparency (an opaque background instead of translucent material) and Increase Contrast (stronger borders and selection outlines). Result rows, the search mode label and the FSearch menu's rows carry VoiceOver labels.
+
+## Why does FSearch ask to move to Applications?
+
+It asks when you open it from the disk image or from a temporary (translocated) copy, such as a download run straight from Downloads. **Move to Applications** copies it to /Applications and opens that copy. **Quit** closes FSearch so you can move it yourself.
+
+## What happens when I open FSearch again?
+
+If FSearch is already running, the new launch does not start a second copy. The running copy shows the search panel, and the new one quits.
 
 ## Glossary
 

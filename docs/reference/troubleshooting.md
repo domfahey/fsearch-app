@@ -18,7 +18,7 @@ The app cannot reach the search daemon. It restarts the daemon it registered its
 
 The fsearch daemon is building its first index. Results appear when it finishes, usually within a minute or so. The panel keeps checking by itself. Searching works as soon as the index is ready.
 
-If it never finishes, open Index Details: while initial indexing is running it shows **Indexing…**; once the initial scan finishes, it switches to the **Index** stats (entries, folders and content files waiting to be indexed). If it stays stuck on **Indexing…**, check the unified log below or `daemon.log` (when using the CLI daemon).
+If it never finishes, open Index Details: while initial indexing is running it shows **Indexing…**; once the initial scan finishes, it switches to the **Index** stats (entries, folders and pending changes), followed by a **Content index** section (files, segments, size and files waiting to be indexed). If it stays stuck on **Indexing…**, check the unified log below or `daemon.log` (when using the CLI daemon).
 
 ## The menu-bar icon shows a warning
 
@@ -26,9 +26,9 @@ The icon changes to a magnifying glass with an exclamation mark. Open the menu t
 
 | Message | What to do |
 |---|---|
-| The search helper isn't running | Choose **Fix…**, then **Restart Daemon**. |
-| The search helper isn't answering | Choose **Fix…**, then **Restart Daemon**. |
-| The search helper needs your approval | Choose **Fix…**, then **Open Login Items Settings** and turn FSearch on. See below. |
+| The background helper isn't running | Choose **Fix…**, then **Restart Daemon**. |
+| The background helper isn't answering | Choose **Fix…**, then **Restart Daemon**. |
+| The background helper needs your approval | Choose **Fix…**, then **Open Login Items Settings** and turn FSearch on. See below. |
 | Full Disk Access is off, so some files won't be found | See [Grant Full Disk Access](../how-to/grant-full-disk-access.md). This one has no **Fix…** button; the menu offers **Turn On Full Disk Access…** (**Grant Full Disk Access to fsearch…** when using your CLI daemon). If you skipped the Full Disk Access step during onboarding, the menu-bar icon is a quieter magnifying glass in a circle and the menu also offers **Don't Remind Me**. |
 
 ## Files in Desktop, Documents, Downloads, Mail or iCloud Drive are missing
@@ -67,7 +67,7 @@ These are the exact texts the panel shows when a search cannot return results.
 | You see | Meaning | What to do |
 |---|---|---|
 | Starting search… | The app cannot reach the daemon yet and is trying to reconnect or restart it. | See ["Starting search…" does not go away](#starting-search-does-not-go-away). |
-| The search helper isn't answering | A search timed out, or the app spent its restarts without reaching the daemon. | See ["Starting search…" does not go away](#starting-search-does-not-go-away) and check Index Details. |
+| The background helper isn't answering | A search timed out, or the app spent its restarts without reaching the daemon. | See ["Starting search…" does not go away](#starting-search-does-not-go-away) and check Index Details. |
 | Indexing your disk… results will appear shortly | The first index is still being built. | Wait. See [Indexing](#indexing-your-disk-results-will-appear-shortly). |
 | Unexpected reply from the search daemon: *detail* | The daemon answered with something the app does not understand, for example `reply has no "hits"`. This usually means the app and the daemon are different versions. | Quit and reopen FSearch. If it persists, [report it](../../.github/SUPPORT.md) with the detail text. |
 | *The daemon's own message* (in red) | The daemon rejected the query. | Fix the query. |
@@ -98,6 +98,25 @@ Search inside files reads only text and code files up to 1 MB under your home fo
 ## Index Details says "Follower"
 
 In Index Details, **Role** reads **Follower** when another daemon owns the index and writes it. That is normal when the app uses the daemon from the fsearch CLI, or when two daemons share the data folder. A follower serves searches from the index the owner saves, and takes over if the owner stops. You do not need to fix anything unless searches fail. If they do, see [Starting search…](#starting-search-does-not-go-away).
+
+## Data folder safety shows a problem
+
+In Index Details, **Data folder safety** reads **No problems found** when the daemon's data folder (`~/Library/Application Support/FSearch`) looks right. Otherwise it lists what is wrong. The check only reads; it never changes the folder.
+
+| You see | Meaning | What to do |
+|---|---|---|
+| The data folder is a symbolic link. | The path points somewhere else, so the socket and index may live in a place you did not choose. | Find where it points (`ls -ld` on the folder). Remove the link if you did not make it. |
+| The data folder is not a folder. | A file sits where the folder should be. | Move it away and restart the daemon. |
+| The data folder belongs to another user. | Someone else owns it, so they could change the socket or index. | Do not use this folder. Fix its owner or remove it. |
+| The data folder can be written to by other users. | Group or others have write access. | Remove that access (`chmod go-w`). |
+| *name* is a symbolic link. | `socket.lock` or `fsearch.sock` is a link. | Remove the link and restart the daemon. |
+| *name* belongs to another user. | Another user owns `socket.lock` or `fsearch.sock`. | Remove the file and restart the daemon. |
+
+Read access for your group or others (a folder mode of 0755) is normal and is not reported. If the folder is a symbolic link or belongs to another user, **Remove Background Helper and Data…** leaves it alone and says so, so it cannot trash the wrong files.
+
+## Index Details shows "Other (unverified)" for Daemon
+
+The **Daemon** row names the program that answers on the socket by its code signature. **FSearch helper (signature verified)** means it is FSearch's own helper. **Other (unverified)** means a different daemon answers, most often the one from the fsearch CLI. FSearch still searches with it, but never restarts or removes it. **Not identified** means the app could not read the program's identity; it then falls back to the pid in `socket.lock`, which any program running as you could write. If you expect FSearch's own helper and see **Other (unverified)**, stop the CLI daemon, then press **Restart Daemon**. See [Index Details says "Follower"](#index-details-says-follower).
 
 ## Still stuck
 

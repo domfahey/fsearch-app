@@ -6,7 +6,7 @@ import Testing
 @Suite
 struct LocalizationTests {
     private static let requiredKeys = [
-        "The search helper isn't answering",
+        "The background helper isn't answering",
         "FSearch Settings",
         "Send Feedback",
         "Can't reach the search daemon",

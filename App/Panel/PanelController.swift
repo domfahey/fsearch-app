@@ -33,6 +33,16 @@ final class PanelController: PanelHost {
     private var previousApp: NSRunningApplication?
     /// A result key waiting for results; hiding drops it, so it never runs behind the user's back.
     let held = HeldKeyBox()
+    /// The clock for the resume session; tests replace it.
+    var now: () -> Date {
+        get { held.now }
+        set { held.now = newValue }
+    }
+    /// The monotonic clock for the external-open guard; tests replace it.
+    var uptime: () -> ContinuousClock.Instant {
+        get { held.uptime }
+        set { held.uptime = newValue }
+    }
     /// Keys sent to the view from outside it: ↑/↓ in Quick Look.
     let keys = PanelKeyFeed()
     /// Where the view laid out its rows, so ⌘K's menu opens at the selected one.
@@ -104,12 +114,17 @@ final class PanelController: PanelHost {
 
     /// Shows the panel on the screen holding the mouse, resuming the last query if it was hidden within the resume window.
     func show(app: AppState) {
-        present(app: app, state: session.opened(at: Date()))
+        present(app: app, state: session.opened(at: now()), external: false)
+    }
+
+    /// Shows the panel for a request from outside the app (the reopen notification): activation keys are ignored for half a second.
+    func showExternally(app: AppState) {
+        present(app: app, state: session.opened(at: now()), external: true)
     }
 
     /// Shows the panel pre-filled with a parsed `fsearch://` search, replacing any resumed session state.
     func show(app: AppState, search: SearchURL) {
-        present(app: app, state: PanelState(query: search.query, mode: search.mode, selection: 0))
+        present(app: app, state: PanelState(query: search.query, mode: search.mode, selection: 0), external: true)
     }
 
     /// Parses and opens a `fsearch://` URL in the panel. Returns false for unrecognized URLs without showing the panel.
@@ -120,7 +135,7 @@ final class PanelController: PanelHost {
         return true
     }
 
-    private func present(app: AppState, state: PanelState) {
+    private func present(app: AppState, state: PanelState, external: Bool) {
         let wasVisible = isVisible
         self.app = app
         observeAppResignActive()
@@ -130,6 +145,7 @@ final class PanelController: PanelHost {
         selection = state.selection
         viewState.resume(state)
         held.key.cancel()
+        if external { held.external.arm(at: uptime()) } else { held.external.disarm() }
         menu.close()
         let p = panel ?? Panel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         p.staysUpWithoutKey = app.options.showPanel
@@ -200,7 +216,7 @@ final class PanelController: PanelHost {
         menu.close()
         guard let p = panel, p.isVisible, let app else { return }
         defer { previousApp = nil }
-        session.hidden(PanelState(query: app.search.query, mode: app.search.mode, selection: selection), at: Date())
+        session.hidden(PanelState(query: app.search.query, mode: app.search.mode, selection: selection), at: now())
         p.orderOut(nil)
         QuickLookSource.shared.close()
         restoreFocusOnHide(except: p, returnFocus: returnFocus)

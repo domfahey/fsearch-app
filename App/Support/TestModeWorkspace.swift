@@ -58,6 +58,9 @@ import Foundation
         /// Real and read-only: a UI test's results are real files in its fixture.
         func fileInfo(atPath path: String) -> FileInfo? { FileInfo.onDisk(path) }
 
+        /// Real and read-only: the check only reads the app's signature.
+        func isTrustedApp(at app: URL, requirement: String) -> Bool { CodeSignature.satisfies(app, requirement: requirement) }
+
         func trash(_ url: URL) throws { record("trash \(url.path)") }
     }
 #endif

@@ -225,6 +225,10 @@ final class FakeWorkspace: Workspace {
     /// plain file, so tests can use made-up paths like /p/x.txt.
     var missing: Set<String> = []
     var trashError: Error?
+    /// Apps whose code signature check fails. Any other app passes.
+    var untrustedApps: Set<URL> = []
+    /// The requirements `isTrustedApp` was asked about.
+    private(set) var checkedRequirements: [String] = []
 
     private(set) var opened: [URL] = []
     private(set) var openedWith: [(urls: [URL], app: URL)] = []
@@ -259,6 +263,11 @@ final class FakeWorkspace: Workspace {
         return FileInfo.onDisk(path) ?? FileInfo()
     }
 
+    func isTrustedApp(at app: URL, requirement: String) -> Bool {
+        checkedRequirements.append(requirement)
+        return !untrustedApps.contains(app)
+    }
+
     func trash(_ url: URL) throws {
         if let trashError { throw trashError }
         trashed.append(url)
@@ -268,9 +277,13 @@ final class FakeWorkspace: Workspace {
 @MainActor
 final class FakePanel: PanelHost {
     var isVisible = false
-    private(set) var shows = 0, hides = 0
+    private(set) var shows = 0, hides = 0, externalShows = 0
     private(set) var openedSearches: [SearchURL] = []
     func show(app: AppState) { shows += 1; isVisible = true }
+    func showExternally(app: AppState) {
+        externalShows += 1
+        show(app: app)
+    }
     func show(app: AppState, search: SearchURL) {
         shows += 1
         isVisible = true
