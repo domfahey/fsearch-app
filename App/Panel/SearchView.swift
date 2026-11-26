@@ -441,6 +441,8 @@ struct SearchView: View {
         guard let key = PanelInput.key(for: p, queryIsEmpty: model.query.isEmpty) else {
             return PanelInput.swallows(p) ? .handled : .ignored
         }
+        // Right after another app opened the panel, ↵ and the ⌘ shortcuts may be meant for that app.
+        if PanelInput.ignoresActivation(key, held: held, at: held.now()) { return .handled }
         // A result key waits for results that answer the query in the box.
         if let now = PanelInput.gate(key, held: &held.key, model: model) { act(now) }
         return .handled

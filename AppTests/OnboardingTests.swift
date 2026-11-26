@@ -161,7 +161,7 @@ extension AppTests {
             #expect(flow.facts.helperEnabled)
             env.daemon.onStatus = { _ in throw DaemonError.disconnected }
             await flow.poll()
-            #expect(env.app.daemon.state == .failed("The search helper isn't answering."))
+            #expect(env.app.daemon.state == .failed("The background helper isn't answering."))
             #expect(!flow.facts.helperEnabled)
             #expect(!flow.daemonRunning)
         }
@@ -304,7 +304,7 @@ extension AppTests {
                 // The inputs that pick "failed: Try Again" vs "Open Login Items Settings".
                 #expect(Onboarding.helperStepMode(owns: env.app.daemon.ownsDaemon, running: flow.daemonRunning) == .bundledHelper)
                 #expect(!flow.facts.helperEnabled && !flow.busy)
-                #expect(env.app.daemon.state == (fail ? .failed("The search helper isn't answering.") : .checking))
+                #expect(env.app.daemon.state == (fail ? .failed("The background helper isn't answering.") : .checking))
                 if !fail {
                     // While still checking, don't flash "Open Login Items Settings".
                     #expect(await eventually { !axTexts(in: w).isEmpty })

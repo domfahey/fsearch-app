@@ -1,6 +1,7 @@
 import AppKit
 import FSearchKit
 import Foundation
+import Security
 import ServiceManagement
 
 // The real implementations of the seams in Seams.swift. Each is a thin
@@ -62,7 +63,23 @@ final class SystemWorkspace: Workspace {
     func urlForApplication(withBundleIdentifier id: String) -> URL? { ws.urlForApplication(withBundleIdentifier: id) }
     func urlsForApplications(toOpen url: URL) -> [URL] { ws.urlsForApplications(toOpen: url) }
 
+    func isTrustedApp(at app: URL, requirement: String) -> Bool { CodeSignature.satisfies(app, requirement: requirement) }
+
     func fileInfo(atPath path: String) -> FileInfo? { FileInfo.onDisk(path) }
 
     func trash(_ url: URL) throws { try FileManager.default.trashItem(at: url, resultingItemURL: nil) }
+}
+
+/// Static code-signature checks (read-only: nothing is launched).
+enum CodeSignature {
+    /// Whether the app at `app` has a valid static signature, on every architecture, that satisfies `requirement`.
+    static func satisfies(_ app: URL, requirement: String) -> Bool {
+        var code: SecStaticCode?
+        var req: SecRequirement?
+        guard SecStaticCodeCreateWithPath(app as CFURL, [], &code) == errSecSuccess, let code,
+            SecRequirementCreateWithString(requirement as CFString, [], &req) == errSecSuccess, let req
+        else { return false }
+        return SecStaticCodeCheckValidity(code, SecCSFlags(rawValue: kSecCSCheckAllArchitectures | kSecCSStrictValidate), req)
+            == errSecSuccess
+    }
 }

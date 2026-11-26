@@ -81,12 +81,32 @@
         }
       }
     },
+    "Allow Shortcuts to search inside files": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow Shortcuts to search inside files"
+          }
+        }
+      }
+    },
     "Allowed in Login Items": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "Allowed in Login Items"
+          }
+        }
+      }
+    },
+    "Any shortcut could then find files by what they contain, including files it can't open itself. File name searches always work.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Any shortcut could then find files by what they contain, including files it can't open itself. File name searches always work."
           }
         }
       }
@@ -281,12 +301,12 @@
         }
       }
     },
-    "Couldn't start the search helper: %@": {
+    "Couldn't start the background helper: %@": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Couldn't start the search helper: %@"
+            "value": "Couldn't start the background helper: %@"
           }
         }
       }
@@ -317,6 +337,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Daemon"
+          }
+        }
+      }
+    },
+    "Data folder safety": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Data folder safety"
           }
         }
       }
@@ -901,6 +931,16 @@
         }
       }
     },
+    "No problems found": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No problems found"
+          }
+        }
+      }
+    },
     "None": {
       "localizations": {
         "en": {
@@ -917,6 +957,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Not available in this build."
+          }
+        }
+      }
+    },
+    "Not opening in %@: its code signature isn’t the genuine app’s. Opened with the default app.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not opening in %@: its code signature isn’t the genuine app’s. Opened with the default app."
           }
         }
       }
@@ -1491,6 +1541,16 @@
         }
       }
     },
+    "Shortcuts can't search inside files or find definitions. To allow it, open FSearch Settings and turn on “Allow Shortcuts to search inside files”.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shortcuts can't search inside files or find definitions. To allow it, open FSearch Settings and turn on “Allow Shortcuts to search inside files”."
+          }
+        }
+      }
+    },
     "Size": {
       "localizations": {
         "en": {
@@ -1561,12 +1621,42 @@
         }
       }
     },
+    "The background helper isn't answering.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The background helper isn't answering."
+          }
+        }
+      }
+    },
+    "The background helper stopped answering.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The background helper stopped answering."
+          }
+        }
+      }
+    },
     "The data folder (%@) was left alone: %@": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "The data folder (%1$@) was left alone: %2$@"
+          }
+        }
+      }
+    },
+    "The data folder (%@) was left alone: %@ Check it before removing it yourself.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The data folder (%1$@) was left alone: %2$@ Check it before removing it yourself."
           }
         }
       }
@@ -1611,32 +1701,12 @@
         }
       }
     },
-    "The search helper isn't answering.": {
+    "This turns off FSearch's background helper, moves its logs to the Trash, and its index too when only this app's helper uses it, and clears the app's settings and shortcut. A separately installed fsearch command-line tool is left alone. You can restore the logs and index from the Trash, but not the settings.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The search helper isn't answering."
-          }
-        }
-      }
-    },
-    "The search helper stopped answering.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The search helper stopped answering."
-          }
-        }
-      }
-    },
-    "This turns off FSearch's background helper and moves its logs and settings to the Trash, and its index too when only this app's helper uses it. A separately installed fsearch command-line tool is left alone. You can undo it from the Trash.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "This turns off FSearch's background helper and moves its logs and settings to the Trash, and its index too when only this app's helper uses it. A separately installed fsearch command-line tool is left alone. You can undo it from the Trash."
+            "value": "This turns off FSearch's background helper, moves its logs to the Trash, and its index too when only this app's helper uses it, and clears the app's settings and shortcut. A separately installed fsearch command-line tool is left alone. You can restore the logs and index from the Trash, but not the settings."
           }
         }
       }

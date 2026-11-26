@@ -197,6 +197,8 @@ extension AppTests {
             #expect(IndexDetailsView.logText("") == IndexDetailsView.noLogNote)
             #expect(IndexDetailsView.noLogNote.contains("daemon.log"))
             #expect(IndexDetailsView.logText("line 1") == "line 1")
+            #expect(IndexDetailsView.folderLines([]).count == 1)
+            #expect(IndexDetailsView.folderLines([.folderIsSymlink, .fileNotOwned("socket.lock")]).count == 2)
         }
 
         // MARK: item 24 and A-M3
@@ -249,6 +251,7 @@ extension AppTests {
             #expect(env.panel.shows == 0)
             LaunchGuards.notifyOtherInstance(center: center)
             #expect(env.panel.shows == 1 && env.panel.isVisible)
+            #expect(env.panel.externalShows == 1, "the notification is external: activation keys must be guarded")
             // Already visible: don't re-show.
             LaunchGuards.notifyOtherInstance(center: center)
             #expect(env.panel.shows == 1)

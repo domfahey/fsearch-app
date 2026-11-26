@@ -39,6 +39,25 @@ public enum Editor: String, CaseIterable, Sendable {
         }
     }
 
+    /// The code-signing requirement the editor app must satisfy before it is sent a file path.
+    ///
+    /// Launch Services resolves an editor by bundle id alone, and any app can claim
+    /// a bundle id, so the app's signature is checked too: Apple-anchored (Developer ID
+    /// or App Store) and signed with the editor's own bundle id as identifier. A team
+    /// id is pinned only where it was read from an installed copy with
+    /// `codesign -dv` (2026-11-26): VS Code `UBF8T346G9`, Cursor `VDXQ22DGB9`. Xcode
+    /// must be signed by Apple itself. Zed, Sublime Text and BBEdit were not installed
+    /// there, so no team id is guessed for them.
+    public var codeRequirement: String {
+        let id = "identifier \"\(bundleId)\""
+        switch self {
+        case .vscode: return "anchor apple generic and \(id) and certificate leaf[subject.OU] = \"UBF8T346G9\""
+        case .cursor: return "anchor apple generic and \(id) and certificate leaf[subject.OU] = \"VDXQ22DGB9\""
+        case .xcode: return "anchor apple and \(id)"
+        case .zed, .sublime, .bbedit: return "anchor apple generic and \(id)"
+        }
+    }
+
     /// The name shown in menus.
     public var displayName: String {
         switch self {

@@ -16,12 +16,16 @@
 #   --maximum-deltas N           Maximum binary deltas to generate (default: 5)
 #   --account NAME               Keychain EdDSA account passed to generate_appcast / sign_update
 #   --ed-key-file FILE           Private EdDSA key file (or '-' for stdin)
+#   --skip-attestation           Local dry runs only: skip `gh attestation verify` (prints a loud warning)
 #   --extract-notes VERSION      Print extracted Markdown notes for VERSION to stdout and exit
 #   -h, --help                   Show this help
 #
 # Environment:
-#   GENERATE_APPCAST             Path to Sparkle's generate_appcast binary (auto-detected under build/)
+#   GENERATE_APPCAST             Path to Sparkle's generate_appcast binary (auto-detected under build/; never taken from PATH)
 #   SIGN_UPDATE                  Path to Sparkle's sign_update binary (defaults beside generate_appcast)
+#
+# Before anything is signed with the EdDSA key, the DMG must pass `shasum -a 256 -c`
+# against <dmg>.sha256 and `gh attestation verify <dmg> -R domfahey/fsearch-app`.
 #
 # Keep prior FSearch-*.dmg releases in <ARCHIVES_DIR> so Sparkle can build binary
 # .delta files against them. Existing releases keep their original download URLs
@@ -29,12 +33,12 @@
 # newly generated .delta files to the GitHub release, and publish only appcast.xml
 # to gh-pages.
 #
-# Exit codes: 0 success; 1 missing tool/input or invalid CHANGELOG section; 2 bad usage.
+# Exit codes: 0 success; 1 missing tool/input, failed DMG verification or invalid CHANGELOG section; 2 bad usage.
 set -euo pipefail
 REPO_ROOT=$(cd "$(dirname "$0")/.." && pwd)
 
 usage() {
-  sed -n '2,32p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,36p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 fail() { echo "appcast.sh: $*" >&2; exit 1; }
@@ -206,10 +210,7 @@ find_generate_appcast() {
       return
     fi
   done
-  if command -v generate_appcast >/dev/null 2>&1; then
-    command -v generate_appcast
-    return
-  fi
+  # No PATH fallback: a tool earlier on PATH would receive the EdDSA key.
   fail "Sparkle's generate_appcast not found (run 'make build' first, or set GENERATE_APPCAST)"
 }
 
@@ -226,10 +227,6 @@ find_sign_update() {
     printf '%s\n' "$sibling"
     return
   fi
-  if command -v sign_update >/dev/null 2>&1; then
-    command -v sign_update
-    return
-  fi
   fail "Sparkle's sign_update not found beside $gen_bin (set SIGN_UPDATE)"
 }
 
@@ -243,6 +240,7 @@ MAX_DELTAS="5"
 ACCOUNT=""
 ED_KEY_FILE=""
 EXTRACT_ONLY=""
+SKIP_ATTEST=0
 POSITIONAL=()
 
 while [ $# -gt 0 ]; do
@@ -256,6 +254,7 @@ while [ $# -gt 0 ]; do
     --maximum-deltas) [ $# -ge 2 ] || bad_usage "--maximum-deltas needs a number"; MAX_DELTAS=$2; shift 2 ;;
     --account) [ $# -ge 2 ] || bad_usage "--account needs a name"; ACCOUNT=$2; shift 2 ;;
     --ed-key-file) [ $# -ge 2 ] || bad_usage "--ed-key-file needs a path"; ED_KEY_FILE=$2; shift 2 ;;
+    --skip-attestation) SKIP_ATTEST=1; shift ;;
     --extract-notes) [ $# -ge 2 ] || bad_usage "--extract-notes needs a version"; EXTRACT_ONLY=$2; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     --) shift; POSITIONAL+=("$@"); break ;;
@@ -279,15 +278,33 @@ ARCHIVES_DIR=${POSITIONAL[1]}
 [[ "$MAX_DELTAS" =~ ^[0-9]+$ ]] \
   || bad_usage "--maximum-deltas must be a non-negative integer (got '$MAX_DELTAS')"
 
+# The DMG about to be signed must match its published checksum and carry a build
+# provenance attestation from this repo's CI.
+verify_dmg() {
+  local dmg=$1
+  [ -f "$dmg.sha256" ] || fail "missing checksum $dmg.sha256 (refusing to sign an unverified DMG)"
+  (cd "$(dirname "$dmg")" && /usr/bin/shasum -a 256 -c "$(basename "$dmg").sha256") \
+    || fail "checksum mismatch for $dmg"
+  if [ "$SKIP_ATTEST" = 1 ]; then
+    echo "appcast.sh: WARNING: --skip-attestation: NOT verifying build provenance of $dmg. Never use this for a real release." >&2
+  else
+    command -v gh >/dev/null 2>&1 || fail "gh not found; cannot verify attestation (or pass --skip-attestation for a local dry run)"
+    gh attestation verify "$dmg" -R domfahey/fsearch-app >/dev/null \
+      || fail "gh attestation verify failed for $dmg"
+  fi
+}
+
 mkdir -p "$ARCHIVES_DIR"
 TARGET_DMG="$ARCHIVES_DIR/FSearch-$VERSION.dmg"
 if [ -n "$DMG_SRC" ]; then
   [ -f "$DMG_SRC" ] || fail "DMG not found: $DMG_SRC"
+  verify_dmg "$DMG_SRC"
   if [ ! "$DMG_SRC" -ef "$TARGET_DMG" ]; then
     cp -f "$DMG_SRC" "$TARGET_DMG"
   fi
 fi
 [ -f "$TARGET_DMG" ] || fail "expected DMG at $TARGET_DMG (pass --dmg PATH or copy it there first)"
+[ -n "$DMG_SRC" ] || verify_dmg "$TARGET_DMG"
 
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT

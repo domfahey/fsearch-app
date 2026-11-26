@@ -439,6 +439,19 @@ extension AppTests {
             try #require(await axWait("Open Login Items Settings", in: w2)).press()
             #expect(approvalHelper.openedSettings == 1)
         }
+
+        /// The Index section names the connected daemon by its code signature.
+        @Test func indexDetailsShowsWhoTheDaemonIs() async throws {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let app = AppState(
+                options: env.app.options, defaults: env.defaults, helper: nil, names: env.daemon, content: env.daemon,
+                control: env.daemon, clock: env.clock.clock, cliAgentInstalled: { false }, peer: { .ours })
+            await app.daemon.refresh()
+            let w = await render(IndexDetailsView().environmentObject(app), size: NSSize(width: 520, height: 600))
+            defer { w.close() }
+            #expect(await axWait(DebugFormat.peerLabel(.ours), in: w) != nil)
+        }
     }
 
     @Suite @MainActor

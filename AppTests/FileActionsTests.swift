@@ -125,6 +125,36 @@ extension AppTests {
             #expect(await eventually { env.workspace.opened == [URL(fileURLWithPath: "/p/main.swift")] })
         }
 
+        /// An app squatting an editor's bundle id must not receive file paths: untrusted means default app plus an error.
+        @Test func untrustedEditorIsNeverOpenedAndFallsBackWithAnError() throws {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            env.workspace.apps[Editor.vscode.bundleId] = vscodeApp
+            env.workspace.schemeHandlers["vscode"] = [vscodeApp]
+            env.workspace.untrustedApps = [vscodeApp]
+            #expect(FileActions.editorTarget(for: line, editor: .vscode) == nil)
+            #expect(!FileActions.opensAtLine(line, editor: .vscode))
+            var errors: [String] = []
+            #expect(FileActions.open(line, editor: .vscode) { errors.append($0) })
+            #expect(env.workspace.openedWith.isEmpty)
+            #expect(env.workspace.opened == [URL(fileURLWithPath: "/p/main.swift")])
+            #expect(
+                errors == ["Not opening in Visual Studio Code: its code signature isn’t the genuine app’s. Opened with the default app."])
+            #expect(!env.workspace.checkedRequirements.isEmpty)
+            #expect(env.workspace.checkedRequirements.allSatisfy { $0 == Editor.vscode.codeRequirement })
+        }
+
+        @Test func untrustedEditorWithRefusingDefaultReportsOnlyTheOpenFailure() {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            env.workspace.apps[Editor.vscode.bundleId] = vscodeApp
+            env.workspace.untrustedApps = [vscodeApp]
+            env.workspace.defaultOpenSucceeds = false
+            var errors: [String] = []
+            #expect(!FileActions.open(line, editor: .vscode) { errors.append($0) })
+            #expect(errors == ["Couldn't open “main.swift”"])
+        }
+
         @Test func editorFallbackRefusalReportsAnError() async throws {
             let env = TestEnv()
             defer { env.tearDown() }

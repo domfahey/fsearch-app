@@ -30,8 +30,8 @@ import Testing
 
     @Test func allFieldsRoundTrip() {
         let s = sandbox(); defer { try? FileManager.default.removeItem(at: s.dir) }
-        let log = SearchLog(file: s.file)
         let t = Date(timeIntervalSince1970: 1_700_000_123)
+        let log = SearchLog(file: s.file, now: { t })
         log.append(
             SearchModel.LogEntry(query: "🏡 \"q\"", mode: .content, resultCount: 7, tookUs: 42, roundTripMs: 3.5, error: "boom"), at: t)
         #expect(

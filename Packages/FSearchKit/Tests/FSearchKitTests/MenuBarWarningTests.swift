@@ -60,7 +60,7 @@ import Testing
 
     @Test func anUnresponsiveHelperSaysSo() {
         let w = MenuBarWarning.evaluate(.unresponsive, skippedFullDiskAccess: false)
-        #expect(w?.message == "The search helper isn't answering")
+        #expect(w?.message == "The background helper isn't answering")
         #expect(w?.offersFix == true)
         #expect(w?.offersFullDiskAccess == false)
     }

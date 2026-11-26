@@ -49,6 +49,11 @@ public final class DaemonClient: SearchBackend, @unchecked Sendable {
     private let queue = DispatchQueue(label: "fsearch.client")
     private let decoder = DaemonClient.makeDecoder()
     private var nextId = 0
+    private let connectedPeer = Mutex<SocketHolder?>(nil)
+
+    /// Who the daemon on the open connection is, by its code signature: set when the
+    /// connection opens (with an `identifyPeer`), nil once it closes or when unknown.
+    public var peer: SocketHolder? { connectedPeer.withLock { $0 } }
 
     /// Creates a client; it connects lazily on the first call.
     ///
@@ -57,8 +62,14 @@ public final class DaemonClient: SearchBackend, @unchecked Sendable {
     ///   - timeout: Seconds one round trip may take before it fails with ``DaemonError/timeout``.
     ///   - expectedPeerUid: The only user whose socket is trusted: ours (tests vary it). A socket
     ///     another user serves is never sent a query.
-    public init(socketPath: String = DaemonClient.defaultSocketPath, timeout: TimeInterval = 5, expectedPeerUid: uid_t = getuid()) {
-        socket = LineSocket(path: socketPath, timeout: timeout, expectedPeerUid: expectedPeerUid)
+    ///   - identifyPeer: Names each new connection's peer for ``peer``; nil skips it. An
+    ///     unidentified or unknown peer is still talked to.
+    public init(
+        socketPath: String = DaemonClient.defaultSocketPath, timeout: TimeInterval = 5, expectedPeerUid: uid_t = getuid(),
+        identifyPeer: PeerIdentifier? = nil
+    ) {
+        socket = LineSocket(
+            path: socketPath, timeout: timeout, expectedPeerUid: expectedPeerUid, identifyPeer: identifyPeer.map { $0.identify(socket:) })
     }
 
     private func call<T: Decodable & Sendable>(_ req: Request, as: T.Type) async throws -> T {
@@ -71,10 +82,10 @@ public final class DaemonClient: SearchBackend, @unchecked Sendable {
                     if cancelled.isSet { cont.resume(throwing: CancellationError()); return }
                     nextId += 1
                     let id = nextId
-                    do {
-                        let line = try socket.roundTrip(req.json(id: id), accepts: { replyIsFor(id, $0) })
-                        cont.resume(returning: try Self.decodeReply(line, as: T.self, using: decoder))
-                    } catch { cont.resume(throwing: error) }
+                    let result = Result { try socket.roundTrip(req.json(id: id), accepts: { replyIsFor(id, $0) }) }
+                    let peer = socket.peer
+                    connectedPeer.withLock { $0 = peer }
+                    cont.resume(with: result.flatMap { line in Result { try Self.decodeReply(line, as: T.self, using: decoder) } })
                 }
             }
         } onCancel: {

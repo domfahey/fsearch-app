@@ -214,7 +214,7 @@ enum LaunchGuards {
         guard reopenObserver == nil else { return }
         reopenObserver = center.addObserver(forName: reopenNotification, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated {
-                if !panel.isVisible { panel.show(app: app) }
+                if !panel.isVisible { panel.showExternally(app: app) }
             }
         }
     }

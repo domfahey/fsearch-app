@@ -1,0 +1,25 @@
+# cargo-deny policy for the pinned fsearch daemon's crates. Used only by
+# .github/workflows/deps.yml (`cargo deny check advisories sources bans`).
+# Licenses are not checked here: THIRD_PARTY_NOTICES.md covers them.
+
+[graph]
+# The daemon ships on macOS only, so ignore Windows/Linux-only dependencies.
+targets = ["aarch64-apple-darwin", "x86_64-apple-darwin"]
+
+[advisories]
+version = 2
+# Unmaintained advisories apply to direct dependencies only; yanked crates fail.
+unmaintained = "workspace"
+yanked = "deny"
+# Reviewed exceptions go here as { id = "RUSTSEC-YYYY-NNNN", reason = "..." }.
+ignore = []
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

@@ -104,6 +104,15 @@ public extension DaemonPlan {
         return answers ? .refreshOnly : .start
     }
 
+    /// Who holds the daemon's socket: the connected peer, named by its audit token,
+    /// when there is one; otherwise the pid in socket.lock, which any same-user
+    /// process can write, so it is read only as a fallback.
+    ///
+    /// - Parameters:
+    ///   - peer: The connected daemon's identity (see ``PeerIdentifier``), nil when unknown.
+    ///   - lock: Reads socket.lock's holder (see ``SocketHolder/read(dataDir:bundlePath:)``).
+    static func holder(peer: SocketHolder?, lock: () -> SocketHolder) -> SocketHolder { peer ?? lock() }
+
     /// Whether the daemon is ours: our login item is enabled and the socket
     /// isn't held by some other daemon (our helper yields to a CLI agent's).
     ///

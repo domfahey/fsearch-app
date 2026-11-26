@@ -7,7 +7,8 @@ import os
 /// login item, once. Never stops or replaces a daemon it didn't start.
 ///
 /// Ownership: the app "owns" the daemon only when its own helper is enabled AND no other
-/// process holds the daemon's socket (``ownsDaemon``, from `SocketHolder`): our helper yields
+/// process holds the daemon's socket (``ownsDaemon``: the connected peer's code signature,
+/// from its audit token, or socket.lock's `SocketHolder` when that can't be read): our helper yields
 /// to a CLI agent's daemon. Everything that stops or restarts a daemon is gated on that,
 /// because a daemon started from the CLI (or a test daemon) belongs to the user and may be
 /// serving other tools. For those the app only reads its state. In test mode there is no
@@ -37,7 +38,7 @@ final class DaemonManager: ObservableObject {
     static let cliAgentPlist = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/LaunchAgents/mt.nd.fsearch.plist")
     /// The state after timeouts, or a disconnect once the restarts ran out.
-    nonisolated static let unresponsiveMessage = String(localized: "The search helper stopped answering.")
+    nonisolated static let unresponsiveMessage = String(localized: "The background helper stopped answering.")
     /// Defaults key: the bundled helper's identity when it was last seen running.
     static let helperIdentityKey = "helperIdentity"
     /// Defaults key: removal turned automatic recovery off. Not one of
@@ -55,6 +56,7 @@ final class DaemonManager: ObservableObject {
     /// Sleeps and time (injected so tests don't wait).
     private let clock: DaemonClock
     private let socketHolder: () -> SocketHolder
+    private let peer: () -> SocketHolder?
     private let defaults: UserDefaults
     private let helperIdentity: () -> String?
     /// The one restart in flight; other callers wait for it instead of
@@ -79,7 +81,8 @@ final class DaemonManager: ObservableObject {
     ///   - service: The helper's login item, or nil in test mode (SMAppService is never touched).
     ///   - cliAgentInstalled: Whether a CLI login agent exists.
     ///   - clock: Timers for the wait loops.
-    ///   - socketHolder: Who holds the daemon's socket (see `SocketHolder`).
+    ///   - socketHolder: Who holds the daemon's socket per socket.lock (see `SocketHolder`); only a fallback for `peer`.
+    ///   - peer: The connected daemon, named by its audit token (see `PeerIdentifier`); nil when unknown.
     ///   - defaults: Where the helper's identity is stored.
     ///   - helperIdentity: The bundled helper binary's identity, to spot an app update.
     ///   - fullDiskAccessGranted: Whether FSearch has Full Disk Access now (see ``appHasFullDiskAccess()``).
@@ -88,6 +91,7 @@ final class DaemonManager: ObservableObject {
         cliAgentInstalled: @escaping () -> Bool = { FileManager.default.fileExists(atPath: DaemonManager.cliAgentPlist.path) },
         clock: DaemonClock = .live,
         socketHolder: @escaping () -> SocketHolder = { .none },
+        peer: @escaping () -> SocketHolder? = { nil },
         defaults: UserDefaults = AppDefaults.store,
         helperIdentity: @escaping () -> String? = { nil },
         fullDiskAccessGranted: @escaping () -> Bool = { false }
@@ -98,6 +102,7 @@ final class DaemonManager: ObservableObject {
         self.cliAgentInstalled = cliAgentInstalled
         self.clock = clock
         self.socketHolder = socketHolder
+        self.peer = peer
         self.defaults = defaults
         self.helperIdentity = helperIdentity
         recoverySuspended = defaults.bool(forKey: Self.recoverySuspendedKey)
@@ -105,12 +110,18 @@ final class DaemonManager: ObservableObject {
 
     /// True only when our login item is enabled and no other daemon holds the
     /// socket (our helper yields to a CLI agent's daemon). Never in test mode.
-    var ownsDaemon: Bool { DaemonPlan.owns(helperEnabled: service?.status == .enabled, holder: socketHolder()) }
+    var ownsDaemon: Bool { DaemonPlan.owns(helperEnabled: service?.status == .enabled, holder: holder) }
 
     /// Whether the data folder is the app's to remove; stricter than ``ownsDaemon`` (see `DaemonPlan.dataOwnership`).
     var dataOwnership: DataOwnership {
-        DaemonPlan.dataOwnership(helperEnabled: service?.status == .enabled, holder: socketHolder())
+        DaemonPlan.dataOwnership(helperEnabled: service?.status == .enabled, holder: holder)
     }
+
+    /// The connected daemon, named by its code signature; nil when not connected or unknown.
+    var connectedPeer: SocketHolder? { peer() }
+
+    /// The connected peer when known, else socket.lock's (forgeable) holder.
+    private var holder: SocketHolder { DaemonPlan.holder(peer: peer(), lock: socketHolder) }
 
     /// After timeouts, or a disconnect with no restarts left.
     var isUnresponsive: Bool { state == .failed(Self.unresponsiveMessage) }
@@ -237,7 +248,7 @@ final class DaemonManager: ObservableObject {
             )
             // Already waiting for approval is not an error worth showing as one.
             if service.status == .requiresApproval { return .needsApproval }
-            setState(.failed(String(localized: "Couldn't start the search helper: \(error.localizedDescription)")))
+            setState(.failed(String(localized: "Couldn't start the background helper: \(error.localizedDescription)")))
             return .registerBundled
         }
         return DaemonPlan.afterRegister(ownStatus: service.status)
@@ -260,7 +271,7 @@ final class DaemonManager: ObservableObject {
         if Task.isCancelled { return }
         switch DaemonPlan.noAnswer(wasNeedingApproval: state == .needsApproval, ownStatus: service?.status) {
         case .needsApproval: setState(.needsApproval)
-        case .failed: setState(.failed(String(localized: "The search helper isn't answering.")))
+        case .failed: setState(.failed(String(localized: "The background helper isn't answering.")))
         }
     }
 

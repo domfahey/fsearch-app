@@ -26,7 +26,25 @@ enum SearchModeOption: String, AppEnum {
     }
 }
 
+/// Why a Search Files run was refused before reaching the daemon.
+enum SearchFilesIntentError: Error, Equatable, LocalizedError, CustomLocalizedStringResourceConvertible {
+    /// Inside Files, Definitions or a content filter while the Settings opt-in is off.
+    case contentSearchNotAllowed
+
+    var localizedStringResource: LocalizedStringResource {
+        switch self {
+        case .contentSearchNotAllowed:
+            "Shortcuts can't search inside files or find definitions. To allow it, open FSearch Settings and turn on “Allow Shortcuts to search inside files”."
+        }
+    }
+
+    var errorDescription: String? { String(localized: localizedStringResource) }
+}
+
 /// Shortcuts action that queries the fsearch daemon in the background and returns matching files.
+///
+/// Content and definition searches need the Settings opt-in (``allowContentSearchKey``, off by default): the action runs
+/// unattended for any shortcut, including imported ones, and the daemon reads files with FSearch's Full Disk Access.
 struct SearchFilesIntent: AppIntent {
     static let title: LocalizedStringResource = "Search Files"
     static let description = IntentDescription(
@@ -63,9 +81,26 @@ struct SearchFilesIntent: AppIntent {
     /// Seam allowing unit tests to supply a fake backend without touching the user's daemon socket.
     static let backendFactory = Mutex<@Sendable () -> SearchBackend>({ defaultBackend() })
 
+    /// Defaults key for the Settings toggle that lets Shortcuts search inside files (off by default).
+    static let allowContentSearchKey = "allowShortcutsContentSearch"
+    /// The Settings toggle's title; the refusal error names it too.
+    static let allowContentSearchTitle: LocalizedStringResource = "Allow Shortcuts to search inside files"
+
+    /// Whether `defaults` has the content-search opt-in turned on.
+    static func contentSearchAllowed(in defaults: UserDefaults) -> Bool {
+        defaults.bool(forKey: allowContentSearchKey)
+    }
+
+    /// Seam for the opt-in; reads the app's settings store (the same one Settings writes).
+    static let contentSearchAllowed = Mutex<@Sendable () -> Bool>({ contentSearchAllowed(in: AppDefaults.store) })
+
     init() {}
 
+    /// Returns the matches as file URLs only; FSearch never preloads their contents into the result.
     func perform() async throws -> some IntentResult & ReturnsValue<[IntentFile]> {
+        if ShortcutSearch.readsFileContents(query: query, mode: mode.searchMode), !Self.contentSearchAllowed.withLock({ $0 })() {
+            throw SearchFilesIntentError.contentSearchNotAllowed
+        }
         let backend = Self.backendFactory.withLock { $0 }()
         let paths = try await ShortcutSearch.run(query: query, mode: mode.searchMode, limit: limit, backend: backend)
         let files = paths.map { IntentFile(fileURL: URL(fileURLWithPath: $0)) }

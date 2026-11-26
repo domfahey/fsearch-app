@@ -30,7 +30,7 @@ struct ResultRow: View {
         .contentShape(Rectangle())
         // Container keeps child Text nodes findable while exposing selection and a combined label to VoiceOver.
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(Text(verbatim: "\(name), \(detail)"))
+        .accessibilityLabel(Text(verbatim: "\(Self.displayName(for: item)), \(Self.displayDetail(for: item))"))
         .accessibilityValue(Text(verbatim: selected ? "selected" : ""))
         .accessibilityAddTraits(selected ? .isSelected : [])
         .accessibilityAction(.default) { onActivate?() }
@@ -45,7 +45,7 @@ struct ResultRow: View {
 
     /// Highlights the filename only for file-name hits; content/definition rows highlight the matching line instead.
     static func nameText(for item: ResultItem, query: String, increasedContrast: Bool = false) -> AttributedString {
-        let name = (item.path as NSString).lastPathComponent
+        let name = displayName(for: item)
         if case .file = item { return highlighted(name, query, increasedContrast: increasedContrast) }
         return AttributedString(name)
     }
@@ -54,7 +54,7 @@ struct ResultRow: View {
     static func detailText(for item: ResultItem, query: String, increasedContrast: Bool = false) -> AttributedString {
         switch item {
         case .file:
-            return AttributedString(((item.path as NSString).deletingLastPathComponent as NSString).abbreviatingWithTildeInPath)
+            return AttributedString(displayDetail(for: item))
         case let .line(_, m):
             var out = AttributedString("\(m.line) · ")
             out.append(highlighted(m.text.trimmingCharacters(in: .whitespaces), query, increasedContrast: increasedContrast))
@@ -62,11 +62,15 @@ struct ResultRow: View {
         }
     }
 
-    private var name: String { (item.path as NSString).lastPathComponent }
+    /// The file name with bidi and invisible controls made visible, so it can't disguise its extension. Display only.
+    static func displayName(for item: ResultItem) -> String {
+        DisplaySafe.name((item.path as NSString).lastPathComponent)
+    }
 
-    private var detail: String {
+    /// The folder (file hits, display-safe) or `<line> · <match>` (content hits), as shown and spoken.
+    static func displayDetail(for item: ResultItem) -> String {
         switch item {
-        case .file: ((item.path as NSString).deletingLastPathComponent as NSString).abbreviatingWithTildeInPath
+        case .file: DisplaySafe.name(((item.path as NSString).deletingLastPathComponent as NSString).abbreviatingWithTildeInPath)
         case let .line(_, m): "\(m.line) · \(m.text.trimmingCharacters(in: .whitespaces))"
         }
     }

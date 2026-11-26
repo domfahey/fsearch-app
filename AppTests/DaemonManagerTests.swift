@@ -144,7 +144,7 @@ extension AppTests {
             d.onPing = { _ in false }
             let m = manager(h, d)
             await m.start()
-            #expect(m.state == .failed("Couldn't start the search helper: no helper"))
+            #expect(m.state == .failed("Couldn't start the background helper: no helper"))
             #expect(d.statuses == 0)
         }
 
@@ -178,7 +178,7 @@ extension AppTests {
             await m.refresh()
             #expect(d.statuses == 50)
             #expect(clock.slept.count == 50)
-            #expect(m.state == .failed("The search helper isn't answering."))
+            #expect(m.state == .failed("The background helper isn't answering."))
         }
 
         @Test func refreshRetriesUntilAnswered() async {
@@ -258,7 +258,7 @@ extension AppTests {
             d.onPing = { _ in false }
             let m = manager(h, d)
             await m.restart()
-            #expect(m.state == .failed("Couldn't start the search helper: gone"))
+            #expect(m.state == .failed("Couldn't start the background helper: gone"))
 
             let h2 = FakeHelper(.enabled)
             h2.statusAfterRegister = .requiresApproval
@@ -303,6 +303,29 @@ extension AppTests {
             h.status = .notRegistered
             holder = .ours
             #expect(!m.ownsDaemon)
+        }
+
+        /// socket.lock is forgeable: the connected peer's code signature decides when it is known.
+        @Test func theConnectedPeerOutranksSocketLock() async {
+            let h = FakeHelper(.enabled)
+            var peer: SocketHolder? = .other
+            var lock = SocketHolder.ours
+            let m = DaemonManager(
+                client: StubDaemon(), service: h, cliAgentInstalled: { false }, clock: FakeClock().clock,
+                socketHolder: { lock }, peer: { peer }, defaults: TestEnv.emptySuite(TestEnv.unitSuite))
+            // A same-user impostor answers, and wrote our helper's pid into socket.lock.
+            #expect(m.connectedPeer == .other)
+            #expect(!m.ownsDaemon)
+            #expect(m.dataOwnership == .otherDaemon, "never trash the data folder on the lock's word")
+            await m.restart()
+            #expect(h.unregistered == 0 && h.registered == 0, "an impostor is never restarted as ours")
+            peer = .ours
+            lock = .other
+            #expect(m.ownsDaemon && m.dataOwnership == .ours, "our verified helper, whatever the lock says")
+            peer = nil  // no token: fall back to socket.lock
+            #expect(!m.ownsDaemon && m.dataOwnership == .otherDaemon)
+            lock = .ours
+            #expect(m.ownsDaemon && m.connectedPeer == nil)
         }
 
         /// The invariant: a running CLI daemon is never stopped, replaced or taken over,

@@ -7,6 +7,10 @@ public enum Launchable {
     /// Extensions (lowercased) that run something when opened.
     static let extensions: Set<String> = [
         "app", "command", "tool", "terminal", "workflow", "pkg", "mpkg", "scpt", "applescript", "webloc", "inetloc", "fileloc",
+        // Installs a configuration profile, pane, screen saver or plugin, or runs an action or shortcut, when opened.
+        "mobileconfig", "prefpane", "saver", "qlgenerator", "osax", "action", "shortcut",
+        // Runs a Java program or Web Start app; a script bundle; a disk image that mounts and may hold an installer.
+        "jar", "jnlp", "scptd", "dmg",
     ]
 
     /// The extension of the last path component, lowercased; "" for none (a leading dot is no extension).

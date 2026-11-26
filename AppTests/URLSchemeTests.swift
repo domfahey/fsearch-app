@@ -68,6 +68,33 @@ extension AppTests {
             #expect(await eventually { env.daemon.searches.contains("second ext:txt") })
         }
 
+        /// Another app can plant a result and open the panel just as ↵ is pressed for something else.
+        @Test func externalShowsIgnoreActivationKeysForHalfASecondButUserShowsDoNot() throws {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let pc = PanelController()
+            defer { pc.hide(returnFocus: false) }
+            var now = Date(timeIntervalSince1970: 5000)
+            pc.now = { now }
+
+            let url = try #require(URL(string: "fsearch://search?q=planted"))
+            #expect(pc.open(url: url, app: env.app))
+            #expect(PanelInput.ignoresActivation(.enter, held: pc.held, at: now))
+            #expect(PanelInput.ignoresActivation(.cmdDigit(1), held: pc.held, at: now))
+            #expect(!PanelInput.ignoresActivation(.down, held: pc.held, at: now))
+            now.addTimeInterval(0.5)
+            #expect(!PanelInput.ignoresActivation(.enter, held: pc.held, at: now))
+
+            // The reopen notification path.
+            pc.showExternally(app: env.app)
+            #expect(PanelInput.ignoresActivation(.enter, held: pc.held, at: now))
+
+            // The hotkey/menu path disarms it.
+            pc.hide(returnFocus: false)
+            pc.show(app: env.app)
+            #expect(!PanelInput.ignoresActivation(.enter, held: pc.held, at: now))
+        }
+
         @Test func openURLIgnoresUnrecognizedURLsWithoutShowingPanel() throws {
             let env = TestEnv()
             defer { env.tearDown() }

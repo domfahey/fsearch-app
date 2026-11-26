@@ -20,6 +20,8 @@ final class AppState: ObservableObject {
     @AppStorage("debugMode") var debugMode = false
     /// Editor for content hits: `Editor.rawValue`, "" for none.
     @AppStorage("editor") var editorRaw = ""
+    /// Lets the Shortcuts "Search Files" action search inside files and find definitions (off by default).
+    @AppStorage(SearchFilesIntent.allowContentSearchKey) var allowShortcutsContentSearch = false
     /// The chosen editor, if any.
     var editor: Editor? {
         get { Editor(rawValue: editorRaw) }
@@ -69,16 +71,19 @@ final class AppState: ObservableObject {
     ///
     /// - Parameter options: The launch options.
     static func live(options: LaunchOptions = .current) -> AppState {
-        AppState(
+        // The control connection names its daemon by code signature (ownership, Index Details).
+        let control = DaemonClient(socketPath: options.socketPath, identifyPeer: .live(bundlePath: Bundle.main.bundlePath))
+        return AppState(
             options: options, defaults: options.testMode ? AppDefaults.store : .standard,
             helper: options.testMode ? nil : SMAppHelperService(),
             // Three connections: names, content, and control never wait on each other.
             names: DaemonClient(socketPath: options.socketPath),
             content: DaemonClient(socketPath: options.socketPath),
-            control: DaemonClient(socketPath: options.socketPath),
+            control: control,
             socketHolder: {
                 SocketHolder.read(dataDir: DebugFormat.dataDir(socketPath: options.socketPath), bundlePath: Bundle.main.bundlePath)
             },
+            peer: { control.peer },
             helperIdentity: { DaemonManager.bundledHelperIdentity() },
             fullDiskAccessGranted: { DaemonManager.appHasFullDiskAccess() })
     }
@@ -94,7 +99,8 @@ final class AppState: ObservableObject {
     ///   - control: The connection for status and "Save Now".
     ///   - clock: Timers for the daemon wait loops.
     ///   - cliAgentInstalled: Whether the CLI's login agent exists.
-    ///   - socketHolder: Who holds the daemon's socket (decides ``DaemonManager/ownsDaemon``).
+    ///   - socketHolder: Who holds the daemon's socket per socket.lock (a fallback for `peer`).
+    ///   - peer: The connected daemon by code signature (decides ``DaemonManager/ownsDaemon`` when known).
     ///   - helperIdentity: The bundled helper binary's identity, to spot an app update.
     ///   - fullDiskAccessGranted: Whether FSearch has Full Disk Access now.
     init(
@@ -103,19 +109,21 @@ final class AppState: ObservableObject {
         clock: DaemonClock = .live,
         cliAgentInstalled: @escaping () -> Bool = { FileManager.default.fileExists(atPath: DaemonManager.cliAgentPlist.path) },
         socketHolder: @escaping () -> SocketHolder = { .none },
+        peer: @escaping () -> SocketHolder? = { nil },
         helperIdentity: @escaping () -> String? = { nil },
         fullDiskAccessGranted: @escaping () -> Bool = { false }
     ) {
         self.options = options
         daemon = DaemonManager(
             client: control, service: helper, cliAgentInstalled: cliAgentInstalled, clock: clock,
-            socketHolder: socketHolder, defaults: defaults, helperIdentity: helperIdentity,
+            socketHolder: socketHolder, peer: peer, defaults: defaults, helperIdentity: helperIdentity,
             fullDiskAccessGranted: fullDiskAccessGranted)
         search = SearchModel(names: names, content: content)
         recents = Recents(defaults: defaults)
         log = SearchLog(file: options.searchLogFile)
         _debugMode = AppStorage(wrappedValue: false, "debugMode", store: defaults)
         _editorRaw = AppStorage(wrappedValue: "", "editor", store: defaults)
+        _allowShortcutsContentSearch = AppStorage(wrappedValue: false, SearchFilesIntent.allowContentSearchKey, store: defaults)
         search.onSearched = { [weak self] e in
             guard let self, self.debugMode else { return }
             self.log.appendAsync(e, at: Date())

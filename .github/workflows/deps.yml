@@ -1,0 +1,65 @@
+name: Dependency scan
+# Supply-chain checks on the pinned daemon crates and the Swift packages:
+#   - cargo-deny: RustSec advisories, yanked crates, registry/git sources, bans
+#     (policy in .github/cargo-deny.toml).
+#   - osv-scanner: OSV advisories for the daemon's Cargo.lock and Package.resolved.
+# Runs on ubuntu-latest: it scans lockfiles only and builds nothing, so the cheaper
+# runner and the static linux binaries are enough. The weekly run catches advisories
+# published after a pin was merged.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '17 6 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Pinned release binaries, checksum-verified below. Only releases at least two
+      # weeks old (CONTRIBUTING.md, "Updating dependencies").
+      CARGO_DENY: '0.20.2'
+      CARGO_DENY_SHA256: 9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f
+      OSV_SCANNER: '2.7.1'
+      OSV_SCANNER_SHA256: fb7dab19a8bd9bbe5c3189f09d4b7ee1820c9553a23bac202648a56efd2f6ee8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install cargo-deny and osv-scanner (pinned, checksum-verified)
+        run: |
+          set -euo pipefail
+          bin="$RUNNER_TEMP/scan-bin"; mkdir -p "$bin"; cd "$RUNNER_TEMP"
+          d="cargo-deny-${CARGO_DENY}-x86_64-unknown-linux-musl"
+          curl -fsSLo "$d.tar.gz" "https://github.com/EmbarkStudios/cargo-deny/releases/download/${CARGO_DENY}/$d.tar.gz"
+          echo "$CARGO_DENY_SHA256  $d.tar.gz" | sha256sum -c -
+          tar -xzf "$d.tar.gz" --strip-components 1 -C "$bin" "$d/cargo-deny"
+          curl -fsSLo "$bin/osv-scanner" "https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER}/osv-scanner_linux_amd64"
+          echo "$OSV_SCANNER_SHA256  $bin/osv-scanner" | sha256sum -c -
+          chmod +x "$bin/osv-scanner"
+          echo "$bin" >> "$GITHUB_PATH"
+      - name: Fetch the daemon source at the pinned revision
+        # The revision comes from scripts/build-daemon.sh, the single place it is pinned.
+        run: |
+          set -euo pipefail
+          rev=$(sed -n 's/^REV=\${FSEARCH_REV:-\([0-9a-f]\{40\}\)}.*/\1/p' scripts/build-daemon.sh)
+          [[ "$rev" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::could not read REV from scripts/build-daemon.sh"; exit 1; }
+          src="$RUNNER_TEMP/fsearch-daemon"
+          git init -q "$src"
+          git -C "$src" fetch -q --depth 1 https://github.com/domfahey/fsearch.git "$rev"
+          git -C "$src" checkout -q FETCH_HEAD
+          [ "$(git -C "$src" rev-parse HEAD)" = "$rev" ] || { echo "::error::fetched commit is not $rev"; exit 1; }
+          echo "DAEMON_SRC=$src" >> "$GITHUB_ENV"
+      - name: cargo-deny (advisories, sources, bans)
+        run: cargo-deny --manifest-path "$DAEMON_SRC/Cargo.toml" --config .github/cargo-deny.toml check advisories sources bans
+      - name: osv-scanner (daemon Cargo.lock, Package.resolved)
+        run: osv-scanner scan source -L "$DAEMON_SRC/Cargo.lock" -L Package.resolved

@@ -77,6 +77,8 @@ protocol Workspace: AnyObject {
     func urlForApplication(withBundleIdentifier id: String) -> URL?
     /// The apps that can open a file.
     func urlsForApplications(toOpen url: URL) -> [URL]
+    /// Whether the app's static code signature is valid and satisfies the code-signing `requirement`.
+    func isTrustedApp(at app: URL, requirement: String) -> Bool
     /// The file at `path`, or nil if it is gone.
     func fileInfo(atPath path: String) -> FileInfo?
     /// Moves a file to the Trash; throws if it can't.
@@ -101,6 +103,9 @@ protocol PanelHost: AnyObject, Sendable {
     var isVisible: Bool { get }
     /// Shows the panel, resuming the recent query.
     func show(app: AppState)
+    /// Shows the panel for a request from outside (another launch of the app): like ``show(app:)``,
+    /// but activation keys are ignored briefly so a stray ↵ cannot open a file.
+    func showExternally(app: AppState)
     /// Shows the panel pre-filled with a `fsearch://` search, replacing any resumed session state.
     func show(app: AppState, search: SearchURL)
     /// Hides the panel; `returnFocus` is false when the user already moved to another app.
