@@ -305,8 +305,8 @@ extension AppTests {
             #expect(!m.ownsDaemon)
         }
 
-        /// socket.lock is forgeable: the connected peer's code signature decides when it is known.
-        @Test func theConnectedPeerOutranksSocketLock() async {
+        /// socket.lock is forgeable and the peer can be stale, so the more cautious of the two decides.
+        @Test func thePeerAndSocketLockMustBothAllowOwnership() async {
             let h = FakeHelper(.enabled)
             var peer: SocketHolder? = .other
             var lock = SocketHolder.ours
@@ -321,7 +321,10 @@ extension AppTests {
             #expect(h.unregistered == 0 && h.registered == 0, "an impostor is never restarted as ours")
             peer = .ours
             lock = .other
-            #expect(m.ownsDaemon && m.dataOwnership == .ours, "our verified helper, whatever the lock says")
+            #expect(!m.ownsDaemon && m.dataOwnership == .otherDaemon, "another daemon may hold the socket since the peer was named")
+            lock = .ours
+            #expect(m.ownsDaemon && m.dataOwnership == .ours)
+            lock = .other
             peer = nil  // no token: fall back to socket.lock
             #expect(!m.ownsDaemon && m.dataOwnership == .otherDaemon)
             lock = .ours

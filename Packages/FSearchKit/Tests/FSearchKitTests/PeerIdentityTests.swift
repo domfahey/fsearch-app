@@ -24,7 +24,7 @@ import Testing
         #expect(peer("/Users/me/.Trash/FSearch.app/Contents/Helpers/fsearch") == .other)
         #expect(peer("/tmp/x/FSearch.app/Contents/Helpers/fsearch", appSigned: false) == .ours, "a dev build's moved helper")
         #expect(peer(nil, signed: true) == .ours, "its file is gone but its signature is ours")
-        #expect(peer(nil) == .other, "a live peer we can't name is never 'nobody'")
+        #expect(peer(nil) == .none, "file gone, not signed as ours: unnamed, as socket.lock would say")
     }
 
     @Test func identifyingWithoutATokenGivesNothing() {
@@ -50,18 +50,27 @@ import Testing
         #expect(id.identify(socket: 8) == nil)
     }
 
-    // MARK: ownership falls back to socket.lock only without a peer
+    // MARK: ownership needs the peer and socket.lock to agree
 
-    @Test func theConnectedPeerOverridesSocketLock() {
-        var lockReads = 0
-        let lock: () -> SocketHolder = {
-            lockReads += 1; return .ours
-        }
-        #expect(DaemonPlan.holder(peer: .other, lock: lock) == .other)
-        #expect(DaemonPlan.holder(peer: .ours, lock: { .other }) == .ours)
-        #expect(lockReads == 0, "socket.lock isn't read when the peer is known")
-        #expect(DaemonPlan.holder(peer: nil, lock: lock) == .ours)
-        #expect(lockReads == 1)
+    /// The peer can be stale (named when the control connection last answered) and socket.lock
+    /// can be forged, so when they disagree the answer that does least wins: either can make the
+    /// app leave a daemon alone, neither can make it manage one that isn't ours.
+    @Test func theMoreCautiousOfPeerAndSocketLockWins() {
+        #expect(DaemonPlan.holder(peer: .other, lock: { .ours }) == .other, "forged lock")
+        #expect(DaemonPlan.holder(peer: .ours, lock: { .other }) == .other, "stale peer: another daemon took the socket")
+        #expect(DaemonPlan.holder(peer: .ours, lock: { .none }) == .ours)
+        #expect(DaemonPlan.holder(peer: SocketHolder.none, lock: { .ours }) == .ours)
+        #expect(DaemonPlan.holder(peer: SocketHolder.none, lock: { .none }) == .none)
+        #expect(DaemonPlan.holder(peer: nil, lock: { .ours }) == .ours)
+        #expect(DaemonPlan.holder(peer: nil, lock: { .other }) == .other)
+    }
+
+    /// After an update deletes the old bundle, the old helper's file is gone. Unsigned (a dev
+    /// build), it is unnamed either way, so it stays ours to restart.
+    @Test func anOldHelperWhoseFileIsGoneStaysOurs() {
+        let peer = SocketHolder.classifyPeer(path: nil, signedAsHelper: { false }, appTeamSigned: { false }, bundlePath: bundle)
+        let lock = SocketHolder.classify(pid: 42, path: nil, signedAsHelper: false, appTeamSigned: false, bundlePath: bundle)
+        #expect(DaemonPlan.owns(helperEnabled: true, holder: DaemonPlan.holder(peer: peer, lock: { lock })))
     }
 
     @Test func labelsThePeerForIndexDetails() {

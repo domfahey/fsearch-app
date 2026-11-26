@@ -91,7 +91,7 @@ enum FileActions {
 
     /// The footer line for a result that is no longer on disk.
     static func missingMessage(_ path: String) -> String {
-        String(localized: "“\((path as NSString).lastPathComponent)” is gone: moved or deleted")
+        String(localized: "“\(DisplaySafe.name((path as NSString).lastPathComponent))” is gone: moved or deleted")
     }
 
     /// False, after reporting it, if `path` is gone (moved or deleted since the search).
@@ -131,7 +131,7 @@ enum FileActions {
     /// Reports a refused LaunchServices request. `NSWorkspace.open` has no error value to pass along.
     private static func openInDefaultApp(_ file: URL, onError: @escaping @MainActor (String) -> Void) -> Bool {
         guard workspace.open(file) else {
-            let message = String(localized: "Couldn't open “\(file.lastPathComponent)”")
+            let message = String(localized: "Couldn't open “\(DisplaySafe.name(file.lastPathComponent))”")
             Log.actions.error("default app refused to open file: \(file.path, privacy: .private)")
             onError(message)
             return false
@@ -176,7 +176,7 @@ enum FileActions {
     /// Opens the file in a chosen app; a missing file or a launch error goes to `onError`.
     static func openWith(_ path: String, app: URL, onError: @escaping @MainActor (String) -> Void) {
         guard exists(path, onError) else { return }
-        let name = app.deletingPathExtension().lastPathComponent
+        let name = DisplaySafe.name(app.deletingPathExtension().lastPathComponent)
         workspace.open([url(path)], withApplicationAt: app) { error in
             guard let error else { return }
             Log.actions.error("Open With failed: \(error.localizedDescription, privacy: .private)")

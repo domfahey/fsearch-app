@@ -57,7 +57,8 @@ struct ResultRow: View {
             return AttributedString(displayDetail(for: item))
         case let .line(_, m):
             var out = AttributedString("\(m.line) · ")
-            out.append(highlighted(m.text.trimmingCharacters(in: .whitespaces), query, increasedContrast: increasedContrast))
+            out.append(
+                highlighted(DisplaySafe.name(m.text.trimmingCharacters(in: .whitespaces)), query, increasedContrast: increasedContrast))
             return out
         }
     }
@@ -67,11 +68,11 @@ struct ResultRow: View {
         DisplaySafe.name((item.path as NSString).lastPathComponent)
     }
 
-    /// The folder (file hits, display-safe) or `<line> · <match>` (content hits), as shown and spoken.
+    /// The folder or `<line> · <match>` (content hits), display-safe, as shown and spoken.
     static func displayDetail(for item: ResultItem) -> String {
         switch item {
         case .file: DisplaySafe.name(((item.path as NSString).deletingLastPathComponent as NSString).abbreviatingWithTildeInPath)
-        case let .line(_, m): "\(m.line) · \(m.text.trimmingCharacters(in: .whitespaces))"
+        case let .line(_, m): "\(m.line) · \(DisplaySafe.name(m.text.trimmingCharacters(in: .whitespaces)))"
         }
     }
 

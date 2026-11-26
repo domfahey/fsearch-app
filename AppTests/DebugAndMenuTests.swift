@@ -192,6 +192,12 @@ extension AppTests {
             #expect(item.path == "/p\u{202E}q/invoice\u{202E}fdp.exe")
         }
 
+        @Test func contentHitLinesShowNoBidiControls() {
+            let item = ResultItem.line(path: "/p/a.txt", match: Match(line: 3, text: "  pay \u{202E}fdp.exe"))
+            #expect(ResultRow.displayDetail(for: item) == "3 · pay \u{FFFD}fdp.exe")
+            #expect(String(ResultRow.detailText(for: item, query: "pay").characters) == "3 · pay \u{FFFD}fdp.exe")
+        }
+
         @Test func resultRowHighlightsFilenameOrMatchLine() {
             func hasHighlight(_ s: AttributedString) -> Bool {
                 s.runs.contains { $0.backgroundColor != nil }

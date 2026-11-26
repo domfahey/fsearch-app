@@ -20,7 +20,9 @@ esac
 REPO=${FSEARCH_REPO:-https://github.com/domfahey/fsearch.git}
 REV=${FSEARCH_REV:-d26cf78da7a0136b0632aa7cc55d271ae7b049e7}   # domfahey/fsearch fork (adds ba100f4 stray-daemon takeover + tests); upstream closed #12-#14, re-pin per ADR 0013
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-WORK=$(mktemp -d)
+# The physical path (/private/var/..., not the /var/... symlink mktemp returns): cargo sees
+# the physical one, and --remap-path-prefix below must match it to keep it out of the binary.
+WORK=$(cd "$(mktemp -d)" && pwd -P)
 # The clone and target builds are large; remove them however the script ends.
 trap 'rm -rf "$WORK"' EXIT
 # Fetch exactly the pinned commit. It is reachable through the protected tag

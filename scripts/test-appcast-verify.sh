@@ -8,7 +8,7 @@ mkdir -p "$T/bin" "$T/dl" "$T/arch"
 printf 'fake dmg' > "$T/dl/FSearch-1.2.3.dmg"
 printf '## [1.2.3]\n- x\n' > "$T/CHANGELOG.md"
 printf '#!/bin/sh\necho ran >> "%s/signed"\nwhile [ $# -gt 1 ]; do [ "$1" = -o ] && echo "<rss/>" > "$2"; shift; done\n' "$T" > "$T/bin/gen"; chmod +x "$T/bin/gen"
-printf '#!/bin/sh\n[ -z "$GH_FAIL" ]\n' > "$T/bin/gh"; chmod +x "$T/bin/gh"
+printf '#!/bin/sh\necho "$*" >> "%s/gh-args"\n[ -z "$GH_FAIL" ]\n' "$T" > "$T/bin/gh"; chmod +x "$T/bin/gh"
 cp "$T/bin/gen" "$T/bin/generate_appcast"
 PASS=0; FAILN=0
 run() { # name expect(0|1) [VAR=val...] cmd...
@@ -33,6 +33,25 @@ printf 'other' > "$T/dl/other.dmg"; cp "$T/dl/FSearch-1.2.3.dmg.sha256" "$T/dl/o
 run ".sha256 naming a sibling file is refused" 1 "$ROOT/scripts/appcast.sh" --changelog "$T/CHANGELOG.md" --dmg "$T/dl/other.dmg" 1.2.3 "$T/arch"
 printf 'tampered' > "$T/dl/FSearch-1.2.3.dmg"
 run "checksum mismatch is refused" 1 "${A[@]}" 1.2.3 "$T/arch"
+# The attestation must come from the release workflow on this version's tag.
+grep -q -- "--signer-workflow domfahey/fsearch-app/.github/workflows/ci.yml --source-ref refs/tags/v1.2.3" "$T/gh-args" \
+  && { PASS=$((PASS+1)); echo "ok   attestation pinned to the release workflow and tag"; } \
+  || { FAILN=$((FAILN+1)); echo "FAIL attestation not pinned:"; cat "$T/gh-args"; }
+# Every older DMG in the archives folder is signed too, so each must verify.
+mkdir -p "$T/new" "$T/arch2"; printf 'new dmg' > "$T/new/FSearch-1.2.4.dmg"
+(cd "$T/new" && shasum -a 256 FSearch-1.2.4.dmg > FSearch-1.2.4.dmg.sha256)
+printf '## [1.2.4]\n- y\n' >> "$T/CHANGELOG.md"
+B=("$ROOT/scripts/appcast.sh" --changelog "$T/CHANGELOG.md" --dmg "$T/new/FSearch-1.2.4.dmg" 1.2.4 "$T/arch2")
+printf 'old dmg' > "$T/arch2/FSearch-1.2.2.dmg"
+run "older DMG without a .sha256 is refused" 1 "${B[@]}"
+(cd "$T/arch2" && shasum -a 256 FSearch-1.2.2.dmg > FSearch-1.2.2.dmg.sha256)
+rm -f "$T/gh-args"
+run "older DMG that verifies signs" 0 "${B[@]}"
+grep -q -- "--source-ref refs/tags/v1.2.2" "$T/gh-args" \
+  && { PASS=$((PASS+1)); echo "ok   older DMG checked against its own tag"; } \
+  || { FAILN=$((FAILN+1)); echo "FAIL older DMG not attested by its tag"; }
+printf 'tampered old' > "$T/arch2/FSearch-1.2.2.dmg"
+run "tampered older DMG is refused" 1 "${B[@]}"
 # generate_appcast on PATH must not be used (no GENERATE_APPCAST, none under build/).
 if [ ! -e "$ROOT/build/SourcePackages" ] && [ ! -e "$ROOT/build/release-derived/SourcePackages" ]; then
   (cd "$T/dl" && shasum -a 256 FSearch-1.2.3.dmg > FSearch-1.2.3.dmg.sha256)

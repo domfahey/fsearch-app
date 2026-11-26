@@ -24,8 +24,10 @@
 #   GENERATE_APPCAST             Path to Sparkle's generate_appcast binary (auto-detected under build/; never taken from PATH)
 #   SIGN_UPDATE                  Path to Sparkle's sign_update binary (defaults beside generate_appcast)
 #
-# Before anything is signed with the EdDSA key, the DMG must pass `shasum -a 256 -c`
-# against <dmg>.sha256 and `gh attestation verify <dmg> -R domfahey/fsearch-app`.
+# Before anything is signed with the EdDSA key, every DMG generate_appcast will sign
+# (the new one and each older FSearch-<V>.dmg kept in <ARCHIVES_DIR>) must match the
+# SHA-256 in its <dmg>.sha256 and carry a build provenance attestation from this repo's
+# release workflow (.github/workflows/ci.yml) on the tag v<V>.
 #
 # Keep prior FSearch-*.dmg releases in <ARCHIVES_DIR> so Sparkle can build binary
 # .delta files against them. Existing releases keep their original download URLs
@@ -278,10 +280,10 @@ ARCHIVES_DIR=${POSITIONAL[1]}
 [[ "$MAX_DELTAS" =~ ^[0-9]+$ ]] \
   || bad_usage "--maximum-deltas must be a non-negative integer (got '$MAX_DELTAS')"
 
-# The DMG about to be signed must match its published checksum and carry a build
-# provenance attestation from this repo's CI.
+# A DMG about to be signed must match its published checksum and carry a build
+# provenance attestation from the release workflow on its version's tag.
 verify_dmg() {
-  local dmg=$1
+  local dmg=$1 version=$2
   [ -f "$dmg.sha256" ] || fail "missing checksum $dmg.sha256 (refusing to sign an unverified DMG)"
   # Compare hashes directly: `shasum -c` would check whatever file the .sha256 names, not $dmg.
   local want got
@@ -293,8 +295,9 @@ verify_dmg() {
     echo "appcast.sh: WARNING: --skip-attestation: NOT verifying build provenance of $dmg. Never use this for a real release." >&2
   else
     command -v gh >/dev/null 2>&1 || fail "gh not found; cannot verify attestation (or pass --skip-attestation for a local dry run)"
-    gh attestation verify "$dmg" -R domfahey/fsearch-app >/dev/null \
-      || fail "gh attestation verify failed for $dmg"
+    gh attestation verify "$dmg" -R domfahey/fsearch-app \
+      --signer-workflow domfahey/fsearch-app/.github/workflows/ci.yml --source-ref "refs/tags/v$version" >/dev/null \
+      || fail "gh attestation verify failed for $dmg (release workflow, tag v$version)"
   fi
 }
 
@@ -302,13 +305,23 @@ mkdir -p "$ARCHIVES_DIR"
 TARGET_DMG="$ARCHIVES_DIR/FSearch-$VERSION.dmg"
 if [ -n "$DMG_SRC" ]; then
   [ -f "$DMG_SRC" ] || fail "DMG not found: $DMG_SRC"
-  verify_dmg "$DMG_SRC"
+  verify_dmg "$DMG_SRC" "$VERSION"
   if [ ! "$DMG_SRC" -ef "$TARGET_DMG" ]; then
     cp -f "$DMG_SRC" "$TARGET_DMG"
   fi
 fi
 [ -f "$TARGET_DMG" ] || fail "expected DMG at $TARGET_DMG (pass --dmg PATH or copy it there first)"
-[ -n "$DMG_SRC" ] || verify_dmg "$TARGET_DMG"
+[ -n "$DMG_SRC" ] || verify_dmg "$TARGET_DMG" "$VERSION"
+
+# generate_appcast signs every archive in the folder (and builds deltas from them), so
+# each older one must verify too. Anything that isn't an FSearch-<V>.dmg is refused.
+while IFS= read -r archive; do
+  [ "$archive" -ef "$TARGET_DMG" ] && continue
+  name=$(basename "$archive")
+  [[ "$name" =~ ^FSearch-([0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?)\.dmg$ ]] \
+    || fail "unexpected archive $archive (only FSearch-<VERSION>.dmg files may be in $ARCHIVES_DIR)"
+  verify_dmg "$archive" "${BASH_REMATCH[1]}"
+done < <(find "$ARCHIVES_DIR" -maxdepth 1 -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.tar' -o -name '*.tar.*' -o -name '*.tgz' -o -name '*.tbz' -o -name '*.aar' -o -name '*.pkg' -o -name '*.mpkg' \) | sort)
 
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT

@@ -42,6 +42,16 @@ extension AppTests {
             #expect(env.workspace.openedWith.isEmpty)
         }
 
+        @Test func footerMessagesShowNoBidiControlsInNames() {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            #expect(FileActions.missingMessage("/p/invoice\u{202E}fdp.exe") == "“invoice\u{FFFD}fdp.exe” is gone: moved or deleted")
+            env.workspace.defaultOpenSucceeds = false
+            var errors: [String] = []
+            #expect(!FileActions.open(.file(Wire.hit("/p/invoice\u{202E}fdp.exe")), editor: nil) { errors.append($0) })
+            #expect(errors == ["Couldn't open “invoice\u{FFFD}fdp.exe”"])
+        }
+
         @Test func defaultOpenRefusalReportsAnErrorAndReturnsFalse() {
             let env = TestEnv()
             defer { env.tearDown() }
@@ -645,17 +655,33 @@ extension AppTests {
         }
 
         // Real Security framework, read-only: a system app nothing launches.
-        @Test func codeSignatureChecksIdentityWithoutHashingResourcesAndCachesTheAnswer() {
+        @Test func codeSignatureAnswersFromTheIdentityCheckThenFullValidationOffTheMainThread() async {
             let calculator = URL(fileURLWithPath: "/System/Applications/Calculator.app")
-            CodeSignature.resetCache()
-            #expect(CodeSignature.flags.contains(SecCSFlags(rawValue: kSecCSDoNotValidateResources)))
+            CodeSignature.reset()
+            defer { CodeSignature.reset() }
+            #expect(CodeSignature.identityFlags.contains(SecCSFlags(rawValue: kSecCSDoNotValidateResources)))
+            #expect(!CodeSignature.fullFlags.contains(SecCSFlags(rawValue: kSecCSDoNotValidateResources)))
             #expect(CodeSignature.satisfies(calculator, requirement: "anchor apple"))
-            #expect(CodeSignature.validations == 1)
+            await CodeSignature.settle()
+            #expect(CodeSignature.checks == [.identity, .full], "the full check, resources included, runs once in the background")
             #expect(CodeSignature.satisfies(calculator, requirement: "anchor apple"))
-            #expect(CodeSignature.validations == 1)
+            #expect(CodeSignature.checks == [.identity, .full], "then the answer is cached")
             #expect(!CodeSignature.satisfies(calculator, requirement: "identifier \"com.example.nope\""))
-            #expect(CodeSignature.validations == 2)
+            await CodeSignature.settle()
+            #expect(CodeSignature.checks == [.identity, .full, .identity], "a failed identity check needs no full one")
             #expect(!CodeSignature.satisfies(URL(fileURLWithPath: "/nonexistent/Nope.app"), requirement: "anchor apple"))
+        }
+
+        /// An app whose identity checks out but whose resources were changed (an Electron editor's
+        /// JavaScript, say) stops being trusted once the full check finishes.
+        @Test func codeSignatureDistrustsAnAppWhoseResourcesFailTheFullCheck() async {
+            let calculator = URL(fileURLWithPath: "/System/Applications/Calculator.app")
+            CodeSignature.reset()
+            defer { CodeSignature.reset() }
+            CodeSignature.validator = { _, _, flags in flags == CodeSignature.identityFlags }
+            #expect(CodeSignature.satisfies(calculator, requirement: "anchor apple"), "identity only so far")
+            await CodeSignature.settle()
+            #expect(!CodeSignature.satisfies(calculator, requirement: "anchor apple"))
         }
     }
 }

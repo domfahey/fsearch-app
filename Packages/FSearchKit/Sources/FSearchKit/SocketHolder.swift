@@ -77,8 +77,9 @@ public enum SocketHolder: Equatable, Sendable {
     }
 
     /// Classifies a socket's peer, named by its audit token (see ``PeerIdentifier``), by the
-    /// same rules as ``classify(pid:path:signedAsHelper:appTeamSigned:bundlePath:)``. The peer
-    /// is a live process, so it is never ``none``: one we can't name is ``other``.
+    /// same rules as ``classify(pid:path:signedAsHelper:appTeamSigned:bundlePath:)``. A peer whose
+    /// file is gone and isn't signed as our helper is ``none``, as socket.lock's holder would be:
+    /// an old helper whose bundle an update deleted stays ours to restart.
     ///
     /// - Parameters:
     ///   - path: The peer's executable, nil when it can't be read (its file is gone).
@@ -88,7 +89,7 @@ public enum SocketHolder: Equatable, Sendable {
     static func classifyPeer(
         path: String?, signedAsHelper: () -> Bool, appTeamSigned: () -> Bool, bundlePath: String
     ) -> SocketHolder {
-        guard let path else { return signedAsHelper() ? .ours : .other }
+        guard let path else { return signedAsHelper() ? .ours : .none }
         return classifyByPath(path, signedAsHelper: signedAsHelper, appTeamSigned: appTeamSigned, bundlePath: bundlePath)
     }
 
