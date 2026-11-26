@@ -4,7 +4,8 @@ import Testing
 @testable import FSearchKit
 
 @Suite struct ExternalOpenGuardTests {
-    let t0 = Date(timeIntervalSince1970: 1000)
+    // A monotonic clock: a wall-clock step (NTP, manual change) can't stretch or shrink the window.
+    let t0 = ContinuousClock.now
 
     @Test func unarmedIgnoresNothing() {
         let g = ExternalOpenGuard()
@@ -16,8 +17,8 @@ import Testing
         g.arm(at: t0)
         for k in [PanelKey.enter, .cmdEnter, .cmdDigit(1), .cmdDigit(9)] {
             #expect(g.ignores(k, at: t0), "\(k)")
-            #expect(g.ignores(k, at: t0.addingTimeInterval(0.49)), "\(k)")
-            #expect(!g.ignores(k, at: t0.addingTimeInterval(0.5)), "\(k)")
+            #expect(g.ignores(k, at: t0.advanced(by: .milliseconds(490))), "\(k)")
+            #expect(!g.ignores(k, at: t0.advanced(by: ExternalOpenGuard.window)), "\(k)")
         }
     }
 
@@ -29,11 +30,14 @@ import Testing
         }
     }
 
-    @Test func disarmAndClockGoingBackwards() {
+    @Test func disarmEndsTheWindow() {
         var g = ExternalOpenGuard()
         g.arm(at: t0)
-        #expect(g.ignores(.enter, at: t0.addingTimeInterval(-5)))  // clock stepped back: stay safe
         g.disarm()
         #expect(!g.ignores(.enter, at: t0))
+    }
+
+    @Test func windowIsHalfASecond() {
+        #expect(ExternalOpenGuard.window == .milliseconds(500))
     }
 }

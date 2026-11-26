@@ -164,26 +164,28 @@ extension PanelState {
 ///
 /// Anything can open the panel (an `fsearch://` URL, the reopen notification) with a result
 /// selected, just as the user presses ↵ for something else. After such a show the activation keys
-/// (↵, ⌘↵, ⌘1–9) are ignored for ``window`` seconds. The hotkey and menu never arm it.
+/// (↵, ⌘↵, ⌘1–9) are ignored for ``window``. The hotkey and menu never arm it. A key held
+/// through the window can't act either: held activation keys don't repeat (see `PanelInput.key`).
+/// The window runs on a monotonic clock, so a wall-clock step can't stretch or shrink it.
 public struct ExternalOpenGuard: Equatable, Sendable {
-    /// Seconds after an external show in which activation keys are ignored.
-    public static let window: TimeInterval = 0.5
-    private var armedAt: Date?
+    /// How long after an external show activation keys are ignored.
+    public static let window: Duration = .milliseconds(500)
+    private var armedAt: ContinuousClock.Instant?
 
     /// Creates a disarmed guard.
     public init() {}
 
     /// Starts the window; call when the panel is shown from outside.
-    public mutating func arm(at t: Date) { armedAt = t }
+    public mutating func arm(at t: ContinuousClock.Instant) { armedAt = t }
 
     /// Ends the window; call when the user opens the panel themselves.
     public mutating func disarm() { armedAt = nil }
 
-    /// Whether `key` must be dropped at `t`. A clock that stepped back keeps ignoring.
-    public func ignores(_ key: PanelKey, at t: Date) -> Bool {
+    /// Whether `key` must be dropped at `t`.
+    public func ignores(_ key: PanelKey, at t: ContinuousClock.Instant) -> Bool {
         guard let armedAt else { return false }
         switch key {
-        case .enter, .cmdEnter, .cmdDigit: return t.timeIntervalSince(armedAt) < Self.window
+        case .enter, .cmdEnter, .cmdDigit: return t < armedAt.advanced(by: Self.window)
         default: return false
         }
     }

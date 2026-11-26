@@ -51,7 +51,7 @@ jobs:
         # The revision comes from scripts/build-daemon.sh, the single place it is pinned.
         run: |
           set -euo pipefail
-          rev=$(sed -n 's/^REV=\${FSEARCH_REV:-\([0-9a-f]\{40\}\)}.*/\1/p' scripts/build-daemon.sh)
+          rev=$(grep -m1 '^REV=' scripts/build-daemon.sh | grep -o '[0-9a-f]\{40\}' || true)
           [[ "$rev" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::could not read REV from scripts/build-daemon.sh"; exit 1; }
           src="$RUNNER_TEMP/fsearch-daemon"
           git init -q "$src"

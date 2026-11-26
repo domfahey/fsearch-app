@@ -72,7 +72,7 @@ Two modes keep tests away from your real setup. **Test mode** starts when you pa
 
 | Task | Command | Raw equivalent |
 |---|---|---|
-| Lint (swift-format, links, credits, shell scripts, workflows) | `make lint` | see the `lint` target in the [Makefile](Makefile) |
+| Lint (swift-format, links, credits, appcast checks, shell scripts, workflows) | `make lint` | see the `lint` target in the [Makefile](Makefile) |
 | Warnings as errors | `make type` | `swift build --build-tests -Xswiftc -warnings-as-errors` and `swift build --product FSearchBench -Xswiftc -warnings-as-errors` in the package, plus a warnings check of the app build |
 | Lint, type and test together | `make check` | |
 | Lint, type, test and both 95% coverage gates (excludes `bench`) | `make ci` | |
@@ -87,7 +87,7 @@ Two modes keep tests away from your real setup. **Test mode** starts when you pa
 - `make lint` ends with `lint: ok` when everything passes. The checks print nothing of their own on success. It includes `scripts/check-links.sh`, which checks that every relative Markdown link and anchor resolves. CI runs it, so run it when you edit docs.
 
 - [`.github/workflows/deps.yml`](.github/workflows/deps.yml) scans the dependencies in CI. It runs `cargo-deny` on the daemon's crates (policy in [`.github/cargo-deny.toml`](.github/cargo-deny.toml): advisories, yanked crates, sources and bans) and `osv-scanner` on the daemon's `Cargo.lock` and `Package.resolved`. It runs on pull requests, on pushes to `main` and weekly. It reads lockfiles only and builds nothing. If it flags a crate, bump the pin or, with a reason, add an exception to `cargo-deny.toml` in the same pull request.
-- [`scripts/test-appcast-verify.sh`](scripts/test-appcast-verify.sh) checks that `scripts/appcast.sh` refuses to sign an unverified DMG and ignores a `generate_appcast` on `PATH`. It uses a fake DMG and stub tools and signs nothing. Run it after you change `appcast.sh`. CI and `make` do not run it.
+- [`scripts/test-appcast-verify.sh`](scripts/test-appcast-verify.sh) checks that `scripts/appcast.sh` refuses to sign an unverified DMG and ignores a `generate_appcast` on `PATH`. It uses a fake DMG and stub tools and signs nothing. `make lint` runs it.
 
 ## Running your own build
 

@@ -643,5 +643,19 @@ extension AppTests {
             #expect(env.app.actionError == "Couldn't find Terminal")
             #expect(env.panel.hides == 1)
         }
+
+        // Real Security framework, read-only: a system app nothing launches.
+        @Test func codeSignatureChecksIdentityWithoutHashingResourcesAndCachesTheAnswer() {
+            let calculator = URL(fileURLWithPath: "/System/Applications/Calculator.app")
+            CodeSignature.resetCache()
+            #expect(CodeSignature.flags.contains(SecCSFlags(rawValue: kSecCSDoNotValidateResources)))
+            #expect(CodeSignature.satisfies(calculator, requirement: "anchor apple"))
+            #expect(CodeSignature.validations == 1)
+            #expect(CodeSignature.satisfies(calculator, requirement: "anchor apple"))
+            #expect(CodeSignature.validations == 1)
+            #expect(!CodeSignature.satisfies(calculator, requirement: "identifier \"com.example.nope\""))
+            #expect(CodeSignature.validations == 2)
+            #expect(!CodeSignature.satisfies(URL(fileURLWithPath: "/nonexistent/Nope.app"), requirement: "anchor apple"))
+        }
     }
 }

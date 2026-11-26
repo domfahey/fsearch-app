@@ -25,4 +25,19 @@ import Testing
             #expect(DisplaySafe.name(s) == s)
         }
     }
+
+    // Subdivision flags (England, Scotland, Wales) are 🏴 plus tag characters ending in CANCEL TAG.
+    @Test func keepsEmojiTagSequences() {
+        let scotland = "\u{1F3F4}\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}\u{E007F}"
+        for s in ["trip \(scotland).jpg", "\(scotland)\(scotland).png"] {
+            #expect(DisplaySafe.name(s) == s)
+        }
+    }
+
+    // Outside a flag, tag characters are invisible padding: still replaced.
+    @Test func replacesStrayTagCharacters() {
+        #expect(DisplaySafe.name("a\u{E0061}b.txt") == "a\u{FFFD}b.txt")
+        #expect(DisplaySafe.name("\u{E0001}x") == "\u{FFFD}x")
+        #expect(DisplaySafe.name("\u{1F3F4}\u{E0001}") == "\u{1F3F4}\u{FFFD}")
+    }
 }

@@ -71,15 +71,56 @@ final class SystemWorkspace: Workspace {
 }
 
 /// Static code-signature checks (read-only: nothing is launched).
+///
+/// The question is identity: is the app at this path the editor the user chose, or another app
+/// claiming its bundle id? The code directory, main executable and Info.plist answer that, so the
+/// bundle's resources (thousands of files in an Electron editor, gigabytes in Xcode) are not
+/// re-hashed; macOS checks a bundle's seal itself when it launches it. Answers are cached per path
+/// and requirement until the app's signature or executable changes, so moving through results
+/// costs nothing after the first check.
+@MainActor
 enum CodeSignature {
+    /// The validation flags: every architecture, strict, without hashing resources.
+    static let flags = SecCSFlags(rawValue: kSecCSCheckAllArchitectures | kSecCSStrictValidate | kSecCSDoNotValidateResources)
+    /// How many real validations ran (not cache hits); tests read it.
+    private(set) static var validations = 0
+
+    private struct Key: Hashable {
+        let path: String
+        let requirement: String
+        let stamp: [Date?]
+    }
+    private static var cache: [Key: Bool] = [:]
+
+    /// Forgets every cached answer; tests call it.
+    static func resetCache() {
+        cache = [:]
+        validations = 0
+    }
+
     /// Whether the app at `app` has a valid static signature, on every architecture, that satisfies `requirement`.
     static func satisfies(_ app: URL, requirement: String) -> Bool {
+        let key = Key(path: app.path, requirement: requirement, stamp: stamp(app))
+        if let hit = cache[key] { return hit }
+        let ok = validate(app, requirement: requirement)
+        cache[key] = ok
+        return ok
+    }
+
+    /// Modification dates that change when the app is replaced, updated or re-signed.
+    private static func stamp(_ app: URL) -> [Date?] {
+        let contents = app.appendingPathComponent("Contents")
+        return [app, contents.appendingPathComponent("_CodeSignature/CodeResources"), contents.appendingPathComponent("MacOS")]
+            .map { try? FileManager.default.attributesOfItem(atPath: $0.path)[.modificationDate] as? Date }
+    }
+
+    private static func validate(_ app: URL, requirement: String) -> Bool {
+        validations += 1
         var code: SecStaticCode?
         var req: SecRequirement?
         guard SecStaticCodeCreateWithPath(app as CFURL, [], &code) == errSecSuccess, let code,
             SecRequirementCreateWithString(requirement as CFString, [], &req) == errSecSuccess, let req
         else { return false }
-        return SecStaticCodeCheckValidity(code, SecCSFlags(rawValue: kSecCSCheckAllArchitectures | kSecCSStrictValidate), req)
-            == errSecSuccess
+        return SecStaticCodeCheckValidity(code, flags, req) == errSecSuccess
     }
 }

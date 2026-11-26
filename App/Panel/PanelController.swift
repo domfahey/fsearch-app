@@ -33,10 +33,15 @@ final class PanelController: PanelHost {
     private var previousApp: NSRunningApplication?
     /// A result key waiting for results; hiding drops it, so it never runs behind the user's back.
     let held = HeldKeyBox()
-    /// The clock for the session and the external-open guard; tests replace it.
+    /// The clock for the resume session; tests replace it.
     var now: () -> Date {
         get { held.now }
         set { held.now = newValue }
+    }
+    /// The monotonic clock for the external-open guard; tests replace it.
+    var uptime: () -> ContinuousClock.Instant {
+        get { held.uptime }
+        set { held.uptime = newValue }
     }
     /// Keys sent to the view from outside it: ↑/↓ in Quick Look.
     let keys = PanelKeyFeed()
@@ -140,7 +145,7 @@ final class PanelController: PanelHost {
         selection = state.selection
         viewState.resume(state)
         held.key.cancel()
-        if external { held.external.arm(at: now()) } else { held.external.disarm() }
+        if external { held.external.arm(at: uptime()) } else { held.external.disarm() }
         menu.close()
         let p = panel ?? Panel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         p.staysUpWithoutKey = app.options.showPanel

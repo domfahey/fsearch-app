@@ -74,15 +74,15 @@ extension AppTests {
             defer { env.tearDown() }
             let pc = PanelController()
             defer { pc.hide(returnFocus: false) }
-            var now = Date(timeIntervalSince1970: 5000)
-            pc.now = { now }
+            var now = ContinuousClock.now
+            pc.uptime = { now }
 
             let url = try #require(URL(string: "fsearch://search?q=planted"))
             #expect(pc.open(url: url, app: env.app))
             #expect(PanelInput.ignoresActivation(.enter, held: pc.held, at: now))
             #expect(PanelInput.ignoresActivation(.cmdDigit(1), held: pc.held, at: now))
             #expect(!PanelInput.ignoresActivation(.down, held: pc.held, at: now))
-            now.addTimeInterval(0.5)
+            now = now.advanced(by: ExternalOpenGuard.window)
             #expect(!PanelInput.ignoresActivation(.enter, held: pc.held, at: now))
 
             // The reopen notification path.

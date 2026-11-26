@@ -17,17 +17,26 @@ public enum DisplaySafe {
     /// overrides and isolates, LRM/RLM, the Arabic letter mark, zero-width space,
     /// word joiner, BOM, soft hyphen), control characters (Cc) and the line and
     /// paragraph separators. Kept: ZWJ and ZWNJ, which emoji sequences and
-    /// Persian and Indic scripts need and which do not reorder text.
+    /// Persian and Indic scripts need and which do not reorder text, and the tag
+    /// characters (U+E0020–E007F) of an emoji tag sequence such as a subdivision
+    /// flag, which follow a 🏴 (U+1F3F4) or another tag.
     ///
     /// - Parameter s: A file name or folder path.
     /// - Returns: The same text, safe to show.
     public static func name(_ s: String) -> String {
         var out = String.UnicodeScalarView()
+        var inTagSequence = false
         for scalar in s.unicodeScalars {
-            if isHidden(scalar) {
+            let isTag = (0xE0020...0xE007F).contains(scalar.value)
+            if isTag && inTagSequence {
+                out.append(scalar)
+                inTagSequence = scalar.value != 0xE007F  // CANCEL TAG ends the sequence
+            } else if isHidden(scalar) {
                 out.append(contentsOf: marker.unicodeScalars)
+                inTagSequence = false
             } else {
                 out.append(scalar)
+                inTagSequence = scalar.value == 0x1F3F4  // WAVING BLACK FLAG starts one
             }
         }
         return String(out)

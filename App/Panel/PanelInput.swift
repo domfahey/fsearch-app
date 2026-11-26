@@ -166,7 +166,7 @@ enum PanelInput {
 
     /// Whether `key` is an activation key arriving inside the window after an external show, and so is dropped.
     @MainActor
-    static func ignoresActivation(_ key: PanelKey, held: HeldKeyBox, at now: Date) -> Bool {
+    static func ignoresActivation(_ key: PanelKey, held: HeldKeyBox, at now: ContinuousClock.Instant) -> Bool {
         held.external.ignores(key, at: now)
     }
 
@@ -322,8 +322,10 @@ final class HeldKeyBox {
     var key = HeldKey()
     /// Set while another app's request has just opened the panel; see ``ExternalOpenGuard``.
     var external = ExternalOpenGuard()
-    /// The clock the guard is read against; tests replace it.
+    /// The session's wall clock; tests replace it.
     var now: () -> Date = Date.init
+    /// The guard's monotonic clock; tests replace it.
+    var uptime: () -> ContinuousClock.Instant = { ContinuousClock.now }
 }
 
 /// Keys for the panel from outside its own key handling: ↑/↓ pressed in

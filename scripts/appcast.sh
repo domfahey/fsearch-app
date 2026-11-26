@@ -283,8 +283,12 @@ ARCHIVES_DIR=${POSITIONAL[1]}
 verify_dmg() {
   local dmg=$1
   [ -f "$dmg.sha256" ] || fail "missing checksum $dmg.sha256 (refusing to sign an unverified DMG)"
-  (cd "$(dirname "$dmg")" && /usr/bin/shasum -a 256 -c "$(basename "$dmg").sha256") \
-    || fail "checksum mismatch for $dmg"
+  # Compare hashes directly: `shasum -c` would check whatever file the .sha256 names, not $dmg.
+  local want got
+  want=$(/usr/bin/awk 'NR==1{print tolower($1)}' "$dmg.sha256")
+  got=$(/usr/bin/shasum -a 256 "$dmg" | /usr/bin/awk '{print $1}')
+  [[ "$want" =~ ^[0-9a-f]{64}$ ]] || fail "no SHA-256 in $dmg.sha256"
+  [ "$got" = "$want" ] || fail "checksum mismatch for $dmg"
   if [ "$SKIP_ATTEST" = 1 ]; then
     echo "appcast.sh: WARNING: --skip-attestation: NOT verifying build provenance of $dmg. Never use this for a real release." >&2
   else

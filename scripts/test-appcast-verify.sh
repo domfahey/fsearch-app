@@ -26,6 +26,11 @@ run "good checksum and attestation signs" 0 "${A[@]}" 1.2.3 "$T/arch"
 run "failed attestation is refused" 1 GH_FAIL=1 "${A[@]}" 1.2.3 "$T/arch"
 run "--skip-attestation signs with a warning" 0 GH_FAIL=1 "${A[@]}" --skip-attestation 1.2.3 "$T/arch"
 grep -q WARNING "$T/out" || { FAILN=$((FAILN+1)); echo "FAIL no warning printed"; }
+# The .sha256 must hash this DMG, whatever file name is written inside it.
+cp "$T/dl/FSearch-1.2.3.dmg" "$T/dl/renamed.dmg"; cp "$T/dl/FSearch-1.2.3.dmg.sha256" "$T/dl/renamed.dmg.sha256"
+run "renamed DMG with a matching hash signs" 0 "$ROOT/scripts/appcast.sh" --changelog "$T/CHANGELOG.md" --dmg "$T/dl/renamed.dmg" 1.2.3 "$T/arch"
+printf 'other' > "$T/dl/other.dmg"; cp "$T/dl/FSearch-1.2.3.dmg.sha256" "$T/dl/other.dmg.sha256"
+run ".sha256 naming a sibling file is refused" 1 "$ROOT/scripts/appcast.sh" --changelog "$T/CHANGELOG.md" --dmg "$T/dl/other.dmg" 1.2.3 "$T/arch"
 printf 'tampered' > "$T/dl/FSearch-1.2.3.dmg"
 run "checksum mismatch is refused" 1 "${A[@]}" 1.2.3 "$T/arch"
 # generate_appcast on PATH must not be used (no GENERATE_APPCAST, none under build/).

@@ -173,7 +173,7 @@ jobs:
           CARGO_CYCLONEDX_SHA256: 4c39e13494d51c9d7f63e2923e7afdb5648a7a806a9ed7684dbe3786d2e2d1da
         run: |
           set -euo pipefail
-          rev=$(sed -n 's/^REV=\${FSEARCH_REV:-\([0-9a-f]\{40\}\)}.*/\1/p' scripts/build-daemon.sh)
+          rev=$(grep -m1 '^REV=' scripts/build-daemon.sh | grep -o '[0-9a-f]\{40\}' || true)
           [[ "$rev" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::could not read REV from scripts/build-daemon.sh"; exit 1; }
           [ "$(cat Vendor/fsearch.rev)" = "$rev" ] || { echo "::error::Vendor/fsearch.rev is not the pinned $rev"; exit 1; }
           cd "$RUNNER_TEMP"
@@ -207,11 +207,11 @@ jobs:
                 echo "::error::$name is set; an earlier step altered the environment"; bad=1 ;;
             esac
           done < <(/usr/bin/env)
-          # The tools the signing steps call must resolve to the system copies, even before
-          # the steps reset PATH.
+          # The signing steps reset PATH to /usr/bin:/bin:/usr/sbin:/sbin, so the system
+          # copies of their tools are what run. The runner's own PATH (Homebrew first) is
+          # not checked: a Homebrew shasum there is never called.
           for t in xcrun security ditto shasum codesign hdiutil base64; do
-            p=$(command -v "$t" || true)
-            [ "$p" = "/usr/bin/$t" ] || { echo "::error::$t resolves to '$p', not /usr/bin/$t"; bad=1; }
+            [ -x "/usr/bin/$t" ] || { echo "::error::/usr/bin/$t is missing"; bad=1; }
           done
           [ "$bad" -eq 0 ]
       - name: Import signing certificate
