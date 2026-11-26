@@ -108,7 +108,12 @@ import Testing
         #expect(Editor.xcode.codeRequirement == "anchor apple and identifier \"com.apple.dt.Xcode\"")
         #expect(Editor.zed.codeRequirement.contains("certificate leaf[subject.OU] = \"MQ55VZLNZQ\""))
         #expect(Editor.sublime.codeRequirement.contains("certificate leaf[subject.OU] = \"Z6D26JE4Y4\""))
-        #expect(Editor.bbedit.codeRequirement.contains("certificate leaf[subject.OU] = \"W52GZAXT98\""))
+        // BBEdit is also sold on the Mac App Store, where Apple signs it: no team in the leaf, but
+        // Apple's App Store marker. Only Bare Bones can publish com.barebones.bbedit there.
+        #expect(
+            Editor.bbedit.codeRequirement
+                == "anchor apple generic and identifier \"com.barebones.bbedit\" and (certificate leaf[subject.OU] = \"W52GZAXT98\" or certificate leaf[field.1.2.840.113635.100.6.1.9] exists)"
+        )
         // Every third-party editor is pinned to its team; Xcode to Apple itself.
         for e in Editor.allCases where e != .xcode { #expect(e.codeRequirement.contains("subject.OU"), "\(e)") }
     }

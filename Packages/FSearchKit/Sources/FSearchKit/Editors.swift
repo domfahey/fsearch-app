@@ -39,6 +39,9 @@ public enum Editor: String, CaseIterable, Sendable {
         }
     }
 
+    /// Apple's Mac App Store signing marker in a leaf certificate.
+    private var appStoreMarker: String { "certificate leaf[field.1.2.840.113635.100.6.1.9] exists" }
+
     /// The code-signing requirement the editor app must satisfy before it is sent a file path.
     ///
     /// Launch Services resolves an editor by bundle id alone, and any app can claim
@@ -47,7 +50,8 @@ public enum Editor: String, CaseIterable, Sendable {
     /// editor's own team. The team ids were read with `codesign -dv` from installed copies
     /// (VS Code `UBF8T346G9`, Cursor `VDXQ22DGB9`) and from each vendor's official download,
     /// checked with `codesign --verify --strict` (Zed `MQ55VZLNZQ`, Sublime Text
-    /// `Z6D26JE4Y4`, BBEdit `W52GZAXT98`), on 2026-11-26. Xcode must be signed by Apple itself.
+    /// `Z6D26JE4Y4`, BBEdit `W52GZAXT98`), on 2026-11-26. BBEdit's Mac App Store copy, signed by Apple, is accepted
+    /// by Apple's App Store marker instead. Xcode must be signed by Apple itself.
     public var codeRequirement: String {
         let id = "identifier \"\(bundleId)\""
         let team: String
@@ -57,7 +61,10 @@ public enum Editor: String, CaseIterable, Sendable {
         case .cursor: team = "VDXQ22DGB9"
         case .zed: team = "MQ55VZLNZQ"
         case .sublime: team = "Z6D26JE4Y4"
-        case .bbedit: team = "W52GZAXT98"
+        case .bbedit:
+            // Also on the Mac App Store, signed by Apple: its leaf has Apple's App Store
+            // marker instead of the team. Only Bare Bones can publish this bundle id there.
+            return "anchor apple generic and \(id) and (certificate leaf[subject.OU] = \"W52GZAXT98\" or \(appStoreMarker))"
         }
         return "anchor apple generic and \(id) and certificate leaf[subject.OU] = \"\(team)\""
     }
