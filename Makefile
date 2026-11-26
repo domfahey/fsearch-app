@@ -22,7 +22,7 @@ SWIFT_DIRS ?= App AppTests AppUITests Packages/FSearchKit/Sources Packages/FSear
 FORMAT_CFG ?= --configuration .swift-format
 RUST_TARGETS ?= aarch64-apple-darwin x86_64-apple-darwin
 XCODEBUILD ?= xcodebuild -project FSearch.xcodeproj -scheme FSearch -configuration Debug \
-	-derivedDataPath build -destination 'generic/platform=macOS' CODE_SIGN_IDENTITY=-
+	-onlyUsePackageVersionsFromResolvedFile -derivedDataPath build -destination 'generic/platform=macOS' CODE_SIGN_IDENTITY=-
 
 .DEFAULT_GOAL := help
 .PHONY: help install install-tools setup doctor daemon project build test apptest ui coverage coverage-kit bench \
@@ -88,7 +88,8 @@ doctor: ## Check developer prerequisites; non-zero if a required one is missing
 		else bad "Vendor/fsearch is not universal ($${archs:-unreadable})" "make daemon"; fi; \
 		want=$$(grep -m1 '^REV=' scripts/build-daemon.sh | grep -o '[0-9a-f]\{40\}' || true); \
 		have=$$(cat Vendor/fsearch.rev 2>/dev/null || true); \
-		if [ -n "$$want" ] && [ -n "$$have" ]; then case "$$want" in "$$have"*) ;; *) bad "Vendor/fsearch is not the pinned revision" "make daemon" ;; esac; fi; \
+		if [ -z "$$have" ]; then bad "Vendor/fsearch.rev missing (cannot confirm the pinned revision)" "make daemon"; \
+		elif [ -n "$$want" ]; then case "$$want" in "$$have"*) ;; *) bad "Vendor/fsearch is not the pinned revision" "make daemon" ;; esac; fi; \
 	else bad "Vendor/fsearch not built" "make daemon"; fi; \
 	opt shellcheck "brew install shellcheck"; \
 	opt actionlint "brew install actionlint"; \

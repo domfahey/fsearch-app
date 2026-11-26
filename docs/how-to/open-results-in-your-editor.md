@@ -25,6 +25,12 @@ FSearch asks macOS (LaunchServices) to open the editor with a link, the same way
 
 VS Code and Cursor have been checked on a real Mac. Zed, Sublime Text and BBEdit have not been tested against a real install yet. If one of them does not work for you, please report it (see [Support](../../.github/SUPPORT.md)).
 
+## Editor signature check
+
+Any app can claim an editor's bundle id, so before FSearch sends a file path to an editor it checks the app's code signature. The app must be validly signed by Apple's chain (Developer ID or App Store) with the editor's own identifier. For Visual Studio Code and Cursor the check also pins the developer's team. Xcode must be signed by Apple itself. For Zed, Sublime Text and BBEdit the team is not pinned yet.
+
+If an installed editor fails the check, FSearch does not send it the path. It opens the file in the default app and shows "Not opening in *Editor*: its code signature isn’t the genuine app’s. Opened with the default app." in the panel footer. A copy of an editor that you re-signed yourself, or one built from source, fails the check too. To stop the message, set **Open content results in** to **Default app**.
+
 ## What opens when
 
 - A content or definition result (a matching line) opens in your chosen editor at that line when the editor registers its URL scheme (the panel footer shows **Open at line ↵**). For Xcode, or an installed editor whose URL scheme isn't registered with LaunchServices, FSearch opens the file in that chosen editor without jumping to the line.

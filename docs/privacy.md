@@ -22,16 +22,22 @@ Debug mode is off by default. It is turned on in Settings, or with Turn On Debug
 While debug mode is on, FSearch writes one line for each search it runs in the panel (including searches opened via `fsearch://search`). Each line has the time, the query, the search mode, the number of results, and the timings. Your search text is in the log.
 
 - The log shows the newest 10,000 searches (and compacts the file back down to 10,000 lines whenever it reaches 20,000). Older ones are dropped.
+- Entries expire after 7 days. Older entries are dropped from the list and removed from the file, checked when a search is logged (at most once an hour).
 - It only records searches made in the panel. It does not record searches from the fsearch CLI, background Shortcuts (**Search Files**) runs, or other apps.
 - Turning debug mode off deletes the log.
+- **Export…**, in the Search Log window, writes the logged queries to a `.jsonl` file that you choose. Nothing is sent anywhere by exporting.
 - Clear Log, in the Search Log window, empties it at any time.
-- The log folder is readable only by your account (mode 0700), the file is private to you (0600), and both are left out of Time Machine backups.
+- The log folder is readable only by your account (mode 0700), the file is private to you (0600), and both are left out of Time Machine backups. When the file is rewritten (to drop old entries or trim it to 10,000), the temporary copy is created with mode 0600 from the start, so its contents are never readable by others.
+
+## Shortcuts and searching inside files
+
+The **Search Files** action in Apple Shortcuts runs in the background with the Full Disk Access you gave FSearch. Searching inside files or for definitions from Shortcuts is therefore off by default. It works only after you turn on **Allow Shortcuts to search inside files** in Settings. Searches by file name always work. With it on, any shortcut on your Mac, including an imported one, could find files by what they contain, even in folders it cannot open itself. See [Shortcuts](reference/shortcuts.md#searching-inside-files).
 
 ## Unified logging and Privacy Manifest
 
 - The app writes operational events to the macOS unified log (`os.Logger`, subsystem `com.domfahey.fsearch`). Queries are never logged, and file paths and error details are marked `private`. See [Collecting logs](reference/troubleshooting.md#collecting-logs).
 - `FSearch.app` includes a Privacy Manifest (`PrivacyInfo.xcprivacy`) declaring no tracking, no collected data types, and only two required-reason API categories: UserDefaults (`CA92.1`, the app's own preferences) and file timestamps (`C617.1`, reading modification times of its own helper binary and log/skipped files).
-- **Report an Issue…** (or **Send Feedback**) opens a pre-filled GitHub issue form in your browser containing only non-private diagnostics (app version/build, macOS version, chip, and daemon install/state) — never paths or queries, and nothing is sent unless you submit the form.
+- **Report an Issue…** (or **Send Feedback**) opens a pre-filled GitHub issue form in your browser. The page address already contains non-private diagnostics (app version/build, macOS version, chip, and daemon install/state), so GitHub receives those when the page opens. It never contains paths or queries. Nothing more is sent unless you submit the form.
 
 ## Known limitations
 
@@ -41,6 +47,7 @@ The index and the daemon's socket live in your account's data folder and are not
 
 - The app has no telemetry and no analytics.
 - The app does not send your files, file names, searches or logs anywhere.
+- Links you click open github.com in your browser. These include the Help menu pages (**FSearch Help**, **Keyboard Shortcuts**, **Query Syntax**, **Changelog**, **Privacy**), the FSearch menu's **Manual**, **Keyboard Shortcuts**, **Changelog**, **GitHub** and **Discussions**, **Send Feedback** and **Report an Issue…** (see above). The About window's credits link to the fsearch, KeyboardShortcuts, Sparkle, Raycast and Everything websites. GitHub sees the request like any other website visit.
 - The app's dependencies are KeyboardShortcuts (the shortcut) and Sparkle (updates). Neither one sends your data.
 - The only network request the app makes is the update check, and only once a real Sparkle public key (`SUPublicEDKey`) is configured in `Info.plist` (outside test mode). Sparkle then reads the update feed at `https://domfahey.github.io/fsearch-app/appcast.xml` and downloads signed updates.
 

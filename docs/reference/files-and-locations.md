@@ -19,7 +19,7 @@ In debug mode, **Reveal Data Folder** in Index Details opens this folder.
 
 | Path | What it is |
 |---|---|
-| `~/Library/Logs/FSearch/searches.jsonl` | The search log, one JSON record per line. Only written while debug mode is on. Capped at 10,000 searches. Deleted when debug mode is turned off. |
+| `~/Library/Logs/FSearch/searches.jsonl` | The search log, one JSON record per line. Only written while debug mode is on. Keeps the last 10,000 searches, none older than 7 days; the file is trimmed periodically. Deleted when debug mode is turned off. |
 
 Each record has the time, query, mode, result count, the daemon's time in microseconds, the round trip in milliseconds, and an error if any.
 

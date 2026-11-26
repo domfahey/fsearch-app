@@ -57,6 +57,7 @@ open 'fsearch://search?q=SearchModel&mode=symbols'
 
 - Opening a valid `fsearch://search` URL brings up the launcher panel with that query and mode and resets the selection to the top row, replacing any query from the 60-second resume window. If the panel is already open, it stays open and updates in place.
 - A URL never opens, reveals, moves or modifies files on its own — it only fills the search field and shows results.
+- A URL cannot trigger an open by accident. After a URL opens the panel, ↵, ⌘↵ and ⌘1 to ⌘9 are ignored for half a second (0.5 s), so a keypress meant for the app you were in does not open the selected row. Arrow keys, typing, Esc and the other keys work at once. Opening the panel with the hotkey or the menu does not start this wait. See [Keyboard shortcuts](keyboard-shortcuts.md#in-the-panel).
 - Unrecognized schemes, hosts, extra path segments, credentials, ports or unknown `mode` values are ignored without opening the panel.
 - Line breaks and tabs are replaced with spaces, control characters are removed, and queries are capped at 1000 Unicode scalars without splitting multi-scalar characters.
 

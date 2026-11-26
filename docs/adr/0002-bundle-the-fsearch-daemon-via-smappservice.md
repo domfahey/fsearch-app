@@ -19,7 +19,7 @@ Full Disk Access is granted to a program. The program that reads the disk has to
 
 Ship the daemon inside the app, at `Contents/Helpers/fsearch`. Run it as a login item with `SMAppService`, using a LaunchAgent plist inside the bundle, `com.domfahey.fsearch.daemon.plist`. The agent runs `fsearch serve`.
 
-The daemon is built from a pinned commit by `scripts/build-daemon.sh` as a universal binary, and is signed with the app's Developer ID. While upstream changes are pending, the build uses the `domfahey/fsearch` fork. The plan is to move to an upstream tag.
+The daemon is built from a pinned commit by `scripts/build-daemon.sh` as a universal binary, and is signed with the app's Developer ID. The build uses a fixed commit of the `domfahey/fsearch` fork. It moves to an upstream tag only when upstream meets the conditions in [ADR 0013](0013-keep-the-daemon-on-the-fork-pin-after-upstream-closed-the-prs.md).
 
 The app talks to the daemon over its socket in `~/Library/Application Support/FSearch`.
 

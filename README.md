@@ -17,9 +17,9 @@ Press a hotkey, type, and find any file by name, or search inside text and code 
 - Search by name, search inside text and code files, or find definitions.
 - Query filters such as `ext:`, `in:`, `type:`, `size:` and `mtime:`. Type `?` for the cheat sheet.
 - Recent files when the query is empty. Reopen the panel within 60 seconds to resume.
-- Actions: open, open at a line in your editor, reveal, Quick Look, copy, open with, move to Trash, and drag a result out.
+- Actions: open, open at a line in your editor, reveal in Finder, Quick Look, copy path, copy file, open with, open folder in Terminal, move to Trash, and drag a result out.
 - Four-step onboarding, with a warning if another launcher holds your hotkey.
-- App commands in the panel: type `settings` (or `prefs`) to get to Settings, or press `⌘/` for the FSearch menu.
+- App commands in the panel: type `settings`, `preferences` or `prefs` to get to Settings, or press `⌘/` for the FSearch menu.
 - Automation: `fsearch://search?q=…` URL scheme and a **Search Files** action for Apple Shortcuts.
 - Accessibility: adapts to Reduce Motion, Reduce Transparency and Increase Contrast, with VoiceOver labels and keyboard defaults.
 - Settings for the hotkey, the editor for content results, Open FSearch at login, and an in-app uninstall ("Remove Background Helper and Data…").
@@ -88,7 +88,7 @@ make test     # run the FSearchKit tests
 
 ## Privacy
 
-Your index and logs stay on your Mac. The app has no telemetry and makes no network requests of its own. The only network code is the Sparkle updater, which checks for updates once it is configured. See [Privacy](docs/privacy.md).
+Your index and logs stay on your Mac. The app has no telemetry and makes no network requests of its own. The only network code is the Sparkle updater, which checks for updates once it is configured. Links you click (the Help menu, the FSearch menu, Report an Issue…, About credits) open github.com in your browser. Report an Issue… puts the app version, macOS version, chip and daemon state (never paths or queries) in the URL. See [Privacy](docs/privacy.md).
 
 ## Contributing
 

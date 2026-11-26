@@ -14,6 +14,7 @@ FSearch then:
 - moves `~/Library/Application Support/FSearch` (the index) to the Trash, only if FSearch's helper was running the daemon and the CLI's login agent (`~/Library/LaunchAgents/mt.nd.fsearch.plist`) isn't installed. Otherwise the folder stays and the window says why.
 - moves `~/Library/Logs/FSearch` to the Trash.
 - clears its settings, recent files and update-check settings.
+- resets its global shortcut.
 
 The window lists what it removed. It cannot remove Full Disk Access: press **Open Full Disk Access…** and remove the entry by hand (step 4). Then quit FSearch (step 1) and delete the app (step 3).
 

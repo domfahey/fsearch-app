@@ -9,11 +9,14 @@ export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 scripts/build-daemon.sh            # once, for the daemon end-to-end metrics
 scripts/bench.sh                   # run + regression check (exit 1 on a regression)
 scripts/bench.sh --record          # run + rewrite this machine's baseline entry
+scripts/bench.sh --record --provisional   # same, marked provisional (noisy machine)
 scripts/bench.sh --self-test       # simulate a 2x slowdown: must exit 1
 scripts/bench.sh --skip-daemon     # in-process metrics only (no Vendor/fsearch needed)
 scripts/bench.sh --filter daemon.grep,decode   # metrics whose names start with these
 scripts/bench.sh --report-only     # compare, but never fail
 ```
+
+`--record --provisional` writes the entry with `"provisional": true`. See [Baselines are machine-specific](#baselines-are-machine-specific).
 
 A full run takes about 20 s. Results land in `bench/results/<UTC time>-<machine>.json`
 (git-ignored) and as a table on stdout.
