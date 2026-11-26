@@ -97,7 +97,7 @@ import Testing
     }
 
     /// Every editor must be Apple-anchored and carry its own bundle id as signing
-    /// identifier; team ids are pinned only where read from an installed copy.
+    /// identifier, and each third-party editor's team id.
     @Test func codeRequirementsAnchorAndPinIdentifiers() {
         for e in Editor.allCases {
             #expect(e.codeRequirement.hasPrefix("anchor apple"), "\(e)")
@@ -106,8 +106,10 @@ import Testing
         #expect(Editor.vscode.codeRequirement.contains("certificate leaf[subject.OU] = \"UBF8T346G9\""))
         #expect(Editor.cursor.codeRequirement.contains("certificate leaf[subject.OU] = \"VDXQ22DGB9\""))
         #expect(Editor.xcode.codeRequirement == "anchor apple and identifier \"com.apple.dt.Xcode\"")
-        // Not installed when checked, so no team id is guessed.
-        for e in [Editor.zed, .sublime, .bbedit] { #expect(!e.codeRequirement.contains("subject.OU"), "\(e)") }
-        #expect(Editor.zed.codeRequirement.hasPrefix("anchor apple generic and"))
+        #expect(Editor.zed.codeRequirement.contains("certificate leaf[subject.OU] = \"MQ55VZLNZQ\""))
+        #expect(Editor.sublime.codeRequirement.contains("certificate leaf[subject.OU] = \"Z6D26JE4Y4\""))
+        #expect(Editor.bbedit.codeRequirement.contains("certificate leaf[subject.OU] = \"W52GZAXT98\""))
+        // Every third-party editor is pinned to its team; Xcode to Apple itself.
+        for e in Editor.allCases where e != .xcode { #expect(e.codeRequirement.contains("subject.OU"), "\(e)") }
     }
 }
