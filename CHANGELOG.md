@@ -112,7 +112,7 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
 - Release builds no longer inject `get-task-allow`, and the helper is signed with its own identifier.
 - Editors no longer inherit FSearch's Full Disk Access (see Changed).
 - After another app opens the panel (an `fsearch://` URL or a reopen), ↵, ⌘↵ and ⌘1–9 are ignored for 0.5 s, so a stray keypress can't open the selected file. The hotkey and menu don't start the wait.
-- Before an editor is sent a file path, its code signature is checked (Apple-anchored, with the editor's own identifier; Visual Studio Code and Cursor also pin their team). A fake app that claims an editor's bundle id is not used: the file opens in the default app and the footer says so.
+- Before an editor is sent a file path, its code signature is checked (Apple-anchored, with the editor's own identifier and its developer's pinned team; Xcode must be Apple's own). A fake app that claims an editor's bundle id is not used: the file opens in the default app and the footer says so.
 - Index Details has a **Data folder safety** section: a read-only check for a symlinked or foreign-owned data folder or socket files, or a data folder others can write to. Remove Background Helper and Data… leaves a symlinked or foreign-owned data folder alone.
 - The app names the daemon on the socket by its code signature (the connection's audit token), not only by the pid in `socket.lock`, which any process running as you could write. Index Details shows the result in a **Daemon** row.
 - The Shortcuts **Search Files** action can no longer search file contents until you allow it (see Changed).

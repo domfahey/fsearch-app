@@ -37,7 +37,8 @@ enum FileActions {
         return workspace.urlForApplication(withBundleIdentifier: e.bundleId)
     }
 
-    /// Whether `app` is the genuine `editor`: valid signature, Apple-anchored, its own identifier (see ``Editor/codeRequirement``).
+    /// Whether `app` is the genuine `editor`: valid signature, Apple-anchored, its own identifier and its developer's
+    /// pinned team (see ``Editor/codeRequirement``).
     private static func isGenuine(_ app: URL, _ editor: Editor) -> Bool {
         let ok = workspace.isTrustedApp(at: app, requirement: editor.codeRequirement)
         if !ok {
