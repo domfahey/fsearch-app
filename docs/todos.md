@@ -10,7 +10,6 @@ Open work, by priority. "You" items need the maintainer: a decision, credentials
 ## P2: features
 
 - [ ] Server-side paging beyond 1,000 rows in the Everything-style search window once upstream `fsearch` adds `offset`/`sort`/`total_hits` (the multi-window v2 UI and `SearchWindowQuery.PageRequest` contract are already in place; see [ADR 0020](adr/0020-everything-style-search-window.md) and [roadmap](roadmap.md)).
-- [ ] Non-English translations (English String Catalogs for the app and FSearchKit are already in place).
 
 ## Upstream (fsearch)
 

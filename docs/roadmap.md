@@ -20,7 +20,7 @@ Also in v1:
 
 ## Next
 
-- Non-English translations (English String Catalogs for the app and FSearchKit are already in place).
+- Additional community translations beyond the initial 8 shipped languages (English, Japanese, Simplified Chinese, Spanish, French, German, Korean, and Brazilian Portuguese).
 
 ## v2: an Everything-style search window
 

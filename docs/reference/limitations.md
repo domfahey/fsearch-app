@@ -45,7 +45,7 @@ Which program macOS lists for the bundled helper (the app or the helper itself) 
 
 ## Localization
 
-The app is in English only for now. Both `FSearch.app` and `FSearchKit` use String Catalogs ready for translations, so additional languages can be added without code changes.
+FSearch for Mac is localized into English, Japanese (`ja`), Simplified Chinese (`zh-Hans`), Spanish (`es`), French (`fr`), German (`de`), Korean (`ko`), and Brazilian Portuguese (`pt-BR`) via Xcode String Catalogs across both `FSearch.app` and `FSearchKit`. Other languages fall back to English; additional languages can be added directly to the catalogs without code changes.
 
 ## See also
 
