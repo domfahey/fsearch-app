@@ -308,6 +308,7 @@ if [ -n "$DMG_SRC" ]; then
   verify_dmg "$DMG_SRC" "$VERSION"
   if [ ! "$DMG_SRC" -ef "$TARGET_DMG" ]; then
     cp -f "$DMG_SRC" "$TARGET_DMG"
+    cp -f "$DMG_SRC.sha256" "$TARGET_DMG.sha256"
   fi
 fi
 [ -f "$TARGET_DMG" ] || fail "expected DMG at $TARGET_DMG (pass --dmg PATH or copy it there first)"

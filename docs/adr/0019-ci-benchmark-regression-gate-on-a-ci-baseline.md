@@ -24,4 +24,4 @@ Status: Accepted
 
 - A real regression fails CI, and runner noise does not.
 - A busy runner can hide a regression for one run, because exit 75 passes.
-- The baseline must be re-recorded when the runner image, Xcode or the daemon changes enough to move the numbers (`scripts/bench.sh --record`). See `bench/README.md`.
+- The baseline must be re-recorded when the runner image, Xcode or the daemon changes enough to move the numbers, using CI's `bench-results` artifact (`swift run -c release --package-path Packages/FSearchKit FSearchBench record --baseline bench/baseline.json --current <file> --machine ci-macos-26`). See [bench/README.md](../../bench/README.md).

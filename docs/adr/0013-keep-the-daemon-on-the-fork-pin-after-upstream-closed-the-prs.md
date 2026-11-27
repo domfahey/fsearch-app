@@ -32,4 +32,4 @@ When the pin moves, update `REV`, the benchmark baseline, the changelog and [THI
 - No change to builds. `scripts/build-daemon.sh` still pins `d26cf78`.
 - The app does not get upstream's v0.2.1 and v0.2.2 fixes until the fork is rebased or upstream gains the missing behavior.
 - The fork stays a dependency of every build and must stay reachable.
-- Wording about pending pull requests in `scripts/build-daemon.sh`, THIRD_PARTY_NOTICES.md and the [to-do list](../todos.md) is out of date and should follow this record.
+- Wording about pending pull requests in `scripts/build-daemon.sh`, THIRD_PARTY_NOTICES.md and the [to-do list](../todos.md) has been updated to follow this record.

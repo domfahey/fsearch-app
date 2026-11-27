@@ -10,7 +10,7 @@
 
 - [ ] `make check` (lint, type and FSearchKit tests; it includes `scripts/check-links.sh`)
 - [ ] `make apptest` (AppTests), if I changed code under `App/`
-- [ ] `make ui` (UI tests), if I changed the panel. **These tests type on the keyboard: I ran them on a Mac nobody was using.**
+- [ ] `make ui` (UI tests), if I changed the UI (panel, Settings, menu bar, or `fsearch://` handling). **These tests type on the keyboard: I ran them on a Mac nobody was using.**
 - [ ] Manual (describe below)
 
 <!-- Notes on manual testing. -->
@@ -23,6 +23,7 @@
 
 - [ ] I added or changed tests. New behavior has a test that fails without it.
 - [ ] The build has zero warnings.
+- [ ] I ran `make strings` and committed both `Localizable.xcstrings` catalogs if I changed user-facing text.
 - [ ] I updated `CHANGELOG.md` under Unreleased.
 - [ ] No test touches the real index, `~/Library/Application Support/FSearch`, `~/Library/LaunchAgents` or `~/.local/bin`.
 - [ ] I updated the docs (README, CONTRIBUTING, `docs/`) if needed.

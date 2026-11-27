@@ -21,7 +21,7 @@ Open **Index Details…** from the menu. It shows live numbers from the daemon:
 
 - Entries, folders, pending changes (added and removed), the last FSEvents id and the index size.
 - Whether Full Disk Access is on, and whether the daemon is the owner (writes the index) or a follower.
-- **Daemon**: who is on the other end of the socket, found from its code signature. **FSearch helper (signature verified)** is FSearch's own background helper. **Other (unverified)** is any other daemon, such as the one from the fsearch CLI. **Not identified** means the app could not read the connected program's identity, for example before it has connected.
+- **Daemon**: who is on the other end of the socket, found from its code signature. **FSearch helper (signature verified)** is FSearch's own background helper. **Other (unverified)** is any other daemon, such as the one from the fsearch CLI. **Not identified** means the app could not read the connected program's identity (for example, if macOS did not return its audit token or the control connection dropped while refreshing).
 - Content search: files indexed, segments, size and files waiting to be indexed.
 - Folders the index lacks (skipped).
 - **Data folder safety**: a read-only check of the daemon's data folder. It reads **No problems found**, or one line per problem (see [Troubleshooting](../reference/troubleshooting.md#data-folder-safety-shows-a-problem)). It changes nothing.

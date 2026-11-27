@@ -86,6 +86,10 @@ See [Uninstall](../uninstall.md).
 
 The daemon rejected your query, and the red text is its own message, for example about an unfinished regular expression. Fix the query. A filter you are still typing, like `size:` with no value, does not trigger it. See [Query syntax](query-syntax.md).
 
+## Why does a file name or matching line show `�`?
+
+FSearch replaces invisible and bidirectional control characters with the Unicode replacement character (`�`, `U+FFFD`) when displaying file names, folder paths, matching lines, and action errors in the panel. That prevents a file name containing a reordering control (such as a right-to-left override) from disguising its real extension. Normal emoji sequences and scripts that rely on zero-width joiners are kept intact, and only the display changes — opening, revealing, copying, and other file actions still use the real path on disk.
+
 ## Where do I report a bug or ask for a feature?
 
 See [Support](../../.github/SUPPORT.md). For security problems, see [Security](../../.github/SECURITY.md).

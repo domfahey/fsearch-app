@@ -23,6 +23,11 @@ A=("$ROOT/scripts/appcast.sh" --changelog "$T/CHANGELOG.md" --dmg "$T/dl/FSearch
 run "no .sha256 is refused" 1 "${A[@]}" 1.2.3 "$T/arch"
 (cd "$T/dl" && shasum -a 256 FSearch-1.2.3.dmg > FSearch-1.2.3.dmg.sha256)
 run "good checksum and attestation signs" 0 "${A[@]}" 1.2.3 "$T/arch"
+if [ -f "$T/arch/FSearch-1.2.3.dmg.sha256" ]; then
+  PASS=$((PASS+1)); echo "ok   .sha256 copied alongside DMG into archives"
+else
+  FAILN=$((FAILN+1)); echo "FAIL .sha256 not copied into archives"
+fi
 run "failed attestation is refused" 1 GH_FAIL=1 "${A[@]}" 1.2.3 "$T/arch"
 run "--skip-attestation signs with a warning" 0 GH_FAIL=1 "${A[@]}" --skip-attestation 1.2.3 "$T/arch"
 grep -q WARNING "$T/out" || { FAILN=$((FAILN+1)); echo "FAIL no warning printed"; }

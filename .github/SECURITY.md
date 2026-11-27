@@ -47,9 +47,9 @@ In scope:
 - Releases are signed with a Developer ID and notarized by Apple.
 - Build, release and CI scripts, including how secrets are handled.
 
-Known limitations, tracked with the upstream fsearch project and not worked around here:
+Known limitations:
 
-- Same-user access. The daemon does not check which program connects to its socket, so other programs running as your macOS user may be able to use the daemon's Full Disk Access. The on-disk index in `~/Library/Application Support/FSearch` is also readable by your account. See [docs/privacy.md](../docs/privacy.md).
+- Same-user access. The daemon does not check which program connects to its socket, so other programs running as your macOS user may be able to use the daemon's Full Disk Access. The on-disk index in `~/Library/Application Support/FSearch` is also readable by your account. This is tracked with the upstream fsearch project and not worked around here. See [docs/privacy.md](../docs/privacy.md).
 - Shortcuts content exposure. The **Search Files** action runs in the background with the Full Disk Access you gave FSearch. Any shortcut can run it, including an imported one. Searching inside files or for definitions could reveal which files contain a given text, in folders the shortcut cannot read itself. Mitigation: those searches are off unless you turn on **Allow Shortcuts to search inside files** in Settings. File name searches are always allowed and still return paths. See [docs/reference/shortcuts.md](../docs/reference/shortcuts.md#searching-inside-files).
 - Launch constraints for the helper are not yet applied. Restricting which programs can launch the daemon is a recommendation only.
 

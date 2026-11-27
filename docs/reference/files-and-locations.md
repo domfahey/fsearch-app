@@ -11,6 +11,8 @@ This is the fsearch daemon's folder. The app and the fsearch CLI share it, so th
 | File | What it is |
 |---|---|
 | `fsearch.sock` | The socket the app uses to talk to the daemon. |
+| `socket.lock` | Daemon lock and PID ownership metadata, checked alongside the connected peer's code signature (and used as a fallback if the peer's identity cannot be read). The [Data folder safety](troubleshooting.md#data-folder-safety-shows-a-problem) check verifies that `socket.lock`, `fsearch.sock` and the data folder itself are owned by your user and are not symbolic links. |
+| `skipped` | Folders the daemon skipped while indexing (for example, protected folders while Full Disk Access is off), shown in Index Details under **Folders the index lacks (skipped)**. |
 | `daemon.log` | The daemon's log, written by the fsearch CLI's daemon. The app's bundled `SMAppService` helper does not write `daemon.log` (its stderr is discarded; the FSearch app itself writes operational logs to the macOS unified log). Index Details shows the last 30 lines of `daemon.log` in debug mode when present. |
 
 In debug mode, **Reveal Data Folder** in Index Details opens this folder.
@@ -19,7 +21,7 @@ In debug mode, **Reveal Data Folder** in Index Details opens this folder.
 
 | Path | What it is |
 |---|---|
-| `~/Library/Logs/FSearch/searches.jsonl` | The search log, one JSON record per line. Only written while debug mode is on. Keeps the last 10,000 searches, none older than 7 days; the file is trimmed periodically. Deleted when debug mode is turned off. |
+| `~/Library/Logs/FSearch/searches.jsonl` | The search log, one JSON record per line. Only written while debug mode is on. Keeps the last 10,000 searches, none older than 7 days; the file is trimmed periodically. Its folder uses mode `0700`, the file uses mode `0600`, and both are excluded from Time Machine backups (see [Privacy](../privacy.md#debug-search-log)). Deleted when debug mode is turned off. |
 
 Each record has the time, query, mode, result count, the daemon's time in microseconds, the round trip in milliseconds, and an error if any.
 

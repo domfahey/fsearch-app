@@ -30,7 +30,7 @@ Removing FSearch's background helper and data in Settings turns the setting off 
 ## Notes
 
 - **Runs in the background:** **Search Files** does not open the launcher panel or steal focus. If you want to open the interactive launcher pre-filled with a query from Shortcuts, use the **Open URLs** action with the [URL scheme](url-scheme.md) (`fsearch://search?q=…`).
-- **Query rules:** Blank queries and content searches with no text pattern return an empty list. Line breaks and tabs are turned into spaces and control characters are removed. Accented file names match both composed (NFC) and decomposed (NFD) forms.
+- **Query rules:** Blank queries return an empty list in **File Names** mode; in **Inside Files** or **Definitions** (or with an inline content filter and no text pattern), they return an empty list when content search is allowed, and fail with the opt-in error while **Allow Shortcuts to search inside files** is off. Line breaks and tabs are turned into spaces, control characters are removed, and queries are capped at 1000 Unicode scalars without splitting multi-scalar characters. Accented file names match both composed (NFC) and decomposed (NFD) forms.
 - **Returned files:** The action returns the matching files by location. FSearch doesn't load their contents into the result; the action that receives them opens them.
 - **Daemon errors:** If the `fsearch` daemon is not running, times out, is still building its initial index, or rejects a filter, the action fails with a plain-English error message (the daemon's own message for rejected filters, or the same short error text recorded in the debug Search Log).
 

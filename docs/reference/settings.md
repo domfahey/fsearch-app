@@ -11,8 +11,8 @@ Open **Settings…** from the menu-bar icon, from the FSearch menu (⌘/, then *
 | Shortcut | Any key combination | ⌥Space | The global hotkey that shows and hides the panel. While it is still ⌥Space, Settings warns if Raycast is running (it uses ⌥Space) or Alfred is running (it may use ⌥Space). |
 | Open content results in | Default app, or an installed editor | Default app | The editor that opens a matching line at its line number. See [Open results in your editor](../how-to/open-results-in-your-editor.md). |
 | Debug mode | On or off | Off | Shows the debug dot, timings, Index Details and Search Log. Turning it off deletes the search log. See [Turn on debug mode](../how-to/turn-on-debug-mode.md). |
-| Allow Shortcuts to search inside files | On or off | Off | Lets the **Search Files** action in Shortcuts use **Inside Files** and **Definitions**, and content filters such as `grep:`. File name searches always work. Turn it on only if you trust every shortcut that uses the action. See [Shortcuts](shortcuts.md#searching-inside-files). |
 | Open FSearch at login | On or off | Off | Opens the app when you log in, using a Login Item. Shows the real status: on, waiting for approval (with a button that opens Login Items), or off. A failure appears under the switch. |
+| Allow Shortcuts to search inside files | On or off | Off | Lets the **Search Files** action in Shortcuts use **Inside Files** and **Definitions**, and content filters such as `grep:`. File name searches always work. Turn it on only if you trust every shortcut that uses the action. See [Shortcuts](shortcuts.md#searching-inside-files). |
 
 ### Updates
 
@@ -29,12 +29,12 @@ When a background check finds an update and FSearch isn't the front app, it does
 
 - turns off FSearch's own background helper, whether it is running or waiting for approval in Login Items. A helper from the fsearch CLI is never touched.
 - turns off **Open FSearch at login**.
-- moves the data folder (the index) to the Trash, only if FSearch's helper was running the daemon and the fsearch CLI's login agent is not installed. Otherwise the folder stays and the window says why.
+- moves the data folder (the index) to the Trash, only if FSearch's helper was running the daemon and turned off cleanly, the fsearch CLI's login agent is not installed, and the folder passes the safety check (it is not a symbolic link and is owned by your user; see [Data folder safety](troubleshooting.md#data-folder-safety-shows-a-problem)). Otherwise the folder stays and the window says why.
 - moves the debug log folder to the Trash.
 - clears the app's settings, recent files and update-check settings.
 - resets the global shortcut to its default, ⌥Space.
 
-It cannot remove the Full Disk Access grant; remove that by hand. See [Uninstall](../uninstall.md). See [Uninstall](../uninstall.md).
+It cannot remove the Full Disk Access grant; remove that by hand. See [Uninstall](../uninstall.md).
 
 The same debug switch is in the menu-bar menu as **Turn On Debug Mode** (⌥⌘D). ⌥⌘D is a menu-item shortcut: it works while the menu is open, not as a global hotkey.
 
