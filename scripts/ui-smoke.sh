@@ -51,6 +51,10 @@ echo x > "$R/duo/plover-one.txt"
 echo x > "$R/duo/plover-two.txt"
 printf 'first line\nthe quokkaneedle line\nlast line\n' > "$R/notes.md"
 printf 'import Foundation\n\nfunc kestrelHandler() -> Int {\n    return 1\n}\n' > "$R/src/kestrel.swift"
+printf '#!/bin/sh\necho ok\n' > "$R/osprey-script.command"
+chmod +x "$R/osprey-script.command"
+# NFD-decomposed "café-note.txt" (e + U+0301) to test NFC query matching against macOS decomposed names.
+echo x > "$R/$(printf 'cafe\314\201-note.txt')"
 
 # "mtime size" of a file, or "absent": detects any write to the real search log.
 stamp() { if [ -e "$1" ]; then stat -f '%m %z' "$1"; else echo absent; fi; }
@@ -81,7 +85,12 @@ if [ "$(stamp "$REAL_LOG")" != "$REAL_BEFORE" ]; then
   echo "ui-smoke: the app wrote the real $REAL_LOG" >&2; rc=1
 fi
 if grep -qE "testDebugModeShowsTimingAndLogsInTempHome.*passed" "$LOG"; then
-  if [ -s "$TEST_LOG" ]; then echo "ui-smoke: debug search log stayed inside the temp HOME"
-  else echo "ui-smoke: debug test ran but no search log at $TEST_LOG" >&2; rc=1; fi
+  if [ -s "$TEST_LOG" ]; then
+    echo "ui-smoke: debug search log stayed inside the temp HOME"
+  elif grep -qE "testDebugModeInSettingsCreatesAndDeletesLog.*passed" "$LOG"; then
+    echo "ui-smoke: debug search log stayed inside the temp HOME (cleared by toggle-off test)"
+  else
+    echo "ui-smoke: debug test ran but no search log at $TEST_LOG" >&2; rc=1
+  fi
 fi
 exit $rc

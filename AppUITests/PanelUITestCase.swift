@@ -92,6 +92,11 @@ class PanelUITestCase: XCTestCase {
         return ((try? String(contentsOf: log, encoding: .utf8)) ?? "").split(separator: "\n").map(String.init)
     }
 
+    /// The debug search log inside the test daemon's temp HOME.
+    var debugSearchLogURL: URL {
+        URL(fileURLWithPath: socket).deletingLastPathComponent().appendingPathComponent("searches.jsonl")
+    }
+
     /// Launches the app with the panel up. `debugMode` NO keeps a test from
     /// ever writing a search log, except the one test that checks where it goes.
     func launch(debugMode: Bool = false, file: StaticString = #filePath, line: UInt = #line) throws {
@@ -109,18 +114,30 @@ class PanelUITestCase: XCTestCase {
         ]
         app.launch()
         app.activate()
-        let found = field.waitForExistence(timeout: 15)
+        let found = poll(timeout: 15) { field.exists }
         XCTAssertTrue(found, found ? "" : "state=\(app.state.rawValue) tree=\(app.debugDescription)")
+    }
+
+    /// The `FSearch.app` product built alongside this UI-test runner.
+    var testAppBundleURL: URL {
+        // .../Debug/AppUITests-Runner.app/Contents/PlugIns/AppUITests.xctest
+        var products = Bundle(for: PanelUITestCase.self).bundleURL
+        for _ in 0..<4 { products.deleteLastPathComponent() }
+        return products.appendingPathComponent("FSearch.app")
+    }
+
+    /// Sends a URL (such as `fsearch://search?…`) strictly to this test build of `FSearch.app`.
+    func openURLInTestApp(_ url: URL) async throws {
+        let config = NSWorkspace.OpenConfiguration()
+        config.activates = true
+        _ = try await NSWorkspace.shared.open([url], withApplicationAt: testAppBundleURL, configuration: config)
     }
 
     /// `launch()` quits every running app with our bundle id. One that isn't
     /// this build's (in the products folder next to the test runner) is the
     /// user's: stop instead of quitting it.
     private func refuseIfTheUsersFSearchIsRunning(file: StaticString, line: UInt) throws {
-        // .../Debug/AppUITests-Runner.app/Contents/PlugIns/AppUITests.xctest
-        var products = Bundle(for: PanelUITestCase.self).bundleURL
-        for _ in 0..<4 { products.deleteLastPathComponent() }
-        let ours = products.standardizedFileURL.path + "/"
+        let ours = testAppBundleURL.deletingLastPathComponent().standardizedFileURL.path + "/"
         let others = NSRunningApplication.runningApplications(withBundleIdentifier: "com.domfahey.fsearch")
             .filter { !$0.isTerminated && !($0.bundleURL?.standardizedFileURL.path.hasPrefix(ours) ?? false) }
         if !others.isEmpty {
@@ -135,13 +152,14 @@ class PanelUITestCase: XCTestCase {
     /// test can never type into another app the user has open. Throws, so the
     /// caller never sends the event when the check fails.
     func requireFocus(field needsField: Bool, file: StaticString = #filePath, line: UInt = #line) throws {
-        if app.state != .runningForeground { app.activate() }
-        guard app.wait(for: .runningForeground, timeout: 5) else {
-            throw UITestRefusal("FSearch isn't frontmost: not sending keys", file: file, line: line)
+        if app.state != .runningForeground {
+            app.activate()
+            guard app.wait(for: .runningForeground, timeout: 5) else {
+                throw UITestRefusal("FSearch isn't frontmost: not sending keys", file: file, line: line)
+            }
         }
         guard needsField else { return }
-        let focused = NSPredicate { _, _ in MainActor.assumeIsolated { self.fieldHasKeyboard } }
-        if XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: focused, object: nil)], timeout: 5) != .completed {
+        guard poll(timeout: 5, { fieldHasKeyboard }) else {
             throw UITestRefusal("the search field doesn't have the keyboard: not sending keys", file: file, line: line)
         }
     }
@@ -177,6 +195,15 @@ class PanelUITestCase: XCTestCase {
     func click(_ e: XCUIElement, file: StaticString = #filePath, line: UInt = #line) throws {
         try requireFocus(field: false, file: file, line: line)
         e.click()
+    }
+
+    /// Sends the single-instance reopen distributed notification (`LaunchGuards.reopenNotification`)
+    /// and activates the app (matching `LaunchGuards.anotherCopyIsRunning`) so the hidden panel reopens
+    /// and resumes its saved session state.
+    func reopenPanel() {
+        DistributedNotificationCenter.default().postNotificationName(
+            Notification.Name("com.domfahey.fsearch.reopen"), object: nil, userInfo: nil, deliverImmediately: true)
+        app.activate()
     }
 
     /// Types into the field one character at a time, checking focus before
@@ -245,17 +272,39 @@ class PanelUITestCase: XCTestCase {
         return try XCTUnwrap(clipboard, file: file, line: line)
     }
 
+    /// Polls `cond` immediately, then every `interval` up to `timeout`.
+    /// Avoids `XCTNSPredicateExpectation` and `waitForExistence`'s fixed 1.0 s polling floor,
+    /// which otherwise adds ~1 s of idle sleep to every focus check and fast UI transition.
+    private func poll(timeout: TimeInterval, interval: TimeInterval = 0.05, _ cond: () -> Bool) -> Bool {
+        if cond() { return true }
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(interval))
+            if cond() { return true }
+        }
+        return false
+    }
+
     func waitFor(_ e: XCUIElement, _ timeout: TimeInterval = 20, _ file: StaticString = #filePath, _ line: UInt = #line) {
-        let ok = e.waitForExistence(timeout: timeout)
+        let ok = poll(timeout: timeout) { e.exists }
         XCTAssertTrue(ok, "never appeared: \(e)\n" + tree(), file: file, line: line)
+    }
+
+    /// Waits for `e` to disappear, polling every 50 ms instead of `waitForNonExistence`'s 1.0 s floor.
+    func waitForAbsence(
+        _ e: XCUIElement, _ timeout: TimeInterval = 5, _ message: @autoclosure () -> String = "",
+        file: StaticString = #filePath, line: UInt = #line
+    ) {
+        let gone = poll(timeout: timeout) { !e.exists }
+        let detail = message()
+        XCTAssertTrue(gone, detail.isEmpty ? "never disappeared: \(e)\n" + tree() : detail, file: file, line: line)
     }
 
     func waitUntil(
         _ timeout: TimeInterval = 10, _ what: String, _ cond: @escaping () -> Bool, file: StaticString = #filePath, line: UInt = #line
     ) {
-        let p = NSPredicate { _, _ in MainActor.assumeIsolated { cond() } }
-        let r = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: p, object: nil)], timeout: timeout)
-        XCTAssertEqual(r, .completed, what + "\n" + tree(), file: file, line: line)
+        let ok = poll(timeout: timeout, cond)
+        XCTAssertTrue(ok, what + "\n" + tree(), file: file, line: line)
     }
 
     /// Asserts `e` does not show up within `timeout` (for things that must stay absent).
