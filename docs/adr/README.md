@@ -23,6 +23,7 @@ These records explain why FSearch for Mac is built the way it is. Each one state
 | [0017](0017-trust-only-a-same-user-daemon-socket.md) | Trust only a same-user daemon socket, and decide helper ownership from the socket holder | Accepted |
 | [0018](0018-open-editors-through-launchservices-url-schemes.md) | Open editors through LaunchServices URL schemes, not child processes | Accepted |
 | [0019](0019-ci-benchmark-regression-gate-on-a-ci-baseline.md) | CI benchmark regression gate on a `ci-macos-26` baseline | Accepted |
+| [0020](0020-everything-style-search-window.md) | Everything-style multi-window search browser (v2) | Accepted |
 
 To add a record, copy the shape of an existing one, use the next number, and add a row here. Do not edit an accepted record to change its decision. Write a new one that supersedes it.
 

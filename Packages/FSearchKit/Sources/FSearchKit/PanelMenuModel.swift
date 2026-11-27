@@ -3,7 +3,7 @@ import Foundation
 /// What a row of the panel's FSearch menu (⌘/) does; the app carries it out.
 public enum PanelMenuAction: CaseIterable, Hashable, Sendable {
     /// The rows, in menu order.
-    case sendFeedback, manual, keyboardShortcuts, changelog, about, settings, github, discussions, quit
+    case sendFeedback, manual, keyboardShortcuts, changelog, about, searchWindow, settings, github, discussions, quit
 }
 
 /// One row of the FSearch menu.
@@ -29,6 +29,7 @@ public struct PanelMenuItem: Equatable, Identifiable, Sendable {
         case .keyboardShortcuts: "Keyboard Shortcuts"
         case .changelog: "Changelog"
         case .about: "About FSearch"
+        case .searchWindow: "Search Window"
         case .settings: "Settings"
         case .github: "GitHub"
         case .discussions: "Discussions"
@@ -84,6 +85,9 @@ public struct PanelMenuModel: Equatable, Sendable {
                 item(
                     .about, String(localized: "About FSearch", bundle: .module), "info.circle",
                     keywords: ["version", "info"]),
+                item(
+                    .searchWindow, String(localized: "Search Window…", bundle: .module), "macwindow",
+                    keywords: ["window", "browser", "table", "everything"]),
                 item(
                     .settings, String(localized: "Settings…", bundle: .module), "gearshape", shortcut: ["⌘", ","],
                     keywords: ["preferences", "prefs"]),

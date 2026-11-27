@@ -14,8 +14,12 @@ final class AppState: ObservableObject {
     let search: SearchModel
     /// Files recently opened from the panel.
     let recents: Recents
+    /// User-created saved searches shared across Everything-style search windows.
+    let savedSearches: SavedSearchStore
     /// The debug search log; written only while ``debugMode`` is on.
     let log: SearchLog
+    /// Creates independent `(names, content)` backends for each Everything-style search window.
+    private let makeWindowBackends: () -> (names: SearchBackend, content: SearchBackend)
     /// Debug mode: log searches and show timings and the debug windows.
     @AppStorage("debugMode") var debugMode = false
     /// Editor for content hits: `Editor.rawValue`, "" for none.
@@ -80,6 +84,9 @@ final class AppState: ObservableObject {
             names: DaemonClient(socketPath: options.socketPath),
             content: DaemonClient(socketPath: options.socketPath),
             control: control,
+            makeWindowBackends: {
+                (DaemonClient(socketPath: options.socketPath), DaemonClient(socketPath: options.socketPath))
+            },
             socketHolder: {
                 SocketHolder.read(dataDir: DebugFormat.dataDir(socketPath: options.socketPath), bundlePath: Bundle.main.bundlePath)
             },
@@ -107,6 +114,7 @@ final class AppState: ObservableObject {
         options: LaunchOptions, defaults: UserDefaults, helper: HelperService?,
         names: SearchBackend, content: SearchBackend, control: any DaemonControl,
         clock: DaemonClock = .live,
+        makeWindowBackends: (() -> (names: SearchBackend, content: SearchBackend))? = nil,
         cliAgentInstalled: @escaping () -> Bool = { FileManager.default.fileExists(atPath: DaemonManager.cliAgentPlist.path) },
         socketHolder: @escaping () -> SocketHolder = { .none },
         peer: @escaping () -> SocketHolder? = { nil },
@@ -120,7 +128,9 @@ final class AppState: ObservableObject {
             fullDiskAccessGranted: fullDiskAccessGranted)
         search = SearchModel(names: names, content: content)
         recents = Recents(defaults: defaults)
+        savedSearches = SavedSearchStore(defaults: defaults)
         log = SearchLog(file: options.searchLogFile)
+        self.makeWindowBackends = makeWindowBackends ?? { (names, content) }
         _debugMode = AppStorage(wrappedValue: false, "debugMode", store: defaults)
         _editorRaw = AppStorage(wrappedValue: "", "editor", store: defaults)
         _allowShortcutsContentSearch = AppStorage(wrappedValue: false, SearchFilesIntent.allowContentSearchKey, store: defaults)
@@ -129,6 +139,18 @@ final class AppState: ObservableObject {
             self.log.appendAsync(e, at: Date())
         }
         search.onSettled = { [weak self] phase in self?.searchSettled(phase) }
+    }
+
+    /// Creates an independent ``SearchWindowModel`` wired to this app's debug search log and daemon recovery.
+    func makeSearchWindowModel() -> SearchWindowModel {
+        let pair = makeWindowBackends()
+        let model = SearchWindowModel(names: pair.names, content: pair.content)
+        model.onSearched = { [weak self] entry in
+            guard let self, self.debugMode else { return }
+            self.log.appendAsync(entry, at: Date())
+        }
+        model.onSettled = { [weak self] phase in self?.searchSettled(phase) }
+        return model
     }
 
     /// The restart budget and recovery check (shared by every panel open).

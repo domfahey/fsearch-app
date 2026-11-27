@@ -9,7 +9,7 @@ import Testing
         let m = PanelMenuModel()
         #expect(
             titles(m) == [
-                "Send Feedback", "Manual", "Keyboard Shortcuts", "Changelog", "About FSearch", "Settings…",
+                "Send Feedback", "Manual", "Keyboard Shortcuts", "Changelog", "About FSearch", "Search Window…", "Settings…",
                 "GitHub", "Discussions", "Quit FSearch",
             ])
         #expect(m.visibleSections.map(\.title) == [nil, "Community", nil])
@@ -67,7 +67,7 @@ import Testing
         #expect(m.selected?.action == .quit)
         _ = m.handle(.down)
         #expect(m.selected?.action == .sendFeedback)
-        for _ in 0..<6 { _ = m.handle(.down) }
+        for _ in 0..<7 { _ = m.handle(.down) }
         // Past the divider and the "Community" header, straight to the next row.
         #expect(m.selected?.action == .github)
         m.filter = "zzz"

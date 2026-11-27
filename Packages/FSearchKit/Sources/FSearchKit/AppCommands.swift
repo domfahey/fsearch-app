@@ -1,15 +1,18 @@
 import Foundation
 
 /// An app command the panel offers as a row when the query names it, such as
-/// "settings". Only Settings for now; About or Quit would be more cases.
+/// "settings" or "window".
 public enum AppCommand: Equatable, Identifiable, Sendable, CaseIterable {
     /// Opens the app's Settings window.
     case settings
+    /// Opens an Everything-style multi-window search browser.
+    case searchWindow
 
     /// Stable English identifier used for view and accessibility ids (`command-FSearch Settings`), independent of localization.
     public var id: String {
         switch self {
         case .settings: "FSearch Settings"
+        case .searchWindow: "New Search Window"
         }
     }
 
@@ -17,6 +20,7 @@ public enum AppCommand: Equatable, Identifiable, Sendable, CaseIterable {
     public var title: String {
         switch self {
         case .settings: String(localized: "FSearch Settings", bundle: .module)
+        case .searchWindow: String(localized: "New Search Window", bundle: .module)
         }
     }
 
@@ -24,6 +28,7 @@ public enum AppCommand: Equatable, Identifiable, Sendable, CaseIterable {
     public var symbol: String {
         switch self {
         case .settings: "gearshape"
+        case .searchWindow: "macwindow.badge.plus"
         }
     }
 
@@ -31,6 +36,7 @@ public enum AppCommand: Equatable, Identifiable, Sendable, CaseIterable {
     var keywords: [String] {
         switch self {
         case .settings: ["settings", "preferences", "prefs"]
+        case .searchWindow: ["window", "browser", "everything"]
         }
     }
 

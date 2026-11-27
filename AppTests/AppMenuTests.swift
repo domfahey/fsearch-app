@@ -89,7 +89,7 @@ extension AppTests {
             for a in PanelMenuAction.allCases {
                 switch a {
                 case .manual, .keyboardShortcuts, .changelog, .github, .discussions: #expect(AppMenuActions.url(for: a) != nil, "\(a)")
-                case .sendFeedback, .about, .settings, .quit: #expect(AppMenuActions.url(for: a) == nil, "\(a)")
+                case .sendFeedback, .about, .searchWindow, .settings, .quit: #expect(AppMenuActions.url(for: a) == nil, "\(a)")
                 }
             }
         }
