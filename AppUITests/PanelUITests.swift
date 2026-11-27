@@ -299,7 +299,7 @@ final class PanelUITests: PanelUITestCase {
         waitUntil(5, "reveal recorded") { self.recordedActions.contains("reveal \(file)") }
     }
 
-    /// ↵ on a launchable script reveals it in Finder instead of launching it, and the footer warns accordingly.
+    /// ↵ on a launchable script reveals it in Finder instead of launching it, while ⌘K → Open explicitly launches it.
     func testLaunchableRevealsOnReturnInsteadOfOpening() throws {
         try launch()
         try search("osprey")
@@ -314,6 +314,20 @@ final class PanelUITests: PanelUITestCase {
         }
         XCTAssertFalse(recordedActions.dropFirst(before).contains("open \(script)"), "launchable must reveal, not open")
         waitForAbsence(field, 5, "↵ puts the launcher away")
+
+        // Reopen and explicitly launch via ⌘K → Open (recorded safely by TestModeWorkspace).
+        reopenPanel()
+        waitFor(field, 10)
+        waitFor(text("osprey-script.command"))
+        let beforeOpen = recordedActions.count
+        try press("k", .command)
+        let menu = app.menus.containing(.menuItem, identifier: "Open").firstMatch
+        waitFor(menu.menuItems["Open"], 10)
+        try click(menu.menuItems["Open"])
+        waitUntil(5, "⌘K → Open recorded launch") {
+            self.recordedActions.dropFirst(beforeOpen).contains("open \(script)")
+        }
+        waitForAbsence(field, 5, "⌘K → Open puts the launcher away")
     }
 
     /// ⌘2 opens the second file row regardless of selection, and reopening the panel shows it under Recent.
@@ -417,5 +431,100 @@ final class PanelUITests: PanelUITestCase {
         waitFor(modeChip("Inside files"), 10)
         waitFor(text("notes.md"), 10)
         waitFor(text(containing: "the quokkaneedle line"), 10)
+    }
+
+    /// Right after an external `fsearch://` open, ↵ is ignored for 0.5 s; pressing ↵ after the guard window opens the file.
+    func testExternalOpenGuardsImmediateReturn() async throws {
+        try launch()
+        try press(.escape)
+        waitForAbsence(field, 5)
+
+        let before = recordedActions.count
+        let file = fixtureRoot + "/proj/heronfile.txt"
+        let opened = ContinuousClock.now
+        let url = try XCTUnwrap(URL(string: "fsearch://search?q=heronfile"))
+        try await openURLInTestApp(url)
+        waitFor(field, 5)
+        waitUntil(5, "field focused after external open") { self.field.value(forKey: "hasKeyboardFocus") as? Bool == true }
+        let elapsedBeforeReturn = ContinuousClock.now - opened
+        field.typeKey(.return, modifierFlags: [])
+        XCTAssertLessThan(
+            elapsedBeforeReturn, .milliseconds(450),
+            "test setup exceeded the 0.5 s external-open guard window (\(elapsedBeforeReturn))")
+
+        // Results land, yet the guarded ↵ must not have opened the file or hidden the panel.
+        waitFor(text("heronfile.txt"), 10)
+        try await Task.sleep(for: .milliseconds(650))
+        XCTAssertTrue(field.exists, "guarded ↵ must keep the panel open")
+        XCTAssertFalse(
+            recordedActions.dropFirst(before).contains("open \(file)"),
+            "↵ within 0.5 s of an external open must be ignored")
+
+        // Once the 0.5 s guard expires, ↵ opens normally.
+        try press(.return)
+        waitUntil(5, "post-guard ↵ opened file") { self.recordedActions.dropFirst(before).contains("open \(file)") }
+        waitForAbsence(field, 5)
+    }
+
+    /// Typing forward into a half-typed filter (`type:code,`, `type:code,d`) keeps current results on screen without an error.
+    func testHalfTypedFilterKeepsCurrentResults() throws {
+        try launch()
+        try search("kestrel type:code")
+        waitFor(text("kestrel.swift"))
+
+        try type(",")
+        waitUntil(5, "trailing comma filter in field") { (self.field.value as? String ?? "") == "kestrel type:code," }
+        assertStaysAbsent(text("queryError"), 1)
+        XCTAssertTrue(text("kestrel.swift").exists, "current results stay up for half-typed type:code,")
+
+        try type("d")
+        waitUntil(5, "prefix type filter in field") { (self.field.value as? String ?? "") == "kestrel type:code,d" }
+        assertStaysAbsent(text("queryError"), 1)
+        XCTAssertTrue(text("kestrel.swift").exists, "current results stay up for half-typed type:code,d")
+
+        try type("oc")
+        waitUntil(5, "completed filter in field") { (self.field.value as? String ?? "") == "kestrel type:code,doc" }
+        waitFor(text("kestrel.swift"), 5)
+        XCTAssertFalse(text("queryError").exists)
+    }
+
+    /// Clicking a row selects it, and double-clicking a row opens it and hides the panel.
+    func testMouseClickSelectsAndDoubleClickOpensRow() throws {
+        try launch()
+        try search("plover")
+        waitFor(text("plover-one.txt"))
+        waitFor(text("plover-two.txt"))
+
+        try press("c", [.command, .shift])
+        let first = try waitForClipboard(matching: { $0.hasSuffix("plover-one.txt") || $0.hasSuffix("plover-two.txt") })
+        let otherName = first.hasSuffix("plover-one.txt") ? "plover-two.txt" : "plover-one.txt"
+        let otherRow = text(otherName)
+        let otherGroup = element("result-\(fixtureRoot)/proj/duo/\(otherName)")
+
+        try click(otherRow)
+        waitUntil(5, "clicked row selected") { otherGroup.isSelected }
+        try press("c", [.command, .shift])
+        let second = try waitForClipboard(matching: { $0.hasSuffix("/" + otherName) })
+
+        let before = recordedActions.count
+        try requireFocus(field: false)
+        otherRow.doubleClick()
+        waitUntil(5, "double-click opened row") { self.recordedActions.dropFirst(before).contains("open \(second)") }
+        waitForAbsence(field, 5, "double-click hides the panel")
+    }
+
+    /// Composed accented queries (`café`) match NFD filenames on disk, and inline `grep:` returns line hits without a chip.
+    func testAccentedFilenameAndInlineGrepQuery() throws {
+        try launch()
+        try search("café")
+        waitFor(text(containing: "-note.txt"), 10)
+        try press("c", [.command, .shift])
+        let copied = try waitForClipboard(matching: { $0.hasSuffix("-note.txt") })
+        XCTAssertTrue((copied as NSString).lastPathComponent.precomposedStringWithCanonicalMapping == "café-note.txt")
+
+        try search("grep:quokkaneedle")
+        waitFor(text("notes.md"), 10)
+        waitFor(text(containing: "the quokkaneedle line"), 10)
+        XCTAssertFalse(modeChip("Inside files").exists, "inline grep: runs without showing the mode chip")
     }
 }
