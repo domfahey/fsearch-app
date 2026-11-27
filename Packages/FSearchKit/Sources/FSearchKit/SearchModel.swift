@@ -2,7 +2,7 @@ import Foundation
 import Observation
 
 /// What the search box searches.
-public enum SearchMode: Equatable, Sendable {
+public enum SearchMode: String, Codable, CaseIterable, Equatable, Hashable, Sendable {
     /// File names (the default).
     case names
     /// Text inside files.

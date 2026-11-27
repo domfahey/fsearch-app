@@ -13,10 +13,18 @@ import Testing
         #expect(AppCommand.matches(q).isEmpty)
     }
 
+    @Test(arguments: ["wi", "win", "window", "Window", "br", "browser", "ev", "everything"])
+    func matchesSearchWindow(_ q: String) {
+        #expect(AppCommand.matches(q) == [.searchWindow])
+    }
+
     @Test func idTitleAndSymbol() {
         #expect(AppCommand.settings.id == "FSearch Settings")
         #expect(AppCommand.settings.title == "FSearch Settings")
         #expect(!AppCommand.settings.symbol.isEmpty)
+        #expect(AppCommand.searchWindow.id == "New Search Window")
+        #expect(AppCommand.searchWindow.title == "New Search Window")
+        #expect(!AppCommand.searchWindow.symbol.isEmpty)
         let ids = AppCommand.allCases.map(\.id)
         #expect(Set(ids).count == ids.count)
     }

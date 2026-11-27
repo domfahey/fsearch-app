@@ -41,7 +41,7 @@ final class Uninstaller: ObservableObject {
     /// these keys must not turn automatic recovery back on.
     static let defaultsKeys = [
         "editor", "debugMode", "onboarded", "skippedFullDiskAccess", "dismissedFullDiskAccessReminder", "recentPaths",
-        "helperIdentity", "updateReminderVisible", SearchFilesIntent.allowContentSearchKey,
+        "helperIdentity", "updateReminderVisible", SearchFilesIntent.allowContentSearchKey, SavedSearchStore.storageKey,
         // Sparkle's own.
         "SUEnableAutomaticChecks", "SUHasLaunchedBefore", "SULastCheckTime", "SUSendProfileInfo",
         "SUAutomaticallyUpdate", "SUScheduledCheckInterval", "SUSkippedVersion", "SULastProfileSubmissionDate",

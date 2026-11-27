@@ -102,6 +102,7 @@ struct MenuContent: View {
 
     var body: some View {
         Button("Search…") { PanelController.shared.toggle(app: app) }
+        Button("New Search Window…") { SearchWindowManager.open(app, "") }
         Divider()
         if app.debugMode {
             Button("Index Details…") { openWindow("index") }

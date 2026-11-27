@@ -81,6 +81,16 @@
         }
       }
     },
+    "Add": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add"
+          }
+        }
+      }
+    },
     "Allow Shortcuts to search inside files": {
       "localizations": {
         "en": {
@@ -171,12 +181,42 @@
         }
       }
     },
+    "Choose Folder…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose Folder…"
+          }
+        }
+      }
+    },
+    "Clear Filters": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear Filters"
+          }
+        }
+      }
+    },
     "Clear Log": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "Clear Log"
+          }
+        }
+      }
+    },
+    "Clear search": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear search"
           }
         }
       }
@@ -217,6 +257,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Copy File"
+          }
+        }
+      }
+    },
+    "Copy Files": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy Files"
           }
         }
       }
@@ -351,6 +401,16 @@
         }
       }
     },
+    "Date Modified": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Date Modified"
+          }
+        }
+      }
+    },
     "Debug mode": {
       "localizations": {
         "en": {
@@ -397,6 +457,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Definitions"
+          }
+        }
+      }
+    },
+    "Delete %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete %@"
           }
         }
       }
@@ -467,6 +537,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Export…"
+          }
+        }
+      }
+    },
+    "Extension…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Extension…"
+          }
+        }
+      }
+    },
+    "FSearch": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FSearch"
           }
         }
       }
@@ -581,6 +671,16 @@
         }
       }
     },
+    "Filter by extension": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filter by extension"
+          }
+        }
+      }
+    },
     "Filter search log": {
       "localizations": {
         "en": {
@@ -637,6 +737,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Fix…"
+          }
+        }
+      }
+    },
+    "Focus Search": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Focus Search"
+          }
+        }
+      }
+    },
+    "Folder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Folder"
           }
         }
       }
@@ -781,6 +901,16 @@
         }
       }
     },
+    "Indexing your disk… results will appear shortly": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indexing your disk… results will appear shortly"
+          }
+        }
+      }
+    },
     "Indexing…": {
       "localizations": {
         "en": {
@@ -831,6 +961,16 @@
         }
       }
     },
+    "Kind": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kind"
+          }
+        }
+      }
+    },
     "Last FSEvents id": {
       "localizations": {
         "en": {
@@ -861,6 +1001,16 @@
         }
       }
     },
+    "Line %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Line %lld"
+          }
+        }
+      }
+    },
     "Match file and folder names": {
       "localizations": {
         "en": {
@@ -877,6 +1027,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mode"
+          }
+        }
+      }
+    },
+    "Modified": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modified"
           }
         }
       }
@@ -911,6 +1071,66 @@
         }
       }
     },
+    "Multiple items selected": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Multiple items selected"
+          }
+        }
+      }
+    },
+    "Name": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Name"
+          }
+        }
+      }
+    },
+    "Names": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Names"
+          }
+        }
+      }
+    },
+    "New Search Window": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Search Window"
+          }
+        }
+      }
+    },
+    "New Search Window…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Search Window…"
+          }
+        }
+      }
+    },
+    "New Window": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Window"
+          }
+        }
+      }
+    },
     "No daemon.log. FSearch's own background helper doesn't write one: its launchd plist is fixed inside the app and can't name a log file in your home folder. A daemon started by the fsearch command-line tool writes its log here.": {
       "localizations": {
         "en": {
@@ -931,12 +1151,32 @@
         }
       }
     },
+    "No matching files": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No matching files"
+          }
+        }
+      }
+    },
     "No problems found": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "No problems found"
+          }
+        }
+      }
+    },
+    "No saved searches": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No saved searches"
           }
         }
       }
@@ -1071,6 +1311,16 @@
         }
       }
     },
+    "Open Selected": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Selected"
+          }
+        }
+      }
+    },
     "Open With": {
       "localizations": {
         "en": {
@@ -1181,6 +1431,16 @@
         }
       }
     },
+    "Quick Filters": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quick Filters"
+          }
+        }
+      }
+    },
     "Quick Look": {
       "localizations": {
         "en": {
@@ -1237,6 +1497,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Remove"
+          }
+        }
+      }
+    },
+    "Remove %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove %@"
           }
         }
       }
@@ -1301,12 +1571,32 @@
         }
       }
     },
+    "Reveal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reveal"
+          }
+        }
+      }
+    },
     "Reveal Data Folder": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "Reveal Data Folder"
+          }
+        }
+      }
+    },
+    "Reveal Selected": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reveal Selected"
           }
         }
       }
@@ -1341,12 +1631,52 @@
         }
       }
     },
+    "Save": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save"
+          }
+        }
+      }
+    },
+    "Save Current Search…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save Current Search…"
+          }
+        }
+      }
+    },
     "Save Now": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "Save Now"
+          }
+        }
+      }
+    },
+    "Save Search": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save Search"
+          }
+        }
+      }
+    },
+    "Saved Searches": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved Searches"
           }
         }
       }
@@ -1431,6 +1761,16 @@
         }
       }
     },
+    "Search files, filters, or contents…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search files, filters, or contents…"
+          }
+        }
+      }
+    },
     "Search for actions": {
       "localizations": {
         "en": {
@@ -1491,6 +1831,16 @@
         }
       }
     },
+    "Searching…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Searching…"
+          }
+        }
+      }
+    },
     "Search…": {
       "localizations": {
         "en": {
@@ -1507,6 +1857,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Segments"
+          }
+        }
+      }
+    },
+    "Select a file to preview": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select a file to preview"
           }
         }
       }
@@ -1721,6 +2081,46 @@
         }
       }
     },
+    "Toggle Preview": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toggle Preview"
+          }
+        }
+      }
+    },
+    "Toggle Preview Pane": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toggle Preview Pane"
+          }
+        }
+      }
+    },
+    "Toggle Sidebar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toggle Sidebar"
+          }
+        }
+      }
+    },
+    "Trash Selected": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trash Selected"
+          }
+        }
+      }
+    },
     "Try Again": {
       "localizations": {
         "en": {
@@ -1757,6 +2157,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Turn on FSearch"
+          }
+        }
+      }
+    },
+    "Type": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type"
+          }
+        }
+      }
+    },
+    "Type a query or choose a filter to search your Mac": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type a query or choose a filter to search your Mac"
           }
         }
       }
@@ -1930,6 +2350,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "grep"
+          }
+        }
+      }
+    },
+    "swift, md, pdf": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "swift, md, pdf"
           }
         }
       }

@@ -290,6 +290,8 @@ final class PanelController: PanelHost {
     func run(_ command: AppCommand) {
         switch command {
         case .settings: Self.openSettings()
+        case .searchWindow:
+            if let app { SearchWindowManager.open(app, "") }
         }
         hide(returnFocus: false)
     }

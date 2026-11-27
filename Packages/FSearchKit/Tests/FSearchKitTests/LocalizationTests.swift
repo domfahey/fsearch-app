@@ -43,7 +43,7 @@ struct LocalizationTests {
         let items = PanelMenuModel.sections.flatMap(\.items)
         #expect(
             items.map(\.id) == [
-                "Send Feedback", "Manual", "Keyboard Shortcuts", "Changelog", "About FSearch", "Settings",
+                "Send Feedback", "Manual", "Keyboard Shortcuts", "Changelog", "About FSearch", "Search Window", "Settings",
                 "GitHub", "Discussions", "Quit FSearch",
             ])
     }

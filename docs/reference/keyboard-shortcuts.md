@@ -52,6 +52,7 @@ Type at least the first two letters of one of a command's keywords (listed below
 | Type | Row | ↵ does |
 |---|---|---|
 | `settings`, `preferences` or `prefs` (or the start, such as `set` or `pre`) | FSearch Settings | Open Settings |
+| `window`, `browser` or `everything` (or the start, such as `win`) | New Search Window | Open an Everything-style search window |
 
 ## With the mouse
 
@@ -92,6 +93,7 @@ Press ⌘/ or click the gear (**FSearch**) at the left of the panel's footer. Th
 | Keyboard Shortcuts | | Open this page |
 | Changelog | | Open the changelog |
 | About FSearch | | Show the About window |
+| Search Window… | | Open a new Search Window (carrying over the panel's current query) |
 | Settings… | ⌘, | Open Settings |
 | GitHub (under **Community**) | | Open the project on GitHub |
 | Discussions (under **Community**) | | Open GitHub Discussions |
@@ -117,6 +119,7 @@ The mouse works too: point at a row to select it, click to run it, and click out
 | Turn On Full Disk Access… or Grant Full Disk Access to fsearch… | | Shown whenever Full Disk Access is off (unless you skipped and dismissed the reminder). Opens Full Disk Access in System Settings and, for FSearch's own helper, restarts the helper automatically once granted |
 | Don't Remind Me | | Shown below the Full Disk Access item only if you skipped Full Disk Access during onboarding; hides the reminder |
 | Search… | | Open the panel |
+| New Search Window… | | Open a new Everything-style search window |
 | Index Details… | | Debug mode only |
 | Search Log… | | Debug mode only |
 | Turn On Debug Mode or Turn Off Debug Mode | ⌥⌘D | Toggle [debug mode](../how-to/turn-on-debug-mode.md). A menu-item shortcut: it works while the menu is open, not as a global hotkey. |
@@ -128,6 +131,21 @@ The mouse works too: point at a row to select it, click to run it, and click out
 | Quit FSearch | | |
 
 When an update is waiting, **Update Available…** is the first item, above any warning line. When something needs attention, the menu starts with a warning line and, for some problems, a **Fix…** button. See [Troubleshooting](troubleshooting.md).
+
+## In the Search Window
+
+Open one or more independent Search Windows from the menu bar (**New Search Window…**), from the panel's FSearch menu (`⌘/` → **Search Window…**), or by typing `window` in the panel.
+
+| Key | Action |
+|---|---|
+| ⌘N | Open another independent Search Window |
+| ⌘L | Focus the search field |
+| ⌥⌘P | Show or hide the Quick Look preview pane |
+| ↵ | Open selected files (or reveal launchables in Finder; use context menu or preview **Open** to launch them directly; open content hits at the matching line in your chosen editor) |
+| ⌘↵ | Reveal all selected files in Finder |
+| ⌘⇧C | Copy selected files |
+| ⌘Y | Quick Look the selected file |
+| ⌘⌫ | Move selected files to the Trash |
 
 ## See also
 

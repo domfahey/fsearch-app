@@ -24,18 +24,20 @@ Also in v1:
 
 ## v2: an Everything-style search window
 
-A full window for when the panel isn't enough, modelled on [Everything](https://www.voidtools.com) by voidtools. It sits alongside the panel and uses the same engine.
+A full window for when the panel isn't enough, modelled on [Everything](https://www.voidtools.com) by voidtools. It sits alongside the panel and uses the same engine ([ADR 0020](adr/0020-everything-style-search-window.md)).
 
-- One search field over a dense results table that updates as you type, across the whole disk.
+Implemented on `main`:
+
+- One search field over a dense results table that updates as you type, across the whole disk (Names, Inside Files, and Definitions modes).
 - Columns for name, folder, size, kind and date modified. Sort by any column; resize and reorder columns.
-- A status bar with the result count and search time.
-- Toggles for match case, whole word, regex and search-in-path, plus the existing `ext:`, `in:`, `size:` and `mtime:` filters as clickable chips.
-- Saved searches and filters you can switch between.
-- Keyboard first: the same shortcuts and actions as the panel, multi-select, and drag out.
-- A preview pane (Quick Look) and inside-file results with the matching line.
-- More than one window open at a time.
+- A status bar with the result count (noting when the 1,000-result cap is reached), selection count/size, and search time.
+- Toggles for match case, whole word, regex and search-in-path, plus clickable `type:`, `kind:`, `ext:`, `in:`, `size:` and `mtime:` filter chips.
+- Built-in quick filters and user-saved searches in a toggleable sidebar.
+- Keyboard first: the same actions as the panel, multi-select, context menu, and drag out.
+- A toggleable Quick Look preview pane and inside-file results with the matching line.
+- More than one independent search window open at a time (`⌘N`).
 
-This needs the daemon to return more than 50 results quickly, with paging. Scrolling through very large result sets may need upstream fsearch changes.
+Still planned once upstream `fsearch` adds server-side `offset` paging and sorting: scrolling past the 1,000-result cap across arbitrarily large result sets (`SearchWindowQuery.PageRequest` already reserves the `offset`/`limit`/`sort` contract).
 
 ## Later
 
