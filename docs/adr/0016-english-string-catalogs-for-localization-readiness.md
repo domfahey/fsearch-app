@@ -28,3 +28,7 @@ Keep one English String Catalog per module: `App/Resources/Localizable.xcstrings
 - Adding a language means translating the catalogs, not editing code.
 - New user-facing strings must be wrapped, and `make strings` run, or the catalog drifts.
 - No translations ship yet. English is the only language the tests cover.
+
+## Amendment
+
+2026-11-27: Added full translations for 7 additional locales—Japanese (`ja`), Simplified Chinese (`zh-Hans`), Spanish (`es`), French (`fr`), German (`de`), Korean (`ko`), and Brazilian Portuguese (`pt-BR`)—across both `App/Resources/Localizable.xcstrings` and `Packages/FSearchKit/Sources/FSearchKit/Resources/Localizable.xcstrings`. `LocalizationTests` in both `FSearchKitTests` and `AppTests` now verify all 8 locales are translated and compiled into the app and package bundles. The String Catalog architecture above stands.
