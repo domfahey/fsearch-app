@@ -48,6 +48,7 @@ struct SearchWindowView: View {
     @State private var showExtensionPopover = false
     @State private var extensionInput = ""
     @State private var windowError: String?
+    @State private var errorClearTask: Task<Void, Never>?
     @FocusState private var searchFocused: Bool
 
     #if DEBUG
@@ -147,6 +148,7 @@ struct SearchWindowView: View {
                 try? await Task.sleep(for: .milliseconds(60))
                 if Task.isCancelled { return }
             }
+            if model.query != "" || !model.chips.isEmpty { clearWindowError() }
             await model.refresh()
             let valid = Set(model.rows.map(\.id))
             selection = selection.intersection(valid)
@@ -530,16 +532,26 @@ struct SearchWindowView: View {
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
+    /// Row-level shortcuts (`↵`, `⌘↵`, `⌘⇧C`, `⌘Y`, `⌘⌫`) stay disabled while editing text or popovers,
+    /// so `⌘⌫` never trashes a selected file while deleting query text and `↵` never interferes with IME or popovers.
+    static func rowShortcutsEnabled(searchFocused: Bool, popoverOpen: Bool, hasSelection: Bool) -> Bool {
+        !searchFocused && !popoverOpen && hasSelection
+    }
+
     private var keyboardShortcutsLayer: some View {
-        Group {
+        let rowEnabled = Self.rowShortcutsEnabled(
+            searchFocused: searchFocused,
+            popoverOpen: showSavePopover || showExtensionPopover,
+            hasSelection: !selectedRows.isEmpty)
+        return Group {
             Button("New Window", action: onNewWindow).keyboardShortcut("n", modifiers: .command)
             Button("Focus Search") { searchFocused = true }.keyboardShortcut("l", modifiers: .command)
             Button("Toggle Preview") { showPreview.toggle() }.keyboardShortcut("p", modifiers: [.command, .option])
-            Button("Open Selected", action: openSelected).keyboardShortcut(.return, modifiers: [])
-            Button("Reveal Selected", action: revealSelected).keyboardShortcut(.return, modifiers: .command)
-            Button("Copy Files", action: copySelectedFiles).keyboardShortcut("c", modifiers: [.command, .shift])
-            Button("Quick Look", action: toggleQuickLook).keyboardShortcut("y", modifiers: .command)
-            Button("Trash Selected", action: trashSelected).keyboardShortcut(.delete, modifiers: .command)
+            Button("Open Selected", action: openSelected).keyboardShortcut(.return, modifiers: []).disabled(!rowEnabled)
+            Button("Reveal Selected", action: revealSelected).keyboardShortcut(.return, modifiers: .command).disabled(!rowEnabled)
+            Button("Copy Files", action: copySelectedFiles).keyboardShortcut("c", modifiers: [.command, .shift]).disabled(!rowEnabled)
+            Button("Quick Look", action: toggleQuickLook).keyboardShortcut("y", modifiers: .command).disabled(!rowEnabled)
+            Button("Trash Selected", action: trashSelected).keyboardShortcut(.delete, modifiers: .command).disabled(!rowEnabled)
         }
         .frame(width: 0, height: 0)
         .opacity(0)
@@ -601,7 +613,21 @@ struct SearchWindowView: View {
     private func trashSelected() {
         Task { await SearchWindowActions.trashSelected(selectedRows, app: app, onError: showWindowError) { await model.refresh() } }
     }
-    private func showWindowError(_ message: String) { windowError = message }
+    private func showWindowError(_ message: String) {
+        windowError = message
+        errorClearTask?.cancel()
+        let duration = app.actionErrorDuration
+        errorClearTask = Task {
+            try? await Task.sleep(for: duration)
+            if !Task.isCancelled { windowError = nil }
+        }
+    }
+
+    private func clearWindowError() {
+        errorClearTask?.cancel()
+        errorClearTask = nil
+        windowError = nil
+    }
 }
 
 /// Name cell for a search window table row, showing the file icon, display-safe name, optional matching line, and drag support.

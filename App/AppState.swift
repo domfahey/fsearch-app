@@ -156,7 +156,8 @@ final class AppState: ObservableObject {
             self.log.appendAsync(entry, at: Date())
         }
         model.onSettled = { [weak self, weak model] phase in
-            self?.searchSettled(phase, refreshOnRecovery: { await model?.refresh() })
+            guard let model else { return }
+            self?.searchSettled(phase, recoveryKey: ObjectIdentifier(model), refreshOnRecovery: { [weak model] in await model?.refresh() })
         }
         return model
     }
@@ -165,8 +166,8 @@ final class AppState: ObservableObject {
     var status: MenuBarStatus = .shared
     /// Coalesces disconnect-driven restarts so rapid failures don't burn extra budget tokens.
     private var disconnectRestartTask: Task<Void, Never>?
-    /// Originating window models waiting to re-run their search once a coalesced disconnect restart finishes.
-    private var pendingRecoveryRefreshes: [@MainActor () async -> Void] = []
+    /// Originating window models (keyed by identity so rapid failures from one window coalesce) waiting to refresh after recovery.
+    private var pendingRecoveryRefreshes: [ObjectIdentifier: @MainActor () async -> Void] = [:]
     /// Coalesces recovery refreshes while `daemon.isUnresponsive`.
     private var recoveryRefreshTask: Task<Void, Never>?
 
@@ -178,8 +179,11 @@ final class AppState: ObservableObject {
     ///
     /// - Parameters:
     ///   - phase: How the search ended.
+    ///   - recoveryKey: Identity key used to deduplicate pending window recovery callbacks.
     ///   - refreshOnRecovery: Optional callback for an originating search window to refresh after recovery.
-    func searchSettled(_ phase: SearchPhase, refreshOnRecovery: (@MainActor () async -> Void)? = nil) {
+    func searchSettled(
+        _ phase: SearchPhase, recoveryKey: ObjectIdentifier? = nil, refreshOnRecovery: (@MainActor () async -> Void)? = nil
+    ) {
         guard !daemon.recoverySuspended else { return }
         switch phase {
         case .results:
@@ -199,7 +203,7 @@ final class AppState: ObservableObject {
                 }
             }
         case .failed(.disconnected):
-            if let refreshOnRecovery { pendingRecoveryRefreshes.append(refreshOnRecovery) }
+            if let recoveryKey, let refreshOnRecovery { pendingRecoveryRefreshes[recoveryKey] = refreshOnRecovery }
             // A restart is already running (and will refresh all waiting searches when it finishes): don't burn another token.
             if daemon.isRestarting || disconnectRestartTask != nil { return }
             // `restart()` re-registers only a daemon the app owns; a CLI daemon is just re-checked.
@@ -213,7 +217,7 @@ final class AppState: ObservableObject {
                 await self?.daemon.restart()
                 self?.disconnectRestartTask = nil
                 guard let self else { return }
-                let pending = self.pendingRecoveryRefreshes
+                let pending = Array(self.pendingRecoveryRefreshes.values)
                 self.pendingRecoveryRefreshes.removeAll()
                 guard !self.daemon.recoverySuspended else { return }
                 await self.search.refresh()

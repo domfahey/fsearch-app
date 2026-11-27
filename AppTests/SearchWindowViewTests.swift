@@ -164,17 +164,28 @@ extension AppTests {
             #expect(env.app.log.entries().last?.query == "doc")
             #expect(model.rows.count == 1)
 
-            // Disconnected search triggers daemon recovery and refreshes the originating window model.
+            // Disconnected search triggers daemon recovery and refreshes the originating window model once (coalesced).
             final class Counter: @unchecked Sendable { var n = 0 }
             let attempts = Counter()
             env.daemon.onSearch = { _ in
                 attempts.n += 1
-                if attempts.n == 1 { throw DaemonError.disconnected }
+                if attempts.n <= 2 { throw DaemonError.disconnected }
                 return SearchReply(tookUs: 120, hits: [Wire.hit("/p/recovered.md")])
             }
             model.query = "recovered"
             await model.refresh()
+            // Simulate a second disconnect from the same window while recovery is in flight: coalesces by identity.
+            env.app.searchSettled(
+                .failed(.disconnected), recoveryKey: ObjectIdentifier(model), refreshOnRecovery: { await model.refresh() })
             #expect(await eventually { model.phase == .results && model.rows.map(\.rawName) == ["recovered.md"] })
+            #expect(attempts.n <= 3)
+        }
+
+        @Test func rowShortcutsDisableWhileEditingTextOrPopovers() {
+            #expect(SearchWindowView.rowShortcutsEnabled(searchFocused: false, popoverOpen: false, hasSelection: true))
+            #expect(!SearchWindowView.rowShortcutsEnabled(searchFocused: true, popoverOpen: false, hasSelection: true))
+            #expect(!SearchWindowView.rowShortcutsEnabled(searchFocused: false, popoverOpen: true, hasSelection: true))
+            #expect(!SearchWindowView.rowShortcutsEnabled(searchFocused: false, popoverOpen: false, hasSelection: false))
         }
 
         @Test func savedSearchesSynchronizeAcrossOpenWindows() async throws {
