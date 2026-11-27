@@ -69,9 +69,9 @@ final class PanelUITests: PanelUITestCase {
         waitUntil(5, "query cleared") { (self.field.value as? String ?? "") == "" }
         XCTAssertTrue(modeChip("Inside files").exists, "the chip stays after the first Esc")
         try press(.escape)
-        XCTAssertTrue(modeChip("Inside files").waitForNonExistence(timeout: 5))
+        waitForAbsence(modeChip("Inside files"), 5)
         try press(.escape)
-        XCTAssertTrue(field.waitForNonExistence(timeout: 5), "the third Esc hides the panel")
+        waitForAbsence(field, 5, "the third Esc hides the panel")
     }
 
     func testBackspaceOnEmptyDropsTheChip() throws {
@@ -81,7 +81,7 @@ final class PanelUITests: PanelUITestCase {
         waitUntil(5, "query cleared") { (self.field.value as? String ?? "") == "" }
         XCTAssertTrue(modeChip("Inside files").exists, tree())
         try press(.delete)
-        XCTAssertTrue(modeChip("Inside files").waitForNonExistence(timeout: 5))
+        waitForAbsence(modeChip("Inside files"), 5)
         XCTAssertTrue(field.exists)
     }
 
@@ -108,7 +108,7 @@ final class PanelUITests: PanelUITestCase {
         try press("y", .command)
         waitFor(preview, 10)
         try pressInApp("y", .command)
-        XCTAssertTrue(preview.waitForNonExistence(timeout: 10), tree())
+        waitForAbsence(preview, 10, tree())
         // The field gets the keyboard back.
         waitUntil(5, "field focused") { self.field.value(forKey: "hasKeyboardFocus") as? Bool == true }
     }
@@ -126,7 +126,7 @@ final class PanelUITests: PanelUITestCase {
         waitFor(preview, 10)
         try pressInApp(.downArrow)
         try pressInApp("y", .command)
-        XCTAssertTrue(preview.waitForNonExistence(timeout: 10), tree())
+        waitForAbsence(preview, 10, tree())
         waitUntil(5, "field focused") { self.field.value(forKey: "hasKeyboardFocus") as? Bool == true }
         // The selection moved while the preview was up.
         try press("c", [.command, .shift])
@@ -157,7 +157,7 @@ final class PanelUITests: PanelUITestCase {
         try press("k", .command)
         waitFor(app.menuItems["Move to Trash"], 10)
         try pressInApp(.escape)
-        XCTAssertTrue(app.menuItems["Move to Trash"].waitForNonExistence(timeout: 5))
+        waitForAbsence(app.menuItems["Move to Trash"], 5)
     }
 
     /// ⌘/ opens the FSearch menu; its field filters the rows, and Esc clears, then closes, with the panel still up.
@@ -172,12 +172,12 @@ final class PanelUITests: PanelUITestCase {
         try requireFocus(field: false)
         menuField.typeText("chan")
         waitFor(element("appMenu-Changelog"), 5)
-        XCTAssertTrue(element("appMenu-Settings").waitForNonExistence(timeout: 5), tree())
+        waitForAbsence(element("appMenu-Settings"), 5, tree())
         XCTAssertEqual(field.value as? String ?? "", "", "typing went to the menu, not the search")
         try pressInApp(.escape)
         waitFor(element("appMenu-Settings"), 5)
         try pressInApp(.escape)
-        XCTAssertTrue(element("appMenu-Changelog").waitForNonExistence(timeout: 5))
+        waitForAbsence(element("appMenu-Changelog"), 5)
         XCTAssertTrue(field.exists, "the panel stays up")
         // The search field has the keyboard again: typing edits the query.
         waitUntil(5, "search field focused") { self.field.value(forKey: "hasKeyboardFocus") as? Bool == true }
@@ -189,10 +189,10 @@ final class PanelUITests: PanelUITestCase {
         waitFor(element("appMenu-Settings"), 10)
         waitUntil(5, "menu field focused after gear click") { menuField.value(forKey: "hasKeyboardFocus") as? Bool == true }
         menuField.typeText("set")
-        XCTAssertTrue(element("appMenu-Changelog").waitForNonExistence(timeout: 5))
+        waitForAbsence(element("appMenu-Changelog"), 5)
         try pressInApp(.return)
         waitFor(app.checkBoxes["Debug mode"], 10)
-        XCTAssertTrue(field.waitForNonExistence(timeout: 5), "running Settings from the menu hides the panel")
+        waitForAbsence(field, 5, "running Settings from the menu hides the panel")
     }
 
     func testQuestionMarkShowsTheCheatSheet() throws {
@@ -220,7 +220,7 @@ final class PanelUITests: PanelUITestCase {
         waitFor(text("notes.md"))
         // Only a filter: nothing is searched, no error, no results.
         try search("ext:md")
-        XCTAssertTrue(text("notes.md").waitForNonExistence(timeout: 5))
+        waitForAbsence(text("notes.md"), 5)
         assertStaysAbsent(text("queryError"))
         // Adding a pattern searches again.
         try search("ext:md quokkaneedle")
@@ -289,7 +289,7 @@ final class PanelUITests: PanelUITestCase {
         try press(.return)
         let file = fixtureRoot + "/proj/heronfile.txt"
         waitUntil(5, "open recorded") { self.recordedActions.contains("open \(file)") }
-        XCTAssertTrue(field.waitForNonExistence(timeout: 5), "↵ puts the launcher away")
+        waitForAbsence(field, 5, "↵ puts the launcher away")
         app.terminate()
 
         try launch()
@@ -313,7 +313,7 @@ final class PanelUITests: PanelUITestCase {
             self.recordedActions.dropFirst(before).contains("reveal \(script)")
         }
         XCTAssertFalse(recordedActions.dropFirst(before).contains("open \(script)"), "launchable must reveal, not open")
-        XCTAssertTrue(field.waitForNonExistence(timeout: 5), "↵ puts the launcher away")
+        waitForAbsence(field, 5, "↵ puts the launcher away")
     }
 
     /// ⌘2 opens the second file row regardless of selection, and reopening the panel shows it under Recent.
@@ -334,7 +334,7 @@ final class PanelUITests: PanelUITestCase {
         try press("2", .command)
         waitUntil(5, "⌘2 opened second row") { self.recordedActions.dropFirst(before).contains("open \(second)") }
         XCTAssertFalse(recordedActions.dropFirst(before).contains("open \(first)"))
-        XCTAssertTrue(field.waitForNonExistence(timeout: 5), "⌘2 puts the launcher away")
+        waitForAbsence(field, 5, "⌘2 puts the launcher away")
 
         // Reopen via the single-instance reopen handoff (resumes "plover" within 60 s), clear with Esc, and verify Recent.
         reopenPanel()
@@ -353,7 +353,7 @@ final class PanelUITests: PanelUITestCase {
 
         // Hide the floating panel first so it doesn't sit over the Settings window, then enable Debug mode.
         try press(.escape)
-        XCTAssertTrue(field.waitForNonExistence(timeout: 5))
+        waitForAbsence(field, 5)
         try pressInApp(",", .command)
         let toggle = app.checkBoxes["Debug mode"]
         waitFor(toggle, 10)
@@ -383,7 +383,7 @@ final class PanelUITests: PanelUITestCase {
         try press(.escape)
         waitUntil(5, "query cleared") { (self.field.value as? String ?? "") == "" }
         try press(.escape)
-        XCTAssertTrue(field.waitForNonExistence(timeout: 5))
+        waitForAbsence(field, 5)
         try pressInApp(",", .command)
         waitFor(toggle, 10)
         try click(toggle)
@@ -391,7 +391,7 @@ final class PanelUITests: PanelUITestCase {
         try pressInApp("w", .command)
 
         waitUntil(5, "debug search log deleted") { !FileManager.default.fileExists(atPath: self.debugSearchLogURL.path) }
-        XCTAssertTrue(menu["Index Details…"].waitForNonExistence(timeout: 5))
+        waitForAbsence(menu["Index Details…"], 5)
         reopenPanel()
         waitFor(field, 10)
         XCTAssertFalse(element("debugModeIndicator").exists)
@@ -401,7 +401,7 @@ final class PanelUITests: PanelUITestCase {
     func testURLSchemeOpensPanelWithQueryAndMode() async throws {
         try launch()
         try press(.escape)
-        XCTAssertTrue(field.waitForNonExistence(timeout: 5), "Esc hides the empty panel")
+        waitForAbsence(field, 5, "Esc hides the empty panel")
 
         let symURL = try XCTUnwrap(URL(string: "fsearch://search?q=kestrelHandler&mode=symbols"))
         try await openURLInTestApp(symURL)
