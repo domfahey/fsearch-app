@@ -1,6 +1,7 @@
 import AppKit
 import FSearchKit
 import Foundation
+import Quartz
 import SwiftUI
 import Testing
 
@@ -138,6 +139,14 @@ extension AppTests {
             #expect(mgr.windows[id2]?.title == "FSearch — beta")
             #expect(mgr.windows[id1]?.canBecomeKey == false)
             #expect(mgr.windows[id2]?.canBecomeMain == false)
+            let browserWin = try #require(mgr.windows[id1])
+            #expect(browserWin.acceptsPreviewPanelControl(nil))
+            if let qlPanel = QLPreviewPanel.shared() {
+                browserWin.beginPreviewPanelControl(qlPanel)
+                #expect(qlPanel.dataSource === QuickLookSource.shared)
+                browserWin.endPreviewPanelControl(qlPanel)
+                #expect(qlPanel.dataSource == nil)
+            }
 
             // Clicking New Search Window inside an open window opens a third independent window.
             let win1 = try #require(mgr.windows[id1])
@@ -201,10 +210,25 @@ extension AppTests {
         }
 
         @Test func rowShortcutsDisableWhileEditingTextOrPopovers() {
-            #expect(SearchWindowView.rowShortcutsEnabled(searchFocused: false, popoverOpen: false, hasSelection: true))
-            #expect(!SearchWindowView.rowShortcutsEnabled(searchFocused: true, popoverOpen: false, hasSelection: true))
-            #expect(!SearchWindowView.rowShortcutsEnabled(searchFocused: false, popoverOpen: true, hasSelection: true))
-            #expect(!SearchWindowView.rowShortcutsEnabled(searchFocused: false, popoverOpen: false, hasSelection: false))
+            #expect(SearchWindowView.rowShortcutsEnabled(searchFocused: false, popoverOpen: false, hasSelection: true, tableFocused: true))
+            #expect(!SearchWindowView.rowShortcutsEnabled(searchFocused: true, popoverOpen: false, hasSelection: true, tableFocused: true))
+            #expect(!SearchWindowView.rowShortcutsEnabled(searchFocused: false, popoverOpen: true, hasSelection: true, tableFocused: true))
+            #expect(
+                !SearchWindowView.rowShortcutsEnabled(searchFocused: false, popoverOpen: false, hasSelection: false, tableFocused: true))
+            #expect(
+                !SearchWindowView.rowShortcutsEnabled(searchFocused: false, popoverOpen: false, hasSelection: true, tableFocused: false))
+
+            // First-responder classification: NSTableView & child views allow row shortcuts; NSTextView / NSButton / nil do not.
+            let table = NSTableView()
+            let child = NSView()
+            table.addSubview(child)
+            #expect(SearchWindowView.firstResponderAllowsRowShortcuts(table))
+            #expect(SearchWindowView.firstResponderAllowsRowShortcuts(child))
+            #expect(!SearchWindowView.firstResponderAllowsRowShortcuts(NSTextView()))
+            #expect(!SearchWindowView.firstResponderAllowsRowShortcuts(NSButton()))
+            #expect(!SearchWindowView.firstResponderAllowsRowShortcuts(NSSegmentedControl()))
+            #expect(!SearchWindowView.firstResponderAllowsRowShortcuts(NSView()))
+            #expect(!SearchWindowView.firstResponderAllowsRowShortcuts(nil))
         }
 
         @Test func savedSearchesSynchronizeAcrossOpenWindows() async throws {
@@ -451,6 +475,179 @@ extension AppTests {
 
             #expect(await eventually { model.phase == .results && model.rows.map(\.rawName) == ["indexed.md"] })
             #expect(counter.searches >= 2)
+        }
+
+        @Test func searchInterfaceRoutesShortcutReopenURLsMenuAndPreviewShortcut() async throws {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let mgr = SearchWindowManager()
+            defer { mgr.closeAll() }
+
+            // Default is classic panel.
+            #expect(env.app.searchInterface == .panel)
+            env.app.togglePrimarySearch(panel: env.panel, windows: mgr)
+            #expect(env.panel.shows == 1 && mgr.openCount == 0)
+            env.app.togglePrimarySearch(panel: env.panel, windows: mgr)
+            #expect(env.panel.hides == 1)
+            env.app.reopenPrimarySearch(panel: env.panel, windows: mgr)
+            #expect(env.panel.externalShows == 1)
+
+            // URL override &ui=window opens a Search Window even when panel is default, hiding the panel.
+            env.app.openSearchURL(SearchURL(query: "budget", mode: .content, interface: .window), panel: env.panel, windows: mgr)
+            #expect(mgr.openCount == 1)
+            #expect(env.panel.isVisible == false)
+            mgr.closeAll()
+
+            // Switch to new Search Window interface.
+            env.app.searchInterface = .window
+            #expect(env.app.searchInterface == .window)
+
+            // Toggle opens a Search Window when none exist; activating while active with key Search Window hides app.
+            env.app.togglePrimarySearch(panel: env.panel, windows: mgr)
+            #expect(mgr.openCount == 1)
+            let firstWin = try #require(mgr.windows.values.first)
+            var hidApp = 0
+            mgr.toggle(app: env.app, inert: false, appIsActive: true, keyWindow: firstWin, hideApp: { hidApp += 1 })
+            #expect(hidApp == 1 && mgr.openCount == 1)
+
+            // Reopen brings back existing Search Window rather than creating a duplicate or opening the panel.
+            let showsBefore = env.panel.shows
+            env.app.reopenPrimarySearch(panel: env.panel, windows: mgr)
+            #expect(mgr.openCount == 1 && env.panel.shows == showsBefore)
+
+            // URL without ui= follows Search Window preference; explicit &ui=panel still routes to panel.
+            env.app.openSearchURL(SearchURL(query: "notes", mode: .symbols), panel: env.panel, windows: mgr)
+            #expect(mgr.openCount == 2)
+            env.app.openSearchURL(SearchURL(query: "quick", mode: .names, interface: .panel), panel: env.panel, windows: mgr)
+            #expect(env.panel.openedSearches.last == SearchURL(query: "quick", mode: .names, interface: .panel))
+
+            // Mode carry-over from panel FSearch menu into SearchWindowManager.openWithMode.
+            var carried: [(String, SearchMode)] = []
+            let savedOpenWithMode = SearchWindowManager.openWithMode
+            SearchWindowManager.openWithMode = { _, q, m in carried.append((q, m)) }
+            defer { SearchWindowManager.openWithMode = savedOpenWithMode }
+            env.app.search.query = "needle"
+            env.app.search.mode = .content
+            AppMenuActions.run(.searchWindow, app: env.app)
+            #expect(carried.count == 1 && carried.first?.0 == "needle" && carried.first?.1 == .content)
+
+            // SearchBrowserWindow layout-independent ⌥⌘P detection and performKeyEquivalent.
+            #expect(SearchBrowserWindow.isTogglePreviewEvent(characters: "π", modifiers: [.command, .option], keyCode: 35))
+            #expect(SearchBrowserWindow.isTogglePreviewEvent(characters: "p", modifiers: [.command, .option], keyCode: 0))
+            // Dvorak ⌥⌘L has keyCode 35 with character "l" and must NOT toggle preview.
+            #expect(!SearchBrowserWindow.isTogglePreviewEvent(characters: "l", modifiers: [.command, .option], keyCode: 35))
+            #expect(!SearchBrowserWindow.isTogglePreviewEvent(characters: "p", modifiers: [.command], keyCode: 35))
+            #expect(!SearchBrowserWindow.isTogglePreviewEvent(characters: "p", modifiers: [.command, .option, .shift], keyCode: 35))
+            let browser = SearchWindowManager.makeWindow(inert: true)
+            let bridge = SearchWindowKeyBridge()
+            var previewToggles = 0
+            bridge.togglePreview = { previewToggles += 1 }
+            browser.keyBridge = bridge
+            let optCmdP = try #require(
+                NSEvent.keyEvent(
+                    with: .keyDown, location: .zero, modifierFlags: [.command, .option], timestamp: 0,
+                    windowNumber: 0, context: nil, characters: "π", charactersIgnoringModifiers: "p",
+                    isARepeat: false, keyCode: 35))
+            #expect(browser.performKeyEquivalent(with: optCmdP))
+            #expect(previewToggles == 1)
+            let repeatOptCmdP = try #require(
+                NSEvent.keyEvent(
+                    with: .keyDown, location: .zero, modifierFlags: [.command, .option], timestamp: 0,
+                    windowNumber: 0, context: nil, characters: "π", charactersIgnoringModifiers: "p",
+                    isARepeat: true, keyCode: 35))
+            #expect(!browser.performKeyEquivalent(with: repeatOptCmdP))
+            #expect(previewToggles == 1)
+            let plainKey = try #require(
+                NSEvent.keyEvent(
+                    with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                    windowNumber: 0, context: nil, characters: "a", charactersIgnoringModifiers: "a",
+                    isARepeat: false, keyCode: 0))
+            #expect(!browser.performKeyEquivalent(with: plainKey))
+
+            // QuickLookSource owned by a SearchBrowserWindow passes ↑/↓ through while keeping ⌘Y close active.
+            if let qlPanel = QLPreviewPanel.shared() {
+                var panelMoves = 0
+                let savedMove = QuickLookSource.shared.move
+                QuickLookSource.shared.move = { _ in panelMoves += 1 }
+                defer { QuickLookSource.shared.move = savedMove }
+                QuickLookSource.shared.attach(qlPanel, owner: browser)
+                #expect(
+                    !QuickLookSource.shared.handleKeyDown(
+                        characters: "", modifiers: [], keyCode: 125, isRepeat: false, inPreviewPanel: true))
+                #expect(panelMoves == 0)
+                #expect(
+                    QuickLookSource.shared.handleKeyDown(
+                        characters: "y", modifiers: .command, keyCode: 16, isRepeat: false, inPreviewPanel: true))
+                // Detaching a different window must not strip browser's preview control.
+                let other = SearchWindowManager.makeWindow(inert: true)
+                QuickLookSource.shared.detach(qlPanel, owner: other)
+                #expect(QuickLookSource.shared.isOwned(by: browser))
+                QuickLookSource.shared.detach(qlPanel, owner: browser)
+                #expect(!QuickLookSource.shared.isOwned(by: browser))
+            }
+
+            // Menu-bar openPrimarySearch activates/opens Search Window instead of hiding it.
+            env.app.openPrimarySearch(panel: env.panel, windows: mgr)
+            #expect(mgr.openCount == 2)
+            // Global-shortcut toggle with another visible titled window preserves that window instead of calling hideApp.
+            let otherTitled = NSWindow(
+                contentRect: NSRect(x: -20_000, y: -20_000, width: 300, height: 200),
+                styleMask: [.titled], backing: .buffered, defer: false)
+            otherTitled.alphaValue = 0
+            otherTitled.ignoresMouseEvents = true
+            otherTitled.orderFrontRegardless()
+            defer { otherTitled.close() }
+            var hidAppWithOther = 0
+            if let activeSearch = mgr.windows.values.first {
+                mgr.toggle(
+                    app: env.app, inert: false, appIsActive: true, keyWindow: activeSearch,
+                    allWindows: [activeSearch, otherTitled], hideApp: { hidAppWithOther += 1 })
+                #expect(hidAppWithOther == 0)
+            }
+
+            // Closing a Search Window clears keyBridge callbacks and contentView (no retain cycle / socket leak).
+            let closedID = try #require(mgr.windows.keys.first)
+            let closedWin = try #require(mgr.windows[closedID] as? SearchBrowserWindow)
+            let closedBridge = closedWin.keyBridge
+            mgr.closeWindow(id: closedID)
+            #expect(closedWin.contentView == nil)
+            #expect(closedWin.keyBridge == nil)
+            #expect(closedBridge?.togglePreview == nil)
+            #expect(closedBridge?.focusSearch == nil)
+
+            // Column customization persistence + Uninstaller key registration.
+            let custom = TableColumnCustomization<SearchWindowRow>()
+            SearchWindowView.saveColumnCustomization(custom, to: env.defaults)
+            #expect(env.defaults.data(forKey: SearchWindowView.columnCustomizationKey) != nil)
+            _ = SearchWindowView.loadColumnCustomization(from: env.defaults)
+            #expect(Uninstaller.defaultsKeys.contains(SearchInterface.storageKey))
+            #expect(Uninstaller.defaultsKeys.contains(SearchWindowView.columnCustomizationKey))
+
+            // rowsForAction(ids: []) must return empty so empty-space table clicks never act on selection.
+            let m = env.app.makeSearchWindowModel()
+            env.daemon.onSearch = { _ in SearchReply(tookUs: 40, hits: [Wire.hit("/p/a.txt")]) }
+            m.query = "a"
+            await m.refresh()
+            let view = SearchWindowView(model: m, savedStore: env.app.savedSearches, selection: ["/p/a.txt"])
+            #expect(view.rowsForAction(ids: []).isEmpty)
+            #expect(view.rowsForAction(ids: ["/p/a.txt"]).count == 1)
+
+            // OnboardingFlow clears stale indexReady when daemon transitions to .indexing or .failed.
+            let flow = OnboardingFlow(app: env.app, defaults: env.defaults, step: .indexing)
+            env.daemon.onStatus = { _ in Wire.status(entries: 42, fullDiskAccess: false) }
+            await env.app.daemon.refresh()
+            flow.apply()
+            #expect(flow.facts.indexReady == true && flow.entries == 42)
+            env.daemon.onStatus = { _ in throw DaemonError.indexing("rebuilding") }
+            await env.app.daemon.refresh()
+            flow.apply()
+            #expect(flow.facts.indexReady == false && flow.entries == 0)
+
+            // MenuContent shows Launcher Panel… item when Search Window is the default UI.
+            let menuView = MenuContent(app: env.app)
+            let mw = await render(menuView, size: NSSize(width: 240, height: 320))
+            defer { mw.close() }
+            #expect(await axWait("Launcher Panel…", in: mw) != nil)
         }
     }
 }

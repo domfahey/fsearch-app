@@ -54,6 +54,16 @@ struct SettingsView: View {
                 Text("⚠ " + w).foregroundStyle(.orange).font(.callout)
                     .accessibilityLabel("Warning: \(w)")
             }
+            Picker("Search interface:", selection: interfaceBinding) {
+                ForEach(SearchInterface.allCases, id: \.self) { style in
+                    Text(style.displayName).tag(style)
+                }
+            }
+            .accessibilityIdentifier("searchInterfacePicker")
+            Text(
+                "Choose whether your shortcut, Search…, and fsearch:// links open the classic floating panel or the Search Window. Both remain available from the menu bar."
+            )
+            .font(.caption).foregroundStyle(.secondary)
             Picker("Open content results in:", selection: $app.editorRaw) {
                 ForEach(editorRows, id: \.tag) { row in
                     Text(row.label).tag(row.tag)
@@ -131,6 +141,14 @@ struct SettingsView: View {
         let ownership = app.daemon.dataOwnership
         await uninstaller.run(ownership: ownership, daemon: app.daemon)
         loginItem.refresh()
+    }
+
+    /// Typed binding for the search interface picker so unrecognized stored values always resolve cleanly.
+    private var interfaceBinding: Binding<SearchInterface> {
+        Binding(
+            get: { app.searchInterface },
+            set: { app.searchInterface = $0 }
+        )
     }
 
     /// Turning debug mode off also deletes the search log and closes the debug windows.

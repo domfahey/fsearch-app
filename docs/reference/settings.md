@@ -8,7 +8,8 @@ Open **Settings…** from the menu-bar icon, from the FSearch menu (⌘/, then *
 
 | Setting | Values | Default | What it does |
 |---|---|---|---|
-| Shortcut | Any key combination | ⌥Space | The global hotkey that shows and hides the panel. While it is still ⌥Space, Settings warns if Raycast is running (it uses ⌥Space) or Alfred is running (it may use ⌥Space). |
+| Shortcut | Any key combination | ⌥Space | The global hotkey that shows and hides your preferred search interface. While it is still ⌥Space, Settings warns if Raycast is running (it uses ⌥Space) or Alfred is running (it may use ⌥Space). |
+| Search interface | Launcher Panel (Classic) or Search Window (New) | Launcher Panel (Classic) | Chooses whether the global shortcut, menu-bar **Search…**, reopening the app, and `fsearch://` links open the classic floating launcher panel or the Everything-style Search Window. Both interfaces remain available from the menu bar anytime. |
 | Open content results in | Default app, or an installed editor | Default app | The editor that opens a matching line at its line number. See [Open results in your editor](../how-to/open-results-in-your-editor.md). |
 | Debug mode | On or off | Off | Shows the debug dot, timings, Index Details and Search Log. Turning it off deletes the search log. See [Turn on debug mode](../how-to/turn-on-debug-mode.md). |
 | Open FSearch at login | On or off | Off | Opens the app when you log in, using a Login Item. Shows the real status: on, waiting for approval (with a button that opens Login Items), or off. A failure appears under the switch. |
@@ -45,6 +46,9 @@ The app keeps its settings in its standard preferences file, `~/Library/Preferen
 | Key | Type | Meaning |
 |---|---|---|
 | `editor` | String | The chosen editor: `vscode`, `cursor`, `zed`, `sublime`, `bbedit` or `xcode`. Empty means the default app. |
+| `searchInterface` | String | Preferred search UI: `panel` (classic floating launcher, default) or `window` (Everything-style Search Window). |
+| `savedSearches` | Data (JSON) | User-created saved searches shown in the Search Window sidebar. |
+| `searchWindowColumns` | Data (JSON) | Resized, reordered, and hidden column state for the Search Window table. |
 | `debugMode` | Bool | Whether debug mode is on. |
 | `allowShortcutsContentSearch` | Bool | Whether Shortcuts may search inside files. Off by default. |
 | `onboarded` | Bool | Whether the welcome window is finished. While false, the menu shows **Finish Setup…**. |

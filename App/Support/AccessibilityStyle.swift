@@ -66,18 +66,20 @@ extension View {
     }
 
     /// Background and border for floating surfaces (launcher panel and FSearch menu), respecting Reduce Transparency and Increase Contrast.
-    @ViewBuilder
+    ///
+    /// Keeps `self` outside the branch so toggling Reduce Transparency never tears down child view state or focus.
     func panelSurface(cornerRadius: CGFloat, material: Material, style: AccessibilityStyle) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius)
-        if style.usesOpaqueSurface {
+        return
             self
-                .background(Color(nsColor: .windowBackgroundColor), in: shape)
-                .overlay(shape.strokeBorder(Color.primary.opacity(style.surfaceStrokeOpacity)))
-        } else {
-            self
-                .background(material, in: shape)
-                .overlay(shape.strokeBorder(Color.primary.opacity(style.surfaceStrokeOpacity)))
-        }
+            .background {
+                if style.usesOpaqueSurface {
+                    shape.fill(Color(nsColor: .windowBackgroundColor))
+                } else {
+                    shape.fill(material)
+                }
+            }
+            .overlay(shape.strokeBorder(Color.primary.opacity(style.surfaceStrokeOpacity)))
     }
 
     /// Selection background (and outline under Increase Contrast) for rows and active controls.

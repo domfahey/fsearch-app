@@ -118,20 +118,23 @@ public struct SearchFilterChip: Codable, Equatable, Hashable, Identifiable, Send
     /// Built-in common folder scope chips.
     public static var folderPresets: [SearchFilterChip] {
         [
-            SearchFilterChip(kind: .folder, value: "~/Desktop", title: String(localized: "Desktop", bundle: .module)),
-            SearchFilterChip(kind: .folder, value: "~/Documents", title: String(localized: "Documents", bundle: .module)),
-            SearchFilterChip(kind: .folder, value: "~/Downloads", title: String(localized: "Downloads", bundle: .module)),
-            SearchFilterChip(kind: .folder, value: "~/Developer", title: String(localized: "Developer", bundle: .module)),
+            SearchFilterChip(kind: .folder, value: "~/Desktop", title: "in:\(String(localized: "Desktop", bundle: .module))"),
+            SearchFilterChip(kind: .folder, value: "~/Documents", title: "in:\(String(localized: "Documents", bundle: .module))"),
+            SearchFilterChip(kind: .folder, value: "~/Downloads", title: "in:\(String(localized: "Downloads", bundle: .module))"),
+            SearchFilterChip(kind: .folder, value: "~/Developer", title: "in:\(String(localized: "Developer", bundle: .module))"),
         ]
     }
 
-    /// Creates a normalized extension chip from user input (e.g. `".swift, .md"` -> `ext:swift,md`), or nil if empty.
+    /// Creates a normalized, deduplicated extension chip from user input (e.g. `".swift, .md"` -> `ext:md,swift`), or nil if empty.
     public static func extensionChip(_ input: String) -> SearchFilterChip? {
-        let exts =
-            input
-            .split(whereSeparator: { $0 == "," || $0.isWhitespace })
-            .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: ".")).lowercased() }
-            .filter { !$0.isEmpty }
+        let exts = Array(
+            Set(
+                input
+                    .split(whereSeparator: { $0 == "," || $0.isWhitespace })
+                    .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: ".")).lowercased() }
+                    .filter { !$0.isEmpty }
+            )
+        ).sorted()
         guard !exts.isEmpty else { return nil }
         let joined = exts.joined(separator: ",")
         return SearchFilterChip(kind: .ext, value: joined, title: "ext:\(joined)")

@@ -29,17 +29,23 @@ struct SearchWindowComparator: SortComparator, Sendable {
 /// Everything-style multi-window desktop search browser: dense sortable table, match toggles,
 /// clickable filter chips, saved searches sidebar, keyboard actions, multi-select, drag-out, and Quick Look preview pane.
 struct SearchWindowView: View {
+    /// `UserDefaults` key storing JSON-encoded `TableColumnCustomization` across Search Windows and launches.
+    static let columnCustomizationKey = "searchWindowColumns"
+
     @EnvironmentObject var app: AppState
     @Environment(\.accessibilityStyleOverride) private var styleOverride
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @Bindable var model: SearchWindowModel
     let savedStore: SavedSearchStore
+    let keyBridge: SearchWindowKeyBridge?
     let onNewWindow: () -> Void
     let onTitleChange: (String) -> Void
 
     @State private var selection: Set<SearchWindowRow.ID> = []
     @State private var tableSortOrder: [SearchWindowComparator] = SearchWindowComparator.from(.defaultSort)
-    @SceneStorage("searchWindowColumns") private var columnCustomization: TableColumnCustomization<SearchWindowRow>
+    @State private var columnCustomization = TableColumnCustomization<SearchWindowRow>()
     @State private var showSidebar = true
     @State private var showPreview = true
     @State private var savedSearches: [SavedSearch] = []
@@ -49,7 +55,36 @@ struct SearchWindowView: View {
     @State private var extensionInput = ""
     @State private var windowError: String?
     @State private var errorClearTask: Task<Void, Never>?
+    @State private var tableHasFocus = false
     @FocusState private var searchFocused: Bool
+
+    private var a11y: AccessibilityStyle {
+        AccessibilityStyle.resolved(
+            override: styleOverride, reduceMotion: reduceMotion,
+            reduceTransparency: reduceTransparency, contrast: colorSchemeContrast)
+    }
+
+    static func loadColumnCustomization(from defaults: UserDefaults) -> TableColumnCustomization<SearchWindowRow> {
+        guard let data = defaults.data(forKey: columnCustomizationKey),
+            let decoded = try? JSONDecoder().decode(TableColumnCustomization<SearchWindowRow>.self, from: data)
+        else { return TableColumnCustomization<SearchWindowRow>() }
+        return decoded
+    }
+
+    static func saveColumnCustomization(_ customization: TableColumnCustomization<SearchWindowRow>, to defaults: UserDefaults) {
+        guard let data = try? JSONEncoder().encode(customization) else { return }
+        defaults.set(data, forKey: columnCustomizationKey)
+    }
+
+    private var columnCustomizationBinding: Binding<TableColumnCustomization<SearchWindowRow>> {
+        Binding(
+            get: { columnCustomization },
+            set: {
+                columnCustomization = $0
+                Self.saveColumnCustomization($0, to: app.defaults)
+            }
+        )
+    }
 
     #if DEBUG
         private let pickFolderOverride: (() -> String?)?
@@ -57,6 +92,7 @@ struct SearchWindowView: View {
 
         init(
             model: SearchWindowModel, savedStore: SavedSearchStore,
+            keyBridge: SearchWindowKeyBridge? = nil,
             onNewWindow: @escaping () -> Void = {},
             onTitleChange: @escaping (String) -> Void = { _ in },
             selection: Set<SearchWindowRow.ID> = [],
@@ -67,6 +103,7 @@ struct SearchWindowView: View {
         ) {
             self.model = model
             self.savedStore = savedStore
+            self.keyBridge = keyBridge
             self.onNewWindow = onNewWindow
             self.onTitleChange = onTitleChange
             _selection = State(initialValue: selection)
@@ -81,11 +118,13 @@ struct SearchWindowView: View {
 
         init(
             model: SearchWindowModel, savedStore: SavedSearchStore,
+            keyBridge: SearchWindowKeyBridge? = nil,
             onNewWindow: @escaping () -> Void = {},
             onTitleChange: @escaping (String) -> Void = { _ in }
         ) {
             self.model = model
             self.savedStore = savedStore
+            self.keyBridge = keyBridge
             self.onNewWindow = onNewWindow
             self.onTitleChange = onTitleChange
         }
@@ -138,10 +177,20 @@ struct SearchWindowView: View {
                     })
             }
         }
-        .respectingReduceMotion(AccessibilityStyle.resolved(override: styleOverride, reduceMotion: reduceMotion).suppressesAnimations)
+        .respectingReduceMotion(a11y.suppressesAnimations)
         .onAppear {
             savedSearches = savedStore.load()
+            columnCustomization = Self.loadColumnCustomization(from: app.defaults)
             tableSortOrder = SearchWindowComparator.from(model.sort)
+            keyBridge?.togglePreview = { showPreview.toggle() }
+            keyBridge?.focusSearch = { DispatchQueue.main.async { searchFocused = true } }
+            keyBridge?.onTableFocusChanged = { tableHasFocus = $0 }
+            DispatchQueue.main.async { searchFocused = true }
+        }
+        .onDisappear {
+            keyBridge?.clear()
+            errorClearTask?.cancel()
+            errorClearTask = nil
         }
         .onChange(of: app.savedSearchesGeneration) { _, _ in
             savedSearches = savedStore.load()
@@ -203,7 +252,10 @@ struct SearchWindowView: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
             .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
-            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.secondary.opacity(0.25)))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .strokeBorder(Color.primary.opacity(a11y.increasedContrast ? a11y.surfaceStrokeOpacity : 0.16))
+            )
 
             Picker("Mode", selection: $model.mode) {
                 Text("Names").tag(SearchMode.names)
@@ -212,7 +264,7 @@ struct SearchWindowView: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .frame(width: 240)
+            .fixedSize()
             .accessibilityIdentifier("searchWindowModePicker")
 
             matchToggle(label: "Aa", help: "Match Case", isOn: $model.options.matchCase, id: "toggleMatchCase")
@@ -233,9 +285,19 @@ struct SearchWindowView: View {
             .accessibilityLabel("Toggle Preview Pane")
             .accessibilityIdentifier("searchWindowTogglePreview")
 
+            Button {
+                app.panel.show(app: app)
+            } label: {
+                Image(systemName: "rectangle.topthird.inset.filled")
+            }
+            .help("Open Launcher Panel")
+            .accessibilityLabel("Open Launcher Panel")
+            .accessibilityIdentifier("searchWindowOpenPanel")
+
             Button(action: onNewWindow) {
                 Image(systemName: "plus.rectangle.on.rectangle")
             }
+            .keyboardShortcut("n", modifiers: .command)
             .help("New Search Window")
             .accessibilityLabel("New Search Window")
             .accessibilityIdentifier("searchWindowNew")
@@ -244,20 +306,25 @@ struct SearchWindowView: View {
         .padding(.vertical, 8)
     }
 
+    @ViewBuilder
     private func matchToggle(label: String, help: String, isOn: Binding<Bool>, id: String) -> some View {
-        Button {
+        let base = Button {
             isOn.wrappedValue.toggle()
         } label: {
             Text(verbatim: label)
                 .font(.system(.caption, design: .monospaced).weight(.semibold))
                 .frame(minWidth: 24, minHeight: 20)
         }
-        .buttonStyle(.bordered)
-        .tint(isOn.wrappedValue ? .accentColor : nil)
         .help(LocalizedStringKey(help))
         .accessibilityLabel(LocalizedStringKey(help))
         .accessibilityValue(isOn.wrappedValue ? Text("On") : Text("Off"))
         .accessibilityIdentifier(id)
+
+        if isOn.wrappedValue {
+            base.buttonStyle(.borderedProminent)
+        } else {
+            base.buttonStyle(.bordered)
+        }
     }
 
     private var filterChipsBar: some View {
@@ -270,7 +337,7 @@ struct SearchWindowView: View {
 
                 Menu("Folder") {
                     ForEach(SearchFilterChip.folderPresets) { chip in
-                        Button(chip.title) { model.toggleChip(chip) }
+                        chipMenuButton(chip)
                     }
                     Divider()
                     Button("Choose Folder…", action: chooseFolder)
@@ -290,6 +357,7 @@ struct SearchWindowView: View {
                         placeholder: "swift, md, pdf",
                         actionTitle: "Add",
                         text: $extensionInput,
+                        canSubmit: SearchFilterChip.extensionChip(extensionInput) != nil,
                         onSubmit: applyExtensionInput
                     )
                 }
@@ -311,7 +379,11 @@ struct SearchWindowView: View {
                         }
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .background(Color.accentColor.opacity(0.14), in: Capsule())
+                        .background(Color.accentColor.opacity(a11y.increasedContrast ? 0.24 : 0.14), in: Capsule())
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(a11y.chipStrokeOpacity > 0 ? Color.primary.opacity(a11y.chipStrokeOpacity) : .clear)
+                        )
                         .accessibilityIdentifier("chip-\(chip.id)")
                     }
                 }
@@ -334,11 +406,25 @@ struct SearchWindowView: View {
     private func chipMenu(_ title: LocalizedStringKey, presets: [SearchFilterChip]) -> some View {
         Menu(title) {
             ForEach(presets) { chip in
-                Button(chip.title) { model.toggleChip(chip) }
+                chipMenuButton(chip)
             }
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
+    }
+
+    @ViewBuilder
+    private func chipMenuButton(_ chip: SearchFilterChip) -> some View {
+        let active = model.chips.contains { $0.id == chip.id }
+        Button {
+            model.toggleChip(chip)
+        } label: {
+            if active {
+                Label(chip.title, systemImage: "checkmark")
+            } else {
+                Text(verbatim: chip.title)
+            }
+        }
     }
 
     private var sidebar: some View {
@@ -348,12 +434,14 @@ struct SearchWindowView: View {
                     Text("Quick Filters")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
+                        .accessibilityAddTraits(.isHeader)
                     ForEach(SavedSearch.builtInPresets) { preset in
                         Button {
                             applySavedSearch(preset)
                         } label: {
                             Label(preset.name, systemImage: preset.symbol)
                                 .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .padding(.vertical, 2)
@@ -364,6 +452,7 @@ struct SearchWindowView: View {
                     Text("Saved Searches")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
+                        .accessibilityAddTraits(.isHeader)
                     if savedSearches.isEmpty {
                         Text("No saved searches")
                             .font(.caption)
@@ -376,6 +465,7 @@ struct SearchWindowView: View {
                                 } label: {
                                     Label(saved.name, systemImage: saved.symbol)
                                         .frame(maxWidth: .infinity, alignment: .leading)
+                                        .contentShape(Rectangle())
                                 }
                                 .buttonStyle(.plain)
                                 Button {
@@ -397,6 +487,8 @@ struct SearchWindowView: View {
                         showSavePopover = true
                     } label: {
                         Label("Save Current Search…", systemImage: "plus")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(Color.accentColor)
@@ -408,6 +500,7 @@ struct SearchWindowView: View {
                             placeholder: "Name",
                             actionTitle: "Save",
                             text: $saveName,
+                            canSubmit: !saveName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                             onSubmit: saveCurrentSearch
                         )
                     }
@@ -417,13 +510,16 @@ struct SearchWindowView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(width: 195)
-        .background(Color(nsColor: .controlBackgroundColor).opacity(0.35))
+        .background(Color(nsColor: .controlBackgroundColor).opacity(a11y.usesOpaqueSurface ? 1 : 0.35))
         .accessibilityIdentifier("searchWindowSidebar")
     }
 
     private var resultsArea: some View {
         ZStack {
-            Table(model.rows, selection: $selection, sortOrder: $tableSortOrder, columnCustomization: $columnCustomization) {
+            Table(
+                of: SearchWindowRow.self, selection: $selection, sortOrder: $tableSortOrder,
+                columnCustomization: columnCustomizationBinding
+            ) {
                 TableColumn("Name", sortUsing: SearchWindowComparator(.name)) { row in
                     SearchWindowNameCell(row: row)
                 }
@@ -463,16 +559,27 @@ struct SearchWindowView: View {
                 }
                 .width(min: 110, ideal: 150)
                 .customizationID("modified")
+            } rows: {
+                ForEach(model.rows) { row in
+                    TableRow(row)
+                        .draggable(FileActions.url(row.path))
+                }
             }
             .contextMenu(forSelectionType: SearchWindowRow.ID.self) { ids in
-                SearchWindowContextMenu(
-                    rows: rowsForAction(ids: ids),
-                    app: app,
-                    onError: showWindowError,
-                    refresh: { await model.refresh() }
-                )
+                let menuRows = rowsForAction(ids: ids)
+                if !menuRows.isEmpty {
+                    SearchWindowContextMenu(
+                        rows: menuRows,
+                        app: app,
+                        onError: showWindowError,
+                        onTrash: { await trashRows(menuRows) }
+                    )
+                }
             } primaryAction: { ids in
-                SearchWindowActions.openSelected(rowsForAction(ids: ids), app: app, onError: showWindowError)
+                let actionRows = rowsForAction(ids: ids)
+                if !actionRows.isEmpty {
+                    SearchWindowActions.openSelected(actionRows, app: app, onError: showWindowError)
+                }
             }
             .accessibilityIdentifier("searchWindowTable")
 
@@ -504,10 +611,7 @@ struct SearchWindowView: View {
                 Text("Indexing your disk… results will appear shortly")
                     .foregroundStyle(.secondary)
             case let .failed(error):
-                Text(verbatim: UserMessage.forPhase(.failed(error), helperGaveUp: app.daemon.isUnresponsive) ?? error.description)
-                    .foregroundStyle(.red)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
+                SearchWindowPhaseErrorView(error: error, daemon: app.daemon)
             }
         }
         .allowsHitTesting(false)
@@ -550,21 +654,35 @@ struct SearchWindowView: View {
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
-    /// Row-level shortcuts (`↵`, `⌘↵`, `⌘⇧C`, `⌘Y`, `⌘⌫`) stay disabled while editing text or popovers,
-    /// so `⌘⌫` never trashes a selected file while deleting query text and `↵` never interferes with IME or popovers.
-    static func rowShortcutsEnabled(searchFocused: Bool, popoverOpen: Bool, hasSelection: Bool) -> Bool {
-        !searchFocused && !popoverOpen && hasSelection
+    /// True when `responder` belongs to the results table (`NSTableView`/`NSOutlineView`),
+    /// rejecting text fields/selectable preview text (`NSTextView`), Quick Look previews, and focused controls.
+    static func firstResponderAllowsRowShortcuts(_ responder: NSResponder?) -> Bool {
+        guard let view = responder as? NSView else { return false }
+        var current: NSView? = view
+        while let v = current {
+            if v is NSTableView { return true }
+            if v is NSTextView || v is NSButton || v is NSSegmentedControl { return false }
+            current = v.superview
+        }
+        return false
+    }
+
+    /// Row-level shortcuts (`↵`, `⌘↵`, `⌘⇧C`, `⌘Y`, `⌘⌫`) stay disabled unless focus is in the results table
+    /// (never while editing text, in popovers, in preview-pane selectable text / Quick Look, or on toolbar buttons).
+    static func rowShortcutsEnabled(
+        searchFocused: Bool, popoverOpen: Bool, hasSelection: Bool, tableFocused: Bool = true
+    ) -> Bool {
+        !searchFocused && !popoverOpen && hasSelection && tableFocused
     }
 
     private var keyboardShortcutsLayer: some View {
         let rowEnabled = Self.rowShortcutsEnabled(
             searchFocused: searchFocused,
             popoverOpen: showSavePopover || showExtensionPopover,
-            hasSelection: !selectedRows.isEmpty)
+            hasSelection: !selectedRows.isEmpty,
+            tableFocused: tableHasFocus)
         return Group {
-            Button("New Window", action: onNewWindow).keyboardShortcut("n", modifiers: .command)
             Button("Focus Search") { searchFocused = true }.keyboardShortcut("l", modifiers: .command)
-            Button("Toggle Preview") { showPreview.toggle() }.keyboardShortcut("p", modifiers: [.command, .option])
             Button("Open Selected", action: openSelected).keyboardShortcut(.return, modifiers: []).disabled(!rowEnabled)
             Button("Reveal Selected", action: revealSelected).keyboardShortcut(.return, modifiers: .command).disabled(!rowEnabled)
             Button("Copy Files", action: copySelectedFiles).keyboardShortcut("c", modifiers: [.command, .shift]).disabled(!rowEnabled)
@@ -573,12 +691,13 @@ struct SearchWindowView: View {
         }
         .frame(width: 0, height: 0)
         .opacity(0)
+        .focusable(false)
         .accessibilityHidden(true)
     }
 
     func rowsForAction(ids: Set<SearchWindowRow.ID>) -> [SearchWindowRow] {
-        let effective = ids.isEmpty ? selection : ids
-        return model.rows.filter { effective.contains($0.id) }
+        guard !ids.isEmpty else { return [] }
+        return model.rows.filter { ids.contains($0.id) }
     }
 
     private func applySavedSearch(_ saved: SavedSearch) {
@@ -587,16 +706,18 @@ struct SearchWindowView: View {
     }
 
     private func saveCurrentSearch() {
-        savedSearches = savedStore.add(model.snapshot(name: saveName))
-        app.savedSearchesChanged()
+        guard showSavePopover else { return }
+        let trimmed = saveName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
         showSavePopover = false
+        savedSearches = savedStore.add(model.snapshot(name: trimmed))
+        app.savedSearchesChanged()
     }
 
     private func applyExtensionInput() {
-        if let chip = SearchFilterChip.extensionChip(extensionInput) {
-            model.addChip(chip)
-        }
+        guard showExtensionPopover, let chip = SearchFilterChip.extensionChip(extensionInput) else { return }
         showExtensionPopover = false
+        model.addChip(chip)
     }
 
     private func chooseFolder() {
@@ -632,7 +753,22 @@ struct SearchWindowView: View {
     private func copySelectedFiles() { SearchWindowActions.copyFiles(selectedRows, onError: showWindowError) }
     private func toggleQuickLook() { SearchWindowActions.toggleQuickLook(selectedRows, onError: showWindowError) }
     private func trashSelected() {
-        Task { await SearchWindowActions.trashSelected(selectedRows, app: app, onError: showWindowError) { await model.refresh() } }
+        let rows = selectedRows
+        Task { await trashRows(rows) }
+    }
+    private func trashRows(_ rows: [SearchWindowRow]) async {
+        await SearchWindowActions.trashSelected(
+            rows, app: app, onError: showWindowError,
+            onTrashed: { trashed in
+                model.removeRows(matchingPaths: trashed)
+                let valid = Set(model.rows.map(\.id))
+                selection = selection.intersection(valid)
+            },
+            refresh: {
+                await model.refresh()
+                let valid = Set(model.rows.map(\.id))
+                selection = selection.intersection(valid)
+            })
     }
     private func showWindowError(_ message: String) {
         windowError = message
@@ -651,7 +787,7 @@ struct SearchWindowView: View {
     }
 }
 
-/// Name cell for a search window table row, showing the file icon, display-safe name, optional matching line, and drag support.
+/// Name cell for a search window table row, showing the file icon, display-safe name, and optional matching line.
 struct SearchWindowNameCell: View {
     let row: SearchWindowRow
 
@@ -671,31 +807,43 @@ struct SearchWindowNameCell: View {
                 }
             }
         }
-        .draggable(FileActions.url(row.path))
     }
 }
 
 /// Compact text-input popover shared by **Filter by extension** and **Save Search**.
+///
+/// Auto-focuses its field on appear, disables submission on blank/invalid input, and relies solely on
+/// `TextField.onSubmit` for Return (preventing double-submission from a competing `.defaultAction` shortcut).
 struct SearchWindowInputPopover: View {
     let heading: LocalizedStringKey
     let placeholder: LocalizedStringKey
     let actionTitle: LocalizedStringKey
     @Binding var text: String
+    var canSubmit: Bool = true
     let onSubmit: () -> Void
+    @FocusState private var fieldFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(heading).font(.headline)
             TextField(placeholder, text: $text)
                 .frame(width: 190)
-                .onSubmit(onSubmit)
+                .focused($fieldFocused)
+                .onSubmit {
+                    if canSubmit { onSubmit() }
+                }
+                .accessibilityIdentifier("searchWindowPopoverField")
             HStack {
                 Spacer()
                 Button(actionTitle, action: onSubmit)
-                    .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!canSubmit)
             }
         }
         .padding(12)
+        .onAppear {
+            DispatchQueue.main.async { fieldFocused = true }
+        }
     }
 }
 
@@ -704,7 +852,22 @@ struct SearchWindowContextMenu: View {
     let rows: [SearchWindowRow]
     let app: AppState
     let onError: @MainActor (String) -> Void
-    let refresh: @MainActor () async -> Void
+    let onTrash: @MainActor () async -> Void
+
+    init(
+        rows: [SearchWindowRow], app: AppState,
+        onError: @escaping @MainActor (String) -> Void,
+        onTrash: (@MainActor () async -> Void)? = nil,
+        refresh: (@MainActor () async -> Void)? = nil
+    ) {
+        self.rows = rows
+        self.app = app
+        self.onError = onError
+        self.onTrash =
+            onTrash ?? {
+                await SearchWindowActions.trashSelected(rows, app: app, onError: onError, refresh: refresh ?? {})
+            }
+    }
 
     var body: some View {
         Button("Open") { SearchWindowActions.openSelected(rows, app: app, respectLaunchableReveal: false, onError: onError) }
@@ -716,8 +879,23 @@ struct SearchWindowContextMenu: View {
         Button("Open Folder in Terminal") { SearchWindowActions.openTerminal(rows, onError: onError) }
         Divider()
         Button("Move to Trash", role: .destructive) {
-            Task { await SearchWindowActions.trashSelected(rows, app: app, onError: onError, refresh: refresh) }
+            Task { await onTrash() }
         }
+    }
+}
+
+/// Observes `DaemonManager` directly so transient `"Starting search…"` updates to
+/// `"The background helper isn't answering"` as soon as restarts run out.
+private struct SearchWindowPhaseErrorView: View {
+    let error: DaemonError
+    @ObservedObject var daemon: DaemonManager
+
+    var body: some View {
+        let transient = error == .disconnected && !daemon.isUnresponsive
+        Text(verbatim: UserMessage.forPhase(.failed(error), helperGaveUp: daemon.isUnresponsive) ?? error.description)
+            .foregroundStyle(transient ? Color.secondary : Color.red)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 24)
     }
 }
 

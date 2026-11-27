@@ -989,6 +989,58 @@
         }
       }
     },
+    "Choose whether your shortcut, Search…, and fsearch:// links open the classic floating panel or the Search Window. Both remain available from the menu bar.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wähle aus, ob dein Kurzbefehl, „Suchen…“ und fsearch://-Links das klassische schwebende Fenster oder das Suchfenster öffnen. Beide bleiben über die Menüleiste erreichbar."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose whether your shortcut, Search…, and fsearch:// links open the classic floating panel or the Search Window. Both remain available from the menu bar."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elige si el atajo, Buscar… y los enlaces fsearch:// abren el panel flotante clásico o la ventana de búsqueda. Ambos siguen disponibles desde la barra de menús."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisissez si votre raccourci, Rechercher… et les liens fsearch:// ouvrent le panneau flottant classique ou la fenêtre de recherche. Les deux restent accessibles depuis la barre des menus."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ショートカット、「検索…」、および fsearch:// リンクで従来のフローティングパネルと検索ウインドウのどちらを開くか選択します。どちらもメニューバーからいつでも開けます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "단축키, 검색… 및 fsearch:// 링크가 클래식 플로팅 패널과 검색 윈도우 중 어느 쪽을 열지 선택합니다. 두 인터페이스 모두 메뉴 막대에서 언제든 열 수 있습니다."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolha se o atalho, Buscar… e os links fsearch:// abrem o painel flutuante clássico ou a Janela de Busca. Ambos continuam disponíveis na barra de menus."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择快捷键、“搜索…”和 fsearch:// 链接默认打开经典浮动面板还是搜索窗口。两种界面都可随时从菜单栏打开。"
+          }
+        }
+      }
+    },
     "Clear Filters": {
       "localizations": {
         "de": {
@@ -5097,6 +5149,58 @@
         }
       }
     },
+    "Launcher Panel…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Launcher-Fenster…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Launcher Panel…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Panel lanzador…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Panneau de lancement…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ランチャーパネル…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "런처 패널…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Painel de Busca…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "启动面板…"
+          }
+        }
+      }
+    },
     "Let FSearch see all your files": {
       "localizations": {
         "de": {
@@ -5821,58 +5925,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "新建搜索窗口…"
-          }
-        }
-      }
-    },
-    "New Window": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Neues Fenster"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "New Window"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nueva ventana"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nouvelle fenêtre"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "新規ウインドウ"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "새로운 윈도우"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nova Janela"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "新建窗口"
           }
         }
       }
@@ -6653,6 +6705,58 @@
           "stringUnit": {
             "state": "translated",
             "value": "打开完全磁盘访问权限…"
+          }
+        }
+      }
+    },
+    "Open Launcher Panel": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Launcher-Fenster öffnen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Launcher Panel"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir panel lanzador"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrir le panneau de lancement"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ランチャーパネルを開く"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "런처 패널 열기"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir Painel de Busca"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开启动面板"
           }
         }
       }
@@ -9413,6 +9517,58 @@
         }
       }
     },
+    "Search interface:": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suchoberfläche:"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search interface:"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interfaz de búsqueda:"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interface de recherche :"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "検索インターフェース:"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "검색 인터페이스:"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interface de busca:"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索界面："
+          }
+        }
+      }
+    },
     "Search mode: %@": {
       "localizations": {
         "de": {
@@ -10813,58 +10969,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "时间"
-          }
-        }
-      }
-    },
-    "Toggle Preview": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Vorschau ein-/ausblenden"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Toggle Preview"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mostrar/ocultar previsualización"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Afficher/masquer l’aperçu"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "プレビューを切り替え"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "미리보기 전환"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Alternar Pré-visualização"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "切换预览"
           }
         }
       }

@@ -45,7 +45,7 @@ TEST_LOG="$H/Library/Application Support/FSearch/searches.jsonl"
 
 # Fixtures. Queries use words the temp folder's hex name can't contain.
 R="$H/root/proj"
-mkdir -p "$R/src" "$R/duo"
+mkdir -p "$R/src" "$R/duo" "$R/puffin"
 echo x > "$R/heronfile.txt"
 echo x > "$R/🏡 zq wv.txt"
 echo x > "$R/duo/plover-one.txt"
@@ -56,6 +56,13 @@ printf '#!/bin/sh\necho ok\n' > "$R/osprey-script.command"
 chmod +x "$R/osprey-script.command"
 # NFD-decomposed "café-note.txt" (e + U+0301) to test NFC query matching against macOS decomposed names.
 echo x > "$R/$(printf 'cafe\314\201-note.txt')"
+# Search Window fixtures: case sensitivity, whole word, search-in-path, and multi-line content matches.
+echo x > "$R/src/FalconCase.txt"
+echo x > "$R/src/falconlower.txt"
+echo x > "$R/src/wren.txt"
+echo x > "$R/src/wrenling.txt"
+echo x > "$R/puffin/nested-leaf.txt"
+printf 'line one ibisneedle\nline two ibisneedle\n' > "$R/multi-match.md"
 
 # "mtime size" of a file, or "absent": detects any write to the real search log.
 stamp() { if [ -e "$1" ]; then stat -f '%m %z' "$1"; else echo absent; fi; }

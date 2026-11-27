@@ -284,6 +284,13 @@ struct SearchView: View {
                     let currentRows = PanelRows(files: current.count, query: model.query, mode: model.mode)
                     if let id = PanelInput.rowID(at: viewState.state.selection, shown: current, rows: currentRows) { proxy.scrollTo(id) }
                 }
+                // Scroll back to the selected top row when a new query/mode answer lands even if selection stayed 0.
+                .onChange(of: PanelInput.answer(model)) { old, new in
+                    guard old.query != new.query || old.mode != new.mode else { return }
+                    let current = self.shown
+                    let currentRows = PanelRows(files: current.count, query: model.query, mode: model.mode)
+                    if let id = PanelInput.rowID(at: viewState.state.selection, shown: current, rows: currentRows) { proxy.scrollTo(id) }
+                }
             }
             Divider()
             HStack(spacing: 14) {
@@ -322,8 +329,14 @@ struct SearchView: View {
         .onAppear { focusSearchField() }
         .onChange(of: viewState.focusTrigger) { focusSearchField() }
         .onChange(of: viewState.state.selection) { onSelect(viewState.state.selection) }
-        // An open preview follows the selected file: a new selection, or new rows under the same one.
+        // Clamp selection if rows shrink (e.g. trashing the last row or deleted Recents).
+        .onChange(of: rows.count) { _, count in
+            let clamped = count > 0 ? min(max(0, viewState.state.selection), count - 1) : 0
+            if viewState.state.selection != clamped { viewState.state.selection = clamped }
+        }
+        // An open preview follows the selected file only while the panel is visible and owns Quick Look.
         .onChange(of: PanelInput.previewPath(at: selection, shown: shown, rows: rows)) { _, path in
+            guard isVisible(), QuickLookSource.shared.owner == nil || QuickLookSource.shared.owner is PanelController.Panel else { return }
             QuickLookSource.shared.follow(path.map(FileActions.url))
         }
         // ↑/↓ pressed in Quick Look, which holds the keyboard while it is up.
@@ -398,6 +411,7 @@ struct SearchView: View {
     private func fallbackRow(_ label: Text, _ icon: String, selected: Bool, action: @escaping () -> Void) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon).frame(width: 22).accessibilityHidden(true); label
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, 12).padding(.vertical, 6)
         .selectionHighlight(selected: selected, cornerRadius: 8, style: a11y)

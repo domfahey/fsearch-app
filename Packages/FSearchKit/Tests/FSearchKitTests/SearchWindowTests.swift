@@ -17,10 +17,12 @@ import Testing
         #expect(spaced.title == "in:~/My Projects")
         #expect(spaced.token == "in:\"~/My Projects\"")
 
-        let exts = SearchFilterChip.extensionChip(" .Swift, MD , .rs ")
-        #expect(exts?.value == "swift,md,rs")
-        #expect(exts?.token == "ext:swift,md,rs")
+        let exts = SearchFilterChip.extensionChip(" .Swift, MD , .rs, swift ")
+        #expect(exts?.value == "md,rs,swift")
+        #expect(exts?.token == "ext:md,rs,swift")
         #expect(SearchFilterChip.extensionChip(" , . ") == nil)
+        // Folder presets use "in:" prefix so "in:Documents" never collides with type:doc's "Documents".
+        #expect(SearchFilterChip.folderPresets.allSatisfy { $0.title.hasPrefix("in:") })
 
         let folder = SearchFilterChip.folderChip("/tmp/My Folder")
         #expect(folder?.kind == .folder)
@@ -378,6 +380,30 @@ import Testing
         model.query = "alpha size:"
         await model.refresh()
         #expect(model.rows.count == 1)
+
+        // Optimistic row removal drops trashed paths immediately without waiting on FSEvents.
+        model.removeRows(matchingPaths: ["/p/alpha.txt"])
+        #expect(model.rows.isEmpty)
+        model.removeRows(matchingPaths: [])
+
+        // Cancelled in-flight search followed by a half-typed filter must NOT stay stranded in .loading.
+        let slow = StubBackend()
+        slow.state.withLock { s in
+            s.onSearch = { _, _ in
+                try await Task.sleep(for: .milliseconds(250))
+                return SearchReply(tookUs: 50, hits: [])
+            }
+        }
+        let slowModel = SearchWindowModel(names: slow, content: slow)
+        slowModel.query = "alpha"
+        let inFlight = Task { await slowModel.refresh() }
+        try? await Task.sleep(for: .milliseconds(20))
+        #expect(slowModel.phase == .loading)
+        inFlight.cancel()
+        await inFlight.value
+        slowModel.query = "alpha size:"
+        await slowModel.refresh()
+        #expect(slowModel.phase == .idle)
 
         // Accented query searches both NFC & NFD forms and merges.
         model.query = "caf\u{00E9}"

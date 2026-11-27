@@ -117,8 +117,9 @@ enum AppMenuActions {
             showAbout()
         case .searchWindow:
             let query = app.search.query
+            let mode = app.search.mode
             app.panel.hide(returnFocus: false)
-            SearchWindowManager.open(app, query)
+            SearchWindowManager.openWithMode(app, query, mode)
         case .settings:
             // The same steps as the panel's FSearch Settings row (PanelController.run).
             PanelController.openSettings()

@@ -98,23 +98,26 @@ enum SearchWindowActions {
         return FileActions.quickLook(first.path, onError: onError)
     }
 
-    /// Moves all unique selected files to the Trash, updates Recents, and invokes `refresh` if any succeeded.
+    /// Moves all unique selected files to the Trash, updates Recents, reports successfully trashed paths
+    /// via `onTrashed` (so the window can remove them optimistically ahead of FSEvents), and invokes `refresh`.
     static func trashSelected(
         _ rows: [SearchWindowRow], app: AppState, onError: @MainActor (String) -> Void,
+        onTrashed: @MainActor (Set<String>) -> Void = { _ in },
         refresh: () async -> Void
     ) async {
         let paths = uniquePaths(rows)
         guard !paths.isEmpty else { return }
-        var trashedAny = false
+        var trashed = Set<String>()
         for path in paths {
             do {
                 try FileActions.trash(path)
-                trashedAny = true
+                trashed.insert(path)
             } catch {
                 onError(String(localized: "Couldn't move to Trash: \(error.localizedDescription)"))
             }
         }
-        if trashedAny {
+        if !trashed.isEmpty {
+            onTrashed(trashed)
             app.recentsChanged()
             await refresh()
         }

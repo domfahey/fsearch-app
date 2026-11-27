@@ -13,6 +13,7 @@ struct IndexDetailsView: View {
     @State private var folderIssues: [DataFolderCheck.Issue] = []
     @State private var skippedStamp: DebugFormat.FileStamp?
     @State private var logStamp: DebugFormat.FileStamp?
+    @State private var pollRefresh: Task<Void, Never>?
     /// The running daemon's folder (a temp folder in test mode).
     private var dataDir: URL { DebugFormat.dataDir(socketPath: app.options.socketPath) }
 
@@ -44,7 +45,12 @@ struct IndexDetailsView: View {
                     Log.debug.info("Save Now pressed"); Task { await app.daemon.saveNow() }
                 }
                 Button("Restart Daemon") {
-                    Log.debug.info("Restart Daemon pressed"); Task { await app.daemon.restart() }
+                    Log.debug.info("Restart Daemon pressed")
+                    Task {
+                        pollRefresh?.cancel()
+                        pollRefresh = nil
+                        await app.daemon.restart()
+                    }
                 }
                 Button("Copy All") {
                     FileActions.pasteboard.clearContents()
@@ -58,7 +64,16 @@ struct IndexDetailsView: View {
         .task {
             while !Task.isCancelled {
                 await load()
-                await app.daemon.refresh()
+                if !app.daemon.isRestarting {
+                    let t = Task { await app.daemon.refresh() }
+                    pollRefresh = t
+                    await withTaskCancellationHandler {
+                        await t.value
+                    } onCancel: {
+                        t.cancel()
+                    }
+                    pollRefresh = nil
+                }
                 try? await Task.sleep(for: .seconds(1))
             }
         }

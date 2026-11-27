@@ -5,15 +5,16 @@ FSearch for Mac registers the `fsearch://` URL scheme so you can open the launch
 ## Format
 
 ```text
-fsearch://search[?q=<query>][&mode=<mode>]
+fsearch://search[?q=<query>][&mode=<mode>][&ui=<panel|window>]
 ```
 
-Only the `search` host is supported (an optional trailing slash, `fsearch://search/`, is also accepted). Scheme, host, parameter names and `mode` values are matched without regard to case.
+Only the `search` host is supported (an optional trailing slash, `fsearch://search/`, is also accepted). Scheme, host, parameter names, `mode` values and `ui` values are matched without regard to case.
 
 | Parameter | Values | Default | Meaning |
 |---|---|---|---|
 | `q` | Percent-encoded query string | Empty | Text to place in the search box. Any [query syntax](query-syntax.md) filter works here. |
 | `mode` | `names`, `content`, `symbols` | `names` | Search file names, inside files or symbol definitions. |
+| `ui` | `panel`, `window` | Settings preference | Optional override to open the classic floating panel (`panel`) or the Search Window (`window`) regardless of the default set in [Settings](settings.md). |
 
 ## Examples
 

@@ -330,15 +330,24 @@ final class QuickLookSource: NSObject, @preconcurrency QLPreviewPanelDataSource 
     func numberOfPreviewItems(in panel: QLPreviewPanel!) -> Int { item == nil ? 0 : 1 }
     func previewPanel(_ panel: QLPreviewPanel!, previewItemAt index: Int) -> (any QLPreviewItem)! { item as NSURL? }
 
+    /// The window currently controlling the shared Quick Look panel (the launcher panel or a search window).
+    private(set) weak var owner: NSWindow?
+    /// True when `window` currently owns the shared Quick Look preview control.
+    func isOwned(by window: NSWindow) -> Bool { owner === window }
     /// A local key monitor, held while the preview is attached so it is installed once.
     private var keyMonitor: Any?
 
-    /// Handles ⌘Y and ↑/↓ while Quick Look is key, returning true when the event should be swallowed.
+    /// Handles ⌘Y and (when owned by the launcher panel) ↑/↓ while Quick Look is key,
+    /// returning true when the event should be swallowed.
     nonisolated func handleKeyDown(
         characters: String, modifiers: NSEvent.ModifierFlags, keyCode: UInt16, isRepeat: Bool, inPreviewPanel: Bool
     ) -> Bool {
         let key = Self.previewKey(characters: characters, modifiers: modifiers, keyCode: keyCode)
         guard let key, inPreviewPanel else { return false }
+        if key == .up || key == .down {
+            let routesToPanel = MainActor.assumeIsolated { self.owner == nil || self.owner is PanelController.Panel }
+            guard routesToPanel else { return false }
+        }
         if Self.shouldHandle(key, isRepeat: isRepeat) {
             MainActor.assumeIsolated { self.handle(key) }
         }
@@ -364,16 +373,20 @@ final class QuickLookSource: NSObject, @preconcurrency QLPreviewPanelDataSource 
         }
     }
 
-    /// The launcher took control of the preview.
-    func attach(_ panel: QLPreviewPanel) {
+    /// A window took control of the preview.
+    func attach(_ panel: QLPreviewPanel, owner: NSWindow? = nil) {
+        self.owner = owner
         panel.dataSource = self
-        // The preview is key while it is up, so its keys (⌘Y, ↑/↓) go to it, not the launcher's key handling: handle them here.
+        // The preview is key while it is up, so its keys (⌘Y, and ↑/↓ for the launcher) go to it: handle them here.
         keyMonitor =
             keyMonitor ?? NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: Self.makeKeyMonitorHandler(for: self))
     }
 
-    /// The launcher gave up control of the preview.
-    func detach(_ panel: QLPreviewPanel) {
+    /// A window gave up control of the preview. Only tears down when `owner` is still the active controller
+    /// (so handing off directly from the panel to a Search Window doesn't strip the new controller's dataSource).
+    func detach(_ panel: QLPreviewPanel, owner: NSWindow? = nil) {
+        guard owner == nil || self.owner == nil || self.owner === owner else { return }
+        self.owner = nil
         panel.dataSource = nil
         if let m = keyMonitor { NSEvent.removeMonitor(m) }
         keyMonitor = nil

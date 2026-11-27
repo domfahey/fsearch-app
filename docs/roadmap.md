@@ -12,7 +12,7 @@ Also in v1:
 
 - App commands in the panel ("settings" opens Settings) and the panel's FSearch menu (`⌘/`).
 - `fsearch://` URL scheme ([URL scheme](reference/url-scheme.md)) and the **Search Files** Shortcuts action ([Shortcuts](reference/shortcuts.md)).
-- Accessibility support (Reduce Motion, Reduce Transparency, Increase Contrast, VoiceOver labels and traits, keyboard defaults) and English String Catalogs ready for translation.
+- Accessibility support (Reduce Motion, Reduce Transparency, Increase Contrast, VoiceOver labels and traits, keyboard defaults) and localized String Catalogs (8 languages shipped).
 - Open FSearch at login.
 - An in-app uninstall button. See [Uninstall](uninstall.md).
 - Unified logging.

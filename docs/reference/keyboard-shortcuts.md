@@ -118,8 +118,9 @@ The mouse works too: point at a row to select it, click to run it, and click out
 | Update Available… | | Shown when a scheduled update is waiting; opens the update window |
 | Turn On Full Disk Access… or Grant Full Disk Access to fsearch… | | Shown whenever Full Disk Access is off (unless you skipped and dismissed the reminder). Opens Full Disk Access in System Settings and, for FSearch's own helper, restarts the helper automatically once granted |
 | Don't Remind Me | | Shown below the Full Disk Access item only if you skipped Full Disk Access during onboarding; hides the reminder |
-| Search… | | Open the panel |
+| Search… | | Open your chosen default search interface (Launcher Panel or Search Window) |
 | New Search Window… | | Open a new Everything-style search window |
+| Launcher Panel… | | Shown when **Search Window (New)** is selected in Settings; opens the classic floating panel |
 | Index Details… | | Debug mode only |
 | Search Log… | | Debug mode only |
 | Turn On Debug Mode or Turn Off Debug Mode | ⌥⌘D | Toggle [debug mode](../how-to/turn-on-debug-mode.md). A menu-item shortcut: it works while the menu is open, not as a global hotkey. |

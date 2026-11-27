@@ -279,6 +279,7 @@ final class FakePanel: PanelHost {
     var isVisible = false
     private(set) var shows = 0, hides = 0, externalShows = 0
     private(set) var openedSearches: [SearchURL] = []
+    func toggle(app: AppState) { isVisible ? hide(returnFocus: true) : show(app: app) }
     func show(app: AppState) { shows += 1; isVisible = true }
     func showExternally(app: AppState) {
         externalShows += 1

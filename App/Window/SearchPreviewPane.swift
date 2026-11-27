@@ -5,11 +5,18 @@ import SwiftUI
 
 /// Toggleable right-hand preview pane for the search window: file metadata, content-match line highlight, and Quick Look.
 struct SearchPreviewPane: View {
+    @Environment(\.accessibilityStyleOverride) private var styleOverride
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     /// Currently selected table rows (zero, one, or many).
     let selected: [SearchWindowRow]
     let onOpen: () -> Void
     let onReveal: () -> Void
     let onCopyPath: () -> Void
+
+    private var a11y: AccessibilityStyle {
+        AccessibilityStyle.resolved(override: styleOverride, reduceTransparency: reduceTransparency, contrast: colorSchemeContrast)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -22,8 +29,9 @@ struct SearchPreviewPane: View {
             }
         }
         .padding(14)
-        .frame(minWidth: 260, idealWidth: 300, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(nsColor: .controlBackgroundColor).opacity(0.45))
+        .frame(minWidth: 250, idealWidth: 290, maxWidth: 320, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color(nsColor: .controlBackgroundColor).opacity(a11y.usesOpaqueSurface ? 1 : 0.45))
+        .clipped()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("searchWindowPreviewPane")
     }
@@ -68,18 +76,25 @@ struct SearchPreviewPane: View {
                         .foregroundStyle(.secondary)
                     Text(verbatim: matchText)
                         .font(.system(.caption, design: .monospaced))
-                        .lineLimit(4)
+                        .lineLimit(3)
                         .textSelection(.enabled)
                         .padding(8)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
+                        .background(Color.accentColor.opacity(a11y.increasedContrast ? 0.18 : 0.1), in: RoundedRectangle(cornerRadius: 6))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .strokeBorder(a11y.chipStrokeOpacity > 0 ? Color.primary.opacity(a11y.chipStrokeOpacity) : .clear)
+                        )
                 }
             }
 
             QuickLookPreviewRepresentable(url: FileActions.url(row.path))
-                .frame(maxWidth: .infinity, minHeight: 140, maxHeight: .infinity)
+                .frame(maxWidth: .infinity, minHeight: 88, maxHeight: .infinity)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
-                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.secondary.opacity(0.2)))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(Color.primary.opacity(a11y.increasedContrast ? a11y.surfaceStrokeOpacity : 0.16))
+                )
 
             Divider()
 
@@ -143,6 +158,7 @@ struct QuickLookPreviewRepresentable: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         guard !inert else { return NSView() }
         let view = QLPreviewView(frame: .zero, style: .compact) ?? QLPreviewView()
+        view.shouldCloseWithWindow = false
         view.autostarts = true
         view.previewItem = url as NSURL
         return view
@@ -153,5 +169,13 @@ struct QuickLookPreviewRepresentable: NSViewRepresentable {
         if (preview.previewItem as? URL) != url {
             preview.previewItem = url as NSURL
         }
+    }
+
+    /// Explicitly closes `QLPreviewView` when unmounted (pane hidden or selection changed) so XPC preview resources
+    /// and auto-started audio/video playback are released immediately.
+    static func dismantleNSView(_ nsView: NSView, coordinator: ()) {
+        guard let preview = nsView as? QLPreviewView else { return }
+        preview.previewItem = nil
+        preview.close()
     }
 }
