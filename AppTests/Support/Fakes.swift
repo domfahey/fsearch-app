@@ -293,17 +293,17 @@ final class FakePanel: PanelHost {
     func hide(returnFocus: Bool) { hides += 1; isVisible = false }
 }
 
-/// One app with fakes everywhere, a throwaway defaults suite in the temp directory
-/// and a temp folder. AppTests run serialized, so every TestEnv shares one fixed
-/// temp-backed suite, emptied when each starts and ends, never touching `~/Library/Preferences`.
+/// One app with fakes everywhere, an isolated throwaway defaults suite inside its
+/// own temp folder (so cfprefsd never bleeds state across tests and never touches
+/// `~/Library/Preferences`).
 @MainActor
 final class TestEnv {
-    /// Temp-directory suite path (without `.plist` so `removePersistentDomain` clears it);
+    /// Temp-directory suite path for standalone defaults tests outside `TestEnv`;
     /// cfprefsd writes only inside `NSTemporaryDirectory()`, never `~/Library/Preferences`.
     nonisolated static let unitSuite: String =
         URL(fileURLWithPath: NSTemporaryDirectory())
         .appendingPathComponent("com.domfahey.fsearch.apptests.unit").path
-    let suite = TestEnv.unitSuite
+    let suite: String
     let defaults: UserDefaults
     let dir: URL
     let daemon: StubDaemon
@@ -316,9 +316,10 @@ final class TestEnv {
 
     init(helper: FakeHelper? = nil, daemon: StubDaemon = StubDaemon()) {
         _ = TestEnv.sweptStaleSuites
-        defaults = TestEnv.emptySuite(suite)
         dir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("fsa-unit-\(UUID().uuidString.prefix(8))")
         try! FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        suite = dir.appendingPathComponent("com.domfahey.fsearch.apptests.unit").path
+        defaults = UserDefaults(suiteName: suite)!
         self.daemon = daemon
         self.helper = helper
         let options = LaunchOptions(
@@ -353,7 +354,7 @@ final class TestEnv {
         FileActions.workspace = FakeWorkspace()
         FileActions.pasteboard = NSPasteboard(name: NSPasteboard.Name("com.domfahey.fsearch.apptests.idle"))
         pasteboard.releaseGlobally()
-        _ = TestEnv.emptySuite(suite)
+        defaults.removePersistentDomain(forName: suite)
         try? FileManager.default.removeItem(at: dir)
     }
 
@@ -372,6 +373,11 @@ final class TestEnv {
     /// The suite, emptied and flushed, so cfprefsd holds no stale keys for it.
     nonisolated static func emptySuite(_ name: String) -> UserDefaults {
         let d = UserDefaults(suiteName: name)!
+        if let domain = d.persistentDomain(forName: name) {
+            for key in domain.keys {
+                d.removeObject(forKey: key)
+            }
+        }
         d.removePersistentDomain(forName: name)
         d.synchronize()
         return d

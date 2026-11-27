@@ -388,16 +388,19 @@ import Testing
 
         // Cancelled in-flight search followed by a half-typed filter must NOT stay stranded in .loading.
         let slow = StubBackend()
+        let (started, startedCont) = AsyncStream.makeStream(of: Void.self)
         slow.state.withLock { s in
             s.onSearch = { _, _ in
-                try await Task.sleep(for: .milliseconds(250))
+                startedCont.yield()
+                try await Task.sleep(for: .seconds(30))
                 return SearchReply(tookUs: 50, hits: [])
             }
         }
         let slowModel = SearchWindowModel(names: slow, content: slow)
         slowModel.query = "alpha"
         let inFlight = Task { await slowModel.refresh() }
-        try? await Task.sleep(for: .milliseconds(20))
+        var startedIt = started.makeAsyncIterator()
+        _ = await startedIt.next()
         #expect(slowModel.phase == .loading)
         inFlight.cancel()
         await inFlight.value
@@ -436,10 +439,12 @@ import Testing
 
     @Test func newerRefreshCancelsStaleInFlightSearch() async {
         let backend = StubBackend()
+        let (started, startedCont) = AsyncStream.makeStream(of: Void.self)
         backend.state.withLock { s in
             s.onSearch = { q, _ in
                 if q == "slow" {
-                    try await Task.sleep(for: .seconds(5))
+                    startedCont.yield()
+                    try await Task.sleep(for: .seconds(30))
                 }
                 return SearchReply(tookUs: 50, hits: [Hit(path: "/p/\(q).txt", kind: "file", size: 1, mtime: 1, score: 1)])
             }
@@ -447,7 +452,8 @@ import Testing
         let model = SearchWindowModel(names: backend, content: backend)
         model.query = "slow"
         let first = Task { await model.refresh() }
-        try? await Task.sleep(for: .milliseconds(20))
+        var startedIt = started.makeAsyncIterator()
+        _ = await startedIt.next()
         model.query = "fast"
         await model.refresh()
         await first.value
