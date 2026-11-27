@@ -98,7 +98,7 @@ enum AppMenuActions {
             case .changelog: "Changelog"
             case .github: "GitHub"
             case .discussions: "Discussions"
-            case .sendFeedback, .about, .settings, .quit: nil
+            case .sendFeedback, .about, .searchWindow, .settings, .quit: nil
             }
         return title.flatMap(HelpLinks.item)?.url
     }
@@ -115,6 +115,10 @@ enum AppMenuActions {
         case .about:
             app.panel.hide(returnFocus: false)
             showAbout()
+        case .searchWindow:
+            let query = app.search.query
+            app.panel.hide(returnFocus: false)
+            SearchWindowManager.open(app, query)
         case .settings:
             // The same steps as the panel's FSearch Settings row (PanelController.run).
             PanelController.openSettings()

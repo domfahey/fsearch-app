@@ -31,6 +31,56 @@
         }
       }
     },
+    "%lld results": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld results"
+          }
+        }
+      }
+    },
+    "%lld results (limit reached)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld results (limit reached)"
+          }
+        }
+      }
+    },
+    "%lld selected": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld selected"
+          }
+        }
+      }
+    },
+    "%lld selected (%@)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld selected (%2$@)"
+          }
+        }
+      }
+    },
+    "1 result": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 result"
+          }
+        }
+      }
+    },
     "About FSearch": {
       "localizations": {
         "en": {
@@ -47,6 +97,66 @@
           "stringUnit": {
             "state": "translated",
             "value": "Alfred may use ⌥ Space. Pick another shortcut, or change Alfred's."
+          }
+        }
+      }
+    },
+    "Alias": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alias"
+          }
+        }
+      }
+    },
+    "Aliases": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aliases"
+          }
+        }
+      }
+    },
+    "Application": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Application"
+          }
+        }
+      }
+    },
+    "Apps": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apps"
+          }
+        }
+      }
+    },
+    "Archives": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Archives"
+          }
+        }
+      }
+    },
+    "Audio": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio"
           }
         }
       }
@@ -71,6 +181,16 @@
         }
       }
     },
+    "Code": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code"
+          }
+        }
+      }
+    },
     "Community": {
       "localizations": {
         "en": {
@@ -81,12 +201,52 @@
         }
       }
     },
+    "Desktop": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desktop"
+          }
+        }
+      }
+    },
+    "Developer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Developer"
+          }
+        }
+      }
+    },
     "Discussions": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "Discussions"
+          }
+        }
+      }
+    },
+    "Documents": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Documents"
+          }
+        }
+      }
+    },
+    "Downloads": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloads"
           }
         }
       }
@@ -151,6 +311,46 @@
         }
       }
     },
+    "File": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "File"
+          }
+        }
+      }
+    },
+    "Files only": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Files only"
+          }
+        }
+      }
+    },
+    "Folder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Folder"
+          }
+        }
+      }
+    },
+    "Folders only": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Folders only"
+          }
+        }
+      }
+    },
     "Full Disk Access is off, so some files won't be found": {
       "localizations": {
         "en": {
@@ -167,6 +367,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Grant Full Disk Access to fsearch…"
+          }
+        }
+      }
+    },
+    "Images": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Images"
           }
         }
       }
@@ -201,12 +411,32 @@
         }
       }
     },
+    "Large Files": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Large Files"
+          }
+        }
+      }
+    },
     "Manual": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "Manual"
+          }
+        }
+      }
+    },
+    "New Search Window": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Search Window"
           }
         }
       }
@@ -231,6 +461,86 @@
         }
       }
     },
+    "Over 1 MB": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Over 1 MB"
+          }
+        }
+      }
+    },
+    "Over 10 MB": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Over 10 MB"
+          }
+        }
+      }
+    },
+    "Over 100 MB": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Over 100 MB"
+          }
+        }
+      }
+    },
+    "Past 24 hours": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Past 24 hours"
+          }
+        }
+      }
+    },
+    "Past 30 days": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Past 30 days"
+          }
+        }
+      }
+    },
+    "Past 7 days": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Past 7 days"
+          }
+        }
+      }
+    },
+    "Past hour": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Past hour"
+          }
+        }
+      }
+    },
+    "Past year": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Past year"
+          }
+        }
+      }
+    },
     "Quit FSearch": {
       "localizations": {
         "en": {
@@ -247,6 +557,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Raycast uses ⌥ Space. Pick another shortcut, or turn Raycast's off."
+          }
+        }
+      }
+    },
+    "Recent Code": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recent Code"
+          }
+        }
+      }
+    },
+    "Search Window…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search Window…"
           }
         }
       }
@@ -411,12 +741,32 @@
         }
       }
     },
+    "Under 100 KB": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Under 100 KB"
+          }
+        }
+      }
+    },
     "Unexpected reply from the search daemon: %@": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "Unexpected reply from the search daemon: %@"
+          }
+        }
+      }
+    },
+    "Video": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video"
           }
         }
       }
