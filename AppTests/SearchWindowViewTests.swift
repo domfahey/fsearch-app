@@ -126,9 +126,10 @@ extension AppTests {
             #expect(SearchWindowManager.windowTitle(for: "  ") == "FSearch")
             #expect(SearchWindowManager.windowTitle(for: "hello") == "FSearch — hello")
 
-            // Default open seam works inertly in unit tests.
+            // Default open seams (names + non-default mode) work inertly in unit tests.
             SearchWindowManager.open(env.app, "seam")
-            #expect(SearchWindowManager.shared.openCount == 1)
+            SearchWindowManager.openWithMode(env.app, "body", .content)
+            #expect(SearchWindowManager.shared.openCount == 2)
             SearchWindowManager.shared.closeAll()
             #expect(SearchWindowManager.shared.openCount == 0)
 
@@ -593,6 +594,7 @@ extension AppTests {
             let otherTitled = NSWindow(
                 contentRect: NSRect(x: -20_000, y: -20_000, width: 300, height: 200),
                 styleMask: [.titled], backing: .buffered, defer: false)
+            otherTitled.isReleasedWhenClosed = false
             otherTitled.alphaValue = 0
             otherTitled.ignoresMouseEvents = true
             otherTitled.orderFrontRegardless()

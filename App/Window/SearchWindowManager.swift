@@ -97,7 +97,7 @@ final class SearchWindowManager {
             forName: NSWindow.willCloseNotification, object: window, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
-                self?.removeWindow(id: id)
+                self?.removeWindow(id: id, deferContentClear: true)
             }
         }
         let keyToken = NotificationCenter.default.addObserver(
@@ -171,8 +171,10 @@ final class SearchWindowManager {
 
     /// Closes a single open search window by id.
     func closeWindow(id: UUID) {
-        windows[id]?.close()
-        removeWindow(id: id)
+        let win = windows[id]
+        win?.close()
+        removeWindow(id: id, deferContentClear: false)
+        win?.contentView = nil
     }
 
     /// Closes all currently open search windows.
@@ -188,7 +190,7 @@ final class SearchWindowManager {
         windowOrder.append(id)
     }
 
-    private func removeWindow(id: UUID) {
+    private func removeWindow(id: UUID, deferContentClear: Bool) {
         let win = windows.removeValue(forKey: id)
         windowOrder.removeAll { $0 == id }
         if let tokens = observers.removeValue(forKey: id) {
@@ -205,7 +207,12 @@ final class SearchWindowManager {
                 browser.keyBridge = nil
             }
             // Release NSHostingView, SearchWindowView, SearchWindowModel, and its dedicated daemon sockets.
-            win.contentView = nil
+            // Defer when triggered by willCloseNotification so AppKit finishes NSWindow.close() first.
+            if deferContentClear {
+                DispatchQueue.main.async { win.contentView = nil }
+            } else {
+                win.contentView = nil
+            }
         }
     }
 }
