@@ -39,7 +39,7 @@ Open work, by priority. "You" items need the maintainer: a decision, credentials
 - [ ] Task 0: the Full Disk Access attribution experiment (which binary macOS lists).
 - [ ] Set up the GitHub Pages site behind `SUFeedURL`, and add the CI secrets listed in docs/release-checklist.md.
 - [ ] Test an update: install a build with a lowered `CFBundleVersion`, run `defaults delete com.domfahey.fsearch SULastCheckTime`, and confirm the update is offered.
-- [ ] Tag `v0.1.0` on `main` (CI's `release` job builds the DMG, `.sha256` and `.intoto.jsonl` provenance attestation into a draft GitHub release; local fallback: `scripts/release.sh 0.1.0`), run `scripts/appcast.sh`, publish the release and `gh-pages` appcast, then add a Homebrew cask (with `zap`).
+- [ ] Tag `v0.1.0` on `main` (CI's `release` job builds the DMG, `.sha256`, DMG `.intoto.jsonl` provenance attestation, and daemon CycloneDX SBOM with its `.intoto.jsonl` attestation into a draft GitHub release; local fallback: `scripts/release.sh 0.1.0`), run `scripts/appcast.sh`, publish the release and `gh-pages` appcast, then add a Homebrew cask (with `zap`).
 
 **By hand**
 - [ ] Manual checks:

@@ -63,7 +63,7 @@ Two modes keep tests away from your real setup. **Test mode** starts when you pa
 |---|---|---|---|
 | FSearchKit unit and integration tests, against a real daemon in a temporary `HOME` | `make test` | Yes | Yes, on macOS 26 with a 95% coverage gate |
 | AppTests, the app's unit tests, in an inert host with fakes | `make apptest` or `scripts/coverage.sh --unit-only` | Yes. The host shows nothing and takes no focus. | Yes, with a 95% coverage gate |
-| UI and end-to-end tests (AppUITests) | `make ui` | No. It synthesizes keystrokes. Use a hands-off GUI session. | No |
+| UI and end-to-end tests (AppUITests, 28 tests, ~2 min) | `make ui` | No. It synthesizes keystrokes. Use a hands-off GUI session. | No |
 | Benchmarks | `scripts/bench.sh --report-only --skip-daemon` (or `make bench` for the full run) | Yes | Yes, gated against `ci-macos-26` (warns on busy runner) |
 
 **Focus-safety rule.** AppTests must never show a window, take the keyboard or bring FSearch to the front, because you may be working at the Mac. A test that needs real focus or keystrokes belongs in AppUITests. While AppUITests run, leave the Mac alone.
@@ -84,10 +84,10 @@ Two modes keep tests away from your real setup. **Test mode** starts when you pa
 | Remove build outputs / also the daemon and generated project | `make clean` / `make distclean` | |
 
 - `make test` needs `Vendor/fsearch` from `make daemon`, and builds it if it is missing.
-- `make lint` ends with `lint: ok` when everything passes. The checks print nothing of their own on success. It includes `scripts/check-links.sh`, which checks that every relative Markdown link and anchor resolves. CI runs it, so run it when you edit docs.
+- `make lint` ends with `lint: ok` when everything passes. Most checks print nothing of their own on success, while `scripts/check-links.sh` prints its Markdown file count. `check-links.sh` checks that every relative Markdown link and anchor resolves. CI runs it, so run it when you edit docs.
 
 - [`.github/workflows/deps.yml`](.github/workflows/deps.yml) scans the dependencies in CI. It runs `cargo-deny` on the daemon's crates (policy in [`.github/cargo-deny.toml`](.github/cargo-deny.toml): advisories, yanked crates, sources and bans) and `osv-scanner` on the daemon's `Cargo.lock` and `Package.resolved`. It runs on pull requests, on pushes to `main` and weekly. It reads lockfiles only and builds nothing. If it flags a crate, bump the pin or, with a reason, add an exception to `cargo-deny.toml` in the same pull request.
-- [`scripts/test-appcast-verify.sh`](scripts/test-appcast-verify.sh) checks that `scripts/appcast.sh` refuses to sign an unverified DMG and ignores a `generate_appcast` on `PATH`. It uses a fake DMG and stub tools and signs nothing. `make lint` runs it.
+- [`scripts/test-appcast-verify.sh`](scripts/test-appcast-verify.sh) checks that `scripts/appcast.sh` refuses to sign an unverified DMG and ignores a `generate_appcast` on `PATH`. It uses a fake DMG and stub tools and signs nothing. Both `make lint` and CI's `lint` job run it.
 
 ## Running your own build
 
@@ -159,7 +159,7 @@ Use the issue templates. For a bug, include the Index Details output from debug 
 | Swift 6 strict-concurrency errors | Fix the isolation: mark the type `@MainActor` or `Sendable`, or move the work off the main actor. Do not turn the checks down. |
 | A git hook refuses your commit with "secret check" | Remove the key or token from the change. Don't use `--no-verify`; if it's a false positive, fix the pattern in `scripts/hooks/check-secrets.sh`. |
 | Your build lost Full Disk Access after a rebuild | An ad-hoc build is a new app to macOS each time. Turn the entry off and on, or remove and re-add it. See [Running your own build](#running-your-own-build). |
-| `make lint` seems to print nothing | On success it ends with `lint: ok`. A skipped check says so, for example "shellcheck not installed; skipped". |
+| `make lint` seems to print almost nothing | On success most checks stay quiet (aside from `scripts/check-links.sh`'s file count) and the target ends with `lint: ok`. A skipped check says so, for example "shellcheck not installed; skipped". |
 | `make doctor` reports a failed check | Follow the `fix:` line under it. |
 
 ## Updating dependencies

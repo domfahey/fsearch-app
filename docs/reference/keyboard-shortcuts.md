@@ -47,7 +47,7 @@ Notes:
 
 ## App commands
 
-Type at least two letters of a command's name (or of its keywords) to show its row under the file results, just above the "Use … with…" rows. Command rows appear only in name search, not in Inside files or Definitions mode. ↵ still opens the top file; select the command row first (↓, or click it). With no matching files, the command row is first.
+Type at least the first two letters of one of a command's keywords (listed below — matching checks keywords, not the row title) to show its row under the file results, just above the "Use … with…" rows. Command rows appear only in name search, not in Inside files or Definitions mode. ↵ still opens the top file; select the command row first (↓, or click it). With no matching files, the command row is first.
 
 | Type | Row | ↵ does |
 |---|---|---|

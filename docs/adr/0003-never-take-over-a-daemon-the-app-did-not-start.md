@@ -43,9 +43,9 @@ See [Use FSearch with the fsearch CLI](../how-to/use-with-the-fsearch-cli.md).
 
 ## Update note
 
-Three refinements landed after this ADR was accepted while keeping the never-take-over invariant intact:
+Four refinements landed after this ADR was accepted while keeping the never-take-over invariant intact:
 
 - When the CLI's login agent plist (`mt.nd.fsearch.plist`) exists and nothing answers immediately, the app now waits up to 10 seconds (`DaemonPlan.recheckWindow(cliAgentInstalled: true)`) before falling back to registering its bundled helper, so a stale leftover plist no longer leaves the app without a daemon.
-- Daemon ownership is verified against `socket.lock` via `SocketHolder` (checking the live process path and, outside the app bundle, its team code signature) rather than relying solely on `SMAppService` status.
+- Daemon ownership is verified by combining the connected control-socket peer's code signature via `PeerIdentifier` (`LOCAL_PEERTOKEN`) with `socket.lock` via `SocketHolder` (checking the live process path and, outside the app bundle, its team code signature) through `DaemonPlan.holder`, where `other` wins if either says `other`, rather than relying solely on `SMAppService` status (see [ADR 0017](0017-trust-only-a-same-user-daemon-socket.md)).
 - The pinned daemon build (fork commit `d26cf78`, see [ADR 0010](0010-pin-the-daemon-to-a-fork-commit.md)) includes `ba100f4`, which lets a daemon launched by a login agent (it checks `XPC_SERVICE_NAME`) stop a stray daemon and take the socket lock. That commit exists only on the `domfahey/fsearch` fork, not in upstream `noahdunnagan/fsearch` (v0.2.2 still lets the loser give way). It is the daemon's behavior, not the app stopping a daemon; the app still never takes over a daemon it did not start.
 - "Restart" for a daemon the app does not own is not always a bare check. `DaemonPlan.restartAction` returns `.start` when nothing answers and the daemon is not ours, which registers the bundled helper. It returns `.refreshOnly` when another daemon answers. Separately, the app restarts its own helper once after an app update changes the helper binary (`DaemonPlan.helperUpdate`, `DaemonManager.restartIfUpdated`).

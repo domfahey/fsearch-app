@@ -29,3 +29,7 @@ A URL never searches silently and never runs a file action. The person sees the 
 - Callers that want results without the panel use the [Search Files action](0015-app-intents-search-files-action.md) instead.
 - The scheme is documented in the [URL scheme reference](../reference/url-scheme.md).
 - Adding a host or action later means a new decision, since the "never acts" rule is what makes the scheme safe to expose.
+
+## Amendment
+
+2026-11-26: External opens of the panel are now protected against stray activation keystrokes by `ExternalOpenGuard` (`Packages/FSearchKit/Sources/FSearchKit/PanelKeys.swift`). `PanelController.show(app:search:)` (for `fsearch://` URLs) and `PanelController.showExternally(app:)` (for a second-instance reopen handover) arm a 0.5 s guard window on a monotonic `ContinuousClock`; while the window is active, the panel ignores `↵`, `⌘↵`, and `⌘1–9` so a keystroke intended for another app cannot act on a result row selected by an external open. Opening the panel via the global hotkey or menu bar disarms the guard. The decision above stands.

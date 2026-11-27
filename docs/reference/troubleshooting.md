@@ -49,6 +49,7 @@ The file opens without jumping to the line when:
 
 - you left **Open content results in** on **Default app** (opens in the default app);
 - the chosen editor is gone, or LaunchServices returns an error when opening with it (falls back to the default app);
+- the chosen editor failed FSearch's code-signature check — for example, a copy you re-signed, built from source, or whose resources changed (falls back to the default app and shows "Not opening in *Editor*: its code signature isn't the genuine app's. Opened with the default app." in the panel footer; see [Editor signature check](../how-to/open-results-in-your-editor.md#editor-signature-check));
 - the chosen editor is Xcode, or another installed editor whose open-at-line URL scheme is not registered with LaunchServices (opens in that chosen editor, without jumping to the line);
 - the result is a file name, not a matching line. Only matching lines open at a line.
 

@@ -88,7 +88,7 @@ make test     # run the FSearchKit tests
 
 ## Privacy
 
-Your index and logs stay on your Mac. The app has no telemetry and makes no network requests of its own. The only network code is the Sparkle updater, which checks for updates once it is configured. Links you click (the Help menu, the FSearch menu, Report an Issue…, About credits) open github.com in your browser. Report an Issue… puts the app version, macOS version, chip and daemon state (never paths or queries) in the URL. See [Privacy](docs/privacy.md).
+Your index and logs stay on your Mac. The app has no telemetry and makes no network requests of its own. The only network code is the Sparkle updater, which checks for updates once it is configured. Links you click in the Help menu, the FSearch menu, and Report an Issue… open github.com in your browser; About credits also link to the Sparkle, Raycast, and Everything websites. Report an Issue… puts the app version, macOS version, chip and daemon state (never paths or queries) in the URL. See [Privacy](docs/privacy.md).
 
 ## Contributing
 

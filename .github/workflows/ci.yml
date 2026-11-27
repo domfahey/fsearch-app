@@ -84,6 +84,8 @@ jobs:
         run: scripts/check-links.sh
       - name: Syntax-check shell scripts
         run: for f in scripts/*.sh scripts/hooks/*; do bash -n "$f"; done
+      - name: Verify appcast signing guardrails
+        run: scripts/test-appcast-verify.sh
       - name: Install actionlint and shellcheck (pinned, checksum-verified)
         env:
           ACTIONLINT: '1.7.12'

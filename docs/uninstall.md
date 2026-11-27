@@ -11,7 +11,7 @@ FSearch then:
 
 - turns off its own background helper, whether it is running or still waiting for your approval in Login Items. A helper from the fsearch command-line tool (`mt.nd.fsearch`) is never touched.
 - turns off **Open FSearch at login**.
-- moves `~/Library/Application Support/FSearch` (the index) to the Trash, only if FSearch's helper was running the daemon and the CLI's login agent (`~/Library/LaunchAgents/mt.nd.fsearch.plist`) isn't installed. Otherwise the folder stays and the window says why.
+- moves `~/Library/Application Support/FSearch` (the index) to the Trash, only if FSearch's helper was running the daemon, the CLI's login agent (`~/Library/LaunchAgents/mt.nd.fsearch.plist`) isn't installed, the helper was turned off cleanly, and the folder is a normal folder owned by your account (not a symbolic link or owned by another user). Otherwise the folder stays and the window says why.
 - moves `~/Library/Logs/FSearch` to the Trash.
 - clears its settings, recent files and update-check settings.
 - resets its global shortcut.
