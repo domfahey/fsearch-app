@@ -227,14 +227,17 @@ final class PanelUITests: PanelUITestCase {
         waitFor(text("notes.md"))
     }
 
-    /// Debug mode shows the timing footer; the script checks the search log
-    /// landed in the temp HOME and the real ~/Library/Logs was left alone.
+    /// Debug mode shows the timing footer and writes its search log inside the temp HOME;
+    /// scripts/ui-smoke.sh also checks the real ~/Library/Logs was left alone.
     func testDebugModeShowsTimingAndLogsInTempHome() throws {
         try launch(debugMode: true)
         try search("heronfile")
         waitFor(text("heronfile.txt"))
         let footer = app.staticTexts.matching(NSPredicate(format: "value CONTAINS ' ms · ' AND value ENDSWITH ' results'")).firstMatch
         waitFor(footer, 10)
+        waitUntil(5, "debug search log written in temp HOME") {
+            (try? String(contentsOf: self.debugSearchLogURL, encoding: .utf8))?.contains("heronfile") == true
+        }
     }
 
     func testNoTimingFooterWithoutDebugMode() throws {
@@ -446,6 +449,9 @@ final class PanelUITests: PanelUITestCase {
         try await openURLInTestApp(url)
         waitFor(field, 5)
         waitUntil(5, "field focused after external open") { self.field.value(forKey: "hasKeyboardFocus") as? Bool == true }
+        guard app.state == .runningForeground else {
+            throw UITestRefusal("FSearch isn't frontmost: not sending keys", file: #filePath, line: #line)
+        }
         let elapsedBeforeReturn = ContinuousClock.now - opened
         field.typeKey(.return, modifierFlags: [])
         XCTAssertLessThan(
