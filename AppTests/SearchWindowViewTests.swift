@@ -650,6 +650,20 @@ extension AppTests {
             let mw = await render(menuView, size: NSSize(width: 240, height: 320))
             defer { mw.close() }
             #expect(await axWait("Launcher Panel…", in: mw) != nil)
+
+            // SettingsView exposes the Search interface picker as an AXPopUpButton with identifier "searchInterfacePicker".
+            let settingsWin = await render(
+                SettingsView(
+                    loginItem: LoginItemModel(service: nil),
+                    uninstaller: Uninstaller(
+                        helper: nil, loginItem: nil, workspace: env.workspace, defaults: env.defaults,
+                        dataFolder: env.dir, logFolder: env.dir, exists: { _ in false },
+                        cliAgentInstalled: { false }, resetShortcut: {})
+                ).environmentObject(env.app),
+                size: NSSize(width: 440, height: 600))
+            defer { settingsWin.close() }
+            let pickerNode = try #require(await axWait(id: "searchInterfacePicker", in: settingsWin))
+            #expect(pickerNode.role == NSAccessibility.Role.popUpButton.rawValue)
         }
     }
 }

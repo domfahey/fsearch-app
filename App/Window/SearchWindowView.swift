@@ -184,7 +184,11 @@ struct SearchWindowView: View {
             tableSortOrder = SearchWindowComparator.from(model.sort)
             keyBridge?.togglePreview = { showPreview.toggle() }
             keyBridge?.focusSearch = { DispatchQueue.main.async { searchFocused = true } }
-            keyBridge?.onTableFocusChanged = { tableHasFocus = $0 }
+            keyBridge?.onTableFocusChanged = { allows in
+                DispatchQueue.main.async {
+                    if tableHasFocus != allows { tableHasFocus = allows }
+                }
+            }
             DispatchQueue.main.async { searchFocused = true }
         }
         .onDisappear {

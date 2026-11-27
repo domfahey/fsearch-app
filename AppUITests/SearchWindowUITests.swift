@@ -421,21 +421,22 @@ final class SearchWindowUITests: PanelUITestCase {
             self.recordedActions.dropFirst(beforeReveal).contains("reveal \(multiFile)")
         }
 
-        // ⌘⌫ trashes the file once (deduplicated across both line matches) with no error.
-        let beforeTrash = recordedActions.count
-        try pressInApp(.delete, .command)
-        waitUntil(5, "⌘⌫ recorded deduplicated trash") {
-            self.recordedActions.dropFirst(beforeTrash).filter { $0 == "trash \(multiFile)" }.count == 1
-        }
-        assertStaysAbsent(windowElement("searchWindowError", in: win), 1)
-
-        // ⌘Y opens and closes Quick Look from a selected table row.
+        // ⌘Y opens and closes Quick Look from the selected table rows (before trashing clears selection).
         let ql = app.windows["Quick Look"]
         XCTAssertFalse(ql.exists)
         try pressInApp("y", .command)
         waitFor(ql, 10)
         try pressInApp("y", .command)
         waitForAbsence(ql, 10)
+
+        // ⌘⌫ trashes the file once (deduplicated across both line matches), clears selection, and shows no error.
+        let beforeTrash = recordedActions.count
+        try pressInApp(.delete, .command)
+        waitUntil(5, "⌘⌫ recorded deduplicated trash") {
+            self.recordedActions.dropFirst(beforeTrash).filter { $0 == "trash \(multiFile)" }.count == 1
+        }
+        waitForAbsence(windowElement("searchWindowSelectionSummary", in: win), 5)
+        assertStaysAbsent(windowElement("searchWindowError", in: win), 1)
     }
 
     // MARK: - UI Version Switcher (Classic Panel vs New Search Window)
