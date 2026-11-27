@@ -33,7 +33,7 @@ The daemon's socket accepts connections from any process that runs as your user.
 
 ## External drives
 
-External drives are untested. The daemon treats `/Volumes` as a guarded folder and does not cross into other volumes, so files on an external drive are probably not indexed.
+External drives, disk images, and network shares mounted under `/Volumes` are not indexed. Without Full Disk Access, the daemon skips `/Volumes` outright. Even with Full Disk Access, both initial scans and live FSEvents updates check mount status and never descend into mounted volumes (only macOS APFS firmlinks, such as `/Users`, are crossed).
 
 ## Editors
 

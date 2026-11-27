@@ -64,8 +64,12 @@ OUT_ABS=$(cd "$OUT" && pwd)
 rc=0
 # Throwaway defaults suites the tests leave behind (TestEnv, AppDefaults.testSuiteName);
 # never the real com.domfahey.fsearch.plist.
-# Only the apptests suites; the glob can't match com.domfahey.fsearch.plist.
-sweep_test_defaults() { rm -f "$HOME"/Library/Preferences/com.domfahey.fsearch.apptests.*.plist; }
+# Only the apptests suites (temp dir + any legacy ~/Library/Preferences files);
+# the glob can't match com.domfahey.fsearch.plist.
+sweep_test_defaults() {
+  rm -f "$HOME"/Library/Preferences/com.domfahey.fsearch.apptests.*.plist
+  [ -n "${TMPDIR:-}" ] && rm -f "${TMPDIR%/}"/com.domfahey.fsearch.apptests.*.plist
+}
 trap sweep_test_defaults EXIT
 
 # FSearchKit line coverage from SwiftPM (llvm-cov), gated by --min.

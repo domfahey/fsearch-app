@@ -329,7 +329,8 @@ import Testing
             InstallLocation.problem(bundlePath: "/Volumes/FSearch/FSearch.app", translocated: false, readOnlyVolume: true)
                 == .readOnlyVolume)
         for p in [InstallLocation.Problem.translocated, .readOnlyVolume] {
-            #expect(p.message.contains("Applications"))
+            #expect(p.message.contains("Move to Applications"))
+            #expect(p.message.contains("background helper"))
         }
     }
 

@@ -2,15 +2,10 @@
 
 Open work, by priority. "You" items need the maintainer: a decision, credentials, design work or a public action. Finished work lives in [CHANGELOG.md](../CHANGELOG.md) and the git history, not here.
 
-## P2: smaller bugs and polish
-
-- [ ] One empty `com.domfahey.fsearch.apptests.unit.plist` stays in ~/Library/Preferences after a full AppTests run (cfprefsd writes it back); it is swept on the next run.
-
 ## Docs follow-ups
 
 - [ ] Switch the Help menu links (`HelpLinks.base`, `blob/main`) to tag-pinned links after 0.1.0.
 - [ ] Confirm the GitHub Pages location for the appcast (the runbook assumes a `gh-pages` branch with `appcast.xml` at its root).
-- [ ] Check external drives (`/Volumes`); the docs currently say "untested, probably not indexed".
 
 ## P2: features
 
@@ -51,6 +46,5 @@ Open work, by priority. "You" items need the maintainer: a decision, credentials
   - editor URL schemes for VS Code and Cursor (and Zed, Sublime Text and BBEdit if installed).
 
 **Design and outreach**
-- [ ] Review the app's new launch-time "Move to Applications" alert wording.
 - [ ] App icon (original; no third-party assets) and README screenshots or a demo GIF.
 - [ ] Follow up on noahdunnagan/fsearch#18.

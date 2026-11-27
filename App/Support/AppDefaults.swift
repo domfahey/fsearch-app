@@ -11,8 +11,11 @@ import Foundation
 /// `UserDefaults.standard`, which a test-mode app still shares with the real
 /// app because both have the same bundle id.
 enum AppDefaults {
-    /// Matches the sweep in scripts/coverage.sh and scripts/ui-smoke.sh.
-    static let testSuiteName = "com.domfahey.fsearch.apptests.testmode"
+    /// Stored under the temporary directory (no `.plist` suffix so `removePersistentDomain` works)
+    /// so test runs never leave a plist in `~/Library/Preferences`.
+    static let testSuiteName: String =
+        URL(fileURLWithPath: NSTemporaryDirectory())
+        .appendingPathComponent("com.domfahey.fsearch.apptests.testmode").path
 
     /// The defaults every part of the app reads and writes: the real ones, or the throwaway suite in test mode.
     // UserDefaults is thread-safe; the SDK just doesn't mark it Sendable.

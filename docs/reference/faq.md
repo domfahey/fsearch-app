@@ -60,7 +60,7 @@ Name searches return up to 50 results. To get more, add `limit:`, such as `limit
 
 ## Does it search external drives?
 
-Probably not. The daemon treats `/Volumes`, where external drives mount, as a guarded folder and does not cross into other volumes. FSearch for Mac has not been tested with external drives, so treat them as unsupported. See [Known limitations](limitations.md).
+No. Without Full Disk Access the daemon skips `/Volumes`, and even with Full Disk Access its scanner and live updater never cross mount points into other volumes (only macOS APFS firmlinks such as `/Users` are crossed). Files on external drives, disk images, and network shares under `/Volumes` are not indexed. See [Known limitations](limitations.md#external-drives).
 
 ## Which folders does search inside files skip?
 

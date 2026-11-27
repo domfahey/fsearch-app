@@ -31,8 +31,9 @@ cleanup() {
   fi
   [ -n "$H" ] && rm -rf "$H"
   [ -n "$LOG" ] && rm -f "$LOG"
-  # The app's test-mode defaults suite (AppDefaults.testSuiteName).
+  # The app's test-mode defaults suite (AppDefaults.testSuiteName, plus any legacy ~/Library/Preferences files).
   rm -f "$HOME"/Library/Preferences/com.domfahey.fsearch.apptests.*.plist
+  [ -n "${TMPDIR:-}" ] && rm -f "${TMPDIR%/}"/com.domfahey.fsearch.apptests.*.plist
 }
 trap cleanup EXIT
 # A short path under /private/tmp: a Unix socket path can be at most 104 bytes.

@@ -292,12 +292,16 @@ final class FakePanel: PanelHost {
     func hide(returnFocus: Bool) { hides += 1; isVisible = false }
 }
 
-/// One app with fakes everywhere, a throwaway defaults suite and a temp folder.
-/// AppTests run serialized, so every TestEnv shares one fixed suite, emptied
-/// when each starts and ends: at most one plist exists, removed at exit.
+/// One app with fakes everywhere, a throwaway defaults suite in the temp directory
+/// and a temp folder. AppTests run serialized, so every TestEnv shares one fixed
+/// temp-backed suite, emptied when each starts and ends, never touching `~/Library/Preferences`.
 @MainActor
 final class TestEnv {
-    nonisolated static let unitSuite = "com.domfahey.fsearch.apptests.unit"
+    /// Temp-directory suite path (without `.plist` so `removePersistentDomain` clears it);
+    /// cfprefsd writes only inside `NSTemporaryDirectory()`, never `~/Library/Preferences`.
+    nonisolated static let unitSuite: String =
+        URL(fileURLWithPath: NSTemporaryDirectory())
+        .appendingPathComponent("com.domfahey.fsearch.apptests.unit").path
     let suite = TestEnv.unitSuite
     let defaults: UserDefaults
     let dir: URL
@@ -352,20 +356,15 @@ final class TestEnv {
         try? FileManager.default.removeItem(at: dir)
     }
 
-    /// Once per run: deletes suites an earlier, interrupted run left behind
-    /// (never the app's own test-mode suite, which this host has open).
+    /// Once per run: cleans up any legacy plists an older checkout left in `~/Library/Preferences`,
+    /// and removes the temp-backed unit suite plist at process exit.
     static let sweptStaleSuites: Void = {
         let prefs = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Preferences")
         let names = (try? FileManager.default.contentsOfDirectory(atPath: prefs.path)) ?? []
         for n in names
-        where n.hasPrefix("com.domfahey.fsearch.apptests.") && n.hasSuffix(".plist")
-            && n != AppDefaults.testSuiteName + ".plist"
-        {
+        where n.hasPrefix("com.domfahey.fsearch.apptests.") && n.hasSuffix(".plist") {
             try? FileManager.default.removeItem(at: prefs.appendingPathComponent(n))
         }
-        // At the end of the run, best effort, the shared suite's (now empty)
-        // plist goes too; cfprefsd may still write it back, and the sweep above
-        // (and scripts/coverage.sh, ui-smoke.sh) removes it next time.
         atexit { TestEnv.deletePlist(TestEnv.unitSuite) }
     }()
 
@@ -378,9 +377,12 @@ final class TestEnv {
     }
 
     nonisolated static func deletePlist(_ name: String) {
-        let plist = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Preferences/\(name).plist")
-        try? FileManager.default.removeItem(at: plist)
+        let path =
+            name.hasPrefix("/")
+            ? name + ".plist"
+            : FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent("Library/Preferences/\(name).plist").path
+        try? FileManager.default.removeItem(atPath: path)
     }
 }
 

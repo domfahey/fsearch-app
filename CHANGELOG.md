@@ -67,8 +67,12 @@ Nothing has been released yet. Version 0.1.0 will be the first release. "Fixed" 
 - The debug search log folder is private (0700) and its file 0600, both excluded from backups. The privacy manifest gives one reason for file timestamps, C617.1: the app reads them only for its own files and never shows them.
 - CI's coverage gates are now 95% for both FSearchKit and the app's unit tests (up from 90% each).
 - CI's `bench` job now compares against a `ci-macos-26` baseline in `bench/baseline.json` (seeded from five hosted `macos-26` runs with hosted-runner tolerances), failing on reproduced regressions while warning on inconclusive busy-runner runs (exit 75).
+- Refined the launch-time "Move to Applications" alert copy to explain why the background helper can't stay registered from a disk image or temporary location and that **Move to Applications** copies and reopens the app automatically.
+- Clarified external-drive behavior in the docs: the pinned daemon skips `/Volumes` without Full Disk Access and never crosses mount points even with Full Disk Access, so external drives, disk images, and network shares are not indexed.
 
 ### Fixed
+
+- Test-mode and unit-test `UserDefaults` suites (`AppDefaults`, `AppTests`, and `FSearchKitTests`) now store their plists under `NSTemporaryDirectory()`, stopping `cfprefsd` from leaving empty test plists behind in `~/Library/Preferences`. Added `*.profraw` to `.gitignore`.
 
 - Socket replies must finish within the request timeout, even when partial data keeps arriving.
 - A file refused by its default app shows an error and keeps the panel open without adding a recent; a failed editor fallback also reports the error.
