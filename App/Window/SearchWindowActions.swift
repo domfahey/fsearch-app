@@ -5,14 +5,27 @@ import Foundation
 /// Multi-select file actions for the Everything-style search window, routed through ``FileActions`` seams.
 @MainActor
 enum SearchWindowActions {
-    /// Opens each selected row, respecting ``FileActions/revealsOnReturn(_:editor:)`` for launchables
-    /// and recording non-launchable opened files in Recents.
+    /// Returns unique raw file paths from `rows`, preserving first-seen order.
+    ///
+    /// Content and definition searches can emit multiple rows for the same file (one per matching line);
+    /// path-level file operations deduplicate so each file is only acted on once.
+    private static func uniquePaths(_ rows: [SearchWindowRow]) -> [String] {
+        var seen = Set<String>()
+        return rows.compactMap { seen.insert($0.path).inserted ? $0.path : nil }
+    }
+
+    /// Opens each selected row, recording opened files in Recents.
+    ///
+    /// When `respectLaunchableReveal` is `true` (Return and double-click), launchables (apps, scripts,
+    /// installers) are revealed in Finder via ``FileActions/revealsOnReturn(_:editor:)``. Explicit
+    /// **Open** actions (context menu and preview pane) pass `false` so launchables can be opened directly.
     static func openSelected(
-        _ rows: [SearchWindowRow], app: AppState, onError: @escaping @MainActor (String) -> Void
+        _ rows: [SearchWindowRow], app: AppState, respectLaunchableReveal: Bool = true,
+        onError: @escaping @MainActor (String) -> Void
     ) {
         guard !rows.isEmpty else { return }
         for row in rows {
-            if FileActions.revealsOnReturn(row.item, editor: app.editor) {
+            if respectLaunchableReveal && FileActions.revealsOnReturn(row.item, editor: app.editor) {
                 FileActions.reveal(row.path, onError: onError)
             } else if FileActions.open(row.item, editor: app.editor, onError: onError) {
                 app.openedRecent(row.path)
@@ -25,15 +38,16 @@ enum SearchWindowActions {
     static func revealSelected(
         _ rows: [SearchWindowRow], onError: @MainActor (String) -> Void
     ) -> Bool {
-        guard !rows.isEmpty else { return false }
+        let paths = uniquePaths(rows)
+        guard !paths.isEmpty else { return false }
         var existing: [URL] = []
         var missingReported = false
-        for row in rows {
-            if FileActions.workspace.fileInfo(atPath: row.path) != nil {
-                existing.append(FileActions.url(row.path))
+        for path in paths {
+            if FileActions.workspace.fileInfo(atPath: path) != nil {
+                existing.append(FileActions.url(path))
             } else if !missingReported {
                 missingReported = true
-                onError(FileActions.missingMessage(row.path))
+                onError(FileActions.missingMessage(path))
             }
         }
         guard !existing.isEmpty else { return false }
@@ -41,10 +55,11 @@ enum SearchWindowActions {
         return true
     }
 
-    /// Copies the raw paths of all selected items (newline-separated) to ``FileActions/pasteboard``.
+    /// Copies the unique raw paths of all selected items (newline-separated) to ``FileActions/pasteboard``.
     static func copyPaths(_ rows: [SearchWindowRow]) {
-        guard !rows.isEmpty else { return }
-        FileActions.copyPath(rows.map(\.path).joined(separator: "\n"))
+        let paths = uniquePaths(rows)
+        guard !paths.isEmpty else { return }
+        FileActions.copyPath(paths.joined(separator: "\n"))
     }
 
     /// Copies all existing selected file URLs to ``FileActions/pasteboard`` so Finder can paste them.
@@ -52,15 +67,16 @@ enum SearchWindowActions {
     static func copyFiles(
         _ rows: [SearchWindowRow], onError: @MainActor (String) -> Void
     ) -> Bool {
-        guard !rows.isEmpty else { return false }
+        let paths = uniquePaths(rows)
+        guard !paths.isEmpty else { return false }
         var urls: [NSURL] = []
         var missingReported = false
-        for row in rows {
-            if FileActions.workspace.fileInfo(atPath: row.path) != nil {
-                urls.append(FileActions.url(row.path) as NSURL)
+        for path in paths {
+            if FileActions.workspace.fileInfo(atPath: path) != nil {
+                urls.append(FileActions.url(path) as NSURL)
             } else if !missingReported {
                 missingReported = true
-                onError(FileActions.missingMessage(row.path))
+                onError(FileActions.missingMessage(path))
             }
         }
         guard !urls.isEmpty else { return false }
@@ -82,16 +98,17 @@ enum SearchWindowActions {
         return FileActions.quickLook(first.path, onError: onError)
     }
 
-    /// Moves all selected rows to the Trash, updates Recents, and invokes `refresh` if any succeeded.
+    /// Moves all unique selected files to the Trash, updates Recents, and invokes `refresh` if any succeeded.
     static func trashSelected(
         _ rows: [SearchWindowRow], app: AppState, onError: @MainActor (String) -> Void,
         refresh: () async -> Void
     ) async {
-        guard !rows.isEmpty else { return }
+        let paths = uniquePaths(rows)
+        guard !paths.isEmpty else { return }
         var trashedAny = false
-        for row in rows {
+        for path in paths {
             do {
-                try FileActions.trash(row.path)
+                try FileActions.trash(path)
                 trashedAny = true
             } catch {
                 onError(String(localized: "Couldn't move to Trash: \(error.localizedDescription)"))

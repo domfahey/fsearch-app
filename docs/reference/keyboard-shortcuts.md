@@ -141,7 +141,7 @@ Open one or more independent Search Windows from the menu bar (**New Search Wind
 | ⌘N | Open another independent Search Window |
 | ⌘L | Focus the search field |
 | ⌥⌘P | Show or hide the Quick Look preview pane |
-| ↵ | Open selected files (or reveal launchables in Finder; open content hits at the matching line in your chosen editor) |
+| ↵ | Open selected files (or reveal launchables in Finder; use context menu or preview **Open** to launch them directly; open content hits at the matching line in your chosen editor) |
 | ⌘↵ | Reveal all selected files in Finder |
 | ⌘⇧C | Copy selected files |
 | ⌘Y | Quick Look the selected file |

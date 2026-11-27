@@ -37,11 +37,28 @@ extension AppTests {
             await SearchWindowActions.trashSelected([], app: env.app, onError: onError) { refreshes += 1 }
             #expect(refreshes == 0 && errors.isEmpty)
 
-            // Open selected: doc opens & becomes recent; .app reveals instead of launching.
+            // Open selected: doc opens & becomes recent; .app reveals instead of launching by default.
             SearchWindowActions.openSelected([docRow, appRow], app: env.app, onError: onError)
             #expect(env.workspace.opened == [URL(fileURLWithPath: docPath)])
             #expect(env.workspace.revealed == [[URL(fileURLWithPath: appPath)]])
             #expect(env.app.recents.paths.contains(docPath))
+
+            // Explicit Open launches .app directly and records it in Recents.
+            SearchWindowActions.openSelected([appRow], app: env.app, respectLaunchableReveal: false, onError: onError)
+            #expect(env.workspace.opened == [URL(fileURLWithPath: docPath), URL(fileURLWithPath: appPath)])
+            #expect(env.app.recents.paths.contains(appPath))
+
+            // Multiple content-match rows for the same file deduplicate before path-level operations.
+            let line1 = SearchWindowRow(item: .line(path: docPath, match: Match(line: 1, text: "hello")))
+            let line2 = SearchWindowRow(item: .line(path: docPath, match: Match(line: 2, text: "hello again")))
+            SearchWindowActions.copyPaths([line1, line2, appRow])
+            #expect(env.pasteboard.string(forType: .string) == "\(docPath)\n\(appPath)")
+            let revDedup = SearchWindowActions.revealSelected([line1, line2], onError: onError)
+            #expect(revDedup)
+            #expect(env.workspace.revealed.last == [URL(fileURLWithPath: docPath)])
+            let copyDedup = SearchWindowActions.copyFiles([line1, line2], onError: onError)
+            #expect(copyDedup)
+            #expect((env.pasteboard.readObjects(forClasses: [NSURL.self]) as? [URL]) == [URL(fileURLWithPath: docPath)])
 
             // Reveal selected batches existing URLs and reports missing once.
             let revMixed = SearchWindowActions.revealSelected([docRow, missingRow], onError: onError)
@@ -71,9 +88,11 @@ extension AppTests {
             #expect(qlOK)
             QuickLookSource.shared.close()
 
-            // Trash succeeds and triggers refresh; failure reports error.
-            await SearchWindowActions.trashSelected([docRow], app: env.app, onError: onError) { refreshes += 1 }
+            // Trash deduplicates multiple rows pointing at the same file and triggers refresh once without error.
+            errors = []
+            await SearchWindowActions.trashSelected([line1, line2], app: env.app, onError: onError) { refreshes += 1 }
             #expect(env.workspace.trashed == [URL(fileURLWithPath: docPath)])
+            #expect(errors.isEmpty)
             #expect(refreshes == 1)
 
             struct Boom: Error {}
@@ -268,7 +287,17 @@ extension AppTests {
             try #require(await axWait("Save", in: popover)).press()
             #expect(submitted == 1)
 
-            // SearchWindowContextMenu buttons route through SearchWindowActions.
+            // SearchWindowContextMenu buttons route through SearchWindowActions; explicit Open launches .app items.
+            let appPath = env.file("LaunchMe.app", "x")
+            let appRow = SearchWindowRow(item: .file(Hit(path: appPath, kind: "dir", size: 0, mtime: 0, score: 5)))
+            let launchMenuView = await render(
+                VStack { SearchWindowContextMenu(rows: [appRow], app: env.app, onError: { _ in }, refresh: {}) },
+                size: NSSize(width: 220, height: 220))
+            defer { launchMenuView.close() }
+            try #require(await axWait("Open", in: launchMenuView)).press()
+            #expect(env.workspace.opened == [URL(fileURLWithPath: appPath)])
+            #expect(env.workspace.revealed.isEmpty)
+
             env.workspace.apps["com.apple.Terminal"] = URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app")
             var refreshes = 0
             let menuView = await render(
@@ -287,7 +316,7 @@ extension AppTests {
             try #require(axNode("Open Folder in Terminal", in: menuView)).press()
             try #require(axNode("Move to Trash", in: menuView)).press()
             #expect(await eventually { refreshes == 1 })
-            #expect(env.workspace.opened == [URL(fileURLWithPath: path)])
+            #expect(env.workspace.opened == [URL(fileURLWithPath: appPath), URL(fileURLWithPath: path)])
             #expect(env.workspace.trashed == [URL(fileURLWithPath: path)])
 
             // pickFolder respects override and returns nil under inert mode.
@@ -388,6 +417,40 @@ extension AppTests {
             model.query = "disc"
             await model.refresh()
             #expect(await eventually { model.phase == .failed(.disconnected) })
+
+            // In Definitions mode, regex/case/word match toggles are disabled because sym: ignores them.
+            model.mode = .symbols
+            #expect(await eventually { axNode(id: "toggleMatchCase", in: w)?.isEnabled == false })
+            #expect(axNode(id: "toggleWholeWord", in: w)?.isEnabled == false)
+            #expect(axNode(id: "toggleRegex", in: w)?.isEnabled == false)
+            #expect(axNode(id: "toggleSearchInPath", in: w)?.isEnabled == false)
+        }
+
+        @Test func indexingWindowRetriesAutomaticallyUntilResultsArrive() async throws {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            final class Counter: @unchecked Sendable { var searches = 0 }
+            let counter = Counter()
+            env.daemon.onSearch = { _ in
+                counter.searches += 1
+                if counter.searches == 1 { throw DaemonError.indexing("building") }
+                return SearchReply(tookUs: 110, hits: [Wire.hit("/p/indexed.md")])
+            }
+            let model = env.app.makeSearchWindowModel()
+            model.query = "indexed"
+            await model.refresh()
+            #expect(model.phase == .indexing)
+
+            let view = SearchWindowView(
+                model: model, savedStore: env.app.savedSearches,
+                indexingPollInterval: .milliseconds(10)
+            ).environmentObject(env.app)
+            let w = await render(view, size: NSSize(width: 900, height: 500))
+            defer { w.close() }
+            NotificationCenter.default.post(name: NSWindow.didChangeOcclusionStateNotification, object: w)
+
+            #expect(await eventually { model.phase == .results && model.rows.map(\.rawName) == ["indexed.md"] })
+            #expect(counter.searches >= 2)
         }
     }
 }

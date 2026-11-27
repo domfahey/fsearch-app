@@ -79,7 +79,7 @@ final class HostWindow {
 }
 
 /// Fills a `HostWindow` once the view lands in a window.
-private struct HostWindowReader: NSViewRepresentable {
+struct HostWindowReader: NSViewRepresentable {
     let host: HostWindow
 
     func makeNSView(context: Context) -> NSView {

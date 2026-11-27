@@ -53,6 +53,7 @@ struct SearchWindowView: View {
 
     #if DEBUG
         private let pickFolderOverride: (() -> String?)?
+        private let indexingPollInterval: Duration
 
         init(
             model: SearchWindowModel, savedStore: SavedSearchStore,
@@ -61,7 +62,8 @@ struct SearchWindowView: View {
             selection: Set<SearchWindowRow.ID> = [],
             showSidebar: Bool = true, showPreview: Bool = true,
             windowError: String? = nil,
-            pickFolderOverride: (() -> String?)? = nil
+            pickFolderOverride: (() -> String?)? = nil,
+            indexingPollInterval: Duration = .seconds(2)
         ) {
             self.model = model
             self.savedStore = savedStore
@@ -72,8 +74,11 @@ struct SearchWindowView: View {
             _showPreview = State(initialValue: showPreview)
             _windowError = State(initialValue: windowError)
             self.pickFolderOverride = pickFolderOverride
+            self.indexingPollInterval = indexingPollInterval
         }
     #else
+        private let indexingPollInterval: Duration = .seconds(2)
+
         init(
             model: SearchWindowModel, savedStore: SavedSearchStore,
             onNewWindow: @escaping () -> Void = {},
@@ -113,7 +118,7 @@ struct SearchWindowView: View {
                     Divider()
                     SearchPreviewPane(
                         selected: selectedRows,
-                        onOpen: openSelected,
+                        onOpen: openExplicitly,
                         onReveal: revealSelected,
                         onCopyPath: copySelectedPaths
                     )
@@ -122,7 +127,17 @@ struct SearchWindowView: View {
             Divider()
             statusBar
         }
-        .background(keyboardShortcutsLayer)
+        .background {
+            ZStack {
+                keyboardShortcutsLayer
+                SearchWindowIndexingObserver(
+                    model: model, daemon: app.daemon, pollInterval: indexingPollInterval,
+                    onRefreshed: {
+                        let valid = Set(model.rows.map(\.id))
+                        selection = selection.intersection(valid)
+                    })
+            }
+        }
         .respectingReduceMotion(AccessibilityStyle.resolved(override: styleOverride, reduceMotion: reduceMotion).suppressesAnimations)
         .onAppear {
             savedSearches = savedStore.load()
@@ -201,8 +216,11 @@ struct SearchWindowView: View {
             .accessibilityIdentifier("searchWindowModePicker")
 
             matchToggle(label: "Aa", help: "Match Case", isOn: $model.options.matchCase, id: "toggleMatchCase")
+                .disabled(model.mode == .symbols)
             matchToggle(label: "W", help: "Whole Word", isOn: $model.options.wholeWord, id: "toggleWholeWord")
+                .disabled(model.mode == .symbols)
             matchToggle(label: ".*", help: "Regular Expression", isOn: $model.options.regex, id: "toggleRegex")
+                .disabled(model.mode == .symbols)
             matchToggle(label: "/", help: "Search in Path", isOn: $model.options.searchInPath, id: "toggleSearchInPath")
                 .disabled(model.mode != .names)
 
@@ -606,6 +624,9 @@ struct SearchWindowView: View {
     }
 
     private func openSelected() { SearchWindowActions.openSelected(selectedRows, app: app, onError: showWindowError) }
+    private func openExplicitly() {
+        SearchWindowActions.openSelected(selectedRows, app: app, respectLaunchableReveal: false, onError: showWindowError)
+    }
     private func revealSelected() { SearchWindowActions.revealSelected(selectedRows, onError: showWindowError) }
     private func copySelectedPaths() { SearchWindowActions.copyPaths(selectedRows) }
     private func copySelectedFiles() { SearchWindowActions.copyFiles(selectedRows, onError: showWindowError) }
@@ -686,7 +707,7 @@ struct SearchWindowContextMenu: View {
     let refresh: @MainActor () async -> Void
 
     var body: some View {
-        Button("Open") { SearchWindowActions.openSelected(rows, app: app, onError: onError) }
+        Button("Open") { SearchWindowActions.openSelected(rows, app: app, respectLaunchableReveal: false, onError: onError) }
         Button("Reveal in Finder") { SearchWindowActions.revealSelected(rows, onError: onError) }
         Button("Quick Look") { SearchWindowActions.toggleQuickLook(rows, onError: onError) }
         Divider()
@@ -697,5 +718,56 @@ struct SearchWindowContextMenu: View {
         Button("Move to Trash", role: .destructive) {
             Task { await SearchWindowActions.trashSelected(rows, app: app, onError: onError, refresh: refresh) }
         }
+    }
+}
+
+/// Polls while a search window is visible and either the model or daemon reports `.indexing`,
+/// re-running the window's query once indexing completes without requiring another edit.
+private struct SearchWindowIndexingObserver: View {
+    @Bindable var model: SearchWindowModel
+    @ObservedObject var daemon: DaemonManager
+    let pollInterval: Duration
+    let onRefreshed: () -> Void
+    @State private var host = HostWindow()
+    @State private var shown = 0
+
+    private var isIndexing: Bool {
+        if daemon.state == .indexing { return true }
+        switch model.phase {
+        case .indexing, .failed(.indexing): return true
+        default: return false
+        }
+    }
+
+    private struct PollKey: Equatable {
+        let indexing: Bool
+        let shown: Int
+    }
+
+    var body: some View {
+        HostWindowReader(host: host)
+            .frame(width: 0, height: 0)
+            .task(id: PollKey(indexing: isIndexing, shown: shown)) {
+                let host = host
+                let interval = pollInterval
+                await DaemonMessageLine.pollWhileIndexing(
+                    isIndexing: { isIndexing },
+                    visible: { host.window?.isVisible == true },
+                    sleep: { try await Task.sleep(for: interval) },
+                    step: {
+                        await daemon.refresh()
+                        // Run refresh in an uncancelled task so flipping from `.indexing` -> `.running` + `.loading`
+                        // doesn't cancel the final fetch mid-flight once indexing finishes.
+                        let refreshTask = Task { @MainActor in
+                            await model.refresh()
+                            onRefreshed()
+                        }
+                        await refreshTask.value
+                    })
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSWindow.didChangeOcclusionStateNotification)) { note in
+                guard let w = note.object as? NSWindow, w === host.window, w.occlusionState.contains(.visible) else { return }
+                shown &+= 1
+            }
     }
 }
