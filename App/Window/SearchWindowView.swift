@@ -127,6 +127,9 @@ struct SearchWindowView: View {
             savedSearches = savedStore.load()
             tableSortOrder = SearchWindowComparator.from(model.sort)
         }
+        .onChange(of: app.savedSearchesGeneration) { _, _ in
+            savedSearches = savedStore.load()
+        }
         .onChange(of: model.query) { _, newValue in
             onTitleChange(newValue)
         }
@@ -357,6 +360,7 @@ struct SearchWindowView: View {
                                 .buttonStyle(.plain)
                                 Button {
                                     savedSearches = savedStore.delete(id: saved.id)
+                                    app.savedSearchesChanged()
                                 } label: {
                                     Image(systemName: "trash")
                                         .font(.caption)
@@ -554,6 +558,7 @@ struct SearchWindowView: View {
 
     private func saveCurrentSearch() {
         savedSearches = savedStore.add(model.snapshot(name: saveName))
+        app.savedSearchesChanged()
         showSavePopover = false
     }
 

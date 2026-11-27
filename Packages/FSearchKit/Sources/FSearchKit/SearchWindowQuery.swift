@@ -315,8 +315,12 @@ public enum SearchWindowQuery {
             }
 
             let terms = QuerySplit.words(plainText).map { $0.replacingOccurrences(of: "\"", with: "") }.filter { !$0.isEmpty }
-            if terms.count == 1, let single = terms.first {
-                let escaped = regexEscape(single)
+            guard let anchor = terms.max(by: { $0.count < $1.count }) else {
+                let q = filterParts.joined(separator: " ")
+                return q.isEmpty ? .empty : .names(query: q, limit: effectiveLimit, clientFilter: nil)
+            }
+            if terms.count == 1 {
+                let escaped = regexEscape(anchor)
                 let body = options.wholeWord ? "\\b(?:\(escaped))\\b" : escaped
                 let flagged = options.matchCase ? "(?-i)\(body)" : body
                 filterParts.append("\(filterKey):\(quoteFilterValue(flagged))")
@@ -325,7 +329,6 @@ public enum SearchWindowQuery {
 
             // Multiple plain words with match toggles: narrow on the daemon using the longest term in `re:`/`path:`
             // (plus exact filename tokens when not searching full paths), then verify all terms client-side.
-            let anchor = terms.max(by: { $0.count < $1.count }) ?? terms[0]
             let anchorEscaped = regexEscape(anchor)
             let anchorBody = options.wholeWord ? "\\b(?:\(anchorEscaped))\\b" : anchorEscaped
             let anchorFlagged = options.matchCase ? "(?-i)\(anchorBody)" : anchorBody
