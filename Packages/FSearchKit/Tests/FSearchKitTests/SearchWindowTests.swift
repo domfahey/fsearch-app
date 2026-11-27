@@ -53,6 +53,13 @@ import Testing
     }
 
     @Test func compilesMatchTogglesForSingleTermMultiTermRegexAndPath() {
+        // Lone quotes with match toggles active must not trap on an empty term list.
+        #expect(SearchWindowQuery.compile(rawQuery: "\"", mode: .names, options: SearchMatchOptions(matchCase: true)) == .empty)
+        #expect(SearchWindowQuery.compile(rawQuery: "\"\"", mode: .names, options: SearchMatchOptions(wholeWord: true)) == .empty)
+        #expect(
+            SearchWindowQuery.compile(rawQuery: "ext:swift \"\"", mode: .names, options: SearchMatchOptions(searchInPath: true))
+                == .names(query: "ext:swift", limit: 1000, clientFilter: nil))
+
         // Only filters with toggles active -> no plain terms to wrap.
         let filtersOnly = SearchWindowQuery.compile(
             rawQuery: "ext:swift", mode: .names, options: SearchMatchOptions(matchCase: true))

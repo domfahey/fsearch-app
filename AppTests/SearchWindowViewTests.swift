@@ -152,7 +152,7 @@ extension AppTests {
             #expect(openedQueries == ["invoice", ""])
         }
 
-        @Test func appStateWindowModelLogsInDebugMode() async {
+        @Test func appStateWindowModelLogsInDebugModeAndRecoversAfterDisconnect() async {
             let env = TestEnv()
             defer { env.tearDown() }
             env.daemon.onSearch = { _ in SearchReply(tookUs: 250, hits: [Wire.hit("/p/doc.md")]) }
@@ -163,6 +163,43 @@ extension AppTests {
             env.app.log.flush()
             #expect(env.app.log.entries().last?.query == "doc")
             #expect(model.rows.count == 1)
+
+            // Disconnected search triggers daemon recovery and refreshes the originating window model.
+            final class Counter: @unchecked Sendable { var n = 0 }
+            let attempts = Counter()
+            env.daemon.onSearch = { _ in
+                attempts.n += 1
+                if attempts.n == 1 { throw DaemonError.disconnected }
+                return SearchReply(tookUs: 120, hits: [Wire.hit("/p/recovered.md")])
+            }
+            model.query = "recovered"
+            await model.refresh()
+            #expect(await eventually { model.phase == .results && model.rows.map(\.rawName) == ["recovered.md"] })
+        }
+
+        @Test func savedSearchesSynchronizeAcrossOpenWindows() async throws {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let saved = SavedSearch(name: "Shared Filter", query: "shared")
+            _ = env.app.savedSearches.add(saved)
+
+            let view1 = SearchWindowView(model: env.app.makeSearchWindowModel(), savedStore: env.app.savedSearches)
+                .environmentObject(env.app)
+            let view2 = SearchWindowView(model: env.app.makeSearchWindowModel(), savedStore: env.app.savedSearches)
+                .environmentObject(env.app)
+            let w1 = await render(view1, size: NSSize(width: 900, height: 500))
+            let w2 = await render(view2, size: NSSize(width: 900, height: 500))
+            defer {
+                w1.close()
+                w2.close()
+            }
+
+            #expect(await axWait("Shared Filter", in: w1) != nil)
+            #expect(await axWait("Shared Filter", in: w2) != nil)
+
+            // Deleting in window 1 removes it from window 2's sidebar too.
+            try #require(await axWait("Delete Shared Filter", in: w1)).press()
+            #expect(await eventually { axNode("Shared Filter", in: w2) == nil })
         }
 
         @Test func previewPaneRendersEmptySingleLineAndMultiSelectionStates() async throws {

@@ -34,6 +34,12 @@ final class AppState: ObservableObject {
     /// Bumped whenever the recents may have changed (a file opened or trashed),
     /// so the panel re-reads `recents.paths`, which aren't observable themselves.
     @Published private(set) var recentsGeneration = 0
+    /// Bumped whenever user-saved searches change, so every open search window refreshes its sidebar.
+    @Published private(set) var savedSearchesGeneration = 0
+    /// Tells open search windows to reload `savedSearches`.
+    func savedSearchesChanged() {
+        savedSearchesGeneration += 1
+    }
     /// Tells the panel to re-read the recents, dropping Recents' existence cache first.
     func recentsChanged() {
         recents.invalidate()
@@ -149,7 +155,9 @@ final class AppState: ObservableObject {
             guard let self, self.debugMode else { return }
             self.log.appendAsync(entry, at: Date())
         }
-        model.onSettled = { [weak self] phase in self?.searchSettled(phase) }
+        model.onSettled = { [weak self, weak model] phase in
+            self?.searchSettled(phase, refreshOnRecovery: { await model?.refresh() })
+        }
         return model
     }
 
@@ -157,17 +165,21 @@ final class AppState: ObservableObject {
     var status: MenuBarStatus = .shared
     /// Coalesces disconnect-driven restarts so rapid failures don't burn extra budget tokens.
     private var disconnectRestartTask: Task<Void, Never>?
+    /// Originating window models waiting to re-run their search once a coalesced disconnect restart finishes.
+    private var pendingRecoveryRefreshes: [@MainActor () async -> Void] = []
     /// Coalesces recovery refreshes while `daemon.isUnresponsive`.
     private var recoveryRefreshTask: Task<Void, Never>?
 
-    /// Handles every finished search; wired to ``SearchModel/onSettled``.
+    /// Handles every finished search; wired to ``SearchModel/onSettled`` and ``SearchWindowModel/onSettled``.
     ///
     /// Results refill the restart budget and re-check a
     /// daemon marked down; a dropped connection restarts it, once per unit of
     /// the outage's budget (each restart searches again, and may fail again).
     ///
-    /// - Parameter phase: How the search ended.
-    func searchSettled(_ phase: SearchPhase) {
+    /// - Parameters:
+    ///   - phase: How the search ended.
+    ///   - refreshOnRecovery: Optional callback for an originating search window to refresh after recovery.
+    func searchSettled(_ phase: SearchPhase, refreshOnRecovery: (@MainActor () async -> Void)? = nil) {
         guard !daemon.recoverySuspended else { return }
         switch phase {
         case .results:
@@ -187,16 +199,27 @@ final class AppState: ObservableObject {
                 }
             }
         case .failed(.disconnected):
-            // A restart is already running (and will refresh the search when it finishes): don't burn another token.
+            if let refreshOnRecovery { pendingRecoveryRefreshes.append(refreshOnRecovery) }
+            // A restart is already running (and will refresh all waiting searches when it finishes): don't burn another token.
             if daemon.isRestarting || disconnectRestartTask != nil { return }
             // `restart()` re-registers only a daemon the app owns; a CLI daemon is just re-checked.
             // Out of restarts: say the helper isn't answering, not "Starting search…".
-            guard status.restartBudget.spend() else { daemon.markUnresponsive(); return }
+            guard status.restartBudget.spend() else {
+                pendingRecoveryRefreshes.removeAll()
+                daemon.markUnresponsive()
+                return
+            }
             disconnectRestartTask = Task { [weak self] in
                 await self?.daemon.restart()
                 self?.disconnectRestartTask = nil
-                guard let self, !self.daemon.recoverySuspended else { return }
+                guard let self else { return }
+                let pending = self.pendingRecoveryRefreshes
+                self.pendingRecoveryRefreshes.removeAll()
+                guard !self.daemon.recoverySuspended else { return }
                 await self.search.refresh()
+                for refresh in pending {
+                    await refresh()
+                }
             }
         case .failed(.timeout):
             daemon.markUnresponsive()
