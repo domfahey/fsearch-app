@@ -3,11 +3,11 @@ import Testing
 
 @testable import FSearchKit
 
-/// All tests share one defaults suite, which is cleared at the start of each
-/// test, so at most one plist for it exists. The suite is serialized so the
-/// tests never touch it at the same time.
+/// All tests share one temp-backed defaults suite, cleared at the start and end
+/// of each test, so tests never write plists into `~/Library/Preferences`.
 @Suite(.serialized) struct RecentsTests {
-    static let suiteName = "mt.fsearchkit.tests.recents"
+    static let suiteName = URL(fileURLWithPath: NSTemporaryDirectory())
+        .appendingPathComponent("mt.fsearchkit.tests.recents").path
 
     /// A clean suite for one test. Removing the domain first wipes what the
     /// previous test left behind.
@@ -18,6 +18,7 @@ import Testing
 
     func clear() {
         UserDefaults(suiteName: Self.suiteName)?.removePersistentDomain(forName: Self.suiteName)
+        try? FileManager.default.removeItem(atPath: Self.suiteName + ".plist")
     }
 
     @Test func newestFirstDedupedCappedAtEight() {

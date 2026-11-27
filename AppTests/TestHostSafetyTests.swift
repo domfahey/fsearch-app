@@ -204,16 +204,22 @@ extension AppTests {
             #expect(!env.app.options.testMode)
         }
 
-        /// Every TestEnv shares one defaults suite, emptied for each.
+        /// Every TestEnv shares one temp-backed defaults suite, emptied for each and never writing to ~/Library/Preferences.
         @Test func testEnvsShareOneEmptiedSuite() {
             let a = TestEnv()
             a.defaults.set("x", forKey: "editor")
+            a.defaults.synchronize()
             let name = a.suite
             a.tearDown()
             let b = TestEnv()
             defer { b.tearDown() }
             #expect(b.suite == name)
+            #expect(b.suite.hasPrefix(NSTemporaryDirectory()))
+            #expect(AppDefaults.testSuiteName.hasPrefix(NSTemporaryDirectory()))
             #expect(b.defaults.object(forKey: "editor") == nil)
+            let prefs = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Preferences")
+            let names = (try? FileManager.default.contentsOfDirectory(atPath: prefs.path)) ?? []
+            #expect(!names.contains { $0.hasPrefix("com.domfahey.fsearch.apptests.") })
         }
     }
 }

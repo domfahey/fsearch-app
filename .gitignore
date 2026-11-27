@@ -8,6 +8,7 @@ Vendor/fsearch.rev
 .worktrees*/
 Packages/FSearchKit/.swiftpm/
 release/
+*.profraw
 
 # Keys and secrets: never commit these.
 *.p12

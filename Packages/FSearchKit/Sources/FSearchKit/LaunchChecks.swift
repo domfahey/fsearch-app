@@ -14,12 +14,12 @@ public enum InstallLocation {
             case .translocated:
                 String(
                     localized:
-                        "FSearch is running from a temporary location macOS made for it. Move FSearch to your Applications folder, then open it from there.",
+                        "FSearch is running from a temporary location macOS made for it, so its background helper can't stay registered. Choose Move to Applications to copy FSearch to your Applications folder and reopen it from there.",
                     bundle: .module)
             case .readOnlyVolume:
                 String(
                     localized:
-                        "FSearch is running from the disk image. Move FSearch to your Applications folder, then open it from there.",
+                        "FSearch is running from the disk image, so its background helper can't stay registered. Choose Move to Applications to copy FSearch to your Applications folder and reopen it from there.",
                     bundle: .module)
             }
         }

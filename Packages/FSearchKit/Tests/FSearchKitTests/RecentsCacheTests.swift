@@ -27,7 +27,8 @@ final class TestClock: @unchecked Sendable {
 /// Redraws read `paths` many times a second: the files are checked once, then
 /// again only after the list changes, `invalidate()`, or `Recents.recheckAfter`.
 @Suite(.serialized) struct RecentsCacheTests {
-    static let suiteName = "mt.fsearchkit.tests.recents.cache"
+    static let suiteName = URL(fileURLWithPath: NSTemporaryDirectory())
+        .appendingPathComponent("mt.fsearchkit.tests.recents.cache").path
     func fresh() -> UserDefaults {
         UserDefaults(suiteName: Self.suiteName)!.removePersistentDomain(forName: Self.suiteName)
         return UserDefaults(suiteName: Self.suiteName)!
@@ -35,6 +36,7 @@ final class TestClock: @unchecked Sendable {
 
     func clear() {
         UserDefaults(suiteName: Self.suiteName)?.removePersistentDomain(forName: Self.suiteName)
+        try? FileManager.default.removeItem(atPath: Self.suiteName + ".plist")
     }
 
     @Test func repeatedReadsCheckOnce() {
