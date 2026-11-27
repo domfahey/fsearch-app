@@ -92,6 +92,11 @@ class PanelUITestCase: XCTestCase {
         return ((try? String(contentsOf: log, encoding: .utf8)) ?? "").split(separator: "\n").map(String.init)
     }
 
+    /// The debug search log inside the test daemon's temp HOME.
+    var debugSearchLogURL: URL {
+        URL(fileURLWithPath: socket).deletingLastPathComponent().appendingPathComponent("searches.jsonl")
+    }
+
     /// Launches the app with the panel up. `debugMode` NO keeps a test from
     /// ever writing a search log, except the one test that checks where it goes.
     func launch(debugMode: Bool = false, file: StaticString = #filePath, line: UInt = #line) throws {
@@ -113,14 +118,26 @@ class PanelUITestCase: XCTestCase {
         XCTAssertTrue(found, found ? "" : "state=\(app.state.rawValue) tree=\(app.debugDescription)")
     }
 
+    /// The `FSearch.app` product built alongside this UI-test runner.
+    var testAppBundleURL: URL {
+        // .../Debug/AppUITests-Runner.app/Contents/PlugIns/AppUITests.xctest
+        var products = Bundle(for: PanelUITestCase.self).bundleURL
+        for _ in 0..<4 { products.deleteLastPathComponent() }
+        return products.appendingPathComponent("FSearch.app")
+    }
+
+    /// Sends a URL (such as `fsearch://search?…`) strictly to this test build of `FSearch.app`.
+    func openURLInTestApp(_ url: URL) async throws {
+        let config = NSWorkspace.OpenConfiguration()
+        config.activates = true
+        _ = try await NSWorkspace.shared.open([url], withApplicationAt: testAppBundleURL, configuration: config)
+    }
+
     /// `launch()` quits every running app with our bundle id. One that isn't
     /// this build's (in the products folder next to the test runner) is the
     /// user's: stop instead of quitting it.
     private func refuseIfTheUsersFSearchIsRunning(file: StaticString, line: UInt) throws {
-        // .../Debug/AppUITests-Runner.app/Contents/PlugIns/AppUITests.xctest
-        var products = Bundle(for: PanelUITestCase.self).bundleURL
-        for _ in 0..<4 { products.deleteLastPathComponent() }
-        let ours = products.standardizedFileURL.path + "/"
+        let ours = testAppBundleURL.deletingLastPathComponent().standardizedFileURL.path + "/"
         let others = NSRunningApplication.runningApplications(withBundleIdentifier: "com.domfahey.fsearch")
             .filter { !$0.isTerminated && !($0.bundleURL?.standardizedFileURL.path.hasPrefix(ours) ?? false) }
         if !others.isEmpty {
@@ -177,6 +194,15 @@ class PanelUITestCase: XCTestCase {
     func click(_ e: XCUIElement, file: StaticString = #filePath, line: UInt = #line) throws {
         try requireFocus(field: false, file: file, line: line)
         e.click()
+    }
+
+    /// Sends the single-instance reopen distributed notification (`LaunchGuards.reopenNotification`)
+    /// and activates the app (matching `LaunchGuards.anotherCopyIsRunning`) so the hidden panel reopens
+    /// and resumes its saved session state.
+    func reopenPanel() {
+        DistributedNotificationCenter.default().postNotificationName(
+            Notification.Name("com.domfahey.fsearch.reopen"), object: nil, userInfo: nil, deliverImmediately: true)
+        app.activate()
     }
 
     /// Types into the field one character at a time, checking focus before

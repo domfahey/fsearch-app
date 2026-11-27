@@ -51,6 +51,8 @@ echo x > "$R/duo/plover-one.txt"
 echo x > "$R/duo/plover-two.txt"
 printf 'first line\nthe quokkaneedle line\nlast line\n' > "$R/notes.md"
 printf 'import Foundation\n\nfunc kestrelHandler() -> Int {\n    return 1\n}\n' > "$R/src/kestrel.swift"
+printf '#!/bin/sh\necho ok\n' > "$R/osprey-script.command"
+chmod +x "$R/osprey-script.command"
 
 # "mtime size" of a file, or "absent": detects any write to the real search log.
 stamp() { if [ -e "$1" ]; then stat -f '%m %z' "$1"; else echo absent; fi; }
