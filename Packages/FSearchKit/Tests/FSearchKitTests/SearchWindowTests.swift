@@ -116,22 +116,40 @@ import Testing
 
         let literal = SearchWindowQuery.compile(
             rawQuery: "needle ext:swift", mode: .content, chips: [SearchFilterChip(kind: .folder, value: "~/src")])
-        #expect(literal == .grep(filters: "ext:swift in:~/src", pattern: "needle", mode: .literal))
+        #expect(literal == .grep(filters: "ext:swift in:~/src limit:1000", pattern: "needle", mode: .literal, limit: 1000))
 
         let caseWhole = SearchWindowQuery.compile(
             rawQuery: "foo.bar", mode: .content, options: SearchMatchOptions(matchCase: true, wholeWord: true))
-        #expect(caseWhole == .grep(filters: "", pattern: #"(?-i)\b(?:foo\.bar)\b"#, mode: .regex))
+        #expect(
+            caseWhole
+                == .grep(filters: "limit:1000", pattern: #"(?-i)\b(?:foo\.bar)\b"#, mode: .regex, limit: 1000))
 
         let ciRegex = SearchWindowQuery.compile(
             rawQuery: "fn\\s+\\w+", mode: .content, options: SearchMatchOptions(regex: true))
-        #expect(ciRegex == .grep(filters: "", pattern: #"(?i)fn\s+\w+"#, mode: .regex))
+        #expect(ciRegex == .grep(filters: "limit:1000", pattern: #"(?i)fn\s+\w+"#, mode: .regex, limit: 1000))
 
         let sym = SearchWindowQuery.compile(rawQuery: "SearchModel", mode: .symbols)
-        #expect(sym == .grep(filters: "", pattern: "SearchModel", mode: .symbol))
+        #expect(sym == .grep(filters: "limit:1000", pattern: "SearchModel", mode: .symbol, limit: 1000))
 
         let inline = SearchWindowQuery.compile(
             rawQuery: "ext:rs grep:TODO", mode: .names, options: SearchMatchOptions(matchCase: true))
-        #expect(inline == .grep(filters: "ext:rs", pattern: "(?-i)TODO", mode: .regex))
+        #expect(inline == .grep(filters: "ext:rs limit:1000", pattern: "(?-i)TODO", mode: .regex, limit: 1000))
+
+        let explicitContentLimit = SearchWindowQuery.compile(rawQuery: "needle ext:swift limit:25", mode: .content)
+        #expect(
+            explicitContentLimit
+                == .grep(filters: "ext:swift limit:25", pattern: "needle", mode: .literal, limit: 25))
+
+        let clampedSymbolLimit = SearchWindowQuery.compile(rawQuery: "SearchModel limit:5000", mode: .symbols)
+        #expect(
+            clampedSymbolLimit
+                == .grep(filters: "limit:5000", pattern: "SearchModel", mode: .symbol, limit: 1000))
+
+        let customInlineDefault = SearchWindowQuery.compile(
+            rawQuery: "ext:rs grep:TODO", mode: .names, defaultLimit: 200)
+        #expect(
+            customInlineDefault
+                == .grep(filters: "ext:rs limit:200", pattern: "TODO", mode: .literal, limit: 200))
     }
 
     @Test func pageRequestClampsOffsetAndLimit() {
@@ -503,5 +521,91 @@ import Testing
         await model.refresh()
         #expect(model.rows.count == 2)
         #expect(model.rows.allSatisfy { $0.matchText?.contains("Target = ") == true })
+    }
+
+    @Test func grepModesInjectDefaultLimitAndFlagHitCapAtFileLimit() async {
+        let backend = StubBackend()
+        let model = SearchWindowModel(names: backend, content: backend)
+
+        model.mode = .content
+        model.query = "needle"
+        #expect(model.pageRequest.limit == 1000)
+        await model.refresh()
+
+        model.mode = .symbols
+        model.query = "SearchModel"
+        #expect(model.pageRequest.limit == 1000)
+        await model.refresh()
+
+        let recordedGreps = backend.state.withLock { $0.greps }
+        #expect(recordedGreps.count == 2)
+        #expect(recordedGreps[0].0 == "limit:1000")
+        #expect(recordedGreps[0].2 == .literal)
+        #expect(recordedGreps[1].0 == "limit:1000")
+        #expect(recordedGreps[1].2 == .symbol)
+
+        backend.state.withLock { s in
+            s.greps.removeAll()
+            s.onGrep = { _, _, _ in
+                let files = (0..<19).map { i in
+                    FileMatches(path: "/p/f\(i).swift", matches: [Match(line: 1, text: "needle")])
+                }
+                return GrepReply(tookUs: 100, complete: true, files: files)
+            }
+        }
+        model.mode = .content
+        model.query = "needle limit:20"
+        #expect(model.pageRequest.limit == 20)
+        await model.refresh()
+        let underCapGreps = backend.state.withLock { $0.greps }
+        #expect(underCapGreps.last?.0 == "limit:20")
+        #expect(!underCapGreps.last!.0.contains("limit:1000"))
+        #expect(model.rows.count == 19)
+        #expect(!model.hitCap)
+
+        backend.state.withLock { s in
+            s.onGrep = { _, _, _ in
+                let files = (0..<20).map { i in
+                    FileMatches(path: "/p/f\(i).swift", matches: [Match(line: 1, text: "needle")])
+                }
+                return GrepReply(tookUs: 100, complete: true, files: files)
+            }
+        }
+        await model.refresh()
+        #expect(model.rows.count == 20)
+        #expect(model.hitCap)
+    }
+
+    @Test(.enabled(if: RealDaemon.binary != nil, "Vendor/fsearch not built"))
+    func grepExceeds50FileDaemonDefaultAndFlagsExplicitLimitHitCapAgainstRealDaemon() async throws {
+        var files: [String: String] = [:]
+        for i in 0..<60 {
+            files["f\(i).txt"] = "shared_needle_token\n"
+        }
+        let daemon = try RealDaemon(files: files)
+        defer { withExtendedLifetime(daemon) {} }
+        let names = DaemonClient(socketPath: daemon.socketPath, timeout: 5)
+        let content = DaemonClient(socketPath: daemon.socketPath, timeout: 5)
+        var ready = false
+        for _ in 0..<100 {
+            if let s = try? await names.status(), s.entries >= 60, s.contentDocs >= 60, s.contentPending == 0 {
+                ready = true
+                break
+            }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        try #require(ready, "RealDaemon failed to index 60 fixture files")
+
+        let model = SearchWindowModel(names: names, content: content)
+        model.mode = .content
+        model.query = "shared_needle_token"
+        await model.refresh()
+        #expect(model.rows.count == 60)
+        #expect(!model.hitCap)
+
+        model.query = "shared_needle_token limit:10"
+        await model.refresh()
+        #expect(model.rows.count == 10)
+        #expect(model.hitCap)
     }
 }

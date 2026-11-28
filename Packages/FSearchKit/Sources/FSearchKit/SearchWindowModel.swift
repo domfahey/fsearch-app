@@ -69,8 +69,8 @@ public final class SearchWindowModel {
         let lim: Int
         switch compiled {
         case let .names(composed, limit, _): (q, lim) = (composed, limit)
-        case let .grep(filters, pattern, _):
-            (q, lim) = (filters.isEmpty ? pattern : "\(pattern) \(filters)", SearchWindowQuery.defaultLimit)
+        case let .grep(filters, pattern, _, limit):
+            (q, lim) = (filters.isEmpty ? pattern : "\(pattern) \(filters)", limit)
         case .empty: (q, lim) = ("", SearchWindowQuery.defaultLimit)
         }
         return SearchWindowQuery.PageRequest(query: q, mode: mode, offset: 0, limit: lim, sort: sort)
@@ -251,12 +251,12 @@ public final class SearchWindowModel {
             }
             let cappedRows = Array(filtered.prefix(SearchWindowQuery.defaultLimit)).map { SearchWindowRow(item: .file($0)) }
             return (cappedRows, took, capped)
-        case let .grep(filters, pattern, grepMode):
+        case let .grep(filters, pattern, grepMode, limit):
             let reply = try await content.grep(q: filters, pattern: pattern, mode: grepMode)
             let allLines = reply.files.flatMap { file in
                 file.matches.map { SearchWindowRow(item: .line(path: file.path, match: $0)) }
             }
-            let capped = !reply.complete || allLines.count >= SearchWindowQuery.defaultLimit
+            let capped = !reply.complete || reply.files.count >= limit || allLines.count >= SearchWindowQuery.defaultLimit
             return (Array(allLines.prefix(SearchWindowQuery.defaultLimit)), reply.tookUs, capped)
         }
     }

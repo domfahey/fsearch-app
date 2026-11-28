@@ -240,8 +240,8 @@ public enum SearchWindowQuery {
         case empty
         /// File-name search with an effective limit and optional client-side post-filter.
         case names(query: String, limit: Int, clientFilter: ClientFilter?)
-        /// Content or symbol search.
-        case grep(filters: String, pattern: String, mode: GrepMode)
+        /// Content or symbol search with its effective file limit.
+        case grep(filters: String, pattern: String, mode: GrepMode, limit: Int)
     }
 
     /// Escapes Rust `regex` metacharacters so literal text matches verbatim.
@@ -284,7 +284,9 @@ public enum SearchWindowQuery {
             if let inline = QuerySplit.contentSearch(trimmed) {
                 guard !inline.pattern.isEmpty else { return .empty }
                 let mergedFilters = ([inline.q] + chipTokens).filter { !$0.isEmpty }.joined(separator: " ")
-                return compileGrep(pattern: inline.pattern, filters: mergedFilters, baseMode: inline.mode, options: options)
+                return compileGrep(
+                    pattern: inline.pattern, filters: mergedFilters, baseMode: inline.mode, options: options,
+                    defaultLimit: defaultLimit)
             }
             let combinedRaw = ([trimmed] + chipTokens).filter { !$0.isEmpty }.joined(separator: " ")
             guard !combinedRaw.isEmpty else { return .empty }
@@ -350,23 +352,34 @@ public enum SearchWindowQuery {
             guard !pattern.isEmpty else { return .empty }
             let mergedFilters = ([existingFilters] + chipTokens).filter { !$0.isEmpty }.joined(separator: " ")
             let baseMode: GrepMode = mode == .symbols ? .symbol : .literal
-            return compileGrep(pattern: pattern, filters: mergedFilters, baseMode: baseMode, options: options)
+            return compileGrep(
+                pattern: pattern, filters: mergedFilters, baseMode: baseMode, options: options,
+                defaultLimit: defaultLimit)
         }
     }
 
     private static func compileGrep(
-        pattern: String, filters: String, baseMode: GrepMode, options: SearchMatchOptions
+        pattern: String, filters: String, baseMode: GrepMode, options: SearchMatchOptions, defaultLimit: Int
     ) -> CompiledQuery {
+        let hasExplicitLimit = QuerySplit.hasLimitWord(filters)
+        let explicitLimit = QuerySplit.limit(filters)
+        let effectiveLimit = min(max(1, explicitLimit ?? defaultLimit), SearchWindowQuery.defaultLimit)
+        let grepFilters: String
+        if !hasExplicitLimit {
+            grepFilters = filters.isEmpty ? "limit:\(effectiveLimit)" : "\(filters) limit:\(effectiveLimit)"
+        } else {
+            grepFilters = filters
+        }
         if baseMode == .symbol {
-            return .grep(filters: filters, pattern: pattern, mode: .symbol)
+            return .grep(filters: grepFilters, pattern: pattern, mode: .symbol, limit: effectiveLimit)
         }
         let useRegex = baseMode == .regex || options.regex || options.matchCase || options.wholeWord
         guard useRegex else {
-            return .grep(filters: filters, pattern: pattern, mode: .literal)
+            return .grep(filters: grepFilters, pattern: pattern, mode: .literal, limit: effectiveLimit)
         }
         let core = (baseMode == .regex || options.regex) ? pattern : regexEscape(pattern)
         let bounded = options.wholeWord ? "\\b(?:\(core))\\b" : core
         let flagged = options.matchCase ? "(?-i)\(bounded)" : "(?i)\(bounded)"
-        return .grep(filters: filters, pattern: flagged, mode: .regex)
+        return .grep(filters: grepFilters, pattern: flagged, mode: .regex, limit: effectiveLimit)
     }
 }
