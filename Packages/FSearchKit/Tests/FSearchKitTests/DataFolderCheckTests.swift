@@ -31,6 +31,40 @@ import Testing
         #expect(DataFolderCheck.issues(in: link) == [.folderIsSymlink])
     }
 
+    @Test func symlinkToFileAndDanglingSymlinkAreFlagged() throws {
+        let d = try temp()
+        defer { try? FileManager.default.removeItem(at: d) }
+        let file = d.appendingPathComponent("plain")
+        FileManager.default.createFile(atPath: file.path, contents: Data())
+        let linkToFile = d.appendingPathComponent("linkToFile")
+        try FileManager.default.createSymbolicLink(at: linkToFile, withDestinationURL: file)
+        #expect(DataFolderCheck.issues(in: linkToFile) == [.folderIsSymlink])
+
+        let missing = d.appendingPathComponent("missing")
+        let dangling = d.appendingPathComponent("dangling")
+        try FileManager.default.createSymbolicLink(at: dangling, withDestinationURL: missing)
+        #expect(DataFolderCheck.issues(in: dangling) == [.folderIsSymlink])
+    }
+
+    @Test func unreadableFolderStillChecksOwnership() throws {
+        let d = try temp()
+        defer {
+            chmod(d.path, 0o755)
+            try? FileManager.default.removeItem(at: d)
+        }
+        #expect(chmod(d.path, 0o000) == 0)
+        #expect(DataFolderCheck.issues(in: d, uid: getuid()).isEmpty)
+        #expect(DataFolderCheck.issues(in: d, uid: getuid() &+ 1) == [.folderNotOwned])
+    }
+
+    @Test func ownedRegularSocketFilesHaveNoIssues() throws {
+        let d = try temp()
+        defer { try? FileManager.default.removeItem(at: d) }
+        FileManager.default.createFile(atPath: d.appendingPathComponent("socket.lock").path, contents: Data())
+        FileManager.default.createFile(atPath: d.appendingPathComponent("fsearch.sock").path, contents: Data())
+        #expect(DataFolderCheck.issues(in: d).isEmpty)
+    }
+
     @Test func plainFileIsNotADirectory() throws {
         let d = try temp()
         defer { try? FileManager.default.removeItem(at: d) }
