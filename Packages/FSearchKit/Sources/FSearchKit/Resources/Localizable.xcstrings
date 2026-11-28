@@ -2190,7 +2190,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Launcher-Fenster (Klassisch)"
+            "value": "Launcher-Panel (Klassisch)"
           }
         },
         "en": {
@@ -3058,7 +3058,7 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Janela de Busca (Novo)"
+            "value": "Janela de Busca (Nova)"
           }
         },
         "zh-Hans": {

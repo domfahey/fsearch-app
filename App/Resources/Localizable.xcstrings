@@ -5154,7 +5154,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Launcher-Fenster…"
+            "value": "Launcher-Panel…"
           }
         },
         "en": {
@@ -6766,7 +6766,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Launcher-Fenster öffnen"
+            "value": "Launcher-Panel öffnen"
           }
         },
         "en": {
