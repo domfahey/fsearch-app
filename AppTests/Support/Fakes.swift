@@ -304,11 +304,19 @@ final class FakePanel: PanelHost {
 /// `~/Library/Preferences`).
 @MainActor
 final class TestEnv {
-    /// Temp-directory suite path for standalone defaults tests outside `TestEnv`;
-    /// cfprefsd writes only inside `NSTemporaryDirectory()`, never `~/Library/Preferences`.
-    nonisolated static let unitSuite: String =
-        URL(fileURLWithPath: NSTemporaryDirectory())
-        .appendingPathComponent("com.domfahey.fsearch.apptests.unit").path
+    /// Per-process temp directory holding standalone test suites, deleted on process exit.
+    private nonisolated static let suitesDir: URL = {
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("com.domfahey.fsearch.apptests.suites-\(UUID().uuidString.prefix(8))")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        atexit { try? FileManager.default.removeItem(at: TestEnv.suitesDir) }
+        return dir
+    }()
+    /// Fresh temp-directory suite path for standalone defaults tests outside `TestEnv`;
+    /// isolated per call so `cfprefsd` never bleeds state across tests and never touches `~/Library/Preferences`.
+    nonisolated static var unitSuite: String {
+        suitesDir.appendingPathComponent("unit-\(UUID().uuidString.prefix(8))").path
+    }
     let suite: String
     let defaults: UserDefaults
     let dir: URL
@@ -364,8 +372,7 @@ final class TestEnv {
         try? FileManager.default.removeItem(at: dir)
     }
 
-    /// Once per run: cleans up any legacy plists an older checkout left in `~/Library/Preferences`,
-    /// and removes the temp-backed unit suite plist at process exit.
+    /// Once per run: cleans up any legacy plists an older checkout left in `~/Library/Preferences`.
     static let sweptStaleSuites: Void = {
         let prefs = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Preferences")
         let names = (try? FileManager.default.contentsOfDirectory(atPath: prefs.path)) ?? []
@@ -373,7 +380,6 @@ final class TestEnv {
         where n.hasPrefix("com.domfahey.fsearch.apptests.") && n.hasSuffix(".plist") {
             try? FileManager.default.removeItem(at: prefs.appendingPathComponent(n))
         }
-        atexit { TestEnv.deletePlist(TestEnv.unitSuite) }
     }()
 
     /// The suite, emptied and flushed, so cfprefsd holds no stale keys for it.
