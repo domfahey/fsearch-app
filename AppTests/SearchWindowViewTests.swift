@@ -221,6 +221,40 @@ extension AppTests {
             #expect(attempts.n <= 3)
         }
 
+        @Test func disconnectedWindowSearchRefreshesAfterExternalRestart() async {
+            let started = AsyncGate(), gate = AsyncGate()
+            let h = FakeHelper(.enabled)
+            h.onUnregister = {
+                started.release()
+                await gate.wait()
+            }
+            let d = StubDaemon()
+            d.onPing = { _ in false }
+            d.onSearch = { _ in throw DaemonError.disconnected }
+            let env = TestEnv(helper: h, daemon: d)
+            defer {
+                gate.release()
+                env.tearDown()
+            }
+            let externalRestart = Task { await env.app.daemon.restart() }
+            await started.wait()
+            #expect(env.app.daemon.isRestarting)
+
+            let model = env.app.makeSearchWindowModel()
+            model.query = "report"
+            await model.refresh()
+            #expect(model.phase == .failed(.disconnected))
+            #expect(env.app.status.restartBudget.used == 0)
+
+            d.onSearch = { _ in SearchReply(tookUs: 100, hits: [Wire.hit("/p/report.pdf")]) }
+            gate.release()
+            await externalRestart.value
+
+            #expect(await eventually { model.phase == .results && model.rows.map(\.rawName) == ["report.pdf"] })
+            #expect(h.unregistered == 1)
+            #expect(env.app.status.restartBudget.used == 0)
+        }
+
         @Test func rowShortcutsDisableWhileEditingTextOrPopovers() {
             #expect(SearchWindowView.rowShortcutsEnabled(searchFocused: false, popoverOpen: false, hasSelection: true, tableFocused: true))
             #expect(!SearchWindowView.rowShortcutsEnabled(searchFocused: true, popoverOpen: false, hasSelection: true, tableFocused: true))

@@ -74,6 +74,40 @@ extension AppTests {
             #expect(await eventually { h.registered == 1 })
         }
 
+        @Test func disconnectedPanelSearchRefreshesAfterExternalRestartWithoutSpendingBudget() async {
+            let started = AsyncGate(), gate = AsyncGate()
+            let h = FakeHelper(.enabled)
+            h.onUnregister = {
+                started.release()
+                await gate.wait()
+            }
+            let d = StubDaemon()
+            d.onPing = { _ in false }
+            d.onSearch = { _ in throw DaemonError.disconnected }
+            let env = TestEnv(helper: h, daemon: d)
+            defer {
+                gate.release()
+                env.tearDown()
+            }
+            let app = env.app
+            let externalRestart = Task { await app.daemon.restart() }
+            await started.wait()
+            #expect(app.daemon.isRestarting)
+
+            app.search.query = "needle"
+            await app.search.refresh()
+            #expect(app.search.phase == .failed(.disconnected))
+            #expect(app.status.restartBudget.used == 0)
+
+            d.onSearch = { _ in SearchReply(tookUs: 100, hits: [Wire.hit("/p/needle.txt")]) }
+            gate.release()
+            await externalRestart.value
+
+            #expect(await eventually { app.search.phase == .results && app.search.items.count == 1 })
+            #expect(h.unregistered == 1)
+            #expect(app.status.restartBudget.used == 0)
+        }
+
         @Test func rapidResultsWhileUnresponsiveCoalesceRecoveryRefresh() async {
             let gate = AsyncGate()
             let d = StubDaemon()
