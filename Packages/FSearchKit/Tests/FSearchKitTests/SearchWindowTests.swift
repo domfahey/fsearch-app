@@ -235,6 +235,17 @@ import Testing
             SearchWindowRow.sort([f2, f10], by: SearchWindowSort(column: .name, direction: .descending)).map(\.rawName)
                 == ["file10.txt", "file2.txt"])
 
+        // Canonically equivalent NFC vs NFD strings must still follow localizedStandardCompare (NSForcedOrderingSearch).
+        let nfc = SearchWindowRow(item: .file(Hit(path: "/a/caf\u{00E9}.txt", kind: "file", size: 1, mtime: 1, score: 1)))
+        let nfd = SearchWindowRow(item: .file(Hit(path: "/z/cafe\u{0301}.txt", kind: "file", size: 1, mtime: 1, score: 1)))
+        let expectedUnicodeAsc =
+            nfc.rawName.localizedStandardCompare(nfd.rawName) == .orderedAscending ? [nfc.id, nfd.id] : [nfd.id, nfc.id]
+        #expect(
+            SearchWindowRow.sort([nfc, nfd], by: SearchWindowSort(column: .name, direction: .ascending)).map(\.id) == expectedUnicodeAsc)
+        #expect(
+            SearchWindowRow.sort([nfc, nfd], by: SearchWindowSort(column: .name, direction: .descending)).map(\.id)
+                == expectedUnicodeAsc.reversed())
+
         // Equal-folder and equal-kind ties fall back to path ascending (both directions) and lineNumber ascending.
         let sameFolderB = SearchWindowRow(item: .file(Hit(path: "/shared/b.txt", kind: "file", size: 1, mtime: 1, score: 1)))
         let sameFolderA20 = SearchWindowRow(item: .line(path: "/shared/a.txt", match: Match(line: 20, text: "b")))

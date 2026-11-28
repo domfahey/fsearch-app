@@ -9,7 +9,7 @@ CHECK="$ROOT/scripts/check-strings.sh"
 T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT
 
-python3 -I - "$T" <<'PY'
+python3 -I - "$T" <<'PY' || exit 1
 import copy
 import json
 import os

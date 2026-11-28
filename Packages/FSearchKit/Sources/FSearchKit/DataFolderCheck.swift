@@ -54,26 +54,16 @@ public enum DataFolderCheck {
     ///   - dir: The data folder (a temp folder in tests).
     ///   - uid: The user who should own everything; ours by default.
     public static func issues(in dir: URL, uid: uid_t = getuid()) -> [Issue] {
-        let dirfd = open(dir.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+        let dirfd = open(dir.path, O_SEARCH | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
         var st = stat()
         if dirfd < 0 {
-            switch errno {
-            case ELOOP:
-                return [.folderIsSymlink]
-            case ENOTDIR:
-                if lstat(dir.path, &st) == 0 && (st.st_mode & S_IFMT == S_IFLNK) { return [.folderIsSymlink] }
-                return [.folderNotDirectory]
-            case ENOENT:
-                return []
-            default:
-                guard lstat(dir.path, &st) == 0 else { return [] }
-                if st.st_mode & S_IFMT == S_IFLNK { return [.folderIsSymlink] }
-                if st.st_mode & S_IFMT != S_IFDIR { return [.folderNotDirectory] }
-                var found: [Issue] = []
-                if st.st_uid != uid { found.append(.folderNotOwned) }
-                if st.st_mode & (S_IWGRP | S_IWOTH) != 0 { found.append(.folderWritableByOthers) }
-                return found
-            }
+            guard lstat(dir.path, &st) == 0 else { return [] }
+            if st.st_mode & S_IFMT == S_IFLNK { return [.folderIsSymlink] }
+            if st.st_mode & S_IFMT != S_IFDIR { return [.folderNotDirectory] }
+            var found: [Issue] = []
+            if st.st_uid != uid { found.append(.folderNotOwned) }
+            if st.st_mode & (S_IWGRP | S_IWOTH) != 0 { found.append(.folderWritableByOthers) }
+            return found
         }
         defer { close(dirfd) }
         guard fstat(dirfd, &st) == 0 else { return [] }

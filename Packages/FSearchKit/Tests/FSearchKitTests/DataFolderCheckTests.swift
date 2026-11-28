@@ -57,6 +57,32 @@ import Testing
         #expect(DataFolderCheck.issues(in: d, uid: getuid() &+ 1) == [.folderNotOwned])
     }
 
+    @Test func searchableUnreadableFolderStillChecksWatchedFiles() throws {
+        let d = try temp()
+        defer {
+            chmod(d.path, 0o755)
+            try? FileManager.default.removeItem(at: d)
+        }
+        let target = d.appendingPathComponent("elsewhere")
+        FileManager.default.createFile(atPath: target.path, contents: Data())
+        try FileManager.default.createSymbolicLink(at: d.appendingPathComponent("socket.lock"), withDestinationURL: target)
+        FileManager.default.createFile(atPath: d.appendingPathComponent("fsearch.sock").path, contents: Data())
+        #expect(chmod(d.path, 0o300) == 0)
+        #expect(DataFolderCheck.issues(in: d) == [.fileIsSymlink("socket.lock")])
+        let foreignIssues = DataFolderCheck.issues(in: d, uid: getuid() &+ 1)
+        #expect(foreignIssues == [.folderNotOwned, .fileIsSymlink("socket.lock"), .fileNotOwned("fsearch.sock")])
+        #expect(chmod(d.path, 0o100) == 0)
+        #expect(DataFolderCheck.issues(in: d) == [.fileIsSymlink("socket.lock")])
+    }
+
+    @Test func pathUnderPlainFileIsNotAnIssue() throws {
+        let d = try temp()
+        defer { try? FileManager.default.removeItem(at: d) }
+        let file = d.appendingPathComponent("plain")
+        FileManager.default.createFile(atPath: file.path, contents: Data())
+        #expect(DataFolderCheck.issues(in: file.appendingPathComponent("child")).isEmpty)
+    }
+
     @Test func ownedRegularSocketFilesHaveNoIssues() throws {
         let d = try temp()
         defer { try? FileManager.default.removeItem(at: d) }

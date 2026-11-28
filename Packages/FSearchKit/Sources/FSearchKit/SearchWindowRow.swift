@@ -168,7 +168,7 @@ public struct SearchWindowRow: Equatable, Identifiable, Sendable {
     }
 
     private static func compareLocalized(_ a: String, _ b: String) -> ComparisonResult {
-        a == b ? .orderedSame : a.localizedStandardCompare(b)
+        a.utf8.elementsEqual(b.utf8) ? .orderedSame : a.localizedStandardCompare(b)
     }
 
     private static func compareValues<T: Comparable>(_ a: T, _ b: T) -> ComparisonResult {

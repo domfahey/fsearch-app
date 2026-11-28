@@ -222,6 +222,30 @@ import Testing
         #expect(m.phase == .idle && m.items.isEmpty && m.resultsAreCurrent)
     }
 
+    @Test func cancelledSearchBeforeUnwindFollowedByHalfTypedFilterClearsLoading() async {
+        let (started, startedCont) = AsyncStream.makeStream(of: Void.self)
+        let gate = ContinuationGate()
+        let names = HookedSearchBackend { _ in
+            startedCont.yield()
+            await gate.wait()
+            try Task.checkCancellation()
+            return SearchReply(tookUs: 1, hits: [])
+        }
+        let m = SearchModel(names: names, content: RecordingBackend())
+        m.query = "alpha"
+        let task = Task { await m.refresh() }
+        var startedIt = started.makeAsyncIterator()
+        _ = await startedIt.next()
+        #expect(m.phase == .loading)
+        task.cancel()
+        m.query = "alpha size:"
+        await m.refresh()
+        #expect(m.phase == .idle && m.items.isEmpty && m.resultsAreCurrent)
+        gate.release()
+        await task.value
+        #expect(m.phase == .idle && m.items.isEmpty)
+    }
+
     @Test func activeInFlightSearchFollowedByHalfTypedFilterStillFinishes() async {
         let (started, startedCont) = AsyncStream.makeStream(of: Void.self)
         let gate = ContinuationGate()

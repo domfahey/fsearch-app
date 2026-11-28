@@ -145,7 +145,7 @@ public final class SearchModel {
         // a tail was pasted, or the mode changed) those rows answer something
         // else: clear them, still sending nothing.
         let halfTyped = QuerySplit.endsInHalfTypedFilter(query, mode: mode)
-        if halfTyped && (phase != .loading || inflight != nil) && mode == requested.mode
+        if halfTyped && (phase != .loading || inflight?.isCancelled == false) && mode == requested.mode
             && QuerySplit.halfTypedExtends(query, answered: requested.query, mode: mode)
         {
             return
