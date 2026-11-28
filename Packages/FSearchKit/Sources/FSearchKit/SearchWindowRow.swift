@@ -149,13 +149,13 @@ public struct SearchWindowRow: Equatable, Identifiable, Sendable {
             case .relevance:
                 order = compareValues(lhs.score, rhs.score)
             case .name:
-                order = lhs.rawName.localizedStandardCompare(rhs.rawName)
+                order = compareLocalized(lhs.rawName, rhs.rawName)
             case .folder:
-                order = lhs.rawFolder.localizedStandardCompare(rhs.rawFolder)
+                order = compareLocalized(lhs.rawFolder, rhs.rawFolder)
             case .size:
                 order = compareOptional(lhs.size, rhs.size)
             case .kind:
-                order = lhs.kindLabel.localizedStandardCompare(rhs.kindLabel)
+                order = compareLocalized(lhs.kindLabel, rhs.kindLabel)
             case .modified:
                 order = compareOptional(lhs.mtime, rhs.mtime)
             }
@@ -165,6 +165,10 @@ public struct SearchWindowRow: Equatable, Identifiable, Sendable {
             if lhs.path != rhs.path { return lhs.path < rhs.path }
             return (lhs.lineNumber ?? 0) < (rhs.lineNumber ?? 0)
         }
+    }
+
+    private static func compareLocalized(_ a: String, _ b: String) -> ComparisonResult {
+        a == b ? .orderedSame : a.localizedStandardCompare(b)
     }
 
     private static func compareValues<T: Comparable>(_ a: T, _ b: T) -> ComparisonResult {
