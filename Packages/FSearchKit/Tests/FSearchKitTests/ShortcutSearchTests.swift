@@ -171,6 +171,38 @@ struct ShortcutSearchTests {
         #expect(ShortcutSearch.readsFileContents(query: "notes\tgrep:password", mode: .names))
     }
 
+    @Test func readsFileContentsDetectsCombiningMarkPayloads() {
+        let payloads = [
+            "grep:\u{0301}secret",
+            "grep:\"\u{0301}secret\"",
+            "\"grep:\"\u{0301}secret",
+            "\"\u{0301}\" grep:secret",
+            "\"a\"\u{0301} grep:secret",
+            "foo \u{0301} regex:\u{0301}token",
+            "sym:\u{0301}foo",
+        ]
+        for query in payloads {
+            #expect(ShortcutSearch.readsFileContents(query: query, mode: .names), "\(query)")
+        }
+        // Combining mark before key name changes the key itself to `\u{0301}grep`, matching daemon behavior.
+        #expect(!ShortcutSearch.readsFileContents(query: "\"\u{0301}grep:secret\"", mode: .names))
+    }
+
+    @Test func combiningMarkInExplicitLimitForwardsLimitToDaemon() async throws {
+        let backend = StubBackend()
+        backend.state.withLock { s in
+            s.onSearch = { [self] _, _ in
+                SearchReply(tookUs: 100, hits: [hit("/p/a.txt"), hit("/p/b.txt"), hit("/p/c.txt")])
+            }
+        }
+        // Caller limit 0 normally short-circuits, so reaching the backend proves hasExplicitLimit == true.
+        let paths = try await ShortcutSearch.run(query: "foo limit:\u{0301}5", mode: .names, limit: 0, backend: backend)
+        #expect(paths.count == 3)
+        let sent = backend.state.withLock { $0.searches }
+        #expect(sent.count == 1)
+        #expect(sent[0].q == "foo limit:\u{0301}5")
+    }
+
     @Test(.enabled(if: RealDaemon.binary != nil, "Vendor/fsearch not built"))
     func worksEndToEndAgainstRealDaemon() async throws {
         let nfdName = "cafe\u{0301}_notes.txt"
