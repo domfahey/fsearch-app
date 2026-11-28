@@ -46,5 +46,5 @@ Open work, by priority. "You" items need the maintainer: a decision, credentials
   - switching between Classic Panel and Search Window in **Settings → Search interface**.
 
 **Design and outreach**
-- [ ] App icon (original; no third-party assets) and README screenshots or a demo GIF.
+- [ ] README screenshots or a demo GIF.
 - [ ] Follow up on noahdunnagan/fsearch#18.

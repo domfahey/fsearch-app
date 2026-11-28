@@ -82,6 +82,10 @@ jobs:
       - run: scripts/gen-credits.sh --check
       - name: Check Markdown links
         run: scripts/check-links.sh
+      - name: Check String Catalogs (8 locales)
+        run: |
+          scripts/check-strings.sh
+          scripts/test-check-strings.sh >/dev/null
       - name: Syntax-check shell scripts
         run: for f in scripts/*.sh scripts/hooks/*; do bash -n "$f"; done
       - name: Verify appcast signing guardrails
