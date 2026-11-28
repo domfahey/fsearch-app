@@ -152,8 +152,8 @@ final class SearchWindowUITests: PanelUITestCase {
             return (countEl.value as? String ?? countEl.label) == "1 result"
         }
 
-        // Reopen the floating panel and run the `window` App Command to open a second independent window.
-        reopenPanel()
+        // Open the floating panel via the toolbar button (no ExternalOpenGuard delay) and run `window` to open a second window.
+        try click(windowElement("searchWindowOpenPanel", in: win1))
         waitFor(field, 10)
         try search("window")
         waitFor(text("New Search Window"), 10)
@@ -174,7 +174,7 @@ final class SearchWindowUITests: PanelUITestCase {
         waitFor(tableText("heronfile.txt", in: win1), 10)
         waitUntil(5, "win1 title updated") { win1.title == "FSearch — heronfile" }
 
-        // Toggle sidebar off/on and toggle Preview pane off/on via ⌥⌘P.
+        // Toggle sidebar off/on and toggle Preview pane off/on via toolbar buttons.
         let sidebar = windowElement("searchWindowSidebar", in: win1)
         let preview = windowElement("searchWindowPreviewPane", in: win1)
         waitFor(sidebar, 5)
@@ -184,9 +184,9 @@ final class SearchWindowUITests: PanelUITestCase {
         try click(windowElement("searchWindowToggleSidebar", in: win1))
         waitFor(sidebar, 5)
 
-        try pressInApp("p", [.command, .option])
+        try click(windowElement("searchWindowTogglePreview", in: win1))
         waitForAbsence(preview, 5)
-        try pressInApp("p", [.command, .option])
+        try click(windowElement("searchWindowTogglePreview", in: win1))
         waitFor(preview, 5)
 
         // ⌘N opens a second independent Search Window without disturbing window 1.
@@ -198,8 +198,9 @@ final class SearchWindowUITests: PanelUITestCase {
         try searchInWindow("plover", in: win2)
         waitFor(tableText("plover-one.txt", in: win2), 10)
         waitFor(tableText("plover-two.txt", in: win2), 10)
-        XCTAssertEqual(win1.title, "FSearch — heronfile", "window 1 keeps its own query and title")
-        XCTAssertTrue(tableText("heronfile.txt", in: win1).exists, "window 1 keeps its own results")
+        let origWin = app.windows["FSearch — heronfile"]
+        XCTAssertTrue(origWin.exists, "window 1 keeps its own query and title")
+        XCTAssertTrue(tableText("heronfile.txt", in: origWin).exists, "window 1 keeps its own results")
     }
 
     // MARK: - Match Toggles & Modes
@@ -311,8 +312,11 @@ final class SearchWindowUITests: PanelUITestCase {
 
         try pressInApp("n", .command)
         waitUntil(10, "second window opened") { self.searchWindows.count == 2 }
-        let win2 = searchWindows.allElementsBoundByIndex.first { $0 != win1 } ?? searchWindows.element(boundBy: 1)
+        // macOS orders app.windows front-to-back: boundBy(0) is the newly opened window, boundBy(1) is the original window.
+        let win2 = searchWindows.element(boundBy: 0)
+        let origWin = searchWindows.element(boundBy: 1)
         let sidebar2 = windowElement("searchWindowSidebar", in: win2)
+        let origSidebar = windowElement("searchWindowSidebar", in: origWin)
         waitFor(sidebar2.buttons["My Swift Filter"], 5)
 
         // Deleting the saved search in window 2 removes it from window 1's sidebar too.
@@ -320,7 +324,7 @@ final class SearchWindowUITests: PanelUITestCase {
         waitFor(deleteBtn, 5)
         try click(deleteBtn)
         waitForAbsence(sidebar2.buttons["My Swift Filter"], 5)
-        waitForAbsence(sidebar1.buttons["My Swift Filter"], 5)
+        waitForAbsence(origSidebar.buttons["My Swift Filter"], 5)
     }
 
     // MARK: - Actions, Launchables & Multi-Select
@@ -487,6 +491,7 @@ final class SearchWindowUITests: PanelUITestCase {
         waitFor(field, 10)
         waitFor(text("heronfile.txt"), 10)
         try press(.escape)
+        waitUntil(5, "query cleared") { (self.field.value as? String ?? "") == "" }
         try press(.escape)
         waitForAbsence(field, 5)
 
@@ -561,12 +566,21 @@ final class SearchWindowUITests: PanelUITestCase {
 
         // Clicking Name column header sorts plover results cleanly without error.
         try searchInWindow("plover", in: win)
-        waitFor(tableText("plover-one.txt", in: win), 10)
-        waitFor(tableText("plover-two.txt", in: win), 10)
+        let ploverOne = tableText("plover-one.txt", in: win)
+        let ploverTwo = tableText("plover-two.txt", in: win)
+        waitFor(ploverOne, 10)
+        waitFor(ploverTwo, 10)
         let nameHeader = table(in: win).buttons["Name"].firstMatch
         waitFor(nameHeader, 5)
-        try click(nameHeader)
-        waitFor(tableText("plover-one.txt", in: win), 5)
+        try requireFocus(field: false)
+        nameHeader.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+        waitUntil(5, "Name ascending puts plover-one before plover-two") {
+            ploverOne.frame.minY < ploverTwo.frame.minY
+        }
+        nameHeader.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+        waitUntil(5, "Name descending puts plover-two before plover-one") {
+            ploverTwo.frame.minY < ploverOne.frame.minY
+        }
 
         // ⌘W closes the Search Window cleanly.
         try pressInApp("w", .command)

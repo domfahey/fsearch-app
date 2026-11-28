@@ -155,6 +155,17 @@ extension AppTests {
             newBtn.press()
             #expect(await eventually { mgr.openCount == 3 })
 
+            // Real CGEvent ⌥⌘P toggles the rendered SearchPreviewPane off and back on via SearchBrowserWindow.performKeyEquivalent.
+            #expect(await axWait(id: "searchWindowPreviewPane", in: win1) != nil)
+            let cgOptCmdP = try #require(CGEvent(keyboardEventSource: nil, virtualKey: 35, keyDown: true))
+            cgOptCmdP.flags = [.maskCommand, .maskAlternate]
+            let realOptCmdP = try #require(NSEvent(cgEvent: cgOptCmdP))
+            #expect(NSApp.mainMenu?.performKeyEquivalent(with: realOptCmdP) != true)
+            #expect(win1.performKeyEquivalent(with: realOptCmdP))
+            #expect(await eventually { axNode(id: "searchWindowPreviewPane", in: win1) == nil })
+            #expect(win1.performKeyEquivalent(with: realOptCmdP))
+            #expect(await axWait(id: "searchWindowPreviewPane", in: win1) != nil)
+
             mgr.closeWindow(id: id1)
             #expect(mgr.openCount == 2)
             mgr.closeAll()
@@ -644,6 +655,27 @@ extension AppTests {
             await env.app.daemon.refresh()
             flow.apply()
             #expect(flow.facts.indexReady == false && flow.entries == 0)
+
+            // OnboardingView Step 4 shows busy progress while retrying a failed daemon instead of leaving Try Again clickable.
+            env.daemon.onStatus = { _ in throw DaemonError.disconnected }
+            await env.app.daemon.refresh()
+            flow.apply()
+            let retryGate = AsyncGate()
+            defer { retryGate.release() }
+            env.daemon.onStatusAsync = { _ in
+                await retryGate.wait()
+                return Wire.status(entries: 42, fullDiskAccess: false)
+            }
+            defer { env.daemon.onStatusAsync = nil }
+            let onboardingWin = await render(
+                OnboardingView(flow: flow).environmentObject(env.app).environmentObject(env.app.daemon),
+                size: NSSize(width: 440, height: 340))
+            defer { onboardingWin.close() }
+            try #require(await axWait("Try Again", in: onboardingWin)).press()
+            #expect(await axWait("Starting background helper…", in: onboardingWin) != nil)
+            #expect(axNode("Try Again", in: onboardingWin) == nil)
+            retryGate.release()
+            #expect(await axWait("Ready to search", in: onboardingWin) != nil)
 
             // MenuContent shows Launcher Panel… item when Search Window is the default UI.
             let menuView = MenuContent(app: env.app)

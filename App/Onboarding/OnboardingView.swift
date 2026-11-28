@@ -234,6 +234,10 @@ struct OnboardingView: View {
                     Label("Ready to search", systemImage: "checkmark.circle.fill").font(.title3.bold()).foregroundStyle(.green)
                         .accessibilityAddTraits(.isHeader).accessibilityIdentifier("onboardingHeading")
                     Text("\(flow.entries.formatted()) files indexed.").foregroundStyle(.secondary)
+                } else if flow.busy {
+                    Text("Indexing your disk").font(.title3.bold())
+                        .accessibilityAddTraits(.isHeader).accessibilityIdentifier("onboardingHeading")
+                    ProgressView("Starting background helper…").controlSize(.small)
                 } else if case let .failed(message) = daemon.state {
                     Text("Indexing your disk").font(.title3.bold())
                         .accessibilityAddTraits(.isHeader).accessibilityIdentifier("onboardingHeading")

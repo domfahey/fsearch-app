@@ -61,6 +61,7 @@ final class StubDaemon: DaemonControl, @unchecked Sendable {
     private let lock = NSLock()
     private var _onPing: @Sendable (Int) -> Bool = { _ in true }
     private var _onStatus: @Sendable (Int) throws -> DaemonStatus = { _ in Wire.status() }
+    private var _onStatusAsync: (@Sendable (Int) async throws -> DaemonStatus)?
     private var _onSearch: @Sendable (String) throws -> SearchReply = { _ in SearchReply(tookUs: 1000, hits: []) }
     private var _onSearchAsync: (@Sendable (String) async throws -> SearchReply)?
     private var _onGrep: @Sendable (String, String, GrepMode) throws -> GrepReply = { _, _, _ in Wire.grep([]) }
@@ -77,6 +78,10 @@ final class StubDaemon: DaemonControl, @unchecked Sendable {
     var onStatus: @Sendable (Int) throws -> DaemonStatus {
         get { locked { _onStatus } }
         set { locked { _onStatus = newValue } }
+    }
+    var onStatusAsync: (@Sendable (Int) async throws -> DaemonStatus)? {
+        get { locked { _onStatusAsync } }
+        set { locked { _onStatusAsync = newValue } }
     }
     var onSearch: @Sendable (String) throws -> SearchReply {
         get { locked { _onSearch } }
@@ -104,9 +109,10 @@ final class StubDaemon: DaemonControl, @unchecked Sendable {
     }
 
     func status() async throws -> DaemonStatus {
-        let (n, f) = locked {
-            _statuses += 1; return (_statuses, _onStatus)
+        let (n, f, fa) = locked {
+            _statuses += 1; return (_statuses, _onStatus, _onStatusAsync)
         }
+        if let fa { return try await fa(n) }
         return try f(n)
     }
 

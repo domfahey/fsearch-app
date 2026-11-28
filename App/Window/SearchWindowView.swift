@@ -224,7 +224,7 @@ struct SearchWindowView: View {
     }
 
     private var topSearchBar: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Button {
                 showSidebar.toggle()
             } label: {
@@ -255,6 +255,7 @@ struct SearchWindowView: View {
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
+            .frame(minWidth: 140)
             .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
             .overlay(
                 RoundedRectangle(cornerRadius: 6)
@@ -267,6 +268,7 @@ struct SearchWindowView: View {
                 Text("Definitions").tag(SearchMode.symbols)
             }
             .pickerStyle(.segmented)
+            .controlSize(.small)
             .labelsHidden()
             .fixedSize()
             .accessibilityIdentifier("searchWindowModePicker")
@@ -311,16 +313,17 @@ struct SearchWindowView: View {
     }
 
     @ViewBuilder
-    private func matchToggle(label: String, help: String, isOn: Binding<Bool>, id: String) -> some View {
+    private func matchToggle(label: String, help: LocalizedStringKey, isOn: Binding<Bool>, id: String) -> some View {
         let base = Button {
             isOn.wrappedValue.toggle()
         } label: {
             Text(verbatim: label)
                 .font(.system(.caption, design: .monospaced).weight(.semibold))
-                .frame(minWidth: 24, minHeight: 20)
+                .frame(minWidth: 20, minHeight: 16)
         }
-        .help(LocalizedStringKey(help))
-        .accessibilityLabel(LocalizedStringKey(help))
+        .controlSize(.small)
+        .help(help)
+        .accessibilityLabel(help)
         .accessibilityValue(isOn.wrappedValue ? Text("On") : Text("Off"))
         .accessibilityIdentifier(id)
 
@@ -527,7 +530,7 @@ struct SearchWindowView: View {
                 TableColumn("Name", sortUsing: SearchWindowComparator(.name)) { row in
                     SearchWindowNameCell(row: row)
                 }
-                .width(min: 160, ideal: 250)
+                .width(min: 130, ideal: 175)
                 .customizationID("name")
 
                 TableColumn("Folder", sortUsing: SearchWindowComparator(.folder)) { row in
@@ -536,7 +539,7 @@ struct SearchWindowView: View {
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
-                .width(min: 120, ideal: 220)
+                .width(min: 100, ideal: 145)
                 .customizationID("folder")
 
                 TableColumn("Size", sortUsing: SearchWindowComparator(.size)) { row in
@@ -545,7 +548,7 @@ struct SearchWindowView: View {
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .trailing)
                 }
-                .width(min: 65, ideal: 80)
+                .width(min: 55, ideal: 65)
                 .customizationID("size")
 
                 TableColumn("Kind", sortUsing: SearchWindowComparator(.kind)) { row in
@@ -553,7 +556,7 @@ struct SearchWindowView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
-                .width(min: 60, ideal: 90)
+                .width(min: 50, ideal: 65)
                 .customizationID("kind")
 
                 TableColumn("Date Modified", sortUsing: SearchWindowComparator(.modified)) { row in
@@ -561,7 +564,7 @@ struct SearchWindowView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
-                .width(min: 110, ideal: 150)
+                .width(min: 100, ideal: 115)
                 .customizationID("modified")
             } rows: {
                 ForEach(model.rows) { row in
@@ -691,7 +694,8 @@ struct SearchWindowView: View {
             Button("Reveal Selected", action: revealSelected).keyboardShortcut(.return, modifiers: .command).disabled(!rowEnabled)
             Button("Copy Files", action: copySelectedFiles).keyboardShortcut("c", modifiers: [.command, .shift]).disabled(!rowEnabled)
             Button("Quick Look", action: toggleQuickLook).keyboardShortcut("y", modifiers: .command).disabled(!rowEnabled)
-            Button("Trash Selected", action: trashSelected).keyboardShortcut(.delete, modifiers: .command).disabled(!rowEnabled)
+            Button("Trash Selected", action: trashSelected).keyboardShortcut(KeyEquivalent("\u{7f}"), modifiers: .command).disabled(
+                !rowEnabled)
         }
         .frame(width: 0, height: 0)
         .opacity(0)
@@ -761,15 +765,20 @@ struct SearchWindowView: View {
         Task { await trashRows(rows) }
     }
     private func trashRows(_ rows: [SearchWindowRow]) async {
+        var trashedPaths = Set<String>()
         await SearchWindowActions.trashSelected(
             rows, app: app, onError: showWindowError,
             onTrashed: { trashed in
+                trashedPaths = trashed
                 model.removeRows(matchingPaths: trashed)
                 let valid = Set(model.rows.map(\.id))
                 selection = selection.intersection(valid)
             },
             refresh: {
                 await model.refresh()
+                // Strip paths that are already gone on disk so a pre-FSEvents refresh doesn't flash them back.
+                let stillMissing = Set(trashedPaths.filter { FileActions.workspace.fileInfo(atPath: $0) == nil })
+                model.removeRows(matchingPaths: stillMissing)
                 let valid = Set(model.rows.map(\.id))
                 selection = selection.intersection(valid)
             })
