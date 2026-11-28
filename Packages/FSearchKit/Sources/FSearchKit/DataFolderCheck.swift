@@ -1,7 +1,7 @@
 import Darwin
 import Foundation
 
-/// A read-only sanity check of the daemon's data folder (`lstat` only; nothing is changed).
+/// A read-only sanity check of the daemon's data folder (`O_NOFOLLOW` + `fstat`/`fstatat`; nothing is changed).
 ///
 /// The folder holds the socket, `socket.lock` and the index, so a symlink, another user's
 /// ownership or group/world write access there lets someone else redirect or tamper with them.
@@ -54,16 +54,25 @@ public enum DataFolderCheck {
     ///   - dir: The data folder (a temp folder in tests).
     ///   - uid: The user who should own everything; ours by default.
     public static func issues(in dir: URL, uid: uid_t = getuid()) -> [Issue] {
+        let dirfd = open(dir.path, O_SEARCH | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
         var st = stat()
-        guard lstat(dir.path, &st) == 0 else { return [] }
-        if st.st_mode & S_IFMT == S_IFLNK { return [.folderIsSymlink] }
-        if st.st_mode & S_IFMT != S_IFDIR { return [.folderNotDirectory] }
+        if dirfd < 0 {
+            guard lstat(dir.path, &st) == 0 else { return [] }
+            if st.st_mode & S_IFMT == S_IFLNK { return [.folderIsSymlink] }
+            if st.st_mode & S_IFMT != S_IFDIR { return [.folderNotDirectory] }
+            var found: [Issue] = []
+            if st.st_uid != uid { found.append(.folderNotOwned) }
+            if st.st_mode & (S_IWGRP | S_IWOTH) != 0 { found.append(.folderWritableByOthers) }
+            return found
+        }
+        defer { close(dirfd) }
+        guard fstat(dirfd, &st) == 0 else { return [] }
         var found: [Issue] = []
         if st.st_uid != uid { found.append(.folderNotOwned) }
         if st.st_mode & (S_IWGRP | S_IWOTH) != 0 { found.append(.folderWritableByOthers) }
         for name in watchedFiles {
             var f = stat()
-            guard lstat(dir.appendingPathComponent(name).path, &f) == 0 else { continue }
+            guard fstatat(dirfd, name, &f, AT_SYMLINK_NOFOLLOW) == 0 else { continue }
             if f.st_mode & S_IFMT == S_IFLNK {
                 found.append(.fileIsSymlink(name))
             } else if f.st_uid != uid {

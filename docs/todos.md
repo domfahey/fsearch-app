@@ -42,7 +42,8 @@ Open work, by priority. "You" items need the maintainer: a decision, credentials
   - ⌥⌘D with the menu closed;
   - `defaults delete com.domfahey.fsearch` clears settings;
   - the panel frame on the built-in display, held ↵ replay, scrolling to the selection;
-  - editor URL schemes for VS Code and Cursor (and Zed, Sublime Text and BBEdit if installed).
+  - editor URL schemes for VS Code and Cursor (and Zed, Sublime Text and BBEdit if installed);
+  - switching between Classic Panel and Search Window in **Settings → Search interface**.
 
 **Design and outreach**
 - [ ] App icon (original; no third-party assets) and README screenshots or a demo GIF.

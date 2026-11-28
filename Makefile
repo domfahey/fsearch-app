@@ -133,10 +133,12 @@ format: ## Format Swift sources in place
 format-check: ## Check Swift formatting only (no changes)
 	$(Q)xcrun swift format lint --strict $(FORMAT_CFG) -r $(SWIFT_DIRS)
 
-lint: ## Lint swift-format (LINT_FORMAT=0 skips), links, credits, appcast checks, shell scripts, workflows
+lint: ## Lint swift-format (LINT_FORMAT=0 skips), links, strings, credits, appcast checks, shell scripts, workflows
 	$(Q)if [ "$(LINT_FORMAT)" = "0" ]; then echo "skipping swift-format check (LINT_FORMAT=0)"; \
 	else xcrun swift format lint --strict $(FORMAT_CFG) -r $(SWIFT_DIRS); fi
 	$(Q)scripts/check-links.sh
+	$(Q)scripts/check-strings.sh
+	$(Q)scripts/test-check-strings.sh >/dev/null
 	$(Q)scripts/gen-credits.sh --check
 	$(Q)scripts/test-appcast-verify.sh >/dev/null
 	$(Q)set -euo pipefail; for f in scripts/*.sh scripts/hooks/*; do bash -n "$$f"; done

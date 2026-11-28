@@ -36,6 +36,7 @@ Implemented on `main`:
 - Keyboard first: the same actions as the panel, multi-select, context menu, and drag out.
 - A toggleable Quick Look preview pane and inside-file results with the matching line.
 - More than one independent search window open at a time (`⌘N`).
+- **Search interface** switcher in Settings (choose Classic Panel or Search Window as the default UI, with `ui=panel` / `ui=window` URL override in `fsearch://search`).
 
 Still planned once upstream `fsearch` adds server-side `offset` paging and sorting: scrolling past the 1,000-result cap across arbitrarily large result sets (`SearchWindowQuery.PageRequest` already reserves the `offset`/`limit`/`sort` contract).
 

@@ -224,6 +224,97 @@ import Testing
         #expect(SearchWindowRow.sort([l1, l2], by: .defaultSort).map(\.lineNumber) == [5, 20])
     }
 
+    @Test func sortsNaturalNamesIdenticalStringTiesAndLargeSharedDataset() {
+        // Natural-number ordering on .name.
+        let f10 = SearchWindowRow(item: .file(Hit(path: "/dir/file10.txt", kind: "file", size: 10, mtime: 10, score: 1)))
+        let f2 = SearchWindowRow(item: .file(Hit(path: "/dir/file2.txt", kind: "file", size: 20, mtime: 20, score: 1)))
+        #expect(
+            SearchWindowRow.sort([f10, f2], by: SearchWindowSort(column: .name, direction: .ascending)).map(\.rawName)
+                == ["file2.txt", "file10.txt"])
+        #expect(
+            SearchWindowRow.sort([f2, f10], by: SearchWindowSort(column: .name, direction: .descending)).map(\.rawName)
+                == ["file10.txt", "file2.txt"])
+
+        // Canonically equivalent NFC vs NFD strings must still follow localizedStandardCompare (NSForcedOrderingSearch).
+        let nfc = SearchWindowRow(item: .file(Hit(path: "/a/caf\u{00E9}.txt", kind: "file", size: 1, mtime: 1, score: 1)))
+        let nfd = SearchWindowRow(item: .file(Hit(path: "/z/cafe\u{0301}.txt", kind: "file", size: 1, mtime: 1, score: 1)))
+        let expectedUnicodeAsc =
+            nfc.rawName.localizedStandardCompare(nfd.rawName) == .orderedAscending ? [nfc.id, nfd.id] : [nfd.id, nfc.id]
+        #expect(
+            SearchWindowRow.sort([nfc, nfd], by: SearchWindowSort(column: .name, direction: .ascending)).map(\.id) == expectedUnicodeAsc)
+        #expect(
+            SearchWindowRow.sort([nfc, nfd], by: SearchWindowSort(column: .name, direction: .descending)).map(\.id)
+                == expectedUnicodeAsc.reversed())
+
+        // Equal-folder and equal-kind ties fall back to path ascending (both directions) and lineNumber ascending.
+        let sameFolderB = SearchWindowRow(item: .file(Hit(path: "/shared/b.txt", kind: "file", size: 1, mtime: 1, score: 1)))
+        let sameFolderA20 = SearchWindowRow(item: .line(path: "/shared/a.txt", match: Match(line: 20, text: "b")))
+        let sameFolderA5 = SearchWindowRow(item: .line(path: "/shared/a.txt", match: Match(line: 5, text: "a")))
+        let folderRows = [sameFolderB, sameFolderA20, sameFolderA5]
+        let expectedTieIDs = [sameFolderA5.id, sameFolderA20.id, sameFolderB.id]
+        for direction in [SortDirection.ascending, .descending] {
+            #expect(
+                SearchWindowRow.sort(folderRows, by: SearchWindowSort(column: .folder, direction: direction)).map(\.id) == expectedTieIDs)
+        }
+
+        let kindZ = SearchWindowRow(item: .file(Hit(path: "/z/one.txt", kind: "file", size: 1, mtime: 1, score: 1)))
+        let kindA12 = SearchWindowRow(item: .line(path: "/a/two.txt", match: Match(line: 12, text: "b")))
+        let kindA3 = SearchWindowRow(item: .line(path: "/a/two.txt", match: Match(line: 3, text: "a")))
+        let kindRows = [kindZ, kindA12, kindA3]
+        let expectedKindIDs = [kindA3.id, kindA12.id, kindZ.id]
+        for direction in [SortDirection.ascending, .descending] {
+            #expect(SearchWindowRow.sort(kindRows, by: SearchWindowSort(column: .kind, direction: direction)).map(\.id) == expectedKindIDs)
+        }
+
+        // 1,000-row dataset sharing a few folders and extensions sorts deterministically and monotonically.
+        let folders = ["/root/alpha", "/root/beta", "/root/gamma", "/root/delta"]
+        let exts = ["swift", "txt", "md", "json"]
+        let dataset: [SearchWindowRow] = (0..<1000).map { i in
+            let idx = (i * 37 + 13) % 1000
+            let folder = folders[idx % folders.count]
+            let ext = exts[(idx / folders.count) % exts.count]
+            let path = "\(folder)/item\((idx / 16) % 15).\(ext)"
+            if idx < 240 {
+                return SearchWindowRow(
+                    item: .file(Hit(path: path, kind: "file", size: UInt64(idx), mtime: Int64(idx), score: Int32(idx))))
+            }
+            return SearchWindowRow(item: .line(path: path, match: Match(line: idx + 1, text: "line \(idx)")))
+        }
+
+        for column in [SearchWindowColumn.folder, .kind, .name] {
+            for direction in [SortDirection.ascending, .descending] {
+                let spec = SearchWindowSort(column: column, direction: direction)
+                let sorted1 = SearchWindowRow.sort(dataset, by: spec)
+                let sorted2 = SearchWindowRow.sort(dataset.reversed(), by: spec)
+                #expect(sorted1.count == 1000)
+                #expect(sorted1.map(\.id) == sorted2.map(\.id))
+
+                for pair in zip(sorted1, sorted1.dropFirst()) {
+                    let key: (SearchWindowRow) -> String = { row in
+                        switch column {
+                        case .folder: row.rawFolder
+                        case .kind: row.kindLabel
+                        case .name: row.rawName
+                        default: fatalError("unexpected column")
+                        }
+                    }
+                    let cmp = key(pair.0).localizedStandardCompare(key(pair.1))
+                    if cmp == .orderedSame {
+                        if pair.0.path != pair.1.path {
+                            #expect(pair.0.path < pair.1.path)
+                        } else {
+                            #expect((pair.0.lineNumber ?? 0) <= (pair.1.lineNumber ?? 0))
+                        }
+                    } else if direction == .ascending {
+                        #expect(cmp == .orderedAscending)
+                    } else {
+                        #expect(cmp == .orderedDescending)
+                    }
+                }
+            }
+        }
+    }
+
     @Test func statusSummariesHandleCountsCapsAndSelections() {
         #expect(SearchWindowStatus.resultSummary(count: 0, hitCap: false) == "0 results")
         #expect(SearchWindowStatus.resultSummary(count: 1, hitCap: false) == "1 result")

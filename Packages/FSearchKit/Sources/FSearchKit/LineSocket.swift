@@ -117,9 +117,8 @@ final class LineSocket {
             try writeAll(out, deadline: deadline)
             while true {
                 let reply = try readLine(deadline: deadline)
-                let accepted = accepts(reply)
+                if accepts(reply) { return reply }
                 guard ContinuousClock.now < deadline else { throw DaemonError.timeout }
-                if accepted { return reply }
             }
         } catch {
             close()
@@ -134,7 +133,11 @@ final class LineSocket {
             guard let base = raw.baseAddress else { return }
             while offset < data.count {
                 let n = io.write(fd, base.advanced(by: offset), data.count - offset)
-                if n > 0 { offset += n; continue }
+                if n > 0 {
+                    offset += n
+                    if offset < data.count && ContinuousClock.now >= deadline { throw DaemonError.timeout }
+                    continue
+                }
                 if n < 0 && errno == EINTR {
                     if ContinuousClock.now >= deadline { throw DaemonError.timeout }
                     continue
@@ -160,7 +163,7 @@ final class LineSocket {
                 if buffer.isEmpty { buffer.removeAll(keepingCapacity: true) }
                 return line
             }
-            if buffer.count >= maxLineBytes { throw DaemonError.badReply("reply line too large") }
+            if buffer.count > maxLineBytes { throw DaemonError.badReply("reply line too large") }
             scanned = buffer.count
             let ms = Self.remainingMilliseconds(ContinuousClock.now.duration(to: deadline))
             guard ms > 0 else { throw DaemonError.timeout }
