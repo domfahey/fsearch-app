@@ -24,7 +24,7 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/architecture.md](docs/architec
 
 ## Localization (String Catalogs)
 
-- When adding or editing any user-facing localized string in `App/` or `Packages/FSearchKit/`, run `make strings` (`scripts/sync-strings.sh`) and populate translations for **all 8 locales** (`de`, `en`, `es`, `fr`, `ja`, `ko`, `pt-BR`, `zh-Hans`) in `App/Resources/Localizable.xcstrings` and `Packages/FSearchKit/Sources/FSearchKit/Resources/Localizable.xcstrings`.
+- When adding or editing any user-facing localized string in `App/` or `Packages/FSearchKit/`, run `make strings` (`scripts/sync-strings.sh`) and populate translations for **all 8 locales** (`de`, `en`, `es`, `fr`, `ja`, `ko`, `pt-BR`, `zh-Hans`) in `App/Resources/Localizable.xcstrings` and `Packages/FSearchKit/Sources/FSearchKit/Resources/Localizable.xcstrings`. `scripts/check-strings.sh` enforces 8-locale completeness (and rejects stale keys) inside `make lint`.
 
 ## Coverage Gates (ADR 0012)
 
@@ -44,7 +44,7 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/architecture.md](docs/architec
 | All FSearchKit tests | `make test` |
 | Targeted AppTests suite | `xcodebuild test -project FSearch.xcodeproj -scheme FSearch -derivedDataPath build -only-testing:AppTests/AppTests/<SuiteName> CODE_SIGNING_ALLOWED=NO` |
 | Format Swift sources in place | `make format` |
-| Lint (swift-format, links, credits, appcast, shellcheck, actionlint) | `make lint` |
+| Lint (swift-format, links, strings, credits, appcast, shellcheck, actionlint) | `make lint` |
 | Warnings-as-errors typecheck | `make type` |
 | Coverage gates (95%) | `scripts/coverage.sh --kit-only --min 95` and `scripts/coverage.sh --unit-only --min 95` |
 | Full CI equivalent | `make ci` |
