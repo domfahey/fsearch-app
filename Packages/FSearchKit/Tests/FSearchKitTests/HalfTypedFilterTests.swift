@@ -201,4 +201,81 @@ import Testing
         await m.refresh()
         #expect(names.calls == ["search foo"] && m.items.isEmpty)
     }
+
+    @Test func cancelledSearchFollowedByHalfTypedFilterClearsInsteadOfStrandingLoading() async {
+        let (started, startedCont) = AsyncStream.makeStream(of: Void.self)
+        let names = HookedSearchBackend { _ in
+            startedCont.yield()
+            try await Task.sleep(for: .seconds(30))
+            return SearchReply(tookUs: 1, hits: [])
+        }
+        let m = SearchModel(names: names, content: RecordingBackend())
+        m.query = "alpha"
+        let task = Task { await m.refresh() }
+        var startedIt = started.makeAsyncIterator()
+        _ = await startedIt.next()
+        #expect(m.phase == .loading)
+        task.cancel()
+        await task.value
+        m.query = "alpha size:"
+        await m.refresh()
+        #expect(m.phase == .idle && m.items.isEmpty && m.resultsAreCurrent)
+    }
+
+    @Test func activeInFlightSearchFollowedByHalfTypedFilterStillFinishes() async {
+        let (started, startedCont) = AsyncStream.makeStream(of: Void.self)
+        let gate = ContinuationGate()
+        let names = HookedSearchBackend { _ in
+            startedCont.yield()
+            await gate.wait()
+            return SearchReply(tookUs: 9, hits: [Hit(path: "/p/alpha.txt", kind: "file", size: 1, mtime: 1, score: 1)])
+        }
+        let m = SearchModel(names: names, content: RecordingBackend())
+        m.query = "alpha"
+        let first = Task { await m.refresh() }
+        var startedIt = started.makeAsyncIterator()
+        _ = await startedIt.next()
+        #expect(m.phase == .loading)
+        m.query = "alpha size:"
+        await m.refresh()
+        #expect(m.phase == .loading)
+        gate.release()
+        await first.value
+        #expect(m.phase == .results && m.items.map(\.path) == ["/p/alpha.txt"])
+    }
+}
+
+private final class HookedSearchBackend: SearchBackend, @unchecked Sendable {
+    private let onSearch: @Sendable (String) async throws -> SearchReply
+    init(_ onSearch: @escaping @Sendable (String) async throws -> SearchReply) { self.onSearch = onSearch }
+    func search(_ q: String, limit: Int) async throws -> SearchReply { try await onSearch(q) }
+    func grep(q: String, pattern: String, mode: GrepMode) async throws -> GrepReply { throw DaemonError.disconnected }
+    func status() async throws -> DaemonStatus { throw DaemonError.disconnected }
+    func ping() async throws {}
+}
+
+private final class ContinuationGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cont: CheckedContinuation<Void, Never>?
+    private var released = false
+
+    func wait() async {
+        await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+            let resumeNow = lock.withLock { () -> Bool in
+                if released { return true }
+                cont = c
+                return false
+            }
+            if resumeNow { c.resume() }
+        }
+    }
+
+    func release() {
+        let c = lock.withLock { () -> CheckedContinuation<Void, Never>? in
+            released = true
+            defer { cont = nil }
+            return cont
+        }
+        c?.resume()
+    }
 }
