@@ -57,6 +57,36 @@ grep -q -- "--source-ref refs/tags/v1.2.2" "$T/gh-args" \
   || { FAILN=$((FAILN+1)); echo "FAIL older DMG not attested by its tag"; }
 printf 'tampered old' > "$T/arch2/FSearch-1.2.2.dmg"
 run "tampered older DMG is refused" 1 "${B[@]}"
+# Pre-sign allowlist over every top-level entry in the archives directory.
+mkdir -p "$T/arch3"
+cp "$T/new/FSearch-1.2.4.dmg" "$T/arch3/FSearch-1.2.4.dmg"
+cp "$T/new/FSearch-1.2.4.dmg.sha256" "$T/arch3/FSearch-1.2.4.dmg.sha256"
+C=("$ROOT/scripts/appcast.sh" --changelog "$T/CHANGELOG.md" --dmg "$T/new/FSearch-1.2.4.dmg" 1.2.4 "$T/arch3")
+ln -s "$T/new/FSearch-1.2.4.dmg" "$T/arch3/FSearch-1.2.1.dmg"
+cp "$T/new/FSearch-1.2.4.dmg.sha256" "$T/arch3/FSearch-1.2.1.dmg.sha256"
+run "symlinked DMG is refused" 1 "${C[@]}"
+rm -f "$T/arch3/FSearch-1.2.1.dmg" "$T/arch3/FSearch-1.2.1.dmg.sha256"
+for bad in FSearch-1.2.1.DMG evil.ZIP evil.txz evil.yaa evil.tbz2 FSearch124-122.delta; do
+  printf 'x' > "$T/arch3/$bad"
+  run "unexpected entry $bad is refused" 1 "${C[@]}"
+  rm -f "$T/arch3/$bad"
+done
+mkdir -p "$T/arch3/extra"
+run "unexpected subdirectory is refused" 1 "${C[@]}"
+rmdir "$T/arch3/extra"
+printf 'notes' > "$T/arch3/FSearch-1.2.4.md"
+printf '<rss/>' > "$T/arch3/appcast.xml"
+printf 'ds' > "$T/arch3/.DS_Store"
+mkdir -p "$T/arch3/old_updates"
+run "allowed sidecars and old_updates dir sign" 0 "${C[@]}"
+printf '<rss/>' > "$T/arch3/custom-appcast.xml"
+run "custom -o output inside archives dir signs" 0 "${C[@]}" -o "$T/arch3/custom-appcast.xml"
+rm -f "$T/arch3/custom-appcast.xml"
+rmdir "$T/arch3/old_updates"
+mkdir -p "$T/real_old"
+ln -s "$T/real_old" "$T/arch3/old_updates"
+run "symlinked old_updates dir is refused" 1 "${C[@]}"
+rm -f "$T/arch3/old_updates"
 # generate_appcast on PATH must not be used (no GENERATE_APPCAST, none under build/).
 if [ ! -e "$ROOT/build/SourcePackages" ] && [ ! -e "$ROOT/build/release-derived/SourcePackages" ]; then
   (cd "$T/dl" && shasum -a 256 FSearch-1.2.3.dmg > FSearch-1.2.3.dmg.sha256)

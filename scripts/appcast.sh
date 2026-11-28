@@ -311,18 +311,39 @@ if [ -n "$DMG_SRC" ]; then
     cp -f "$DMG_SRC.sha256" "$TARGET_DMG.sha256"
   fi
 fi
+[ ! -L "$TARGET_DMG" ] || fail "refusing symlink in archives directory: $TARGET_DMG"
 [ -f "$TARGET_DMG" ] || fail "expected DMG at $TARGET_DMG (pass --dmg PATH or copy it there first)"
 [ -n "$DMG_SRC" ] || verify_dmg "$TARGET_DMG" "$VERSION"
+[ -n "$OUTPUT" ] || OUTPUT="$ARCHIVES_DIR/appcast.xml"
 
-# generate_appcast signs every archive in the folder (and builds deltas from them), so
-# each older one must verify too. Anything that isn't an FSearch-<V>.dmg is refused.
-while IFS= read -r archive; do
-  [ "$archive" -ef "$TARGET_DMG" ] && continue
-  name=$(basename "$archive")
-  [[ "$name" =~ ^FSearch-([0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?)\.dmg$ ]] \
-    || fail "unexpected archive $archive (only FSearch-<VERSION>.dmg files may be in $ARCHIVES_DIR)"
-  verify_dmg "$archive" "${BASH_REMATCH[1]}"
-done < <(find "$ARCHIVES_DIR" -maxdepth 1 -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.tar' -o -name '*.tar.*' -o -name '*.tgz' -o -name '*.tbz' -o -name '*.aar' -o -name '*.pkg' -o -name '*.mpkg' \) | sort)
+# generate_appcast scans and signs every archive it recognizes in $ARCHIVES_DIR (including
+# symlinks, uppercase extensions, .txz/.yaa, and pre-existing .delta files). Enforce a strict
+# allowlist over every top-level entry before signing anything.
+VERSION_RE='[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?'
+while IFS= read -r -d '' entry; do
+  name=$(basename "$entry")
+  [ ! -L "$entry" ] || fail "refusing symlink in archives directory: $entry"
+  if [ -d "$entry" ]; then
+    # Sparkle moves pruned updates into old_updates/ when present; refuse any other directory.
+    [ "$name" = "old_updates" ] || fail "unexpected directory in archives directory: $entry"
+    continue
+  fi
+  [ -f "$entry" ] || fail "unexpected non-regular entry in archives directory: $entry"
+  if [[ "$name" =~ ^FSearch-(${VERSION_RE})\.dmg$ ]]; then
+    [ "$entry" -ef "$TARGET_DMG" ] && continue
+    verify_dmg "$entry" "${BASH_REMATCH[1]}"
+  elif [[ "$name" =~ ^FSearch-(${VERSION_RE})\.dmg\.sha256$ ]] \
+    || [[ "$name" =~ ^FSearch-(${VERSION_RE})\.md$ ]] \
+    || [ "$name" = "appcast.xml" ] \
+    || [ "$name" = ".DS_Store" ] \
+    || [ "$entry" -ef "$OUTPUT" ]; then
+    continue
+  elif [[ "$name" == *.delta ]]; then
+    fail "unexpected delta file $entry (remove stale .delta files from $ARCHIVES_DIR; generate_appcast regenerates them from verified DMGs)"
+  else
+    fail "unexpected entry $entry (only verified FSearch-<VERSION>.dmg files and their .sha256/.md/appcast.xml sidecars may be in $ARCHIVES_DIR)"
+  fi
+done < <(find "$ARCHIVES_DIR" -mindepth 1 -maxdepth 1 -print0 | LC_ALL=C sort -z)
 
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
@@ -339,7 +360,6 @@ if [ -z "$DOWNLOAD_PREFIX" ]; then
   DOWNLOAD_PREFIX="https://github.com/domfahey/fsearch-app/releases/download/v$VERSION/"
 fi
 [ -n "$FULL_NOTES_URL" ] || FULL_NOTES_URL="https://github.com/domfahey/fsearch-app/releases/tag/v$VERSION"
-[ -n "$OUTPUT" ] || OUTPUT="$ARCHIVES_DIR/appcast.xml"
 
 # Snapshot any existing appcast before generate_appcast runs so retained older
 # releases keep their original per-version asset URLs.

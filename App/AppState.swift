@@ -259,14 +259,18 @@ final class AppState: ObservableObject {
             }
         case .failed(.disconnected):
             if let recoveryKey, let refreshOnRecovery { pendingRecoveryRefreshes[recoveryKey] = refreshOnRecovery }
-            // A restart is already running (and will refresh all waiting searches when it finishes): don't burn another token.
-            if daemon.isRestarting || disconnectRestartTask != nil { return }
-            // `restart()` re-registers only a daemon the app owns; a CLI daemon is just re-checked.
-            // Out of restarts: say the helper isn't answering, not "Starting search…".
-            guard status.restartBudget.spend() else {
-                pendingRecoveryRefreshes.removeAll()
-                daemon.markUnresponsive()
-                return
+            // A disconnect-recovery task is already awaiting the restart and will refresh all waiting searches.
+            if disconnectRestartTask != nil { return }
+            // Spend a budget token only when starting a new restart; if an external restart is already
+            // in flight, join it so waiting panel and window searches still refresh when it completes.
+            if !daemon.isRestarting {
+                // `restart()` re-registers only a daemon the app owns; a CLI daemon is just re-checked.
+                // Out of restarts: say the helper isn't answering, not "Starting search…".
+                guard status.restartBudget.spend() else {
+                    pendingRecoveryRefreshes.removeAll()
+                    daemon.markUnresponsive()
+                    return
+                }
             }
             disconnectRestartTask = Task { [weak self] in
                 await self?.daemon.restart()

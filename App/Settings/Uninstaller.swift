@@ -64,7 +64,7 @@ final class Uninstaller: ObservableObject {
     private let cliAgentInstalled: () -> Bool
     private let dataFolderIssues: (URL) -> [DataFolderCheck.Issue]
     private let resetShortcut: () -> Void
-    private let waitUntilStopped: @MainActor () async -> Void
+    private let waitUntilStopped: @MainActor () async -> Bool
 
     /// Creates an uninstaller.
     ///
@@ -79,7 +79,7 @@ final class Uninstaller: ObservableObject {
     ///   - cliAgentInstalled: Whether the CLI's login agent exists.
     ///   - dataFolderIssues: Problems with the data folder; a symlink or another owner stops it being trashed.
     ///   - resetShortcut: Clears the global shortcut.
-    ///   - waitUntilStopped: Waits briefly for an unregistered helper to exit before trashing `dataFolder`.
+    ///   - waitUntilStopped: Waits briefly for an unregistered helper to exit before trashing `dataFolder`, returning whether it stopped.
     init(
         helper: HelperService?, loginItem: LoginItemService?, workspace: Workspace, defaults: UserDefaults,
         dataFolder: URL, logFolder: URL,
@@ -87,7 +87,7 @@ final class Uninstaller: ObservableObject {
         cliAgentInstalled: @escaping () -> Bool = { FileManager.default.fileExists(atPath: DaemonManager.cliAgentPlist.path) },
         dataFolderIssues: @escaping (URL) -> [DataFolderCheck.Issue] = { DataFolderCheck.issues(in: $0) },
         resetShortcut: @escaping () -> Void,
-        waitUntilStopped: @escaping @MainActor () async -> Void = {}
+        waitUntilStopped: @escaping @MainActor () async -> Bool = { true }
     ) {
         self.helper = helper
         self.loginItem = loginItem
@@ -120,35 +120,37 @@ final class Uninstaller: ObservableObject {
         ping: @escaping () async throws -> Void,
         sleep: @escaping () async -> Void = { try? await Task.sleep(for: .milliseconds(100)) },
         maxAttempts: Int = 30
-    ) async {
+    ) async -> Bool {
         for _ in 0..<maxAttempts {
-            if (try? await ping()) == nil { return }
+            if (try? await ping()) == nil { return true }
             await sleep()
         }
+        return (try? await ping()) == nil
     }
 
     /// `ownership`: DaemonManager.dataOwnership, read before anything is unregistered.
     /// The helper is unregistered whenever it is registered at all (enabled or
     /// awaiting approval); the data folder is trashed only when this app's
     /// helper held it, the helper is gone, and no CLI login agent shares the folder.
-    func run(ownership: DataOwnership, daemon: DaemonManager? = nil) async {
+    func run(ownership: DataOwnership, daemon: DaemonManager? = nil, flushLog: @MainActor () -> Void = {}) async {
         guard phase != .running else { return }
         phase = .running
+        let helperWasRegistered = helper.map { $0.status == .enabled || $0.status == .requiresApproval } ?? false
         await daemon?.suspendForRemoval()
         defer { daemon?.finishRemoval() }
         var r = Report()
         var helperGone = true
-        var unregisteredHelper = false
 
         if let helper, helper.status == .enabled || helper.status == .requiresApproval {
             do {
                 try await helper.unregister()
-                unregisteredHelper = true
                 r.removed.append(String(localized: "The background helper (search index service)"))
             } catch {
                 helperGone = false
                 r.failures.append(String(localized: "Couldn't remove the background helper: \(error.localizedDescription)"))
             }
+        } else if helperWasRegistered {
+            r.removed.append(String(localized: "The background helper (search index service)"))
         }
 
         if let loginItem, loginItem.status == .enabled || loginItem.status == .requiresApproval {
@@ -177,16 +179,24 @@ final class Uninstaller: ObservableObject {
                             "The data folder (\(dataFolder.path)) was left alone: \(unsafe.message) Check it before removing it yourself."
                     ))
             } else if helperGone {
-                if unregisteredHelper { await waitUntilStopped() }
-                trash(dataFolder, String(localized: "The index and data folder"), into: &r)
+                if await waitUntilStopped() {
+                    trash(dataFolder, String(localized: "The index and data folder"), into: &r)
+                } else {
+                    r.kept.append(
+                        String(
+                            localized:
+                                "The data folder (\(dataFolder.path)) was left alone: the background helper didn't stop in time. Quit or restart your Mac, then move it to the Trash yourself."
+                        ))
+                }
             } else {
                 r.kept.append(String(localized: "The data folder was left in place because the helper is still registered."))
             }
         }
-        if logFolder != dataFolder { trash(logFolder, String(localized: "The debug search log"), into: &r) }
 
         for key in Self.defaultsKeys { defaults.removeObject(forKey: key) }
         resetShortcut()
+        flushLog()
+        if logFolder != dataFolder { trash(logFolder, String(localized: "The debug search log"), into: &r) }
         r.removed.append(String(localized: "The app's settings and recent files"))
 
         phase = .done(r)

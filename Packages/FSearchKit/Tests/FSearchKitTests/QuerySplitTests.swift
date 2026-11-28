@@ -184,3 +184,72 @@ import Testing
         #expect(QuerySplit.halfTypedExtends("\tfoo size:", answered: "foo siz"))
     }
 }
+
+@Suite struct QuerySplitUnicodeScalarTests {
+    @Test(arguments: [
+        ("grep:\u{0301}secret", "\u{0301}secret", GrepMode.literal),
+        ("content:\u{0301}x", "\u{0301}x", GrepMode.literal),
+        ("regex:\u{0301}a", "\u{0301}a", GrepMode.regex),
+        ("sym:\u{0301}Foo", "\u{0301}Foo", GrepMode.symbol),
+        ("symbol:\u{0301}Bar", "\u{0301}Bar", GrepMode.symbol),
+    ])
+    func combiningMarkAfterColonStillMatchesContentKey(_ query: String, _ pattern: String, _ mode: GrepMode) {
+        let c = QuerySplit.contentSearch(query)
+        #expect(c?.q == "" && c?.pattern == pattern && c?.mode == mode)
+    }
+
+    @Test func combiningMarkAdjacentToQuotesSplitsAndUnquotesByScalar() {
+        #expect(QuerySplit.unquoted("\"\u{0301}grep:secret\"") == "\u{0301}grep:secret")
+        #expect(QuerySplit.unquoted("grep:\"\u{0301}secret\"") == "grep:\u{0301}secret")
+        #expect(QuerySplit.unquoted("\"grep:\"\u{0301}secret") == "grep:\u{0301}secret")
+
+        #expect(QuerySplit.words("a \"\u{0301}b c\" grep:x") == ["a", "\"\u{0301}b c\"", "grep:x"])
+        #expect(QuerySplit.words("\"a\"\u{0301} grep:x") == ["\"a\"\u{0301}", "grep:x"])
+
+        let quotedVal = QuerySplit.contentSearch("grep:\"\u{0301}secret\"")
+        #expect(quotedVal?.q == "" && quotedVal?.pattern == "\u{0301}secret" && quotedVal?.mode == .literal)
+
+        let afterQuoted = QuerySplit.contentSearch("a \"\u{0301}b c\" grep:x")
+        #expect(afterQuoted?.q == "a \"\u{0301}b c\"" && afterQuoted?.pattern == "x" && afterQuoted?.mode == .literal)
+
+        let afterClosed = QuerySplit.contentSearch("\"a\"\u{0301} grep:secret")
+        #expect(afterClosed?.q == "\"a\"\u{0301}" && afterClosed?.pattern == "secret" && afterClosed?.mode == .literal)
+
+        let splitQuote = QuerySplit.contentSearch("\"grep:\"\u{0301}secret")
+        #expect(splitQuote?.q == "" && splitQuote?.pattern == "\u{0301}secret" && splitQuote?.mode == .literal)
+
+        // Combining mark before key name makes the key itself `\u{0301}grep`, matching the daemon.
+        #expect(QuerySplit.contentSearch("\"\u{0301}grep:secret\"") == nil)
+    }
+
+    @Test func combiningMarkAfterSpaceSplitsAtAsciiSpace() {
+        #expect(QuerySplit.words("foo \u{0301}grep:secret") == ["foo", "\u{0301}grep:secret"])
+        #expect(QuerySplit.words("foo \u{0301}ext:rs") == ["foo", "\u{0301}ext:rs"])
+
+        let separated = QuerySplit.contentSearch("foo \u{0301} grep:secret")
+        #expect(separated?.q == "foo \u{0301}" && separated?.pattern == "secret" && separated?.mode == .literal)
+    }
+
+    @Test func combiningMarkInLimitMatchesDaemonScalarParsing() {
+        #expect(QuerySplit.hasLimitWord("foo limit:\u{0301}5"))
+        #expect(QuerySplit.hasLimitWord("foo limit:\"\u{0301}5\""))
+        #expect(QuerySplit.limit("foo limit:\u{0301}5") == nil)
+        #expect(QuerySplit.limit("foo limit:\"\u{0301}5\"") == nil)
+        #expect(QuerySplit.limit("foo limit:\"\u{0301}\" limit:10") == 10)
+    }
+
+    @Test func combiningMarkAfterColonInFilterKeyIsSplitOff() {
+        #expect(QuerySplit.split("todo ext:\u{0301}rs") == ("todo", "ext:\u{0301}rs"))
+    }
+
+    @Test func halfTypedFilterHandlesCombiningMarkAfterSpaceWithoutMisSlicing() {
+        #expect(!QuerySplit.endsInHalfTypedFilter("foo \u{0301}size:"))
+        #expect(!QuerySplit.halfTypedExtends("foo \u{0301}size:", answered: "foo \u{0301}"))
+
+        #expect(QuerySplit.endsInHalfTypedFilter("foo \u{0301} size:"))
+        #expect(QuerySplit.halfTypedExtends("foo \u{0301} size:", answered: "foo \u{0301}"))
+        #expect(QuerySplit.halfTypedExtends("foo \u{0301} size:", answered: "foo \u{0301} si"))
+        #expect(QuerySplit.endsInHalfTypedFilter("foo \"\u{0301}\" size:", mode: .content))
+        #expect(QuerySplit.halfTypedExtends("foo \"\u{0301}\" size:", answered: "foo \"\u{0301}\""))
+    }
+}

@@ -23,6 +23,17 @@ public enum QuerySplit {
         "grep": .literal, "content": .literal, "regex": .regex, "sym": .symbol, "symbol": .symbol,
     ]
 
+    private static let spaceScalar = UnicodeScalar(0x20 as UInt8)  // " "
+    private static let quoteScalar = UnicodeScalar(0x22 as UInt8)  // "\""
+    private static let colonScalar = UnicodeScalar(0x3A as UInt8)  // ":"
+
+    /// Splits `s` on the first `U+003A` (`:`) scalar, matching Rust's `str::split_once(':')`.
+    private static func splitColon(_ s: String) -> (key: String, value: String)? {
+        let scalars = s.unicodeScalars
+        guard let colon = scalars.firstIndex(of: colonScalar) else { return nil }
+        return (String(scalars[..<colon]), String(scalars[scalars.index(after: colon)...]))
+    }
+
     /// The pattern keeps the typed spacing (only leading and trailing spaces
     /// are dropped); filters are returned joined by single spaces.
     ///
@@ -45,9 +56,10 @@ public enum QuerySplit {
     /// so searching inside files for literal filter syntax doesn't include the quotes.
     /// Normal quoted phrases (`"a b"`, `"hello"`) keep their quotes intact.
     private static func unescapeFilterWord(_ word: String) -> String {
-        guard word.hasPrefix("\""), word.hasSuffix("\""), word.count >= 2 else { return word }
-        let inner = String(word.dropFirst().dropLast())
-        return !inner.contains(" ") && isFilter(inner) ? inner : word
+        let scalars = word.unicodeScalars
+        guard scalars.count >= 2, scalars.first == quoteScalar, scalars.last == quoteScalar else { return word }
+        let inner = String(scalars.dropFirst().dropLast())
+        return !inner.unicodeScalars.contains(spaceScalar) && isFilter(inner) ? inner : word
     }
 
     /// The words of a query, quotes kept.
@@ -58,7 +70,9 @@ public enum QuerySplit {
     /// A word as the daemon reads it: quotes removed.
     ///
     /// - Parameter word: A word from ``words(_:)``.
-    static func unquoted(_ word: String) -> String { word.replacingOccurrences(of: "\"", with: "") }
+    static func unquoted(_ word: String) -> String {
+        String(word.unicodeScalars.filter { $0 != quoteScalar })
+    }
 
     /// A name query holding `grep:`/`content:`/`regex:`/`sym:`/`symbol:` is a
     /// content search: that word's value is the pattern (possibly empty; the last one wins,
@@ -71,8 +85,8 @@ public enum QuerySplit {
         for word in words(query) {
             let plain = unquoted(word)
             // An empty value counts too: the daemon still runs a content search for it.
-            if let colon = plain.firstIndex(of: ":"), let mode = contentKeys[String(plain[..<colon])] {
-                found = (String(plain[plain.index(after: colon)...]), mode)
+            if let (key, value) = splitColon(plain), let mode = contentKeys[key] {
+                found = (value, mode)
             } else {
                 rest.append(word)
             }
@@ -85,7 +99,7 @@ public enum QuerySplit {
     ///
     /// - Parameter query: The typed text.
     static func hasLimitWord(_ query: String) -> Bool {
-        words(query).contains { unquoted($0).hasPrefix("limit:") }
+        words(query).contains { splitColon(unquoted($0))?.key == "limit" }
     }
 
     /// The typed `limit:` value (the last one wins, as in the daemon), or nil
@@ -93,8 +107,10 @@ public enum QuerySplit {
     ///
     /// - Parameter query: The typed text.
     public static func limit(_ query: String) -> Int? {
-        guard let last = words(query).map(unquoted).last(where: { $0.hasPrefix("limit:") }) else { return nil }
-        return Int(last.dropFirst("limit:".count))
+        guard let last = words(query).compactMap({ splitColon(unquoted($0)) }).last(where: { $0.key == "limit" }) else {
+            return nil
+        }
+        return Int(last.value)
     }
 
     /// True if the query has a content key, so a name search would get lines back.
@@ -120,15 +136,14 @@ public enum QuerySplit {
     ///   - mode: The search mode. Outside names mode a word starting with a quote is text (see ``split(_:)``), never a
     ///     filter; the daemon drops a name query's quotes, so there it can still be one.
     static func endsInHalfTypedFilter(_ query: String, mode: SearchMode = .names) -> Bool {
-        guard query.last != " ", let last = words(query).last else { return false }
+        guard query.unicodeScalars.last != spaceScalar, let last = words(query).last else { return false }
         return isHalfTypedWord(last, mode: mode)
     }
 
     private static func isHalfTypedWord(_ last: String, mode: SearchMode) -> Bool {
-        if mode != .names && last.hasPrefix("\"") { return false }
+        if mode != .names && last.unicodeScalars.first == quoteScalar { return false }
         let plain = unquoted(last)
-        guard let colon = plain.firstIndex(of: ":") else { return false }
-        let key = String(plain[..<colon]), value = String(plain[plain.index(after: colon)...])
+        guard let (key, value) = splitColon(plain) else { return false }
         guard keys.contains(key) else { return false }
         if value.isEmpty { return true }
         switch key {
@@ -149,8 +164,10 @@ public enum QuerySplit {
     ///   - answered: The query the rows answer.
     ///   - mode: The search mode, as for ``endsInHalfTypedFilter(_:mode:)``.
     public static func halfTypedExtends(_ query: String, answered: String, mode: SearchMode = .names) -> Bool {
-        guard query.last != " ", let last = spacedWords(query).last, isHalfTypedWord(last.word, mode: mode) else { return false }
-        let before = String(query.dropLast(last.word.count))
+        guard query.unicodeScalars.last != spaceScalar, let last = spacedWords(query).last, isHalfTypedWord(last.word, mode: mode) else {
+            return false
+        }
+        let before = String(query.unicodeScalars.dropLast(last.word.unicodeScalars.count))
         let a = answered.trimmingCharacters(in: .whitespaces)
         if a == before.trimmingCharacters(in: .whitespaces) { return true }
         let lead = String(before.drop { $0.unicodeScalars.allSatisfy(CharacterSet.whitespaces.contains) })
@@ -166,23 +183,32 @@ public enum QuerySplit {
 
     /// Each word with the spaces typed before it.
     private static func spacedWords(_ s: String) -> [(space: String, word: String)] {
-        var out: [(String, String)] = [], space = "", cur = "", quoted = false
-        for c in s {
-            if c == " " && !quoted {
-                if cur.isEmpty { space.append(c) } else { out.append((space, cur)); (space, cur) = (" ", "") }
+        var out: [(String, String)] = []
+        var space = String.UnicodeScalarView()
+        var cur = String.UnicodeScalarView()
+        var quoted = false
+        for scalar in s.unicodeScalars {
+            if scalar == spaceScalar && !quoted {
+                if cur.isEmpty {
+                    space.append(scalar)
+                } else {
+                    out.append((String(space), String(cur)))
+                    space = String.UnicodeScalarView([spaceScalar])
+                    cur = String.UnicodeScalarView()
+                }
                 continue
             }
-            if c == "\"" { quoted.toggle() }
-            cur.append(c)
+            if scalar == quoteScalar { quoted.toggle() }
+            cur.append(scalar)
         }
-        if !cur.isEmpty { out.append((space, cur)) }
+        if !cur.isEmpty { out.append((String(space), String(cur))) }
         return out
     }
 
     /// `key:value` with a known key, no quote before the colon, and a value
     /// that isn't empty once its quotes are dropped.
     private static func isFilter(_ word: String) -> Bool {
-        guard let colon = word.firstIndex(of: ":"), keys.contains(String(word[..<colon])) else { return false }
-        return !unquoted(String(word[word.index(after: colon)...])).isEmpty
+        guard let (key, value) = splitColon(word), keys.contains(key) else { return false }
+        return !unquoted(value).isEmpty
     }
 }

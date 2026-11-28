@@ -135,11 +135,14 @@ struct SettingsView: View {
         }
     }
 
-    /// Captures daemon ownership before unregistering, runs the uninstaller, and refreshes the login item state.
+    /// Captures daemon ownership before unregistering, runs the uninstaller, and refreshes app, daemon, and login item state.
     @MainActor
     static func performRemoval(app: AppState, uninstaller: Uninstaller, loginItem: LoginItemModel) async {
         let ownership = app.daemon.dataOwnership
-        await uninstaller.run(ownership: ownership, daemon: app.daemon)
+        await uninstaller.run(ownership: ownership, daemon: app.daemon, flushLog: { app.log.flush() })
+        app.recentsChanged()
+        app.savedSearchesChanged()
+        await app.daemon.refreshOnce()
         loginItem.refresh()
     }
 

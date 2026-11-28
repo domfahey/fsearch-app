@@ -275,6 +275,21 @@ final class DaemonManager: ObservableObject {
         }
     }
 
+    /// Checks daemon status once without retrying (used after uninstall so the UI reflects
+    /// a stopped helper immediately instead of waiting 10 s for a daemon that was just removed).
+    func refreshOnce() async {
+        do { setState(.running(try await client.status())) } catch DaemonError.indexing {
+            setState(.indexing)
+        } catch is CancellationError {
+            return
+        } catch {
+            switch DaemonPlan.noAnswer(wasNeedingApproval: state == .needsApproval, ownStatus: service?.status) {
+            case .needsApproval: setState(.needsApproval)
+            case .failed: setState(.failed(String(localized: "The background helper isn't answering.")))
+            }
+        }
+    }
+
     /// Logs changes only; routine polls that find the same state stay quiet.
     private func setState(_ new: State) {
         if new != state {
