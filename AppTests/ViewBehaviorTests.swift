@@ -343,6 +343,38 @@ extension AppTests {
             #expect(texts.contains { $0.contains("was left alone") })
             #expect(texts.contains { $0.contains("disk locked") })
         }
+
+        @Test func performRemovalFlushesLogAndSyncsRecentsSavedSearchesAndDaemon() async {
+            let helper = FakeHelper(.enabled)
+            let env = TestEnv(helper: helper)
+            defer { env.tearDown() }
+            await env.app.daemon.refresh()
+            #expect(env.app.daemon.state == .running(Wire.status()))
+
+            env.app.debugMode = true
+            env.app.search.query = "needle"
+            await env.app.search.refresh()
+            env.app.openedRecent("/tmp/recent.txt")
+            env.app.savedSearches.save([SavedSearch(name: "Saved", query: "needle")])
+            let recentsGen = env.app.recentsGeneration
+            let savedGen = env.app.savedSearchesGeneration
+
+            env.daemon.onStatus = { _ in throw DaemonError.disconnected }
+            let item = FakeLoginItem(.enabled)
+            let login = LoginItemModel(service: item)
+            let u = Uninstaller(
+                helper: helper, loginItem: item, workspace: env.workspace, defaults: env.defaults,
+                dataFolder: data, logFolder: logs, exists: { _ in true }, cliAgentInstalled: { false }, resetShortcut: {})
+
+            await SettingsView.performRemoval(app: env.app, uninstaller: u, loginItem: login)
+
+            #expect(env.app.recentsGeneration == recentsGen + 1)
+            #expect(env.app.savedSearchesGeneration == savedGen + 1)
+            #expect(env.app.daemon.state == .failed("The background helper isn't answering."))
+            #expect(env.clock.slept.isEmpty)
+            #expect(login.display == .off)
+            #expect(FileManager.default.fileExists(atPath: env.app.log.file.path))
+        }
     }
 
     @Suite @MainActor

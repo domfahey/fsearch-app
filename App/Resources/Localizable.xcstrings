@@ -10869,6 +10869,58 @@
         }
       }
     },
+    "The data folder (%@) was left alone: the background helper didn't stop in time. Quit or restart your Mac, then move it to the Trash yourself.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Datenordner (%@) wurde unverändert gelassen: Der Hintergrunddienst wurde nicht rechtzeitig beendet. Beende FSearch oder starte deinen Mac neu und bewege den Ordner dann selbst in den Papierkorb."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The data folder (%@) was left alone: the background helper didn't stop in time. Quit or restart your Mac, then move it to the Trash yourself."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se dejó intacta la carpeta de datos (%@): el servicio en segundo plano no se detuvo a tiempo. Sal de FSearch o reinicia el Mac y muévela a la Papelera manualmente."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le dossier de données (%@) n’a pas été supprimé : l’utilitaire en arrière-plan ne s’est pas arrêté à temps. Quittez FSearch ou redémarrez votre Mac, puis placez-le vous-même dans la Corbeille."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "データフォルダ（%@）は残されました。バックグラウンドヘルパーが時間内に終了しなかったためです。FSearchを終了するかMacを再起動してから、手動でゴミ箱に入れてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "데이터 폴더(%@)는 그대로 두었습니다. 백그라운드 도우미가 제시간에 종료되지 않았습니다. FSearch를 종료하거나 Mac을 재시동한 다음 직접 휴지통으로 옮겨 주세요."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A pasta de dados (%@) foi mantida intacta: o auxiliar em segundo plano não parou a tempo. Encerre o FSearch ou reinicie o Mac e mova-a para o Lixo manualmente."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "数据文件夹（%@）已保留：后台辅助进程未能及时停止。请退出 FSearch 或重新启动 Mac，然后自行将其移到废纸篓。"
+          }
+        }
+      }
+    },
     "The data folder (%@) was left alone: the fsearch command-line tool's login agent (mt.nd.fsearch) is installed and its daemon uses the same index.": {
       "localizations": {
         "de": {

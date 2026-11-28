@@ -327,6 +327,7 @@ extension AppTests {
                 resetShortcut: {},
                 waitUntilStopped: {
                     events.append("waited:unreg=\(helper.unregistered):trashed=\(env.workspace.trashed.count)")
+                    return true
                 })
             await u.run(ownership: .ours)
             #expect(events == ["waited:unreg=1:trashed=0"])
@@ -343,24 +344,125 @@ extension AppTests {
         }
 
         @Test func waitUntilStoppedPollsUntilPingFailsOrCapsAtMaxAttempts() async {
-            // Immediate failure -> 0 sleeps.
+            // Immediate failure -> 0 sleeps, returns true.
             var sleeps = 0
-            await Uninstaller.waitUntilStopped(ping: { throw DaemonError.disconnected }, sleep: { sleeps += 1 }, maxAttempts: 5)
-            #expect(sleeps == 0)
+            let immediate = await Uninstaller.waitUntilStopped(
+                ping: { throw DaemonError.disconnected }, sleep: { sleeps += 1 }, maxAttempts: 5)
+            #expect(immediate && sleeps == 0)
 
-            // Answers twice, fails on 3rd -> 2 sleeps.
+            // Answers twice, fails on 3rd -> 2 sleeps, returns true.
             var pings = 0
-            await Uninstaller.waitUntilStopped(
+            let stopped = await Uninstaller.waitUntilStopped(
                 ping: {
                     pings += 1
                     if pings >= 3 { throw DaemonError.disconnected }
                 }, sleep: { sleeps += 1 }, maxAttempts: 5)
-            #expect(pings == 3 && sleeps == 2)
+            #expect(stopped && pings == 3 && sleeps == 2)
 
-            // Always answers -> capped at maxAttempts.
+            // Always answers -> capped at maxAttempts, returns false.
             sleeps = 0
-            await Uninstaller.waitUntilStopped(ping: {}, sleep: { sleeps += 1 }, maxAttempts: 3)
-            #expect(sleeps == 3)
+            let timedOut = await Uninstaller.waitUntilStopped(ping: {}, sleep: { sleeps += 1 }, maxAttempts: 3)
+            #expect(!timedOut && sleeps == 3)
+        }
+
+        @Test func dataFolderIsKeptWhenDaemonDoesNotStopInTime() async {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let helper = FakeHelper(.enabled)
+            let u = Uninstaller(
+                helper: helper, loginItem: nil, workspace: env.workspace, defaults: env.defaults,
+                dataFolder: data, logFolder: logs, exists: { _ in true }, cliAgentInstalled: { false },
+                resetShortcut: {}, waitUntilStopped: { false })
+            await u.run(ownership: .ours)
+            #expect(helper.unregistered == 1)
+            #expect(env.workspace.trashed == [logs])
+            guard case let .done(r) = u.phase else { Issue.record("not done"); return }
+            #expect(r.kept.count == 1)
+            #expect(r.kept[0].contains(data.path))
+            #expect(r.kept[0].contains("didn't stop in time"))
+        }
+
+        @Test func removalAfterAbortedRestartStillWaitsForDaemonStop() async {
+            let helper = FakeHelper(.enabled)
+            let env = TestEnv(helper: helper)
+            defer { env.tearDown() }
+            env.daemon.onPing = { _ in false }
+            var release: CheckedContinuation<Void, Never>?
+            helper.onUnregister = {
+                if helper.unregistered == 1 {
+                    await withCheckedContinuation { release = $0 }
+                }
+            }
+            let restart = Task { await env.app.daemon.restart() }
+            #expect(await eventually { release != nil })
+
+            var waited = 0
+            let u = Uninstaller(
+                helper: helper, loginItem: nil, workspace: env.workspace, defaults: env.defaults,
+                dataFolder: data, logFolder: logs, exists: { _ in true }, cliAgentInstalled: { false },
+                resetShortcut: {},
+                waitUntilStopped: {
+                    waited += 1
+                    return true
+                })
+            let removal = Task { await u.run(ownership: .ours, daemon: env.app.daemon) }
+            #expect(await eventually { u.phase == .running })
+            release?.resume()
+            await restart.value
+            await removal.value
+            #expect(waited == 1)
+            #expect(env.workspace.trashed.contains(data))
+            guard case let .done(r) = u.phase else { Issue.record("not done"); return }
+            #expect(r.removed.contains { $0.contains("background helper") })
+        }
+
+        @Test func defaultsAreClearedAndLogFlushedBeforeTrashingLogFolder() async {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            seed(env)
+            var events: [String] = []
+            let u = make(env, helper: FakeHelper(.enabled), login: nil)
+            await u.run(
+                ownership: .ours,
+                flushLog: {
+                    let debugStillSet = env.defaults.object(forKey: "debugMode") != nil
+                    let logAlreadyTrashed = env.workspace.trashed.contains(logs)
+                    events.append("flush:debug=\(debugStillSet):trashed=\(logAlreadyTrashed)")
+                })
+            #expect(events == ["flush:debug=false:trashed=false"])
+            #expect(env.workspace.trashed.contains(logs))
+        }
+
+        @Test func daemonRefreshOnceUpdatesStateWithoutRetrying() async {
+            let d = StubDaemon()
+            let clock = FakeClock()
+            let helper = FakeHelper(.enabled)
+            let m = DaemonManager(client: d, service: helper, clock: clock.clock)
+
+            d.onStatus = { _ in Wire.status(entries: 12) }
+            await m.refreshOnce()
+            #expect(m.state == .running(Wire.status(entries: 12)))
+            #expect(d.statuses == 1 && clock.slept.isEmpty)
+
+            d.onStatus = { _ in throw DaemonError.indexing("indexing") }
+            await m.refreshOnce()
+            #expect(m.state == .indexing)
+            #expect(d.statuses == 2 && clock.slept.isEmpty)
+
+            d.onStatus = { _ in throw CancellationError() }
+            await m.refreshOnce()
+            #expect(m.state == .indexing)
+
+            d.onStatus = { _ in throw DaemonError.disconnected }
+            await m.refreshOnce()
+            #expect(m.state == .failed("The background helper isn't answering."))
+            #expect(d.statuses == 4 && clock.slept.isEmpty)
+
+            let approvalHelper = FakeHelper(.requiresApproval)
+            let approvalManager = DaemonManager(client: d, service: approvalHelper, clock: clock.clock)
+            await approvalManager.refreshOnce()
+            #expect(approvalManager.state == .needsApproval)
+            #expect(clock.slept.isEmpty)
         }
 
         @Test func reentrantRunIsIgnoredWhileAlreadyRunning() async {
