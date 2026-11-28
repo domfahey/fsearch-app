@@ -164,8 +164,11 @@ final class OnboardingFlow: ObservableObject {
             facts.fullDiskAccess = s.fullDiskAccess
         case .indexing:
             facts.helperEnabled = true
+            facts.indexReady = false
+            entries = 0
         case .needsApproval, .failed:
             facts.helperEnabled = false
+            facts.indexReady = false
         case .checking:
             break
         }
@@ -231,15 +234,28 @@ struct OnboardingView: View {
                     Label("Ready to search", systemImage: "checkmark.circle.fill").font(.title3.bold()).foregroundStyle(.green)
                         .accessibilityAddTraits(.isHeader).accessibilityIdentifier("onboardingHeading")
                     Text("\(flow.entries.formatted()) files indexed.").foregroundStyle(.secondary)
+                } else if flow.busy {
+                    Text("Indexing your disk").font(.title3.bold())
+                        .accessibilityAddTraits(.isHeader).accessibilityIdentifier("onboardingHeading")
+                    ProgressView("Starting background helper…").controlSize(.small)
+                } else if case let .failed(message) = daemon.state {
+                    Text("Indexing your disk").font(.title3.bold())
+                        .accessibilityAddTraits(.isHeader).accessibilityIdentifier("onboardingHeading")
+                    Text(message).foregroundStyle(.red).font(.callout).fixedSize(horizontal: false, vertical: true)
+                    Button("Try Again") { flow.startDaemon() }
+                } else if daemon.state == .needsApproval {
+                    Text("Indexing your disk").font(.title3.bold())
+                        .accessibilityAddTraits(.isHeader).accessibilityIdentifier("onboardingHeading")
+                    Button("Open Login Items Settings") { daemon.openLoginItems() }
                 } else {
                     Text("Indexing your disk").font(.title3.bold())
                         .accessibilityAddTraits(.isHeader).accessibilityIdentifier("onboardingHeading")
                     ProgressView().progressViewStyle(.linear)
                     Text(Onboarding.indexingLine(entries: flow.entries)).foregroundStyle(.secondary)
                 }
-                Text(Onboarding.tryItLine(shortcut: shortcut?.description))
+                Text(Onboarding.tryItLine(shortcut: shortcut?.description)).fixedSize(horizontal: false, vertical: true)
             }
-            Spacer()
+            Spacer(minLength: 0)
             HStack {
                 Spacer()
                 Button(flow.step == .indexing ? "Done" : "Continue", action: flow.next)
@@ -248,7 +264,7 @@ struct OnboardingView: View {
                     .accessibilityIdentifier("onboardingPrimaryButton")
             }
         }
-        .padding(20).frame(width: 440, height: 300)
+        .padding(20).frame(minWidth: 440, maxWidth: 440, minHeight: 340)
         .respectingReduceMotion(AccessibilityStyle.resolved(override: styleOverride, reduceMotion: reduceMotion).suppressesAnimations)
         .onAppear { flow.appeared() }
         // The loop belongs to the view, so closing the window cancels it.
@@ -305,17 +321,18 @@ struct OnboardingView: View {
         Text(
             "Without Full Disk Access, macOS hides Desktop, Documents, Downloads, Mail, Messages and iCloud Drive from every app. Nothing leaves your Mac: the index stays on this computer."
         )
+        .fixedSize(horizontal: false, vertical: true)
         switch Onboarding.fullDiskAccessStepMode(
             owns: daemon.ownsDaemon, running: flow.daemonRunning, fullDiskAccess: flow.facts.fullDiskAccess)
         {
         case .granted:
             Label("Full Disk Access is on", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
         case .bundledHelper:
-            Text(FDACopy.help).font(.callout).foregroundStyle(.secondary)
+            Text(FDACopy.help).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Button(FDACopy.buttonLabel, action: flow.turnOnFullDiskAccess)
             skipButton
         case .existingDaemon:
-            Text(FDACopy.existingDaemonHelp).font(.callout).foregroundStyle(.secondary)
+            Text(FDACopy.existingDaemonHelp).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Button("Open Privacy Settings", action: flow.openPrivacySettings)
             skipButton
         }

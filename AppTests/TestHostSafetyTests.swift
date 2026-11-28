@@ -204,19 +204,23 @@ extension AppTests {
             #expect(!env.app.options.testMode)
         }
 
-        /// Every TestEnv shares one temp-backed defaults suite, emptied for each and never writing to ~/Library/Preferences.
-        @Test func testEnvsShareOneEmptiedSuite() {
+        /// Every TestEnv gets its own temp-backed defaults suite inside its temp folder, never touching ~/Library/Preferences.
+        @Test func testEnvsUseIsolatedTempSuites() {
             let a = TestEnv()
             a.defaults.set("x", forKey: "editor")
             a.defaults.synchronize()
             let name = a.suite
-            a.tearDown()
+            let dirA = a.dir
             let b = TestEnv()
             defer { b.tearDown() }
-            #expect(b.suite == name)
+            #expect(b.suite != name)
+            #expect(name.hasPrefix(dirA.path))
+            #expect(b.suite.hasPrefix(b.dir.path))
             #expect(b.suite.hasPrefix(NSTemporaryDirectory()))
             #expect(AppDefaults.testSuiteName.hasPrefix(NSTemporaryDirectory()))
             #expect(b.defaults.object(forKey: "editor") == nil)
+            a.tearDown()
+            #expect(!FileManager.default.fileExists(atPath: dirA.path))
             let prefs = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Preferences")
             let names = (try? FileManager.default.contentsOfDirectory(atPath: prefs.path)) ?? []
             #expect(!names.contains { $0.hasPrefix("com.domfahey.fsearch.apptests.") })

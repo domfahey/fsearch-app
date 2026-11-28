@@ -83,7 +83,10 @@ struct ResultRow: View {
         let style = AccessibilityStyle(increasedContrast: increasedContrast)
         if !word.isEmpty, let r = a.range(of: word, options: .caseInsensitive) {
             a[r].backgroundColor = .yellow.opacity(style.highlightOpacity)
-            if style.underlinesMatch { a[r].underlineStyle = .single }
+            if style.underlinesMatch {
+                a[r].foregroundColor = .black
+                a[r].underlineStyle = .single
+            }
         }
         return a
     }

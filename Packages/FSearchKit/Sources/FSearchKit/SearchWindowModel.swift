@@ -116,11 +116,19 @@ public final class SearchWindowModel {
         SavedSearch(name: name, query: query, mode: mode, options: options, chips: chips, sort: sort, isBuiltIn: false)
     }
 
+    /// Optimistically removes rows whose raw file path is in `paths` (for example right after Move to Trash,
+    /// before FSEvents catches up on the daemon).
+    public func removeRows(matchingPaths paths: Set<String>) {
+        guard !paths.isEmpty else { return }
+        rawRows.removeAll { paths.contains($0.path) }
+        rows.removeAll { paths.contains($0.path) }
+    }
+
     /// Runs the search for the current query, mode, options, and chips, publishing sorted rows when finished.
     public func refresh() async {
         let halfTyped = !options.regex && QuerySplit.endsInHalfTypedFilter(query, mode: mode)
         let currentKey = RequestKey(query: query, mode: mode, options: options, chips: chips)
-        if halfTyped, let prev = requestedKey, prev.mode == mode, prev.options == options, prev.chips == chips,
+        if halfTyped, phase != .loading, let prev = requestedKey, prev.mode == mode, prev.options == options, prev.chips == chips,
             QuerySplit.halfTypedExtends(query, answered: prev.query, mode: mode)
         {
             return

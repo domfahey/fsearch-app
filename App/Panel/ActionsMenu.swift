@@ -31,9 +31,9 @@ enum ActionsMenu {
                 let errored = app.actionErrorCount != errors
                 // A file that turned out to be gone is not a recent.
                 if kind.recordsRecent && !errored { app.openedRecent(path) }
-                // Like ↵: the user went to another app, so the launcher goes away,
-                // unless the action already failed and its error line needs reading.
-                if kind.hidesPanel(errored: errored) { app.panel.hide(returnFocus: true) }
+                // Like ↵: the user went to another app, so the launcher goes away without
+                // returning focus to `previousApp` (which would fight the newly opened app).
+                if kind.hidesPanel(errored: errored) { app.panel.hide(returnFocus: false) }
             }
             i.target = t
             i.representedObject = t  // the item keeps its target alive

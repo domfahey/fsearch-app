@@ -42,7 +42,10 @@ struct DaemonMessageLine: View {
                 sleep: { try await Task.sleep(for: .seconds(2)) },
                 step: {
                     await daemon.refresh()
-                    await model.refresh()
+                    // Run refresh in an uncancelled task so flipping from `.indexing` -> `.running` + `.loading`
+                    // doesn't cancel the final fetch mid-flight once indexing finishes.
+                    let refreshTask = Task { @MainActor in await model.refresh() }
+                    await refreshTask.value
                 })
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didChangeOcclusionStateNotification)) { note in

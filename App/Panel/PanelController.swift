@@ -59,30 +59,37 @@ final class PanelController: PanelHost {
         override func resignKey() {
             super.resignKey()
             if staysUpWithoutKey { return }
-            // Quick Look takes key while it previews; the launcher stays up behind it.
-            if QuickLookSource.shared.isPreviewing { return }
-            // The user moved to another app, so don't pull focus back.
+            // Quick Look takes key while it previews for this panel; the launcher stays up behind it.
+            if QuickLookSource.shared.isPreviewing && (QuickLookSource.shared.owner == nil || QuickLookSource.shared.isOwned(by: self)) {
+                return
+            }
+            // The user moved to another app or window, so don't pull focus back.
             PanelController.shared.hide(returnFocus: false)
         }
 
         // Quick Look looks for a controller up the key window's responder chain.
         override func acceptsPreviewPanelControl(_ panel: QLPreviewPanel!) -> Bool { true }
         override func beginPreviewPanelControl(_ panel: QLPreviewPanel!) {
-            MainActor.assumeIsolated { QuickLookSource.shared.attach(panel) }
+            MainActor.assumeIsolated { QuickLookSource.shared.attach(panel, owner: self) }
         }
         override func endPreviewPanelControl(_ panel: QLPreviewPanel!) {
-            MainActor.assumeIsolated { QuickLookSource.shared.detach(panel) }
-            // The preview closed: give the keyboard back to the launcher.
-            DispatchQueue.main.async { self.restoreFocusAfterPreview() }
+            let previewClosed = MainActor.assumeIsolated {
+                QuickLookSource.shared.detach(panel, owner: self)
+                return panel?.isVisible != true
+            }
+            // The preview closed (or focus left): restore focus to the launcher when Quick Look dismissed,
+            // even if AppKit transiently transferred key status to an open Search Window / Settings mainWindow.
+            DispatchQueue.main.async { self.restoreFocusAfterPreview(previewClosed: previewClosed) }
         }
 
         /// Restores keyboard focus to the panel if FSearch is still active, or hides it otherwise.
         func restoreFocusAfterPreview(
+            previewClosed: Bool = false,
             isActive: Bool = NSApp.isActive, keyWindow: NSWindow? = NSApp.keyWindow,
             makeKey: (() -> Void)? = nil, hide: (() -> Void)? = nil
         ) {
             guard isVisible else { return }
-            if isActive && (keyWindow == nil || keyWindow === self) {
+            if isActive && (previewClosed || keyWindow == nil || keyWindow === self) {
                 if let makeKey { makeKey() } else { self.makeKey() }
             } else {
                 if let hide { hide() } else { PanelController.shared.hide(returnFocus: false) }
@@ -97,7 +104,10 @@ final class PanelController: PanelHost {
     func install(app: AppState, registerHotkey: ((@escaping @MainActor () -> Void) -> Void)? = nil) {
         self.app = app
         if Self.registersGlobalHotkey(app.options) {
-            let toggle: @MainActor () -> Void = { [weak self] in self?.toggle(app: app) }
+            let toggle: @MainActor () -> Void = { [weak self] in
+                guard let self else { return }
+                app.togglePrimarySearch(panel: self)
+            }
             if let registerHotkey {
                 registerHotkey(toggle)
             } else {
@@ -218,7 +228,9 @@ final class PanelController: PanelHost {
         defer { previousApp = nil }
         session.hidden(PanelState(query: app.search.query, mode: app.search.mode, selection: selection), at: now())
         p.orderOut(nil)
-        QuickLookSource.shared.close()
+        if QuickLookSource.shared.owner == nil || QuickLookSource.shared.isOwned(by: p) {
+            QuickLookSource.shared.close()
+        }
         restoreFocusOnHide(except: p, returnFocus: returnFocus)
     }
 
@@ -324,9 +336,11 @@ final class PanelController: PanelHost {
         case let .copyPath(i): FileActions.copyPath(items[i].path)
         case let .showActions(i): ActionsMenu.show(for: items[i], in: panel, app: app, geometry: geometry)
         }
-        // The same rule as the ⌘K menu: going to another app puts the launcher
-        // away, unless the action failed at once and its error needs reading.
-        if PanelInput.menuAction(for: effect)?.hidesPanel(errored: app.actionErrorCount != errors) == true { hide() }
+        // The same rule as the ⌘K menu: going to another app puts the launcher away without
+        // activating `previousApp` (which would steal focus from the opened app when another FSearch window is open).
+        if PanelInput.menuAction(for: effect)?.hidesPanel(errored: app.actionErrorCount != errors) == true {
+            hide(returnFocus: false)
+        }
     }
 }
 

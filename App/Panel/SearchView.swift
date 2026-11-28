@@ -284,33 +284,42 @@ struct SearchView: View {
                     let currentRows = PanelRows(files: current.count, query: model.query, mode: model.mode)
                     if let id = PanelInput.rowID(at: viewState.state.selection, shown: current, rows: currentRows) { proxy.scrollTo(id) }
                 }
+                // Scroll back to the selected top row when a new query/mode answer lands even if selection stayed 0.
+                .onChange(of: PanelInput.answer(model)) { old, new in
+                    guard old.query != new.query || old.mode != new.mode else { return }
+                    let current = self.shown
+                    let currentRows = PanelRows(files: current.count, query: model.query, mode: model.mode)
+                    if let id = PanelInput.rowID(at: viewState.state.selection, shown: current, rows: currentRows) { proxy.scrollTo(id) }
+                }
             }
             Divider()
             HStack(spacing: 14) {
                 AppMenuButton(menu: menu)
-                if app.debugMode, let us = model.lastTookUs {
-                    let ms = String(format: "%.1f", Double(us) / 1000)
-                    Text("\(ms) ms · \(model.items.count) results").foregroundStyle(.secondary)
-                }
                 if let err = app.actionError {
                     Text(err).foregroundStyle(.red).lineLimit(1).accessibilityIdentifier("actionError")
-                }
-                Spacer()
-                switch footer {
-                case .none:
-                    EmptyView()
-                case .command:
-                    hint("Open", "↵")
-                case .fallback:
-                    hint("Search", "↵")
-                case .launchable:
-                    hint("Reveal in Finder", "↵")
-                    Text("⌘K → Open to launch").foregroundStyle(.secondary).accessibilityIdentifier("launchHint")
-                    hint("Actions", "⌘K")
-                case let .file(openAtLine):
-                    hint(openAtLine ? "Open at line" : "Open", "↵")
-                    hint("Reveal in Finder", "⌘↵")
-                    hint("Actions", "⌘K")
+                    Spacer(minLength: 0)
+                } else {
+                    if app.debugMode, let us = model.lastTookUs {
+                        let ms = String(format: "%.1f", Double(us) / 1000)
+                        Text("\(ms) ms · \(model.items.count) results").foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                    switch footer {
+                    case .none:
+                        EmptyView()
+                    case .command:
+                        hint("Open", "↵")
+                    case .fallback:
+                        hint("Search", "↵")
+                    case .launchable:
+                        hint("Reveal in Finder", "↵")
+                        Text("⌘K → Open to launch").foregroundStyle(.secondary).lineLimit(1).accessibilityIdentifier("launchHint")
+                        hint("Actions", "⌘K")
+                    case let .file(openAtLine):
+                        hint(openAtLine ? "Open at line" : "Open", "↵")
+                        hint("Reveal in Finder", "⌘↵")
+                        hint("Actions", "⌘K")
+                    }
                 }
             }
             .font(.system(size: 12)).padding(.horizontal, 12).padding(.vertical, 8)
@@ -322,8 +331,14 @@ struct SearchView: View {
         .onAppear { focusSearchField() }
         .onChange(of: viewState.focusTrigger) { focusSearchField() }
         .onChange(of: viewState.state.selection) { onSelect(viewState.state.selection) }
-        // An open preview follows the selected file: a new selection, or new rows under the same one.
+        // Clamp selection if rows shrink (e.g. trashing the last row or deleted Recents).
+        .onChange(of: rows.count) { _, count in
+            let clamped = count > 0 ? min(max(0, viewState.state.selection), count - 1) : 0
+            if viewState.state.selection != clamped { viewState.state.selection = clamped }
+        }
+        // An open preview follows the selected file only while the panel is visible and owns Quick Look.
         .onChange(of: PanelInput.previewPath(at: selection, shown: shown, rows: rows)) { _, path in
+            guard isVisible(), QuickLookSource.shared.owner == nil || QuickLookSource.shared.owner is PanelController.Panel else { return }
             QuickLookSource.shared.follow(path.map(FileActions.url))
         }
         // ↑/↓ pressed in Quick Look, which holds the keyboard while it is up.
@@ -398,6 +413,7 @@ struct SearchView: View {
     private func fallbackRow(_ label: Text, _ icon: String, selected: Bool, action: @escaping () -> Void) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon).frame(width: 22).accessibilityHidden(true); label
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, 12).padding(.vertical, 6)
         .selectionHighlight(selected: selected, cornerRadius: 8, style: a11y)
@@ -413,8 +429,8 @@ struct SearchView: View {
     private func hint(_ t: LocalizedStringKey, _ k: String) -> some View {
         let strokeColor: Color = a11y.increasedContrast ? .primary : .secondary
         return HStack(spacing: 4) {
-            Text(t)
-            Text(verbatim: k).padding(.horizontal, 5)
+            Text(t).lineLimit(1)
+            Text(verbatim: k).lineLimit(1).padding(.horizontal, 5)
                 .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(strokeColor.opacity(a11y.hintStrokeOpacity)))
         }
     }

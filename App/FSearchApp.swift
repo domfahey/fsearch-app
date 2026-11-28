@@ -47,12 +47,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var openSearch: ((SearchURL) -> Void)?
     private var pending: SearchURL?
 
-    /// Connects incoming URLs to the panel and replays any URL that arrived during cold launch.
+    /// Connects incoming URLs to FSearch and replays any URL that arrived during cold launch.
     func connect(panel: PanelHost, app: AppState) {
-        openSearch = { panel.show(app: app, search: $0) }
+        openSearch = { app.openSearchURL($0, panel: panel) }
         if let search = pending {
             pending = nil
-            panel.show(app: app, search: search)
+            app.openSearchURL(search, panel: panel)
         }
     }
 
@@ -101,8 +101,11 @@ struct MenuContent: View {
     }
 
     var body: some View {
-        Button("Search…") { PanelController.shared.toggle(app: app) }
+        Button("Search…") { app.openPrimarySearch() }
         Button("New Search Window…") { SearchWindowManager.open(app, "") }
+        if app.searchInterface == .window {
+            Button("Launcher Panel…") { PanelController.shared.toggle(app: app) }
+        }
         Divider()
         if app.debugMode {
             Button("Index Details…") { openWindow("index") }
@@ -207,7 +210,7 @@ enum LaunchGuards {
     }
 
     private static var reopenObserver: NSObjectProtocol?
-    /// Opens the search panel when another launch of FSearch.app hands over to this running instance.
+    /// Opens the user's preferred search UI when another launch of FSearch.app hands over to this running instance.
     static func observeReopen(
         panel: PanelHost = PanelController.shared, app: AppState,
         center: NotificationCenter = DistributedNotificationCenter.default()
@@ -215,7 +218,7 @@ enum LaunchGuards {
         guard reopenObserver == nil else { return }
         reopenObserver = center.addObserver(forName: reopenNotification, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated {
-                if !panel.isVisible { panel.showExternally(app: app) }
+                app.reopenPrimarySearch(panel: panel)
             }
         }
     }

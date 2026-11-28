@@ -42,6 +42,7 @@ final class Uninstaller: ObservableObject {
     static let defaultsKeys = [
         "editor", "debugMode", "onboarded", "skippedFullDiskAccess", "dismissedFullDiskAccessReminder", "recentPaths",
         "helperIdentity", "updateReminderVisible", SearchFilesIntent.allowContentSearchKey, SavedSearchStore.storageKey,
+        SearchInterface.storageKey, SearchWindowView.columnCustomizationKey,
         // Sparkle's own.
         "SUEnableAutomaticChecks", "SUHasLaunchedBefore", "SULastCheckTime", "SUSendProfileInfo",
         "SUAutomaticallyUpdate", "SUScheduledCheckInterval", "SUSkippedVersion", "SULastProfileSubmissionDate",

@@ -14,7 +14,7 @@ struct AppMenuButton: View {
         } label: {
             HStack(spacing: 5) {
                 Image(systemName: "gearshape").accessibilityHidden(true)
-                Text(verbatim: "FSearch")
+                Text(verbatim: "FSearch").lineLimit(1)
             }
             .foregroundStyle(a11y.increasedContrast ? .primary : .secondary)
             .padding(.horizontal, 5).padding(.vertical, 2)

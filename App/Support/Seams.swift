@@ -101,6 +101,8 @@ struct DaemonClock: Sendable {
 protocol PanelHost: AnyObject, Sendable {
     /// Whether the panel is on screen.
     var isVisible: Bool { get }
+    /// Toggles the panel open or closed.
+    func toggle(app: AppState)
     /// Shows the panel, resuming the recent query.
     func show(app: AppState)
     /// Shows the panel for a request from outside (another launch of the app): like ``show(app:)``,

@@ -105,9 +105,30 @@ struct SearchURLTests {
             SearchURL(query: "TODO & FIXME = 100% #1 c++ \"a b\"", mode: .content),
             SearchURL(query: "café 日本語 🔍", mode: .symbols),
             SearchURL(query: "in:~/Developer ", mode: .names),
+            SearchURL(query: "report", mode: .names, interface: .window),
+            SearchURL(query: "TODO", mode: .content, interface: .panel),
         ]
         for sample in samples {
             #expect(SearchURL.parse(sample.url) == sample, "round-trip failed for \(sample)")
         }
+    }
+
+    @Test func supportsSearchInterfaceOverrideAndResolution() {
+        #expect(SearchInterface.resolve(nil) == .panel)
+        #expect(SearchInterface.resolve("") == .panel)
+        #expect(SearchInterface.resolve("unknown") == .panel)
+        #expect(SearchInterface.resolve("panel") == .panel)
+        #expect(SearchInterface.resolve("WINDOW") == .window)
+        #expect(SearchInterface.parseOverride("panel") == .panel)
+        #expect(SearchInterface.parseOverride("Window") == .window)
+        #expect(SearchInterface.parseOverride("invalid") == nil)
+        #expect(!SearchInterface.panel.displayName.isEmpty)
+        #expect(!SearchInterface.window.displayName.isEmpty)
+
+        #expect(parse("fsearch://search?q=doc&ui=window") == SearchURL(query: "doc", mode: .names, interface: .window))
+        #expect(parse("fsearch://search?q=doc&mode=content&ui=PANEL") == SearchURL(query: "doc", mode: .content, interface: .panel))
+        #expect(parse("fsearch://search?q=doc&ui=bogus") == nil)
+        #expect(parse("fsearch://search?q=doc&ui=") == nil)
+        #expect(SearchURL(query: "doc", interface: .window).url.absoluteString == "fsearch://search?q=doc&ui=window")
     }
 }

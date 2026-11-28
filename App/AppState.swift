@@ -8,6 +8,8 @@ import SwiftUI
 final class AppState: ObservableObject {
     /// How this process was launched.
     let options: LaunchOptions
+    /// Backing defaults store for settings, recents, saved searches, and window column layout.
+    let defaults: UserDefaults
     /// The daemon's lifecycle and state.
     let daemon: DaemonManager
     /// The search box's model.
@@ -24,12 +26,19 @@ final class AppState: ObservableObject {
     @AppStorage("debugMode") var debugMode = false
     /// Editor for content hits: `Editor.rawValue`, "" for none.
     @AppStorage("editor") var editorRaw = ""
+    /// Default search UI (`SearchInterface.rawValue`): `"panel"` (classic) or `"window"` (Everything-style).
+    @AppStorage(SearchInterface.storageKey) var searchInterfaceRaw = SearchInterface.panel.rawValue
     /// Lets the Shortcuts "Search Files" action search inside files and find definitions (off by default).
     @AppStorage(SearchFilesIntent.allowContentSearchKey) var allowShortcutsContentSearch = false
     /// The chosen editor, if any.
     var editor: Editor? {
         get { Editor(rawValue: editorRaw) }
         set { editorRaw = newValue?.rawValue ?? "" }
+    }
+    /// The preferred search interface opened by the global shortcut, menu-bar **Search…**, reopen, and `fsearch://` links.
+    var searchInterface: SearchInterface {
+        get { SearchInterface.resolve(searchInterfaceRaw) }
+        set { searchInterfaceRaw = newValue.rawValue }
     }
     /// Bumped whenever the recents may have changed (a file opened or trashed),
     /// so the panel re-reads `recents.paths`, which aren't observable themselves.
@@ -128,6 +137,7 @@ final class AppState: ObservableObject {
         fullDiskAccessGranted: @escaping () -> Bool = { false }
     ) {
         self.options = options
+        self.defaults = defaults
         daemon = DaemonManager(
             client: control, service: helper, cliAgentInstalled: cliAgentInstalled, clock: clock,
             socketHolder: socketHolder, peer: peer, defaults: defaults, helperIdentity: helperIdentity,
@@ -139,6 +149,7 @@ final class AppState: ObservableObject {
         self.makeWindowBackends = makeWindowBackends ?? { (names, content) }
         _debugMode = AppStorage(wrappedValue: false, "debugMode", store: defaults)
         _editorRaw = AppStorage(wrappedValue: "", "editor", store: defaults)
+        _searchInterfaceRaw = AppStorage(wrappedValue: SearchInterface.panel.rawValue, SearchInterface.storageKey, store: defaults)
         _allowShortcutsContentSearch = AppStorage(wrappedValue: false, SearchFilesIntent.allowContentSearchKey, store: defaults)
         search.onSearched = { [weak self] e in
             guard let self, self.debugMode else { return }
@@ -160,6 +171,50 @@ final class AppState: ObservableObject {
             self?.searchSettled(phase, recoveryKey: ObjectIdentifier(model), refreshOnRecovery: { [weak model] in await model?.refresh() })
         }
         return model
+    }
+
+    /// Toggles the user's preferred search interface (global shortcut).
+    func togglePrimarySearch(panel: PanelHost = PanelController.shared, windows: SearchWindowManager = .shared) {
+        switch searchInterface {
+        case .panel:
+            panel.toggle(app: self)
+        case .window:
+            windows.toggle(app: self)
+        }
+    }
+
+    /// Opens or brings forward the user's preferred search interface (menu-bar **Search…**).
+    ///
+    /// Unlike the global shortcut toggle, clicking **Search…** from the menu bar always surfaces search
+    /// rather than hiding an already-open Search Window.
+    func openPrimarySearch(panel: PanelHost = PanelController.shared, windows: SearchWindowManager = .shared) {
+        switch searchInterface {
+        case .panel:
+            panel.toggle(app: self)
+        case .window:
+            _ = windows.activateOrOpen(app: self)
+        }
+    }
+
+    /// Brings forward or opens the user's preferred search interface when another launch hands over to this instance.
+    func reopenPrimarySearch(panel: PanelHost = PanelController.shared, windows: SearchWindowManager = .shared) {
+        switch searchInterface {
+        case .panel:
+            if !panel.isVisible { panel.showExternally(app: self) }
+        case .window:
+            windows.activateOrOpen(app: self)
+        }
+    }
+
+    /// Opens an incoming `fsearch://` search URL in either its explicit `ui=` target or the user's preferred interface.
+    func openSearchURL(_ search: SearchURL, panel: PanelHost = PanelController.shared, windows: SearchWindowManager = .shared) {
+        switch search.interface ?? searchInterface {
+        case .panel:
+            panel.show(app: self, search: search)
+        case .window:
+            if panel.isVisible { panel.hide(returnFocus: false) }
+            _ = windows.openWindow(app: self, initialQuery: search.query, initialMode: search.mode)
+        }
     }
 
     /// The restart budget and recovery check (shared by every panel open).

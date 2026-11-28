@@ -61,6 +61,7 @@ final class StubDaemon: DaemonControl, @unchecked Sendable {
     private let lock = NSLock()
     private var _onPing: @Sendable (Int) -> Bool = { _ in true }
     private var _onStatus: @Sendable (Int) throws -> DaemonStatus = { _ in Wire.status() }
+    private var _onStatusAsync: (@Sendable (Int) async throws -> DaemonStatus)?
     private var _onSearch: @Sendable (String) throws -> SearchReply = { _ in SearchReply(tookUs: 1000, hits: []) }
     private var _onSearchAsync: (@Sendable (String) async throws -> SearchReply)?
     private var _onGrep: @Sendable (String, String, GrepMode) throws -> GrepReply = { _, _, _ in Wire.grep([]) }
@@ -77,6 +78,10 @@ final class StubDaemon: DaemonControl, @unchecked Sendable {
     var onStatus: @Sendable (Int) throws -> DaemonStatus {
         get { locked { _onStatus } }
         set { locked { _onStatus = newValue } }
+    }
+    var onStatusAsync: (@Sendable (Int) async throws -> DaemonStatus)? {
+        get { locked { _onStatusAsync } }
+        set { locked { _onStatusAsync = newValue } }
     }
     var onSearch: @Sendable (String) throws -> SearchReply {
         get { locked { _onSearch } }
@@ -104,9 +109,10 @@ final class StubDaemon: DaemonControl, @unchecked Sendable {
     }
 
     func status() async throws -> DaemonStatus {
-        let (n, f) = locked {
-            _statuses += 1; return (_statuses, _onStatus)
+        let (n, f, fa) = locked {
+            _statuses += 1; return (_statuses, _onStatus, _onStatusAsync)
         }
+        if let fa { return try await fa(n) }
         return try f(n)
     }
 
@@ -279,6 +285,7 @@ final class FakePanel: PanelHost {
     var isVisible = false
     private(set) var shows = 0, hides = 0, externalShows = 0
     private(set) var openedSearches: [SearchURL] = []
+    func toggle(app: AppState) { isVisible ? hide(returnFocus: true) : show(app: app) }
     func show(app: AppState) { shows += 1; isVisible = true }
     func showExternally(app: AppState) {
         externalShows += 1
@@ -292,17 +299,25 @@ final class FakePanel: PanelHost {
     func hide(returnFocus: Bool) { hides += 1; isVisible = false }
 }
 
-/// One app with fakes everywhere, a throwaway defaults suite in the temp directory
-/// and a temp folder. AppTests run serialized, so every TestEnv shares one fixed
-/// temp-backed suite, emptied when each starts and ends, never touching `~/Library/Preferences`.
+/// One app with fakes everywhere, an isolated throwaway defaults suite inside its
+/// own temp folder (so cfprefsd never bleeds state across tests and never touches
+/// `~/Library/Preferences`).
 @MainActor
 final class TestEnv {
-    /// Temp-directory suite path (without `.plist` so `removePersistentDomain` clears it);
-    /// cfprefsd writes only inside `NSTemporaryDirectory()`, never `~/Library/Preferences`.
-    nonisolated static let unitSuite: String =
-        URL(fileURLWithPath: NSTemporaryDirectory())
-        .appendingPathComponent("com.domfahey.fsearch.apptests.unit").path
-    let suite = TestEnv.unitSuite
+    /// Per-process temp directory holding standalone test suites, deleted on process exit.
+    private nonisolated static let suitesDir: URL = {
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("com.domfahey.fsearch.apptests.suites-\(UUID().uuidString.prefix(8))")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        atexit { try? FileManager.default.removeItem(at: TestEnv.suitesDir) }
+        return dir
+    }()
+    /// Fresh temp-directory suite path for standalone defaults tests outside `TestEnv`;
+    /// isolated per call so `cfprefsd` never bleeds state across tests and never touches `~/Library/Preferences`.
+    nonisolated static var unitSuite: String {
+        suitesDir.appendingPathComponent("unit-\(UUID().uuidString.prefix(8))").path
+    }
+    let suite: String
     let defaults: UserDefaults
     let dir: URL
     let daemon: StubDaemon
@@ -315,9 +330,10 @@ final class TestEnv {
 
     init(helper: FakeHelper? = nil, daemon: StubDaemon = StubDaemon()) {
         _ = TestEnv.sweptStaleSuites
-        defaults = TestEnv.emptySuite(suite)
         dir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("fsa-unit-\(UUID().uuidString.prefix(8))")
         try! FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        suite = dir.appendingPathComponent("com.domfahey.fsearch.apptests.unit").path
+        defaults = UserDefaults(suiteName: suite)!
         self.daemon = daemon
         self.helper = helper
         let options = LaunchOptions(
@@ -352,12 +368,11 @@ final class TestEnv {
         FileActions.workspace = FakeWorkspace()
         FileActions.pasteboard = NSPasteboard(name: NSPasteboard.Name("com.domfahey.fsearch.apptests.idle"))
         pasteboard.releaseGlobally()
-        _ = TestEnv.emptySuite(suite)
+        defaults.removePersistentDomain(forName: suite)
         try? FileManager.default.removeItem(at: dir)
     }
 
-    /// Once per run: cleans up any legacy plists an older checkout left in `~/Library/Preferences`,
-    /// and removes the temp-backed unit suite plist at process exit.
+    /// Once per run: cleans up any legacy plists an older checkout left in `~/Library/Preferences`.
     static let sweptStaleSuites: Void = {
         let prefs = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Preferences")
         let names = (try? FileManager.default.contentsOfDirectory(atPath: prefs.path)) ?? []
@@ -365,12 +380,16 @@ final class TestEnv {
         where n.hasPrefix("com.domfahey.fsearch.apptests.") && n.hasSuffix(".plist") {
             try? FileManager.default.removeItem(at: prefs.appendingPathComponent(n))
         }
-        atexit { TestEnv.deletePlist(TestEnv.unitSuite) }
     }()
 
     /// The suite, emptied and flushed, so cfprefsd holds no stale keys for it.
     nonisolated static func emptySuite(_ name: String) -> UserDefaults {
         let d = UserDefaults(suiteName: name)!
+        if let domain = d.persistentDomain(forName: name) {
+            for key in domain.keys {
+                d.removeObject(forKey: key)
+            }
+        }
         d.removePersistentDomain(forName: name)
         d.synchronize()
         return d
