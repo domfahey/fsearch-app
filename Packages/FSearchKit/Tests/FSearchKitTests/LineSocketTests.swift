@@ -494,6 +494,63 @@ final class RawServer: @unchecked Sendable {
         #expect(LineSocket.remainingMilliseconds(.seconds(Int64(Int32.max))) == Int32.max)
         #expect(LineSocket.remainingMilliseconds(.milliseconds(15)) == 15)
     }
+
+    @Test func acceptedReplyIsReturnedEvenIfDeadlineElapsesDuringAccepts() throws {
+        let srv = RawServer { fd, _ in
+            while RawServer.readLine(fd) { RawServer.send(fd, "ok\n") }
+            close(fd)
+        }
+        defer { srv.stop() }
+        let reply = try LineSocket(path: srv.path, timeout: 0.05).roundTrip(req()) { _ in
+            Thread.sleep(forTimeInterval: 0.08)
+            return true
+        }
+        #expect(String(decoding: reply, as: UTF8.self) == "ok")
+        #expect(throws: DaemonError.timeout) {
+            try LineSocket(path: srv.path, timeout: 0.05).roundTrip(req()) { _ in
+                Thread.sleep(forTimeInterval: 0.08)
+                return false
+            }
+        }
+    }
+
+    @Test func slowPartialWritesTimeOutAtDeadline() {
+        let srv = RawServer { fd, _ in
+            _ = RawServer.readLine(fd)
+            close(fd)
+        }
+        defer { srv.stop() }
+        var io = LineSocket.IO.live
+        io.write = { fd, buf, count in
+            let n = Darwin.write(fd, buf, min(count, 1))
+            Thread.sleep(forTimeInterval: 0.04)
+            return n
+        }
+        #expect(throws: DaemonError.timeout) {
+            try LineSocket(path: srv.path, timeout: 0.03, io: io).roundTrip(req("0123456789"))
+        }
+    }
+
+    @Test func exactMaxLineBytesSucceedsAcrossChunkBoundary() throws {
+        let srv = RawServer { fd, n in
+            _ = RawServer.readLine(fd)
+            if n == 1 {
+                RawServer.send(fd, "abcd")
+                Thread.sleep(forTimeInterval: 0.01)
+                RawServer.send(fd, "\n")
+            } else {
+                RawServer.send(fd, "abcde")
+                Thread.sleep(forTimeInterval: 0.1)
+            }
+            close(fd)
+        }
+        defer { srv.stop() }
+        let line = try LineSocket(path: srv.path, timeout: 1, maxLineBytes: 4).roundTrip(req())
+        #expect(String(decoding: line, as: UTF8.self) == "abcd")
+        #expect(throws: DaemonError.badReply("reply line too large")) {
+            try LineSocket(path: srv.path, timeout: 1, maxLineBytes: 4).roundTrip(req())
+        }
+    }
 }
 
 final class Locked<T>: @unchecked Sendable {
