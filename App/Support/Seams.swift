@@ -48,16 +48,27 @@ struct FileInfo: Equatable, Sendable {
     var isExecutable = false
     /// A folder Finder shows as one file: an app, an .rtfd, an .xcodeproj.
     var isPackage = false
+    /// Resolved target path if the path is a symbolic link; nil otherwise.
+    var resolvedPath: String? = nil
+    /// Finder alias (excluding POSIX symlinks, which also set `isAliasFileKey`).
+    var isAlias = false
 
     /// The path's info, or nil if nothing is there. Read-only.
     @MainActor
     static func onDisk(_ path: String) -> FileInfo? {
         var isDir: ObjCBool = false
         guard FileManager.default.fileExists(atPath: path, isDirectory: &isDir) else { return nil }
+        let url = URL(fileURLWithPath: path)
+        let values = try? url.resourceValues(forKeys: [.isSymbolicLinkKey, .isAliasFileKey])
+        let isSymlink = values?.isSymbolicLink == true
+        let isAlias = (values?.isAliasFile == true) && !isSymlink
+        let resolvedPath = isSymlink ? url.resolvingSymlinksInPath().path : nil
         return FileInfo(
             isDirectory: isDir.boolValue,
             isExecutable: !isDir.boolValue && FileManager.default.isExecutableFile(atPath: path),
-            isPackage: isDir.boolValue && NSWorkspace.shared.isFilePackage(atPath: path))
+            isPackage: isDir.boolValue && NSWorkspace.shared.isFilePackage(atPath: path),
+            resolvedPath: resolvedPath,
+            isAlias: isAlias)
     }
 }
 

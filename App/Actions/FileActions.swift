@@ -67,6 +67,15 @@ enum FileActions {
         return (lineURL, appURL)
     }
 
+    /// Whether `path` should be revealed rather than executed (by extension, symlink target, Finder alias, or executable bit).
+    private static func isLaunchable(_ path: String) -> Bool {
+        if Launchable.revealsOnReturn(path: path, isDirectory: false, isExecutable: false) { return true }
+        guard let info = workspace.fileInfo(atPath: path) else { return false }
+        return Launchable.revealsOnReturn(
+            path: path, isDirectory: info.isDirectory, isExecutable: info.isExecutable,
+            resolvedPath: info.resolvedPath, isAlias: info.isAlias)
+    }
+
     /// What ↵ does on `item`: reveals launchables, or opens content hits at a line when the chosen editor supports it.
     /// Does at most one LaunchServices app lookup for both answers.
     static func returnBehavior(_ item: ResultItem, editor: Editor?) -> (reveals: Bool, opensAtLine: Bool) {
@@ -79,10 +88,7 @@ enum FileActions {
                 }
             return (reveals: false, opensAtLine: lineJump)
         }
-        let info = Launchable.needsFileCheck(item.path) ? workspace.fileInfo(atPath: item.path) : nil
-        let reveals = Launchable.revealsOnReturn(
-            path: item.path, isDirectory: info?.isDirectory ?? false, isExecutable: info?.isExecutable ?? false)
-        return (reveals: reveals, opensAtLine: false)
+        return (reveals: isLaunchable(item.path), opensAtLine: false)
     }
 
     /// True when opening `item` with `editor` will jump directly to a line via the editor's URL scheme.
@@ -109,7 +115,7 @@ enum FileActions {
     static func open(_ item: ResultItem, editor: Editor?, onError: @escaping @MainActor (String) -> Void) -> Bool {
         guard exists(item.path, onError) else { return false }
         let file = url(item.path)
-        guard let target = editorTarget(for: item, editor: editor) else {
+        guard let e = editor, let target = editorTarget(for: item, editor: e) else {
             let opened = openInDefaultApp(file, onError: onError)
             // The editor is installed but isn't the genuine app: say so (unless the open itself failed, which says more).
             if opened, let e = editor, let app = installedEditorApp(for: item, editor: e), !isGenuine(app, e) {
@@ -120,11 +126,24 @@ enum FileActions {
             }
             return opened
         }
-        // The editor may fail to take the URL (no handler, editor damaged): fall back to the default app.
+        let editorName = e.displayName
+        // The editor may fail to take the URL (no handler, editor damaged): fall back to the default app,
+        // unless the file is launchable — reveal in Finder instead of executing it.
         workspace.open([target.url], withApplicationAt: target.app) { error in
             guard let error else { return }
-            Log.actions.error("editor open failed: \(error.localizedDescription, privacy: .private); falling back to the default app")
-            Task { @MainActor in _ = FileActions.openInDefaultApp(file, onError: onError) }
+            Log.actions.error("editor open failed: \(error.localizedDescription, privacy: .private)")
+            Task { @MainActor in
+                if FileActions.isLaunchable(item.path) {
+                    _ = FileActions.reveal(item.path, onError: onError)
+                    onError(
+                        String(
+                            localized:
+                                "Couldn't open “\(DisplaySafe.name(file.lastPathComponent))” in \(editorName); revealed in Finder instead."
+                        ))
+                } else {
+                    _ = FileActions.openInDefaultApp(file, onError: onError)
+                }
+            }
         }
         return true
     }
@@ -141,14 +160,11 @@ enum FileActions {
     }
 
     /// ↵ reveals, rather than opens, a result that would launch something (an
-    /// app, a script, an installer: see `Launchable`). A content hit that the
-    /// chosen editor opens runs nothing, so it opens. Only an extensionless
-    /// path is looked up on disk.
+    /// app, a script, an installer, a symlink/alias to one: see `Launchable`). A
+    /// content hit that the chosen editor opens runs nothing, so it opens.
     static func revealsOnReturn(_ item: ResultItem, editor: Editor?) -> Bool {
         if editorApp(for: item, editor: editor) != nil { return false }
-        let info = Launchable.needsFileCheck(item.path) ? workspace.fileInfo(atPath: item.path) : nil
-        return Launchable.revealsOnReturn(
-            path: item.path, isDirectory: info?.isDirectory ?? false, isExecutable: info?.isExecutable ?? false)
+        return isLaunchable(item.path)
     }
 
     /// Shows the file in Finder. False (reported through `onError`) if the file is gone.

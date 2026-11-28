@@ -230,6 +230,8 @@ final class FakeWorkspace: Workspace {
     /// Paths that don't exist. Any other path that isn't on disk either is a
     /// plain file, so tests can use made-up paths like /p/x.txt.
     var missing: Set<String> = []
+    /// Canned `FileInfo` overrides by path (checked after `missing`, before disk).
+    var fileInfos: [String: FileInfo] = [:]
     var trashError: Error?
     /// Apps whose code signature check fails. Any other app passes.
     var untrustedApps: Set<URL> = []
@@ -266,6 +268,7 @@ final class FakeWorkspace: Workspace {
 
     func fileInfo(atPath path: String) -> FileInfo? {
         if missing.contains(path) { return nil }
+        if let info = fileInfos[path] { return info }
         return FileInfo.onDisk(path) ?? FileInfo()
     }
 

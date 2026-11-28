@@ -279,6 +279,71 @@ extension AppTests {
             #expect(!FileActions.revealsOnReturn(script, editor: .vscode))
         }
 
+        @Test func symlinksAndAliasesToLaunchablesReveal() throws {
+            let env = TestEnv()
+            defer { env.tearDown() }
+
+            let commandTarget = env.file("run.command", "#!/bin/sh\necho hi\n")
+            let linkToCommand = env.dir.appendingPathComponent("readme.txt").path
+            try FileManager.default.createSymbolicLink(atPath: linkToCommand, withDestinationPath: commandTarget)
+            #expect(FileActions.revealsOnReturn(.file(Wire.hit(linkToCommand)), editor: nil))
+            #expect(FileActions.returnBehavior(.file(Wire.hit(linkToCommand)), editor: nil) == (reveals: true, opensAtLine: false))
+
+            let plainTarget = env.file("plain.md", "# plain\n")
+            let linkToPlain = env.dir.appendingPathComponent("alias.txt").path
+            try FileManager.default.createSymbolicLink(atPath: linkToPlain, withDestinationPath: plainTarget)
+            #expect(!FileActions.revealsOnReturn(.file(Wire.hit(linkToPlain)), editor: nil))
+            #expect(FileActions.returnBehavior(.file(Wire.hit(linkToPlain)), editor: nil) == (reveals: false, opensAtLine: false))
+
+            let execTarget = env.file("bin/tool", "#!/bin/sh\n")
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: execTarget)
+            let linkToExec = env.dir.appendingPathComponent("doc.txt").path
+            try FileManager.default.createSymbolicLink(atPath: linkToExec, withDestinationPath: execTarget)
+            #expect(FileActions.revealsOnReturn(.file(Wire.hit(linkToExec)), editor: nil))
+            #expect(FileActions.returnBehavior(.file(Wire.hit(linkToExec)), editor: nil) == (reveals: true, opensAtLine: false))
+
+            env.workspace.fileInfos["/p/readme.txt"] = FileInfo(isAlias: true)
+            #expect(FileActions.revealsOnReturn(.file(Wire.hit("/p/readme.txt")), editor: nil))
+            #expect(FileActions.returnBehavior(.file(Wire.hit("/p/readme.txt")), editor: nil) == (reveals: true, opensAtLine: false))
+        }
+
+        @Test func editorFailureOnLaunchableContentHitRevealsInsteadOfDefaultOpen() async throws {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            env.workspace.apps[Editor.vscode.bundleId] = vscodeApp
+            env.workspace.openWithError = TestError("no handler")
+            let script = ResultItem.line(path: "/p/run.command", match: Match(line: 1, text: "echo"))
+            var errors: [String] = []
+
+            #expect(FileActions.open(script, editor: .vscode) { errors.append($0) })
+            #expect(
+                await eventually {
+                    errors == ["Couldn't open “run.command” in Visual Studio Code; revealed in Finder instead."]
+                })
+            #expect(env.workspace.opened.isEmpty)
+            #expect(env.workspace.revealed == [[URL(fileURLWithPath: "/p/run.command")]])
+        }
+
+        @Test func editorFailureOnSymlinkToLaunchableRevealsInsteadOfDefaultOpen() async throws {
+            let env = TestEnv()
+            defer { env.tearDown() }
+            let commandTarget = env.file("run.command", "#!/bin/sh\necho hi\n")
+            let symlink = env.dir.appendingPathComponent("notes.txt").path
+            try FileManager.default.createSymbolicLink(atPath: symlink, withDestinationPath: commandTarget)
+            env.workspace.apps[Editor.vscode.bundleId] = vscodeApp
+            env.workspace.openWithError = TestError("no handler")
+            let hit = ResultItem.line(path: symlink, match: Match(line: 1, text: "echo"))
+            var errors: [String] = []
+
+            #expect(FileActions.open(hit, editor: .vscode) { errors.append($0) })
+            #expect(
+                await eventually {
+                    errors == ["Couldn't open “notes.txt” in Visual Studio Code; revealed in Finder instead."]
+                })
+            #expect(env.workspace.opened.isEmpty)
+            #expect(env.workspace.revealed == [[URL(fileURLWithPath: symlink)]])
+        }
+
         @Test func trashGoesThroughTheWorkspace() throws {
             let env = TestEnv()
             defer { env.tearDown() }

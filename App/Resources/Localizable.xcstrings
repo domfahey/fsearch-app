@@ -1821,6 +1821,58 @@
         }
       }
     },
+    "Couldn't open “%@” in %@; revealed in Finder instead.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "„%1$@“ konnte nicht in %2$@ geöffnet werden; stattdessen im Finder angezeigt."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't open “%1$@” in %2$@; revealed in Finder instead."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo abrir «%1$@» en %2$@; se mostró en el Finder."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible d’ouvrir « %1$@ » dans %2$@ ; affiché dans le Finder à la place."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%1$@”を%2$@で開けなかったため、代わりにFinderで表示しました。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%1$@”을(를) %2$@에서 열 수 없어 대신 Finder에서 표시했습니다."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível abrir “%1$@” em %2$@; exibido no Finder."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法在 %2$@ 中打开“%1$@”，已在访达中显示。"
+          }
+        }
+      }
+    },
     "Couldn't remove the background helper: %@": {
       "localizations": {
         "de": {

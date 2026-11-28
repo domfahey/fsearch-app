@@ -9,8 +9,9 @@ public enum Launchable {
         "app", "command", "tool", "terminal", "workflow", "pkg", "mpkg", "scpt", "applescript", "webloc", "inetloc", "fileloc",
         // Installs a configuration profile, pane, screen saver or plugin, or runs an action or shortcut, when opened.
         "mobileconfig", "prefpane", "saver", "qlgenerator", "osax", "action", "shortcut",
-        // Runs a Java program or Web Start app; a script bundle; a disk image that mounts and may hold an installer.
+        // Runs a Java program or Web Start app; a script bundle; disk images, archives, and internet locations.
         "jar", "jnlp", "scptd", "dmg",
+        "sparseimage", "sparsebundle", "iso", "img", "cdr", "xip", "url", "vncloc", "ftploc", "afploc", "mailloc",
     ]
 
     /// The extension of the last path component, lowercased; "" for none (a leading dot is no extension).
@@ -25,9 +26,19 @@ public enum Launchable {
 
     /// True if ↵ should reveal `path` in Finder instead of opening it. An
     /// extensionless executable file would run in Terminal; a folder never does.
-    public static func revealsOnReturn(path: String, isDirectory: Bool, isExecutable: Bool) -> Bool {
+    /// Finder aliases and symlinks to launchable targets also reveal.
+    public static func revealsOnReturn(
+        path: String, isDirectory: Bool, isExecutable: Bool,
+        resolvedPath: String? = nil, isAlias: Bool = false
+    ) -> Bool {
+        if isAlias { return true }
         let ext = pathExtension(path)
         if extensions.contains(ext) { return true }
+        if let resolvedPath, resolvedPath != path {
+            let resolvedExt = pathExtension(resolvedPath)
+            if extensions.contains(resolvedExt) { return true }
+            if resolvedExt.isEmpty && !isDirectory && isExecutable { return true }
+        }
         return ext.isEmpty && !isDirectory && isExecutable
     }
 }

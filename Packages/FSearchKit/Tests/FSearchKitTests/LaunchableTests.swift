@@ -48,4 +48,32 @@ import Testing
         #expect(!Launchable.needsFileCheck("/x/a.txt"))
         #expect(!Launchable.needsFileCheck("/x/A.app"))
     }
+
+    @Test func additionalMountAndLocationExtensionsReveal() {
+        for ext in [
+            "sparseimage", "sparsebundle", "iso", "img", "cdr", "xip", "url", "vncloc", "ftploc", "afploc", "mailloc",
+        ] {
+            #expect(Launchable.revealsOnReturn(path: "/x/Thing.\(ext)", isDirectory: false, isExecutable: false), "\(ext)")
+            #expect(Launchable.revealsOnReturn(path: "/x/THING.\(ext.uppercased())", isDirectory: false, isExecutable: false), "\(ext)")
+        }
+    }
+
+    @Test func aliasesAndSymlinksToLaunchablesReveal() {
+        #expect(Launchable.revealsOnReturn(path: "/x/readme.txt", isDirectory: false, isExecutable: false, isAlias: true))
+        #expect(
+            Launchable.revealsOnReturn(
+                path: "/x/readme.txt", isDirectory: false, isExecutable: false, resolvedPath: "/x/run.command"))
+        #expect(
+            Launchable.revealsOnReturn(
+                path: "/x/doc.txt", isDirectory: false, isExecutable: true, resolvedPath: "/x/bin/tool"))
+        #expect(
+            !Launchable.revealsOnReturn(
+                path: "/x/doc.txt", isDirectory: false, isExecutable: false, resolvedPath: "/x/bin/README"))
+        #expect(
+            !Launchable.revealsOnReturn(
+                path: "/x/doc.txt", isDirectory: true, isExecutable: true, resolvedPath: "/x/bin"))
+        #expect(
+            !Launchable.revealsOnReturn(
+                path: "/x/alias.txt", isDirectory: false, isExecutable: false, resolvedPath: "/x/plain.md"))
+    }
 }
